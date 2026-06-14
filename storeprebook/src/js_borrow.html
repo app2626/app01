@@ -283,16 +283,63 @@ function clearlist() {
 
 function searchForm(){
   var id_user = document.getElementById('userID').value
-   google.script.run.withSuccessHandler(formserach).readIdUser(id_user)
+  var id_user2 = document.getElementById('userID2').value
+  var id_user3 = document.getElementById('userID3').value
+  
+  if(id_user == "" || id_user2 == "" || id_user3 == ""){
+    Swal.fire('กรุณากรอกข้อมูลให้ครบทุกช่อง', '', 'warning')
+    return
+  }
+  
+  $('#spinner2').show()
+  $('#loginText').hide()
+  
+  google.script.run.withSuccessHandler(formserach).readIdUser(id_user)
 }
-function formserach(result){
-    if(result !=null){
-      document.querySelector('#showAdmin').innerHTML = result[1]
-       }else{
-            Swal.fire(
-            'กรอกรหัสสาขาไม่ถูกต้อง',
-          )
-       }
 
+function formserach(result){
+    $('#spinner2').hide()
+    $('#loginText').show()
+    
+    if(result != null){
+      document.querySelector('#showAdmin').innerHTML = result[1]
+      document.querySelector('#showUserDetail').innerHTML = `ผู้เบิก: ${document.getElementById('userID2').value} (${document.getElementById('userID3').value})`
+      
+      $('#loginPage').hide()
+      $('#mainPage').fadeIn()
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'ยินดีต้อนรับ',
+        text: result[1],
+        timer: 1500,
+        showConfirmButton: false
+      })
+    } else {
+      Swal.fire('รหัสสาขาไม่ถูกต้อง', 'กรุณาตรวจสอบอีกครั้ง', 'error')
+    }
+}
+
+function logout(){
+  Swal.fire({
+    title: 'ยืนยันการออกจากระบบ?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'ออกจากระบบ',
+    cancelButtonText: 'ยกเลิก'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      $('#mainPage').hide()
+      $('#loginPage').fadeIn()
+      document.getElementById('userID').value = ''
+      document.getElementById('userID2').value = ''
+      document.getElementById('userID3').value = ''
+      document.querySelector('#showAdmin').innerHTML = ''
+      document.querySelector('#showUserDetail').innerHTML = ''
+      clearlist()
+    }
+  })
 }
 </script>
