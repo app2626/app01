@@ -1,22 +1,20 @@
-<div class="container-fluid p-2">
-<div class="row">
-  <div class="col-md-9">
-      <table id="datatable" class="display responsive nowrap" style="width:100%">
-        <thead class="bg-info"></thead>
+<div class="p-2">
+<div class="flex flex-col md:flex-row gap-4">
+  <div class="w-full md:w-3/4">
+      <table id="datatable" class="display responsive nowrap w-full">
+        <thead class="bg-emerald-500 text-white"></thead>
       </table>
   </div>
-  <div class="col-md-3">
-       <h6>รายการเบิก</h6>
-          <div id="mycart" class="cartlist"> </div>
-                <div class="btn-control">
-        <button onclick="clearlist()" class="btn btn-outline-danger btn-sm me-1">
+  <div class="w-full md:w-1/4">
+       <h6 class="font-bold mb-3 text-gray-700">รายการเบิก</h6>
+          <div id="mycart" class="space-y-2 max-h-[500px] overflow-y-auto mb-4"> </div>
+                <div class="flex justify-end space-x-2">
+        <button onclick="clearlist()" class="px-3 py-1.5 border border-red-500 text-red-500 hover:bg-red-50 rounded text-xs transition-colors">
           ยกเลิก
         </button>
-        <button  class="btn btn-outline-success btn-sm" onclick="saveForm()">
+        <button  class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs transition-colors flex items-center" onclick="saveForm()">
           ยืนยัน
-          <div class="spinner-border spinner-border-sm" role="status" id="btnSave1" style="display:none">
-  <span class="visually-hidden">Loading...</span>
-</div>
+          <div class="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full ml-1" id="btnSave1" style="display:none"></div>
         </button>
       </div>
   </div>
@@ -31,7 +29,23 @@
       google.script.run.withSuccessHandler(showTable).getData()
       google.script.run.withSuccessHandler(showTable2).getData()
       google.script.run.withSuccessHandler(populateUserList).getUserList()
+      checkSession()
     });
+
+    function checkSession() {
+      const session = localStorage.getItem('storeSession')
+      if (session) {
+        const data = JSON.parse(session)
+        document.getElementById('userID').value = data.id_user
+        document.getElementById('userID2').value = data.id_user2
+        document.getElementById('userID3').value = data.id_user3
+        document.querySelector('#showAdmin').innerHTML = data.adminName
+        document.querySelector('#showUserDetail').innerHTML = `ผู้เบิก: ${data.id_user2} (${data.id_user3})`
+        
+        $('#loginPage').hide()
+        $('#mainPage').removeClass('hidden')
+      }
+    }
 
     function populateUserList(users) {
       let list = document.getElementById('userList');
@@ -53,31 +67,31 @@
 
   function showTable(item){
    if(item){
-      var result = "<div>"+
-                   "<table class='table table-sm' style='font-size:14px'>"+
-                   "<thead style='white-space: nowrap' class='bg-info'>"+
+      var result = "<div class='overflow-x-auto'>"+
+                   "<table class='w-full text-left border-collapse' style='font-size:12px'>"+
+                   "<thead style='white-space: nowrap' class='bg-emerald-500 text-white'>"+
                      "<tr>"+ 
-                       "<th style='width:100px'>หมวดหมู่</th>"+
-                       "<th style='width:50px'>รหัสสินค้า</th>"+
-                       "<th style='width:200px'>ชื่อสินค้า</th>"+
-                       "<th style='width:20px'>ยอดคงคลัง</th>"+
-                       "<th style='width:20px'>เบิกได้จริง</th>"+
-                       "<th style='width:20px'>คงเหลือ</th>"+
+                       "<th class='p-2 border border-emerald-400'>หมวดหมู่</th>"+
+                       "<th class='p-2 border border-emerald-400'>รหัสสินค้า</th>"+
+                       "<th class='p-2 border border-emerald-400'>ชื่อสินค้า</th>"+
+                       "<th class='p-2 border border-emerald-400'>ยอดคงคลัง</th>"+
+                       "<th class='p-2 border border-emerald-400'>เบิกได้จริง</th>"+
+                       "<th class='p-2 border border-emerald-400'>คงเหลือ</th>"+
                      "</tr>"+
                   "</thead>";
 
            for(var i=0; i<item.length; i++) {
                 var maxCount = item[i][5];
                 result += "<tr>";
-                result += '<td>'+ (item[i][0]) + '</td>';   
-                result += '<td>'+ (item[i][1]) + '</td>'; 
-                result += '<td>'+ (item[i][2]) + '</td>'; 
-                result += '<td>'+ (item[i][3]) + '</td>'; 
-                result += '<td>'+ (item[i][5]) + '</td>'; 
+                result += '<td class="p-2 border border-gray-200">'+ (item[i][0]) + '</td>';   
+                result += '<td class="p-2 border border-gray-200">'+ (item[i][1]) + '</td>'; 
+                result += '<td class="p-2 border border-gray-200">'+ (item[i][2]) + '</td>'; 
+                result += '<td class="p-2 border border-gray-200">'+ (item[i][3]) + '</td>'; 
+                result += '<td class="p-2 border border-gray-200">'+ (item[i][5]) + '</td>'; 
                 if (maxCount > 0){
-                result += "<td><button type='button' class='btn btn-outline-success btn-sm' onclick='editData(this);'><i class='fa fa-edit'></i> "+ (item[i][6]) +" </button></td>";   
+                result += "<td class='p-2 border border-gray-200'><button type='button' class='px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 rounded text-xs transition-colors' onclick='editData(this);'><i class='fa fa-edit mr-1'></i> "+ (item[i][6]) +" </button></td>";   
                 }else{
-                result += '<td>'+ (item[i][6]) + '</td>'; 
+                result += '<td class="p-2 border border-gray-200">'+ (item[i][6]) + '</td>'; 
                 }
                 result += "</tr>";
       }
@@ -163,22 +177,15 @@ function rendercart() {
     if(cart.length > 0) {
         var html = '';
         for (let i = 0; i < cart.length; i++) {
-            html += `<div class="cartlist-items">
-                     <p class="cartlist-left">${cart[i].id} : ${cart[i].name}</p>
-<div class="cartlist-right">
-  <button onclick="deinitems('-', ${i})" class="btn-cartlist">-</button>
-  <div class="cartlist-input">
-    <table>
-      <tr>
-        <td>
-          <input type="number" id="countitems${i}" class="count-items text-center" value="${cart[i].count}" min="1" oninput="updateItemCount(event, ${i})" style="width: 60px;">
-        </td>
-        <td>
-          <button onclick="deinitems('+', ${i})" class="btn-cartlist">+</button>
-        </td>
-      </tr>
-    </table>
+            html += `<div class="flex flex-col p-3 bg-gray-50 rounded-lg border border-gray-200 mb-2">
+                     <p class="font-bold text-gray-800 mb-2">${cart[i].id} : ${cart[i].name}</p>
+<div class="flex items-center justify-between">
+  <div class="flex items-center space-x-1">
+    <button onclick="deinitems('-', ${i})" class="w-8 h-8 flex items-center justify-center bg-red-100 text-red-600 hover:bg-red-200 rounded transition-colors">-</button>
+    <input type="number" id="countitems${i}" class="w-12 h-8 border border-gray-300 rounded text-center outline-none focus:ring-1 focus:ring-emerald-500" value="${cart[i].count}" min="1" oninput="updateItemCount(event, ${i})">
+    <button onclick="deinitems('+', ${i})" class="w-8 h-8 flex items-center justify-center bg-emerald-100 text-emerald-600 hover:bg-emerald-200 rounded transition-colors">+</button>
   </div>
+  <p class="text-xs text-gray-400">สต็อก: ${cart[i].countT}</p>
 </div>
 </div>`;
         }
@@ -302,16 +309,26 @@ function formserach(result){
     $('#loginText').show()
     
     if(result != null){
-      document.querySelector('#showAdmin').innerHTML = result[1]
-      document.querySelector('#showUserDetail').innerHTML = `ผู้เบิก: ${document.getElementById('userID2').value} (${document.getElementById('userID3').value})`
+      const id_user = document.getElementById('userID').value
+      const id_user2 = document.getElementById('userID2').value
+      const id_user3 = document.getElementById('userID3').value
+      const adminName = result[1]
+
+      // Save to localStorage
+      localStorage.setItem('storeSession', JSON.stringify({
+        id_user, id_user2, id_user3, adminName
+      }))
+
+      document.querySelector('#showAdmin').innerHTML = adminName
+      document.querySelector('#showUserDetail').innerHTML = `ผู้เบิก: ${id_user2} (${id_user3})`
       
       $('#loginPage').hide()
-      $('#mainPage').fadeIn()
+      $('#mainPage').removeClass('hidden').hide().fadeIn()
       
       Swal.fire({
         icon: 'success',
         title: 'ยินดีต้อนรับ',
-        text: result[1],
+        text: adminName,
         timer: 1500,
         showConfirmButton: false
       })
@@ -331,7 +348,8 @@ function logout(){
     cancelButtonText: 'ยกเลิก'
   }).then((result) => {
     if (result.isConfirmed) {
-      $('#mainPage').hide()
+      localStorage.removeItem('storeSession')
+      $('#mainPage').addClass('hidden')
       $('#loginPage').fadeIn()
       document.getElementById('userID').value = ''
       document.getElementById('userID2').value = ''
