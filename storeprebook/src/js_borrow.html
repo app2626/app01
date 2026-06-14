@@ -59,8 +59,12 @@
     }
         
     function getAllData(id){
+         $('#loadingOverlay').removeClass('hidden');
          document.getElementById('wsname').value = id
-         google.script.run.withSuccessHandler(showTable).getData(id)
+         google.script.run.withSuccessHandler((item) => {
+           showTable(item);
+           $('#loadingOverlay').addClass('hidden');
+         }).getData(id)
          google.script.run.withSuccessHandler(showTable2).getData(id)
       }
 
@@ -68,15 +72,15 @@
   function showTable(item){
    if(item){
       var result = "<div class='overflow-x-auto'>"+
-                   "<table class='w-full text-left border-collapse' style='font-size:12px'>"+
+                   "<table class='w-full text-left border-collapse' style='font-size:11px'>"+
                    "<thead style='white-space: nowrap' class='bg-emerald-500 text-white'>"+
                      "<tr>"+ 
-                       "<th class='p-2 border border-emerald-400'>หมวดหมู่</th>"+
-                       "<th class='p-2 border border-emerald-400'>รหัสสินค้า</th>"+
-                       "<th class='p-2 border border-emerald-400'>ชื่อสินค้า</th>"+
-                       "<th class='p-2 border border-emerald-400'>ยอดคงคลัง</th>"+
-                       "<th class='p-2 border border-emerald-400'>เบิกได้จริง</th>"+
-                       "<th class='p-2 border border-emerald-400'>คงเหลือ</th>"+
+                       "<th class='p-2 border border-emerald-400 font-bold'>หมวดหมู่</th>"+
+                       "<th class='p-2 border border-emerald-400 font-bold'>รหัสสินค้า</th>"+
+                       "<th class='p-2 border border-emerald-400 font-bold'>ชื่อสินค้า</th>"+
+                       "<th class='p-2 border border-emerald-400 font-bold'>ยอดคงคลัง</th>"+
+                       "<th class='p-2 border border-emerald-400 font-bold'>เบิกได้จริง</th>"+
+                       "<th class='p-2 border border-emerald-400 font-bold'>คงเหลือ</th>"+
                      "</tr>"+
                   "</thead>";
 

@@ -26,6 +26,14 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
 
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="fixed inset-0 z-[100] bg-white bg-opacity-70 flex items-center justify-center hidden">
+    <div class="flex flex-col items-center">
+      <div class="animate-spin h-10 w-10 border-4 border-emerald-500 border-t-transparent rounded-full mb-3"></div>
+      <p class="text-emerald-600 font-bold text-[11px]">กำลังโหลดข้อมูล...</p>
+    </div>
+  </div>
+
   <!-- หน้า Login -->
   <div id="loginPage" class="container mx-auto mt-20 px-4">
     <div class="max-w-md mx-auto">
@@ -82,19 +90,19 @@
   <!-- หน้าหลัก -->
   <div id="mainPage" class="hidden">
     <nav class="bg-white shadow-md sticky top-0 z-50">
-      <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="w-full px-4 py-3 flex justify-between items-center">
         <a class="text-xl font-bold text-emerald-600">ระบบเบิกสินค้าในคลัง</a>
         <div class="flex items-center space-x-4">
           <div class="text-right">
             <h6 class="font-bold text-gray-800 leading-tight" id="showAdmin"></h6>
-            <p class="text-xs text-gray-500" id="showUserDetail"></p>
+            <p class="text-[10px] text-gray-500" id="showUserDetail"></p>
           </div>
-          <button class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1 rounded border border-red-200 text-xs font-medium transition-colors" onclick="logout()">ออกจากระบบ</button>
+          <button class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1 rounded border border-red-200 text-[11px] font-medium transition-colors" onclick="logout()">ออกจากระบบ</button>
         </div>
       </div>
     </nav>
 
-    <div class="container mx-auto px-4 mt-6">
+    <div class="w-full px-2 mt-4">
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div class="flex border-b border-gray-200 bg-gray-50">
           <button class="px-6 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-600 transition-all" id="nav-home-tab" onclick="switchTab('nav-home')">รายการเบิก</button>
@@ -123,12 +131,27 @@
   
   <script>
     function switchTab(tabId) {
+      $('#loadingOverlay').removeClass('hidden');
+      
       $('.tab-pane').addClass('hidden');
       $('#' + tabId).removeClass('hidden');
       
       // Update Tab Styling
       $('[id^="nav-"][id$="-tab"]').removeClass('border-emerald-500 text-emerald-600').addClass('border-transparent text-gray-500');
       $('#' + tabId + '-tab').removeClass('border-transparent text-gray-500').addClass('border-emerald-500 text-emerald-600');
+
+      // Refresh data to prevent stale data (data hangs)
+      const currentId = document.getElementById('wsname').value || 'HANDSET';
+      google.script.run.withSuccessHandler((item) => {
+        showTable(item);
+        // After data is loaded, adjust columns for the current view
+        setTimeout(() => {
+          $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+          $('#loadingOverlay').addClass('hidden');
+        }, 300);
+      }).getData(currentId);
+      
+      google.script.run.withSuccessHandler(showTable2).getData(currentId);
     }
   </script>
   </body>
