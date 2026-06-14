@@ -1,0 +1,60 @@
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="exampleModalLabel">Modal title</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+      <form class="row g-2" onsubmit="saveFormE(this)">
+  <div class="col-md-12">
+    <label for="inputEmail4" class="form-label">รหัสสินค้า</label>
+    <input type="text" class="form-control" id="data1" name="data1" readonly>
+  </div>
+  <div class="col-md-12">
+    <label for="inputState" class="form-label">ชื่อสินค้า</label>
+    <input type="text" class="form-control" id="data2" name="data2" readonly>
+
+  </div>
+    <div class="col-md-12">
+    <label for="inputEmail4" class="form-label">ยอดคงคลัง</label>
+    <input type="text" class="form-control" id="data3" name="data3" oninput="delnum()">
+  </div>
+    <div class="col-md-12">
+    <label for="inputEmail4" class="form-label">ยอดขั้นต่ำ</label>
+    <input type="text" class="form-control" id="data4" name="data4" oninput="delnum()">
+  </div>
+    <div class="col-md-12">
+    <label for="inputEmail4" class="form-label">เพิ่มจำนวน</label>
+    <input type="text" class="form-control" id="data5" name="data5">
+  </div>
+      <div class="col-md-12">
+                <button type="submit" class="btn btn-primary">ยืนยัน</button>
+         </div>
+</form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function saveFormE(obj) { 
+        event.preventDefault();
+        var cc = document.getElementById('showAdmin').innerHTML
+        if(cc !="admin"){
+           Swal.fire(
+            "กรุณาเข้าระบบ ADMIN",
+          )  
+        }else{
+        google.script.run.withSuccessHandler(()=> {
+          google.script.run.withSuccessHandler(showTable).getData()
+          google.script.run.withSuccessHandler(showTable2).getData()
+          Swal.fire(
+            "บันทึกข้อมูลเรียบร้อย",
+          )  
+           }).editAppData(obj);
+        }
+      }
+
+</script>

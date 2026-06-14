@@ -1,0 +1,298 @@
+<div class="container-fluid p-2">
+<div class="row">
+  <div class="col-md-9">
+      <table id="datatable" class="display responsive nowrap" style="width:100%">
+        <thead class="bg-info"></thead>
+      </table>
+  </div>
+  <div class="col-md-3">
+       <h6>รายการเบิก</h6>
+          <div id="mycart" class="cartlist"> </div>
+                <div class="btn-control">
+        <button onclick="clearlist()" class="btn btn-outline-danger btn-sm me-1">
+          ยกเลิก
+        </button>
+        <button  class="btn btn-outline-success btn-sm" onclick="saveForm()">
+          ยืนยัน
+          <div class="spinner-border spinner-border-sm" role="status" id="btnSave1" style="display:none">
+  <span class="visually-hidden">Loading...</span>
+</div>
+        </button>
+      </div>
+  </div>
+</div>
+</div>
+
+
+<script>
+
+  let id = ""
+   $(document).ready(()=>{
+      google.script.run.withSuccessHandler(showTable).getData()
+      google.script.run.withSuccessHandler(showTable2).getData()
+      google.script.run.withSuccessHandler(populateUserList).getUserList()
+    });
+
+    function populateUserList(users) {
+      let list = document.getElementById('userList');
+      list.innerHTML = '';
+      users.forEach(user => {
+        let option = document.createElement('option');
+        option.value = user[0]; // รหัสสาขา
+        option.text = user[0] + ' - ' + user[1]; // รหัสสาขา - ชื่อสาขา
+        list.appendChild(option);
+      });
+    }
+        
+    function getAllData(id){
+         document.getElementById('wsname').value = id
+         google.script.run.withSuccessHandler(showTable).getData(id)
+         google.script.run.withSuccessHandler(showTable2).getData(id)
+      }
+
+
+  function showTable(item){
+   if(item){
+      var result = "<div>"+
+                   "<table class='table table-sm' style='font-size:14px'>"+
+                   "<thead style='white-space: nowrap' class='bg-info'>"+
+                     "<tr>"+ 
+                       "<th style='width:100px'>หมวดหมู่</th>"+
+                       "<th style='width:50px'>รหัสสินค้า</th>"+
+                       "<th style='width:200px'>ชื่อสินค้า</th>"+
+                       "<th style='width:20px'>ยอดคงคลัง</th>"+
+                       "<th style='width:20px'>เบิกได้จริง</th>"+
+                       "<th style='width:20px'>คงเหลือ</th>"+
+                     "</tr>"+
+                  "</thead>";
+
+           for(var i=0; i<item.length; i++) {
+                var maxCount = item[i][5];
+                result += "<tr>";
+                result += '<td>'+ (item[i][0]) + '</td>';   
+                result += '<td>'+ (item[i][1]) + '</td>'; 
+                result += '<td>'+ (item[i][2]) + '</td>'; 
+                result += '<td>'+ (item[i][3]) + '</td>'; 
+                result += '<td>'+ (item[i][5]) + '</td>'; 
+                if (maxCount > 0){
+                result += "<td><button type='button' class='btn btn-outline-success btn-sm' onclick='editData(this);'><i class='fa fa-edit'></i> "+ (item[i][6]) +" </button></td>";   
+                }else{
+                result += '<td>'+ (item[i][6]) + '</td>'; 
+                }
+                result += "</tr>";
+      }
+                result += "</table></div>";
+                var div = document.getElementById('datatable').innerHTML = result;
+                $(document).ready(function() {
+                $('#datatable').DataTable({
+
+      destroy: true,    //ซ่อนคอลัม
+        responsive : true,
+dom: 'Bfrtip',
+        buttons: [
+            { text: 'HANDSET',
+              action: function ( e, dt, node, config ) {
+              getAllData('HANDSET')
+                }},
+            { text: 'PREMIUM',
+              action: function ( e, dt, node, config ) {
+              getAllData('PREMIUM')
+                }},
+            { text: 'NONMOBILE',
+              action: function ( e, dt, node, config ) {
+              getAllData('NONMOBILE')
+                }},
+            { text: 'SIMCARD',
+              action: function ( e, dt, node, config ) {
+              getAllData('SIMCARD')
+                }},
+            { text: 'FILM',
+              action: function ( e, dt, node, config ) {
+              getAllData('FILM')
+                }},
+                
+        ],
+        columnDefs:[{
+          targets: [1,2,5],
+          className: 'all',
+          },
+       ],
+order: [[5, 'desc']],
+
+           });
+        });
+    }
+  }
+
+
+function editData(el){
+    productID = el.parentNode.parentNode.cells[1].innerHTML;  
+    productName = el.parentNode.parentNode.cells[2].innerHTML;  
+    productCount = el.parentNode.parentNode.cells[4].innerHTML;  
+    addtocart()
+}
+
+var cart = [];
+function addtocart() {
+    var pass = true;
+    for (let i = 0; i < cart.length; i++) {
+        if(cart[i].id == productID) {
+            cart[i].count++;
+            pass = false;
+        }
+    }
+    if(pass) {
+        var obj = {
+            id: productID,
+            name: productName,
+            countT: productCount,
+            count: 1
+        };
+        cart.push(obj)
+    }
+    Swal.fire({
+        icon: 'success',
+        title: 'เพิ่ม ' + productName + ' ลงรายการเรียบร้อย'
+    })
+    // $("#cartcount").css('display','flex').text(cart.length)
+rendercart();
+}
+
+
+function rendercart() {
+    if(cart.length > 0) {
+        var html = '';
+        for (let i = 0; i < cart.length; i++) {
+            html += `<div class="cartlist-items">
+                     <p class="cartlist-left">${cart[i].id} : ${cart[i].name}</p>
+<div class="cartlist-right">
+  <button onclick="deinitems('-', ${i})" class="btn-cartlist">-</button>
+  <div class="cartlist-input">
+    <table>
+      <tr>
+        <td>
+          <input type="number" id="countitems${i}" class="count-items text-center" value="${cart[i].count}" min="1" oninput="updateItemCount(event, ${i})" style="width: 60px;">
+        </td>
+        <td>
+          <button onclick="deinitems('+', ${i})" class="btn-cartlist">+</button>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
+</div>`;
+        }
+        $("#mycart").html(html)
+    }
+    else {
+        $("#mycart").html(`<p>Not found product list</p>`)
+    }
+}
+
+function deinitems(action, index) {
+    if(action == '-') {
+        if(cart[index].count > 0) {
+            cart[index].count--;
+            $("#countitems"+index).text(cart[index].count)
+
+            if(cart[index].count <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Are you sure to delete?',
+                    showConfirmButton: true,
+                    showCancelButton: true,
+                    confirmButtonText: 'Delete',
+                    cancelButtonText: 'Cancel'
+                }).then((res) => {
+                  if(res.isConfirmed) {
+                     cart.splice(index, 1) 
+                     console.log(cart)
+                     rendercart();
+                     $("#cartcount").css('display','flex').text(cart.length)
+                     
+                     if(cart.length <= 0) {
+                        $("#cartcount").css('display','none')
+                     }
+                  }  
+                  else {
+                    cart[index].count++;
+                    $("#countitems"+index).text(cart[index].count)
+                    rendercart();
+                  }
+                })
+            }
+            rendercart();
+        }
+        
+    }
+    else if(action == '+') {
+        cart[index].count++;
+        $("#countitems"+index).text(cart[index].count)
+        if(cart[index].countT < cart[index].count ){
+               Swal.fire(
+            'เกินจำนวนที่เบิกได้',
+          )
+        }else{
+        rendercart();
+        }
+    }
+}
+
+function updateItemCount(event, index) {
+  cart[index].count = parseInt(event.target.value);
+  if(cart[index].countT < cart[index].count ){
+        Swal.fire(
+            'เกินจำนวนที่เบิกได้',
+          )
+    cart[index].count = 1
+    rendercart();
+  }else{
+  rendercart();
+  }
+}
+
+function saveForm(){
+var id_user = document.getElementById('userID').value
+var id_user2 = document.getElementById('userID2').value
+var id_user3 = document.getElementById('userID3').value
+var name_user = document.getElementById('showAdmin').innerHTML
+$('#btnSave1').show()
+if(name_user,id_user2,id_user3 ==""){
+       Swal.fire(
+            'กรุณาเข้าระบบด้วยรหัสสาขา,ชื่อผู้เบิก,เบอร์โทร',
+          )
+}else{
+
+     google.script.run.withSuccessHandler(()=>{
+        Swal.fire(
+            'บันทึกข้อมูลเรียบร้อย',
+          )
+$('#btnSave1').hide()
+          google.script.run.withSuccessHandler(showTable).getData()
+          clearlist()
+      }).saveData(cart,id_user,id_user2,id_user3,name_user)
+
+}
+
+}
+
+function clearlist() {
+    cart = [];
+    $("#mycart").html(`<p>โปรดเลือกรายการ</p>`)
+}
+
+function searchForm(){
+  var id_user = document.getElementById('userID').value
+   google.script.run.withSuccessHandler(formserach).readIdUser(id_user)
+}
+function formserach(result){
+    if(result !=null){
+      document.querySelector('#showAdmin').innerHTML = result[1]
+       }else{
+            Swal.fire(
+            'กรอกรหัสสาขาไม่ถูกต้อง',
+          )
+       }
+
+}
+</script>

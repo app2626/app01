@@ -1,0 +1,103 @@
+<div class="container-fluid p-2">
+<div class="row">
+  <div class="col-md-12">
+      <table id="datatable2" class="display responsive nowrap" style="width:100%">
+        <thead class="bg-info"></thead>
+      </table>
+  </div>
+
+</div>
+</div>
+
+
+<script>
+
+  function showTable2(item){
+   if(item){
+      var result = "<div>"+
+                   "<table class='table table-sm' style='font-size:14px'>"+
+                   "<thead style='white-space: nowrap' class='bg-info'>"+
+                     "<tr>"+ 
+                       "<th style='width:100px'>หมวดหมู่</th>"+
+                       "<th style='width:50px'>รหัสสินค้า</th>"+
+                       "<th style='width:200px'>ชื่อสินค้า</th>"+
+                       "<th style='width:20px'>ยอดคงคลัง</th>"+
+                       "<th style='width:20px'>กำหนดขั้นต่ำ</th>"+
+                       "<th style='width:20px'>คงเหลือ</th>"+
+                       "<th style='width:20px'>เพิ่มข้อมูล</th>"+
+                     "</tr>"+
+                  "</thead>";
+  for(var i=0; i<item.length; i++) {
+                var maxCount2 = item[i][5];
+                result += "<tr>";
+                result += '<td>'+ (item[i][0]) + '</td>';   
+                result += '<td>'+ (item[i][1]) + '</td>'; 
+                result += '<td>'+ (item[i][2]) + '</td>'; 
+                result += '<td>'+ (item[i][3]) + '</td>'; 
+                result += '<td>'+ (item[i][4]) + '</td>'; 
+                result += '<td>'+ (item[i][5]) + '</td>'; 
+                result += "<td><button type='button' class='btn btn-warning  btn-sm editBtn' data-bs-toggle='modal' data-bs-target='#exampleModal' onclick='editData2(this)'><i class='fa fa-edit'></i> เพิ่มข้อมูล </button></td>";   
+                result += "</tr>";
+      }
+                result += "</table></div>";
+                var div = document.getElementById('datatable2').innerHTML = result;
+                $(document).ready(function() {
+                $('#datatable2').DataTable({
+
+      destroy: true,    //ซ่อนคอลัม
+        responsive : true,
+dom: 'Bfrtip',
+        buttons: [
+            { text: 'HANDSET',
+              action: function ( e, dt, node, config ) {
+              getAllData('HANDSET')
+                }},
+            { text: 'PREMIUM',
+              action: function ( e, dt, node, config ) {
+              getAllData('PREMIUM')
+                }},
+            { text: 'NONMOBILE',
+              action: function ( e, dt, node, config ) {
+              getAllData('NONMOBILE')
+                }},
+            { text: 'SIMCARD',
+              action: function ( e, dt, node, config ) {
+              getAllData('SIMCARD')
+                }},
+            { text: 'FILM',
+              action: function ( e, dt, node, config ) {
+              getAllData('FILM')
+                }},
+        ],
+          columnDefs:[{
+          targets: [1,2,6],
+          className: 'all',
+          },
+       ],
+order: [[5, 'desc']],
+
+           });
+        });
+    }
+  }
+
+
+function editData2(el){
+    var ids = el.parentNode.parentNode.cells[1].innerHTML;  
+    google.script.run.withSuccessHandler(formadd).readAdd(ids)
+}
+function formadd(result){
+    if(result !=null){
+      document.querySelector('#data1').value = result[1]
+      document.querySelector('#data2').value = result[2]
+      document.querySelector('#data3').value = result[3]
+      document.querySelector('#data4').value = result[4]
+      document.querySelector('#data5').value = result[3]-result[4]
+       }
+}
+function delnum(){
+    var del3 = document.querySelector('#data3').value
+    var del4 = document.querySelector('#data4').value
+      document.querySelector('#data5').value = del3-del4
+}
+</script>
