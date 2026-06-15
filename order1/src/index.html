@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+ <script>
+  if (window.trustedTypes && window.trustedTypes.createPolicy) {
+    window.trustedTypes.createPolicy('default', {
+      createHTML: string => string,
+      createScriptURL: string => string,
+      createScript: string => string,
+    });
+  }
+</script>
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <title>ระบบเบิกสินค้า - Sales Retail</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+  <style>
+    /* DataTables Custom Styling */
+    .dataTables_wrapper .dataTables_filter input {
+      border: 1px solid #e5e7eb !important;
+      border-radius: 0.5rem !important;
+      padding: 0.4rem 1rem !important;
+      outline: none !important;
+      font-size: 10px !important;
+    }
+    .dataTables_wrapper .dataTables_length select {
+      border: 1px solid #e5e7eb !important;
+      border-radius: 0.5rem !important;
+      padding: 0.2rem 1rem !important;
+      font-size: 10px !important;
+    }
+    table.dataTable thead th {
+      background-color: #f9fafb !important;
+      border-bottom: 1px solid #e5e7eb !important;
+      font-size: 10px !important;
+      color: #374151 !important;
+    }
+    table.dataTable tbody td {
+      font-size: 10px !important;
+      padding: 8px 10px !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+      background: #ef4444 !important;
+      color: white !important;
+      border: none !important;
+      border-radius: 0.4rem !important;
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#ef4444', // red-500
+            secondary: '#f97316', // orange-500
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <?!= include('Stylesheet'); ?>
+
+</head>
+
+<body class="bg-gray-50 pt-16">
+
+  <!-- Navigation -->
+  <nav class="bg-primary fixed top-0 left-0 right-0 z-50 shadow-lg">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <a class="text-white font-bold text-lg sm:text-xl truncate" href="#">
+        เบิกสินค้าขาย ตัดรอบ 09.00น.
+      </a>
+      <div class="hidden md:flex space-x-6 items-center">
+        <a class="text-white hover:text-red-100 transition-colors font-medium" href="#">ฝ่ายขายปลีก</a>
+        <a class="text-white hover:text-red-100 transition-colors flex items-center space-x-1" href="mailto:Salr@tgtogo.com">
+          <svg width="1.2em" height="1.2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383l-4.758 2.855L15 11.114v-5.73zm-.034 6.878L9.271 8.82 8 9.583 6.728 8.82l-5.694 3.44A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.739zM1 11.114l4.758-2.876L1 5.383v5.73z"/></svg>
+          <span class="hidden lg:inline">Salr@tgtogo.com</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Page Content -->
+  <div class="container mx-auto px-4 py-8">
+
+    <div class="flex flex-col lg:flex-row gap-8">
+
+      <div class="w-full lg:w-1/4">
+
+        <div class="mb-6">
+          <div class="flex shadow-sm rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all">
+            <input type="text" class="flex-grow px-4 py-2 outline-none" id="txt_search" placeholder="ค้นหาชื่อสินค้า..." aria-label="filtrar producto">
+            <button class="bg-primary hover:bg-red-600 text-white px-6 py-2 transition-colors font-medium" type="button" id="btn-search" onclick="app.printProduct('Nombre','0');" >
+              ค้นหา
+            </button>
+          </div>
+        </div>
+
+        <h2 class="text-xl font-bold mb-4 text-gray-800 border-b-2 border-primary pb-2 inline-block">รายการสินค้า</h2>
+        <div class="flex flex-col space-y-1 categoriasWrapper bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        </div>
+
+      </div>
+      <!-- /.col-lg-3 -->
+
+
+      <div class="fixed bottom-8 right-8 z-40 group">
+        <button type="button" class="bg-primary hover:bg-red-600 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all transform hover:scale-110 relative" data-toggle="modal" data-target="#modalPedido" onclick="$('#modalPedido').removeClass('hidden').addClass('flex');">
+          <svg width="1.8em" height="1.8em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm7 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+          </svg>
+          <span id="val_items" class="absolute -top-1 -right-1 bg-yellow-400 text-red-900 text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">0</span>
+        </button>
+        
+        <div class="absolute bottom-full right-0 mb-4 flex flex-col items-end space-y-2 pointer-events-none">
+          <div class="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity transform translate-y-2" id="alert_carrito"></div>
+          <div class="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity transform translate-y-2" id="alert_carrito_success"></div>
+        </div>
+      </div>
+
+
+
+      <div class="w-full lg:w-3/4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table id="productTable" class="w-full display hover row-border stripe">
+            <thead>
+              <tr>
+                <th class="text-left">ชื่อสินค้า</th>
+                <th class="text-left">หมวดหมู่</th>
+                <th class="text-center w-24">ระบุจำนวน</th>
+                <th class="text-center w-20">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody class="productosWrapper">
+              <!-- contenido  -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="py-8 bg-gray-800 text-white mt-auto">
+    <div class="container mx-auto px-4 text-center">
+      <p class="mb-2">&copy; ติดต่อ "ขายปลีก" 2023</p>
+      <p class="text-gray-400 flex items-center justify-center space-x-2">
+        <svg width="1.2em" height="1.2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" d="M2.267.98a1.636 1.636 0 0 1 2.448.152l1.681 2.162c.309.396.418.913.296 1.4l-.513 2.053a.636.636 0 0 0 .167.604L8.65 9.654a.636.636 0 0 0 .604.167l2.052-.513a1.636 1.636 0 0 1 1.401.296l2.162 1.681c.777.604.849 1.753.153 2.448l-.97.97c-.693.693-1.73.998-2.697.658a17.471 17.471 0 0 1-6.571-4.144A17.47 17.47 0 0 1 .639 4.646c-.34-.967-.035-2.004.658-2.698l.97-.969zM11 .5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V1.707l-4.146 4.147a.5.5 0 0 1-.708-.708L14.293 1H11.5a.5.5 0 0 1-.5-.5z" />
+        </svg>
+        <span>02-237-5559 ต่อ 2803-2806</span>
+      </p>
+    </div>
+  </footer>
+
+  <!-- Modal -->
+  <div id="modalPedido" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
+      <div class="bg-primary px-6 py-4 flex justify-between items-center text-white">
+        <h5 class="text-xl font-bold">ยืนยันการสั่งสินค้า</h5>
+        <button type="button" class="text-white hover:text-red-100 transition-colors" onclick="$('#modalPedido').addClass('hidden').removeClass('flex');">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto flex-grow">
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 hidden" id="alert_customer"></div>
+        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 hidden" id="alert_pedido_sucess"></div>
+
+        <div class="overflow-x-auto mb-6">
+          <table class="w-full text-left border-collapse" id="tbl_carts">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-100">
+                <th class="px-4 py-3 font-bold text-gray-700">สินค้า</th>
+                <th class="px-4 py-3 font-bold text-gray-700 text-center">จำนวน</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50"></tbody>
+          </table>
+        </div>
+
+        <form class="space-y-4">
+          <div>
+            <label for="txt_name" class="block text-sm font-semibold text-gray-700 mb-1">ชื่อผู้เบิก</label>
+            <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="txt_name">
+          </div>
+          <div>
+            <label for="txt_celular" class="block text-sm font-semibold text-gray-700 mb-1">เบอร์โทรผู้เบิก</label>
+            <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="txt_celular">
+          </div>
+          <div>
+            <label for="txt_address" class="block text-sm font-semibold text-gray-700 mb-1">เลือกสาขา</label>
+            <select class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="txt_address">
+              <option value="" disabled selected>เลือกสาขาหรือพิมพ์ค้นหา</option>
+              <? let data = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('สาขา').getDataRange().getDisplayValues().slice(1).map(r => r[0]).filter(a => a && a.trim() !== '') ?>
+              <? data.forEach(a => { ?>
+                <option value="<?= a ?>"><?= a ?></option>
+              <? }) ?>
+            </select>
+          </div>
+        </form>
+      </div>
+
+      <div class="p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="text-lg font-bold text-gray-800">
+          รวมรายการ: <span id="val_total" class="text-primary">0</span>
+        </div>
+        <div class="flex w-full sm:w-auto gap-3">
+          <button type="button" class="flex-1 sm:flex-none px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg transition-colors" onclick="$('#modalPedido').addClass('hidden').removeClass('flex');">ยกเลิก</button>
+          <button type="button" class="flex-1 sm:flex-none px-8 py-2 bg-primary hover:bg-red-600 text-white font-bold rounded-lg shadow-lg shadow-red-200 transition-all" id="save-product-btn" onclick="app.saveProduct();">ยืนยันการเบิก</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- POPUP-->
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <?!= include('Javascript'); ?>
+
+  <script>
+    window.onload = (event) => {
+      popup()
+    };
+
+    function popup(){
+      Swal.fire({
+        title: "ระบบเบิกสินค้าในคลัง",
+        text: "เบิกสินค้า ตัดรอบ 09:00น. เบิกเกินเวลาตัดเป็นรอบถัดไป",
+        imageUrl: "https://sv1.picz.in.th/images/2023/04/28/yc846Q.jpg",
+        imageWidth: 400,
+        imageHeight: 200,
+        imageAlt: "Store Image",
+        confirmButtonColor: '#ef4444',
+      });
+    }
+  </script>
+
+</body>
+
+</html>

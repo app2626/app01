@@ -1,0 +1,309 @@
+<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js'></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@2.1.7/dist/loadingoverlay.min.js">
+</script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/select2-bootstrap4-theme@1.0.0/dist/select2-bootstrap4.min.css">
+<script text="text/javascript">
+  var app = window.app || {}, business_paypal = ''; // aquí va tu correo electrónico de paypal
+
+
+  (function ($) {
+    'use strict';
+
+    //no coflict con underscores
+
+    app.init = function () {
+      var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0.0, Items: 0, Data: [] };
+
+      app.printCart(cart);
+    }
+
+    app.categoryLoad = function (category_string) {
+
+
+      const categoria_json = JSON.parse(category_string);
+      let contenido = '';
+      var categorias = [];
+      for (let i = 0; i < categoria_json.user.length; i++) {
+        contenido += ' <a href="#" class="px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-primary transition-all font-medium border-l-4 border-transparent hover:border-primary" onclick="app.printProduct(\'Categoria\',\'' + categoria_json.user[i].categoria + '\');" >' + categoria_json.user[i].categoria + '</a>';
+      }
+
+      $('.categoriasWrapper').html(contenido)
+      localStorage.setItem('categoria_json', JSON.stringify(categoria_json))
+    }
+
+
+    app.printProduct = function (tipo, filtro) {
+
+      var producto_json = JSON.parse(localStorage.getItem('producto_json'));
+      if (!producto_json) return;
+
+      // Destruir tabla si ya existe para reinicializar
+      if ($.fn.DataTable.isDataTable('#productTable')) {
+        $('#productTable').DataTable().destroy();
+      }
+
+      let content = '';
+
+      for (let i = 0; i < producto_json.user.length; i++) {
+
+
+        if (tipo == "Categoria" && filtro != "แสดงสินค้าทั้งหมด") {
+          if (producto_json.user[i].categoria != filtro) {
+            continue;
+          }
+        }
+        if (tipo == "Nombre") {
+          if ((producto_json.user[i].producto).toUpperCase().includes(($("#txt_search").val()).toUpperCase()) == false) {
+            continue;
+          }
+        }
+
+        content += '<tr class="hover:bg-gray-50 transition-colors">'
+        content += '  <td class="font-medium text-gray-800">' + producto_json.user[i].producto + '</td>'
+        content += '  <td><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px]">' + (producto_json.user[i].categoria || "ทั่วไป") + '</span></td>'
+        content += '  <td class="text-center">'
+        content += '    <input type="number" class="w-full px-2 py-1 rounded border border-gray-200 focus:ring-1 focus:ring-primary focus:border-transparent outline-none transition-all text-center text-[10px]" id="txtcantidad_' + producto_json.user[i].id + '" name="txtcantidad_' + producto_json.user[i].id + '" placeholder="จำนวน" min="1">'
+        content += '  </td>'
+        content += '  <td class="text-center">'
+        content += '    <button class="bg-primary hover:bg-red-600 text-white p-1.5 rounded transition-colors inline-flex items-center justify-center shadow-sm" type="button" onclick="app.addtoCart(' + producto_json.user[i].id + ');">'
+        content += '      <svg width="1.2em" height="1.2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm7 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>'
+        content += '    </button>'
+        content += '  </td>'
+        content += '</tr>'
+
+      }
+      $('.productosWrapper').html(content);
+
+      // Inicializar DataTable
+      $('#productTable').DataTable({
+        "language": {
+          "url": "//cdn.datatables.net/plug-ins/1.13.7/i18n/th.json"
+        },
+        "pageLength": 10,
+        "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "ทั้งหมด"]],
+        "ordering": true,
+        "info": true,
+        "searching": true, // DataTable ya tiene su propio buscador, podemos usar el que ya existía o este
+        "responsive": true
+      });
+
+    }//app.printProduct
+
+    app.productLoad = function (product_string) {
+
+      var producto_json = JSON.parse(product_string);
+      localStorage.setItem('producto_json', JSON.stringify(producto_json));
+      app.printProduct("Categoria", "แสดงสินค้าทั้งหมด");
+
+    }
+
+
+    app.deleteCart = function (id) {
+
+      var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0.0, Items: 0, Data: [] };
+      for (let i = 0; i < cart.Data.length; i++) {
+        if (cart.Data[i].id == id) {
+          cart.Total = parseFloat(parseFloat(cart.Total).toFixed(2) - parseFloat(cart.Data[i].subtotal).toFixed(2)).toFixed(2);
+          cart.Items = parseInt(cart.Items) - 1;
+          cart.Data.splice(i, 1);
+          break;
+        }
+      }
+      localStorage.setItem('cart', JSON.stringify(cart));
+      app.printCart(cart);
+      $("#alert_pedido_sucess").text("ลบข้อมูลแล้ว").show();
+      setTimeout(() => $("#alert_pedido_sucess").hide(), 2000);
+    }
+
+
+    app.printCart = function (cart) {
+
+      $('#tbl_carts tbody').empty();
+      for (let i = 0; i < cart.Data.length; i++) {
+        let newRow = '<tr class="hover:bg-gray-50 transition-colors"><td class="px-4 py-3 text-gray-700 font-medium">' + cart.Data[i].product + '</td><td class="px-4 py-3 text-center font-bold text-primary">' + cart.Data[i].quantity + '</td>';
+        newRow += ' <td class="px-4 py-3 text-right"><button type="button" onclick="app.deleteCart(' + cart.Data[i].id + ');" class="p-2 text-gray-400 hover:text-red-500 transition-colors"><svg width="1.2em" height="1.2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">';
+        newRow += '   <path fill-rule="evenodd" d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15h9.286zM6 7a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H6zM.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8H.8z"/>';
+        newRow += '</svg></button></td></tr>';
+        $("#tbl_carts tbody").append(newRow);
+      }
+      $('#val_total').text(cart.Total);
+      $('#val_items').text(cart.Items);
+      $("#alert_pedido").hide();
+      $("#alert_carrito").addClass('opacity-0').hide();
+      $("#alert_pedido_sucess").hide();
+      $("#alert_carrito_success").addClass('opacity-0').hide();
+
+    }
+
+
+    app.addtoCart = function (id) {
+
+      var producto_json = JSON.parse(localStorage.getItem('producto_json'));
+      for (let i = 0; i < producto_json.user.length; i++) {
+        if (producto_json.user[i].id == id) {
+          var cant = isNaN(parseInt($('#txtcantidad_' + id).val())) ? 0 : parseInt($('#txtcantidad_' + id).val());
+          if (cant == 0) {
+
+            $("#alert_carrito").text("โปรดระบุจำนวนสินค้า").show().removeClass('opacity-0').addClass('fade-in');
+            setTimeout(() => $("#alert_carrito").addClass('opacity-0').hide(), 3000);
+            break;
+          }
+          if (cant >= producto_json.user[i].stock) {
+            $("#alert_carrito").text("ไม่มีสต็อกสินค้า").show().removeClass('opacity-0').addClass('fade-in');
+            setTimeout(() => $("#alert_carrito").addClass('opacity-0').hide(), 3000);
+            break;
+          }
+
+          //CAPTURANDO EL TOTAL
+          var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0.0, Items: 0, Data: [] };
+          cart.Total = cart.Total == 'NaN' ? 0 : cart.Total;
+          var existe_producto = 0;
+          for (var ij = 0; ij < cart.Data.length; ij++) {
+            if (cart.Data[ij].id == id) {
+              existe_producto = 1;
+              break;
+            }
+          }
+          if (existe_producto == 1) {
+            $("#alert_carrito").text("มีสินค้านี้แล้ว").show().removeClass('opacity-0').addClass('fade-in');
+            setTimeout(() => $("#alert_carrito").addClass('opacity-0').hide(), 3000);
+            break;
+          }
+
+
+          var sub_total = cant
+          console.log("🚀 ~ sub_total:", sub_total)
+          var total = parseFloat(sub_total) + parseFloat(cart.Total);
+          console.log("🚀 ~ total:", total)
+          cart.Total = total
+          cart.Items = 1 + cart.Items;
+          cart.Data.push({
+            id: producto_json.user[i].id,
+            product: producto_json.user[i].producto,
+            price: producto_json.user[i].precio,
+            measure: producto_json.user[i].medida,
+            // image:producto_json.user[i].imagen,
+            quantity: parseInt(cant),
+            subtotal: sub_total
+          });
+          localStorage.setItem('cart', JSON.stringify(cart));
+          $('#txtcantidad_' + id).val("");
+          app.printCart(cart);
+          $("#alert_carrito_success").text("เพิ่มในรถเข็นเรียบร้อย").show().removeClass('opacity-0').addClass('fade-in');
+          setTimeout(() => $("#alert_carrito_success").addClass('opacity-0').hide(), 3000);
+          break;
+        }
+      }
+    }//app.addtoCart
+
+
+    app.saveProduct = function () {
+      $('#save-product-btn').attr('disabled', true)
+      const name = $('#txt_name').val();
+      const address = $('#txt_address').val();
+      const celular = $('#txt_celular').val();
+
+      if (name.trim().length == 0) {
+        $("#alert_customer").text("ใส่ชื่อผู้เบิก").show().removeClass('hidden');
+        setTimeout(() => $("#alert_customer").addClass('hidden').hide(), 3000);
+        $('#save-product-btn').attr('disabled', false)
+        return false;
+      }
+
+      if (celular.trim().length == 0) {
+        $("#alert_customer").text("ป้อนโทรศัพท์มือถือ").show().removeClass('hidden');
+        setTimeout(() => $("#alert_customer").addClass('hidden').hide(), 3000);
+        $('#save-product-btn').attr('disabled', false)
+        return false;
+      }
+
+      if (address.trim().length == 0) {
+        $("#alert_customer").text("ใส่รหัสสาขาที่เบิก").show().removeClass('hidden');
+        setTimeout(() => $("#alert_customer").addClass('hidden').hide(), 3000);
+        $('#save-product-btn').attr('disabled', false)
+        return false;
+      }
+
+      let cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0, Items: 0, Data: [] };
+      if (cart.Items == 0 || cart.Data.length == 0) {
+        $("#alert_customer").text("เพิ่มสินค้าลงตะกร้า").show().removeClass('hidden');
+        setTimeout(() => $("#alert_customer").addClass('hidden').hide(), 3000);
+        $('#save-product-btn').attr('disabled', false)
+        return false;
+      }
+      let all_product = '-';
+      const all_product_json = cart.Data
+
+      $('#modalPedido').LoadingOverlay("show");
+      google.script.run.withSuccessHandler(app.saveProductSuccess).productSave(name, address, celular, all_product_json, cart.Total);
+    }//app.saveProduct
+
+    app.saveProductSuccess = function (return_string) {
+      localStorage.removeItem('cart');
+      $('#txt_name').val("");
+      $('#txt_address').val("");
+      $('#txt_celular').val("");
+      $('#modalPedido').addClass('hidden').removeClass('flex');
+      app.init();
+      $('#modalPedido').LoadingOverlay("hide");
+      $('#save-product-btn').attr('disabled', false)
+      $("#alert_carrito_success").text(return_string).show().removeClass('opacity-0').addClass('fade-in');
+      setTimeout(() => $("#alert_carrito_success").addClass('opacity-0').hide(), 4000);
+    }
+
+    app.updatePayForm = function () {
+      //eso va a generar un formulario dinamico para paypal
+      //con los productos y sus precios
+      var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { items: [] };
+      //var statics = '<form action="https://www.paypal.com/cgi-bin/webscr" method="post"><input type="hidden" name="cmd" value="_cart"><input type="hidden" name="upload" value="1"><input type="hidden" name="currency_code" value="USD" /><input type="hidden" name="business" value="'+business_paypal+'">',
+      var statics = '<form action="#" method="post"><input type="hidden" name="cmd" value="_cart"><input type="hidden" name="upload" value="1"><input type="hidden" name="currency_code" value="USD" /><input type="hidden" name="business" value="' + business_paypal + '">';
+      var dinamic = '';
+      var wrapper = $('#submitForm');
+      wrapper.html('');
+
+      if (undefined != cart && null != cart && cart != '') {
+        var i = 1;
+        var pedido = "";
+        _.forEach(cart.items, function (prod, key) {
+          // SE CREAN LOS HIDDEN;
+          dinamic += '<input type="hidden" name="item_name_' + i + '" value="' + prod.name + '">';
+          dinamic += '<input type="hidden" name="amount_' + i + '" value="' + prod.price + '">';
+          dinamic += '<input type="hidden" name="item_number_' + i + '" value="' + prod.id + '" />';
+          dinamic += '<input type="hidden" name="quantity_' + i + '" value="' + prod.cant + '" />';
+          dinamic += '<input type="hidden" name="sub_total_' + i + '" value="' + (prod.cant * prod.price) + '" />';
+          pedido += prod.name + " " + prod.cant + " " + prod.measure + " x " + prod.price + " = " + parseFloat(prod.cant * prod.price).toFixed(2) + "\n";
+          i++;
+        })
+
+        statics += dinamic + '<input type="hidden" name="txt_pedido" id="txt_pedido" value="' + pedido + '"/><button type="button" onclick="app.savePedido();" class="pay">Realizar Pedido &nbsp;<i class="ion-chevron-right"></i></button></form>'
+
+        wrapper.html(statics)
+      }
+    }
+
+    $(document).ready(function () {
+      // txt_address
+    $( "#txt_address" ).select2({
+    theme: "bootstrap4"
+});
+      app.init()
+      //app.getProducts()
+      //app.updatePayForm()
+      //app.masVendidos()
+      google.script.run.withSuccessHandler(app.productLoad).productLoad();
+      google.script.run.withSuccessHandler(app.categoryLoad).categoryLoad();
+
+      // $('.warning-bar-content:first',parent.document).css("border", "1px solid red");
+      // $('.warning-bar-content:first',parent.document).css("display", "none");
+      // $('.warning-bar:first',parent.document).hide();
+      // top.getElementById('warning').style.display = 'none';
+    })
+
+  })(jQuery)
+
+
+</script>
