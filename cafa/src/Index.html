@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="<?= ScriptApp.getService().getUrl() ?>?v=manifest">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1889/1889987.png">
+  <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/1889/1889987.png">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+  <div class="app-container">
+    <div id="login-overlay" class="login-overlay hidden">
+  <div class="login-box">
+      <button id="close-login-button" class="close-login-btn">
+        <span class="material-icons">close</span>
+      </button>
+      <span class="material-icons login-icon">admin_panel_settings</span>
+      <h2>Admin Access</h2>
+      <p>Please enter the password to continue.</p>
+      <input type="password" id="password-input" placeholder="Password">
+      <button id="login-button">Login</button>
+      <p id="error-message" class="error-message"></p>
+  </div>
+</div>
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <span class="material-icons">local_cafe</span>
+        <h2>Café น้องน้ำออย</h2>
+      </div>
+<ul class="sidebar-menu">
+  <? for(let i = 0; i < navbarButtons.length; i++) { ?>
+    <? var pageName = navbarButtons[i].name.toLowerCase().replace(' ', '-'); ?>
+    <li>
+      <a href="#" data-page="<?= pageName ?>">
+        <span class="material-icons"><?= navbarButtons[i].icon ?></span>
+        <span><?= navbarButtons[i].name ?></span>
+      </a>
+    </li>
+  <? } ?>
+</ul>
+    </nav>
+    <main class="content">
+      
+      <!-- === PAGE 1: ORDERING PAGE === -->
+      <div id="page-order" class="page-view">
+        <div class="sticky-header-wrapper">
+          <header class="main-header">
+            <div class="header-left">
+              <h1>เมนูอาหาร</h1>
+            </div>
+             <div id="category-buttons-container" class="category-nav">
+              <!-- Buttons will be dynamically inserted here -->
+            </div>
+            <div class="search-wrapper">
+              <span class="material-icons search-icon">search</span>
+              <input type="text" id="menu-search-input">
+            </div>
+          </header>
+        </div>
+        <div id="menu-container">
+          <p>กำลังโหลดเมนู...</p>
+        </div>
+      </div>
+
+      <!-- === PAGE 2: ORDER STATUS PAGE === -->
+      <div id="page-order-status" class="page-view hidden">
+        <header class="main-header">
+          <h1>สถานะคำสั่งซื้อ</h1>
+          <div class="header-actions">
+            <div class="date-selector-group">
+              <label for="order-date-selector">วันที่:</label>
+              <input type="date" id="order-date-selector">
+            </div>
+            <div class="toggle-group">
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggle-paid-orders">
+                <span class="slider"></span>
+              </label>
+              <span class="toggle-label">แสดงออเดอร์ที่ชำระแล้ว</span>
+            </div>
+            <button id="refresh-status-btn" class="action-button-secondary">
+              <span class="material-icons">refresh</span> รีเฟรช
+            </button>
+          </div>
+        </header>
+        <div id="order-status-container">
+          <!-- Order status cards will be loaded here -->
+        </div>
+      </div>
+
+      <!-- === PAGE 3: MANAGE MENU PAGE === -->
+      <div id="page-จัดการเมนู" class="page-view hidden">
+    <header class="main-header">
+        <h1>จัดการเมนูอาหาร</h1>
+        <button onclick="showAddMenuModal()" class="action-button">
+            <span class="material-icons">add_circle</span> เพิ่มเมนูใหม่
+        </button>
+    </header>
+    <div id="manage-menu-container" class="manage-menu-grid">
+        <p>กำลังโหลดรายการเมนู...</p>
+    </div>
+</div>
+
+      <!-- === PAGE 4: ADMIN DASHBOARD PAGE === -->
+      <div id="page-admin" class="page-view hidden">
+    <header class="main-header">
+      <h1><span class="material-icons">bar_chart</span>Admin Dashboard</h1>
+      <div class="header-actions">
+        <button id="setup-project-btn" class="action-button-secondary">
+          <span class="material-icons">settings</span> ตั้งค่าชีตเริ่มต้น
+        </button>
+        <button id="logout-button" class="action-button-secondary">
+          <span class="material-icons">logout</span> Logout
+        </button>
+      </div>
+    </header>
+
+<main id="admin-dashboard-content" class="dashboard-layout"> <!-- <<< เปลี่ยน class เป็น dashboard-layout -->
+    
+    <!-- === ส่วนที่ 1: Summary Cards & Controls === -->
+    <div class="dashboard-top-section">
+        <!-- Summary Cards -->
+        <div class="card summary-card">
+            <h3>ยอดขายวันนี้</h3>
+            <p id="daily-sales">฿0.00</p>
+            <span class="material-icons card-icon">today</span>
+        </div>
+        <div class="card summary-card">
+            <h3>ยอดขายเดือนนี้</h3>
+            <p id="monthly-sales">฿0.00</p>
+            <span class="material-icons card-icon">calendar_month</span>
+        </div>
+        <div class="card summary-card">
+            <h3>ยอดขายไตรมาสนี้</h3>
+            <p id="quarterly-sales">฿0.00</p>
+            <span class="material-icons card-icon">assessment</span>
+        </div>
+
+        <!-- Dashboard Controls -->
+        <div class="card dashboard-controls">
+          <h4>เลือกช่วงเวลาของกราฟยอดขาย</h4>
+          <div class="report-form">
+            <select id="report-type-select">
+              <option value="last_days" selected>ยอดขายรายวันย้อนหลัง</option>
+              <option value="by_month">ยอดขายรายเดือน</option>
+            </select>
+            <div id="days-input-group">
+              <select id="days-select">
+                <option value="7" selected>7 วัน</option>
+                <option value="14">14 วัน</option>
+                <option value="30">30 วัน</option>
+                <option value="60">60 วัน</option>
+              </select>
+            </div>
+            <div id="month-input-group" class="hidden">
+              <input type="month" id="month-select">
+            </div>
+            <button id="run-report-btn" class="action-button-secondary">แสดงผล</button>
+          </div>
+        </div>
+    </div>
+
+    <!-- === ส่วนที่ 2: กราฟยอดขาย (อยู่แถวบน) === -->
+    <div class="card chart-container">
+        <h3 id="sales-chart-title">ยอดขาย 7 วันย้อนหลัง</h3>
+        <div class="chart-wrapper">
+            <canvas id="sales-chart"></canvas>
+        </div>
+    </div>
+    
+    <!-- === ส่วนที่ 3: กราฟเมนูขายดี (อยู่แถวล่าง) === -->
+    <div class="card chart-container">
+        <h3>เมนูขายดี (ทั้งหมด)</h3>
+        <div class="chart-wrapper">
+            <canvas id="top-items-chart"></canvas>
+        </div>
+    </div>
+
+</main>
+</div>
+
+    </main>
+
+    <!-- === RIGHT ORDER SUMMARY === -->
+    <aside id="order-summary-panel" class="order-summary">
+      <header class="summary-header">
+        <h2>สรุปรายการสั่งซื้อ</h2>
+        <button id="close-cart-btn" class="close-cart-btn">
+          <span class="material-icons">close</span>
+        </button>
+      </header>
+      <div id="cart-items-list" class="cart-items-list">
+        <p class="empty-cart-message">ยังไม่มีรายการในตะกร้า</p>
+      </div>
+      <footer class="summary-footer">
+        <div id="discount-container" class="summary-discounts">
+          <!-- Discount buttons will be inserted here -->
+        </div>
+        <div class="summary-calculation">
+          <div class="calc-row">
+            <span>ราคาก่อนลด:</span>
+            <span id="subtotal-price">฿0.00</span>
+          </div>
+          <div id="discount-row" class="calc-row discount-row hidden">
+            <span>ส่วนลด:</span>
+            <span id="discount-amount">-฿0.00</span>
+          </div>
+        </div>
+        <div class="summary-total">
+          <span>ยอดสุทธิ:</span>
+          <span id="total-price" class="total-price-value">฿0.00</span>
+        </div>
+        <button id="place-order-btn" class="action-button">
+          <span class="material-icons">point_of_sale</span> ยืนยันคำสั่งซื้อ
+        </button>
+      </footer>
+    </aside>
+
+    <div id="mobile-cart-fab" class="mobile-cart-fab">
+      <span class="material-icons">shopping_cart</span>
+      <span id="mobile-cart-badge" class="cart-badge">0</span>
+    </div>
+
+    <div id="scroll-bottom-fab" class="mobile-cart-fab">
+      <span class="material-icons">keyboard_double_arrow_down</span>
+    </div>
+
+  </div> <!-- This closes .app-container -->
+
+  <!-- Chart.js Library must be included before our main script -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- This includes our main application logic -->
+  <?!= include('JavaScript'); ?>
+
+
+</body>
+</html>

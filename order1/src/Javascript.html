@@ -17,8 +17,79 @@
 
     app.init = function () {
       var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0.0, Items: 0, Data: [] };
-
       app.printCart(cart);
+
+      var user_info = JSON.parse(localStorage.getItem('user_info'));
+      if (user_info) {
+        $('#login_screen').addClass('hidden');
+        $('#main_content').removeClass('hidden');
+        $('#user_info_nav').removeClass('hidden');
+        $('#nav_user_name').text(user_info.name);
+        $('#nav_user_branch').text(user_info.address);
+      } else {
+        $('#login_screen').removeClass('hidden');
+        $('#main_content').addClass('hidden');
+        $('#user_info_nav').addClass('hidden');
+      }
+    }
+
+    app.login = function () {
+      const name = $('#login_name').val();
+      const address = $('#login_address').val();
+      const celular = $('#login_celular').val();
+
+      if (!name || !address || !celular) {
+        Swal.fire({
+          icon: 'error',
+          title: 'ข้อมูลไม่ครบถ้วน',
+          text: 'กรุณากรอกข้อมูลให้ครบทุกช่อง',
+          confirmButtonColor: '#ef4444',
+        });
+        return;
+      }
+
+      const user_info = { name, address, celular };
+      localStorage.setItem('user_info', JSON.stringify(user_info));
+      app.init();
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'เข้าสู่ระบบสำเร็จ',
+        text: 'ยินดีต้อนรับคุณ ' + name,
+        timer: 1500,
+        showConfirmButton: false
+      });
+    }
+
+    app.logout = function () {
+      Swal.fire({
+        title: 'ยืนยันการออกจากระบบ?',
+        text: "ข้อมูลผู้เบิกจะถูกลบออกจากเครื่องนี้",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'ยืนยัน',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          localStorage.removeItem('user_info');
+          localStorage.removeItem('cart');
+          // Update UI immediately to show login screen
+          $('#main_content').addClass('hidden');
+          $('#user_info_nav').addClass('hidden');
+          $('#login_screen').removeClass('hidden');
+          // Scroll to top
+          window.scrollTo(0, 0);
+          
+          Swal.fire({
+            icon: 'success',
+            title: 'ออกจากระบบแล้ว',
+            timer: 1000,
+            showConfirmButton: false
+          });
+        }
+      })
     }
 
     app.categoryLoad = function (category_string) {
@@ -63,8 +134,9 @@
         }
 
         content += '<tr class="hover:bg-gray-50 transition-colors">'
-        content += '  <td class="font-medium text-gray-800">' + producto_json.user[i].producto + '</td>'
         content += '  <td><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px]">' + (producto_json.user[i].categoria || "ทั่วไป") + '</span></td>'
+        content += '  <td class="font-medium text-gray-800">' + producto_json.user[i].producto + '</td>'
+        content += '  <td class="text-center font-bold ' + (producto_json.user[i].stock <= 5 ? 'text-red-500' : 'text-green-600') + '">' + (producto_json.user[i].stock || 0) + '</td>'
         content += '  <td class="text-center">'
         content += '    <input type="number" class="w-full px-2 py-1 rounded border border-gray-200 focus:ring-1 focus:ring-primary focus:border-transparent outline-none transition-all text-center text-[10px]" id="txtcantidad_' + producto_json.user[i].id + '" name="txtcantidad_' + producto_json.user[i].id + '" placeholder="จำนวน" min="1">'
         content += '  </td>'
@@ -120,14 +192,47 @@
     }
 
 
-    app.printCart = function (cart) {
+    app.updateCartQuantity = function (id, change) {
+      var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0.0, Items: 0, Data: [] };
+      for (let i = 0; i < cart.Data.length; i++) {
+        if (cart.Data[i].id == id) {
+          let newQty = parseInt(cart.Data[i].quantity) + change;
+          if (newQty <= 0) {
+            app.deleteCart(id);
+            return;
+          }
+          
+          // Update total: subtract old subtotal, add new subtotal
+          cart.Total = (parseFloat(cart.Total) - parseFloat(cart.Data[i].subtotal) + parseFloat(newQty)).toFixed(2);
+          cart.Data[i].quantity = newQty;
+          cart.Data[i].subtotal = newQty; // In this app, subtotal seems to be just the quantity
+          break;
+        }
+      }
+      localStorage.setItem('cart', JSON.stringify(cart));
+      app.printCart(cart);
+    }
 
+    app.printCart = function (cart) {
       $('#tbl_carts tbody').empty();
       for (let i = 0; i < cart.Data.length; i++) {
-        let newRow = '<tr class="hover:bg-gray-50 transition-colors"><td class="px-4 py-3 text-gray-700 font-medium">' + cart.Data[i].product + '</td><td class="px-4 py-3 text-center font-bold text-primary">' + cart.Data[i].quantity + '</td>';
-        newRow += ' <td class="px-4 py-3 text-right"><button type="button" onclick="app.deleteCart(' + cart.Data[i].id + ');" class="p-2 text-gray-400 hover:text-red-500 transition-colors"><svg width="1.2em" height="1.2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">';
-        newRow += '   <path fill-rule="evenodd" d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15h9.286zM6 7a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H6zM.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8H.8z"/>';
-        newRow += '</svg></button></td></tr>';
+        let newRow = '<tr class="hover:bg-gray-50 transition-colors">';
+        newRow += '  <td class="px-4 py-3 text-gray-700 font-medium text-xs">' + cart.Data[i].product + '</td>';
+        newRow += '  <td class="px-4 py-3 text-center">';
+        newRow += '    <div class="flex items-center justify-center space-x-2">';
+        newRow += '      <button type="button" onclick="app.updateCartQuantity(' + cart.Data[i].id + ', -1)" class="w-6 h-6 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors">-</button>';
+        newRow += '      <span class="font-bold text-primary min-w-[20px]">' + cart.Data[i].quantity + '</span>';
+        newRow += '      <button type="button" onclick="app.updateCartQuantity(' + cart.Data[i].id + ', 1)" class="w-6 h-6 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors">+</button>';
+        newRow += '    </div>';
+        newRow += '  </td>';
+        newRow += '  <td class="px-4 py-3 text-right">';
+        newRow += '    <button type="button" onclick="app.deleteCart(' + cart.Data[i].id + ');" class="p-2 text-gray-400 hover:text-red-500 transition-colors">';
+        newRow += '      <svg width="1.2em" height="1.2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">';
+        newRow += '        <path fill-rule="evenodd" d="M12.643 15C13.979 15 15 13.845 15 12.5V5H1v7.5C1 13.845 2.021 15 3.357 15h9.286zM6 7a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H6zM.8 1a.8.8 0 0 0-.8.8V3a.8.8 0 0 0 .8.8h14.4A.8.8 0 0 0 16 3V1.8a.8.8 0 0 0-.8-.8H.8z"/>';
+        newRow += '      </svg>';
+        newRow += '    </button>';
+        newRow += '  </td>';
+        newRow += '</tr>';
         $("#tbl_carts tbody").append(newRow);
       }
       $('#val_total').text(cart.Total);
@@ -136,7 +241,6 @@
       $("#alert_carrito").addClass('opacity-0').hide();
       $("#alert_pedido_sucess").hide();
       $("#alert_carrito_success").addClass('opacity-0').hide();
-
     }
 
 
@@ -147,54 +251,66 @@
         if (producto_json.user[i].id == id) {
           var cant = isNaN(parseInt($('#txtcantidad_' + id).val())) ? 0 : parseInt($('#txtcantidad_' + id).val());
           if (cant == 0) {
-
             $("#alert_carrito").text("โปรดระบุจำนวนสินค้า").show().removeClass('opacity-0').addClass('fade-in');
             setTimeout(() => $("#alert_carrito").addClass('opacity-0').hide(), 3000);
             break;
           }
-          if (cant >= producto_json.user[i].stock) {
-            $("#alert_carrito").text("ไม่มีสต็อกสินค้า").show().removeClass('opacity-0').addClass('fade-in');
-            setTimeout(() => $("#alert_carrito").addClass('opacity-0').hide(), 3000);
-            break;
-          }
 
-          //CAPTURANDO EL TOTAL
-          var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0.0, Items: 0, Data: [] };
-          cart.Total = cart.Total == 'NaN' ? 0 : cart.Total;
-          var existe_producto = 0;
-          for (var ij = 0; ij < cart.Data.length; ij++) {
-            if (cart.Data[ij].id == id) {
-              existe_producto = 1;
-              break;
+          const addProcess = () => {
+            //CAPTURANDO EL TOTAL
+            var cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0.0, Items: 0, Data: [] };
+            cart.Total = cart.Total == 'NaN' ? 0 : cart.Total;
+            var existe_producto = 0;
+            for (var ij = 0; ij < cart.Data.length; ij++) {
+              if (cart.Data[ij].id == id) {
+                existe_producto = 1;
+                break;
+              }
             }
-          }
-          if (existe_producto == 1) {
-            $("#alert_carrito").text("มีสินค้านี้แล้ว").show().removeClass('opacity-0').addClass('fade-in');
-            setTimeout(() => $("#alert_carrito").addClass('opacity-0').hide(), 3000);
-            break;
-          }
+            if (existe_producto == 1) {
+              $("#alert_carrito").text("มีสินค้านี้แล้ว").show().removeClass('opacity-0').addClass('fade-in');
+              setTimeout(() => $("#alert_carrito").addClass('opacity-0').hide(), 3000);
+              return;
+            }
 
+            var sub_total = cant
+            var total = parseFloat(sub_total) + parseFloat(cart.Total);
+            cart.Total = total
+            cart.Items = 1 + cart.Items;
+            cart.Data.push({
+              id: producto_json.user[i].id,
+              product: producto_json.user[i].producto,
+              price: producto_json.user[i].precio,
+              measure: producto_json.user[i].medida,
+              quantity: parseInt(cant),
+              subtotal: sub_total
+            });
+            localStorage.setItem('cart', JSON.stringify(cart));
+            $('#txtcantidad_' + id).val("");
+            app.printCart(cart);
+            $("#alert_carrito_success").text("เพิ่มในรถเข็นเรียบร้อย").show().removeClass('opacity-0').addClass('fade-in');
+            setTimeout(() => $("#alert_carrito_success").addClass('opacity-0').hide(), 3000);
+          };
 
-          var sub_total = cant
-          console.log("🚀 ~ sub_total:", sub_total)
-          var total = parseFloat(sub_total) + parseFloat(cart.Total);
-          console.log("🚀 ~ total:", total)
-          cart.Total = total
-          cart.Items = 1 + cart.Items;
-          cart.Data.push({
-            id: producto_json.user[i].id,
-            product: producto_json.user[i].producto,
-            price: producto_json.user[i].precio,
-            measure: producto_json.user[i].medida,
-            // image:producto_json.user[i].imagen,
-            quantity: parseInt(cant),
-            subtotal: sub_total
-          });
-          localStorage.setItem('cart', JSON.stringify(cart));
-          $('#txtcantidad_' + id).val("");
-          app.printCart(cart);
-          $("#alert_carrito_success").text("เพิ่มในรถเข็นเรียบร้อย").show().removeClass('opacity-0').addClass('fade-in');
-          setTimeout(() => $("#alert_carrito_success").addClass('opacity-0').hide(), 3000);
+          // Check if out of stock
+          if (producto_json.user[i].stock <= 0) {
+            Swal.fire({
+              title: 'สินค้าหมดชั่วคราว',
+              text: 'สินค้ารายการนี้หมดสต๊อก ท่านยังสามารถสั่งเบิกได้ แต่อาจจะต้องรอจนกว่าจะมีสินค้าเข้ามาและจะจัดส่งตามหลังให้อีกครั้ง',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#ef4444',
+              cancelButtonColor: '#d33',
+              confirmButtonText: 'ตกลง (สั่งจอง)',
+              cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+              if (result.isConfirmed) {
+                addProcess();
+              }
+            });
+          } else {
+            addProcess();
+          }
           break;
         }
       }
@@ -203,30 +319,15 @@
 
     app.saveProduct = function () {
       $('#save-product-btn').attr('disabled', true)
-      const name = $('#txt_name').val();
-      const address = $('#txt_address').val();
-      const celular = $('#txt_celular').val();
-
-      if (name.trim().length == 0) {
-        $("#alert_customer").text("ใส่ชื่อผู้เบิก").show().removeClass('hidden');
-        setTimeout(() => $("#alert_customer").addClass('hidden').hide(), 3000);
-        $('#save-product-btn').attr('disabled', false)
+      
+      const user_info = JSON.parse(localStorage.getItem('user_info'));
+      if (!user_info) {
+        Swal.fire({ icon: 'error', title: 'กรุณาเข้าสู่ระบบใหม่' });
+        app.init();
         return false;
       }
 
-      if (celular.trim().length == 0) {
-        $("#alert_customer").text("ป้อนโทรศัพท์มือถือ").show().removeClass('hidden');
-        setTimeout(() => $("#alert_customer").addClass('hidden').hide(), 3000);
-        $('#save-product-btn').attr('disabled', false)
-        return false;
-      }
-
-      if (address.trim().length == 0) {
-        $("#alert_customer").text("ใส่รหัสสาขาที่เบิก").show().removeClass('hidden');
-        setTimeout(() => $("#alert_customer").addClass('hidden').hide(), 3000);
-        $('#save-product-btn').attr('disabled', false)
-        return false;
-      }
+      const { name, address, celular } = user_info;
 
       let cart = (JSON.parse(localStorage.getItem('cart')) != null) ? JSON.parse(localStorage.getItem('cart')) : { Total: 0, Items: 0, Data: [] };
       if (cart.Items == 0 || cart.Data.length == 0) {
@@ -244,15 +345,20 @@
 
     app.saveProductSuccess = function (return_string) {
       localStorage.removeItem('cart');
-      $('#txt_name').val("");
-      $('#txt_address').val("");
-      $('#txt_celular').val("");
       $('#modalPedido').addClass('hidden').removeClass('flex');
       app.init();
+      // โหลดข้อมูลสินค้าใหม่เพื่ออัปเดตสต็อกล่าสุด
+      google.script.run.withSuccessHandler(app.productLoad).productLoad();
+
       $('#modalPedido').LoadingOverlay("hide");
       $('#save-product-btn').attr('disabled', false)
-      $("#alert_carrito_success").text(return_string).show().removeClass('opacity-0').addClass('fade-in');
-      setTimeout(() => $("#alert_carrito_success").addClass('opacity-0').hide(), 4000);
+
+      Swal.fire({
+        icon: 'success',
+        title: 'สำเร็จ',
+        text: return_string,
+        confirmButtonColor: '#ef4444',
+      });
     }
 
     app.updatePayForm = function () {
@@ -286,8 +392,8 @@
     }
 
     $(document).ready(function () {
-      // txt_address
-    $( "#txt_address" ).select2({
+      // login_address
+    $( "#login_address" ).select2({
     theme: "bootstrap4"
 });
       app.init()

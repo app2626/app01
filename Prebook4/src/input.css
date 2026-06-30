@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-orange: #f26522;
+  --color-brand-orange-dark: #d45116;
+  --color-brand-orange-light: #fdf8f5;
+  
+  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  --shadow-enterprise: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .btn-brand {
+    @apply bg-brand-orange text-white font-semibold py-2 px-4 rounded-lg transition-all hover:bg-brand-orange-dark focus:ring-2 focus:ring-brand-orange focus:ring-offset-2;
+  }
+  .card-enterprise {
+    @apply bg-white border border-slate-200 rounded-xl shadow-enterprise;
+  }
+}

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Phone Reservation System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <?!= include('CSS'); ?>
+</head>
+<body>
+  <div id="app"></div>
+
+  <template id="tmpl-login">
+    <div class="login-wrapper d-flex align-items-center justify-content-center h-100vh">
+      <div class="card p-4 shadow-lg border-0" style="width: 400px; border-radius: 20px;">
+        <div class="text-center mb-4">
+          <i class="fas fa-store fa-3x text-orange mb-3"></i>
+          <h3 class="fw-bold text-dark">TG Store System</h3>
+          <p class="text-muted small">Reservation & POS Management</p>
+        </div>
+        <form id="loginForm" onsubmit="app.handleLogin(event)">
+          <div class="mb-3">
+            <input type="text" class="form-control form-control-lg bg-light" id="loginUsername" placeholder="Username" required>
+          </div>
+          <div class="mb-4">
+            <input type="password" class="form-control form-control-lg bg-light" id="loginPassword" placeholder="Password" required>
+          </div>
+          <button type="submit" class="btn btn-orange w-100 fw-bold shadow-sm" id="btnLogin">เข้าสู่ระบบ</button>
+          <div class="mt-4 text-center">
+            <!-- <a href="#" class="text-muted small text-decoration-none" onclick="app.initDB()"><i class="fas fa-cogs"></i> (Auto Setup)</a> -->
+          </div>
+        </form>
+      </div>
+    </div>
+  </template>
+
+  <template id="tmpl-main">
+    <div class="flex h-screen overflow-hidden bg-slate-50">
+      <!-- Sidebar Overlay -->
+      <div id="sidebarOverlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden hidden" onclick="app.closeSidebar()"></div>
+      
+      <!-- Sidebar -->
+      <aside id="mainSidebar" class="fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out lg:static lg:block">
+        <div class="flex flex-col h-full">
+          <div class="p-6 border-b border-slate-100">
+            <h5 class="text-xl font-bold text-slate-900 flex items-center">
+              <span class="w-8 h-8 bg-brand-orange text-white rounded-lg flex items-center justify-center mr-2 shadow-sm">
+                <i class="fas fa-mobile-alt"></i>
+              </span>
+              POS Admin
+            </h5>
+          </div>
+          
+          <div class="p-6 flex flex-col items-center border-b border-slate-50">
+            <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3 border border-slate-200 overflow-hidden">
+              <i class="fas fa-user-circle fa-3x"></i>
+            </div>
+            <h6 class="text-sm font-bold text-slate-900 mb-1" id="sidebarUserName">User Name</h6>
+            <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 rounded-full border border-amber-200" id="sidebarRole">Role</span>
+          </div>
+
+          <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1" id="navMenu">
+            <!-- Menu items will be injected here -->
+          </nav>
+          
+          <div class="p-4 border-t border-slate-100">
+            <button onclick="app.logout()" class="flex items-center w-full px-4 py-2 text-sm font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group">
+              <i class="fas fa-sign-out-alt mr-3 group-hover:scale-110 transition-transform"></i>
+              ออกจากระบบ
+            </button>
+          </div>
+        </div>
+      </aside>
+      
+      <!-- Main Content -->
+      <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10 shrink-0">
+          <div class="flex items-center space-x-4">
+            <button class="p-2 -ml-2 text-slate-500 lg:hidden hover:bg-slate-100 rounded-lg" onclick="app.toggleSidebar()">
+              <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="text-lg font-bold text-slate-900 truncate" id="pageTitle">Dashboard</h1>
+          </div>
+          <div class="flex items-center space-x-4">
+            <div class="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200" id="clock">
+              Loading time...
+            </div>
+          </div>
+        </header>
+        
+        <main class="flex-1 overflow-y-auto p-6 focus:outline-none" id="page-content">
+          <!-- Page content will be injected here -->
+        </main>
+      </div>
+    </div>
+  </template>
+
+  <template id="tmpl-dashboard">
+    <!-- Filter Bar -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-enterprise p-4 mb-6">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:flex items-center gap-4 flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap"><i class="far fa-calendar-alt mr-1"></i> วันที่</span>
+            <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+              <input type="date" class="bg-transparent border-none text-sm focus:ring-0 outline-none p-0 w-32" id="dashStartDate" onchange="app.dashboard.applyFilters()">
+              <span class="mx-1 text-slate-300">-</span>
+              <input type="date" class="bg-transparent border-none text-sm focus:ring-0 outline-none p-0 w-32" id="dashEndDate" onchange="app.dashboard.applyFilters()">
+            </div>
+          </div>
+          
+          <div class="flex items-center space-x-2 admin-filter">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap"><i class="fas fa-store mr-1"></i> สาขา</span>
+            <select class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-orange outline-none" id="dashBranch" onchange="app.dashboard.applyFilters()">
+              <option value="ALL">ทุกสาขา</option>
+            </select>
+          </div>
+          
+          <div class="flex items-center space-x-2 admin-filter">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap"><i class="fas fa-user-tie mr-1"></i> พนักงาน</span>
+            <select class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-orange outline-none" id="dashSales" onchange="app.dashboard.applyFilters()">
+              <option value="ALL">ทุกคน</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="flex items-center space-x-2 shrink-0">
+          <div id="dashSyncStatus" class="flex items-center px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-bold uppercase border border-slate-200">
+            <span class="w-2 h-2 bg-slate-400 rounded-full mr-2 animate-pulse"></span> Live
+          </div>
+          <button class="p-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors" onclick="app.dashboard.resetFilters()" title="รีเซ็ต">
+            <i class="fas fa-undo text-sm"></i>
+          </button>
+          <button class="flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm" onclick="app.dashboard.exportCSV()">
+            <i class="fas fa-file-csv mr-2"></i> Export
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise hover:border-blue-200 transition-colors">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ยอดขายรวม</p>
+        <h4 class="text-xl font-black text-slate-900 truncate" id="dashKpiTotal">฿0</h4>
+        <div class="mt-2 flex items-center text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full w-fit">
+          <i class="fas fa-chart-line mr-1"></i> Overall
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise hover:border-emerald-200 transition-colors">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">รายการจอง</p>
+        <h4 class="text-xl font-black text-slate-900 truncate" id="dashKpiOrders">0</h4>
+        <div class="mt-2 flex items-center text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full w-fit">
+          <i class="fas fa-shopping-bag mr-1"></i> Units
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise hover:border-amber-200 transition-colors">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ยอดจอง T</p>
+        <h4 class="text-xl font-black text-slate-900 truncate" id="dashKpiResT">0</h4>
+        <div class="mt-2 flex items-center text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full w-fit">
+          <i class="fas fa-check-circle mr-1"></i> Active
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise hover:border-sky-200 transition-colors">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ยอดจอง F</p>
+        <h4 class="text-xl font-black text-slate-900 truncate" id="dashKpiResF">0</h4>
+        <div class="mt-2 flex items-center text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full w-fit">
+          <i class="fas fa-user-tag mr-1"></i> Assigned
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise hover:border-rose-200 transition-colors">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">เฉลี่ยต่อบิล</p>
+        <h4 class="text-xl font-black text-slate-900 truncate" id="dashKpiAov">฿0</h4>
+        <div class="mt-2 flex items-center text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full w-fit">
+          <i class="fas fa-calculator mr-1"></i> AOV
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise hover:border-slate-300 transition-colors">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">อัตราปิดการขาย</p>
+        <h4 class="text-xl font-black text-slate-900 truncate" id="dashKpiConv">0%</h4>
+        <div class="mt-2 flex items-center text-[10px] font-bold text-slate-600 bg-slate-50 px-2 py-0.5 rounded-full w-fit">
+          <i class="fas fa-percentage mr-1"></i> CR
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-sm font-bold text-slate-900 mb-6 flex items-center">
+          <i class="fas fa-chart-line text-brand-orange mr-2"></i> แนวโน้มยอดจองรายวัน (เครื่อง)
+        </h6>
+        <div class="h-64"><canvas id="chartSalesTrend"></canvas></div>
+      </div>
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-sm font-bold text-slate-900 mb-6 flex items-center">
+          <i class="fas fa-chart-bar text-blue-600 mr-2"></i> เปรียบเทียบยอดจองรายสัปดาห์
+        </h6>
+        <div class="h-64"><canvas id="chartWeeklyTrend"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Product Analysis -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise mb-6">
+      <h6 class="text-sm font-bold text-slate-900 mb-6 flex items-center">
+        <i class="fas fa-mobile-alt text-brand-orange mr-2"></i> การวิเคราะห์โมเดลสินค้ายอดนิยม
+      </h6>
+      <div class="h-80"><canvas id="chartModelAdvanced"></canvas></div>
+    </div>
+
+    <!-- Regional Analysis -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6 admin-filter">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+          <i class="fas fa-building text-sky-500 mr-2"></i> ยอดจองตาม Mall
+        </h6>
+        <div class="h-48"><canvas id="chartMall"></canvas></div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+          <i class="fas fa-map text-emerald-500 mr-2"></i> ยอดจองตาม Region
+        </h6>
+        <div class="h-48"><canvas id="chartRegion"></canvas></div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+          <i class="fas fa-map-marker-alt text-amber-500 mr-2"></i> ยอดจองตาม Province
+        </h6>
+        <div class="h-48"><canvas id="chartProvince"></canvas></div>
+      </div>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+          <i class="fas fa-tags text-rose-500 mr-2"></i> ยอดจองตาม Type Name
+        </h6>
+        <div class="h-48"><canvas id="chartType"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Top Branches -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise mb-6 admin-filter">
+      <h6 class="text-sm font-bold text-slate-900 mb-6 flex items-center">
+        <i class="fas fa-medal text-emerald-600 mr-2"></i> 10 อันดับสาขาที่มียอดจองดีที่สุด
+      </h6>
+      <div class="h-80"><canvas id="chartTopBranches"></canvas></div>
+    </div>
+
+    <!-- Additional Insights -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-sm font-bold text-slate-900 mb-6 flex items-center">
+          <i class="fas fa-trophy text-amber-500 mr-2"></i> อันดับพนักงานขาย
+        </h6>
+        <div class="h-64"><canvas id="chartSalesRank"></canvas></div>
+      </div>
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise">
+        <h6 class="text-sm font-bold text-slate-900 mb-6 flex items-center">
+          <i class="fas fa-bullhorn text-sky-600 mr-2"></i> โปรโมชั่นที่นิยม
+        </h6>
+        <div class="h-64"><canvas id="chartPromotionsBar"></canvas></div>
+      </div>
+      <div class="bg-white overflow-hidden rounded-2xl border border-slate-200 shadow-enterprise flex flex-col">
+        <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+          <h6 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fas fa-gift text-emerald-600 mr-2"></i> สรุปของแถมทั้งหมด
+          </h6>
+        </div>
+        <div class="flex-1 p-4 overflow-y-auto">
+          <div class="h-64"><canvas id="chartGifts"></canvas></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Customer Interests Table -->
+    <div class="bg-white overflow-hidden rounded-2xl border border-slate-200 shadow-enterprise flex flex-col mb-6">
+      <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+        <h6 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fas fa-users text-sky-600 mr-2"></i> ความสนใจลูกค้า
+        </h6>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50/50 border-b border-slate-100">
+              <th class="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">หัวข้อความสนใจ</th>
+              <th class="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">จำนวน</th>
+              <th class="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">สัดส่วน %</th>
+            </tr>
+          </thead>
+          <tbody id="tableInterestsBody" class="divide-y divide-slate-100">
+            <!-- Rows will be injected here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <template id="tmpl-pos">
+    <div class="row h-100">
+      <div class="col-lg-8 d-flex flex-column h-100">
+        <div class="card border-0 shadow-sm rounded-4 flex-grow-1 d-flex flex-column overflow-hidden">
+          <div class="bg-white p-2 border-bottom z-1 shadow-sm">
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="fw-bold mb-1 small"><i class="fas fa-bullhorn text-orange"></i> ช่องทางการขาย:</label>
+                <select class="form-select form-select-sm border-orange fw-bold" id="posChannelSelect" onchange="app.pos.onChannelChange()">
+                  <option value="">-- เลือกช่องทาง --</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="fw-bold mb-1 small"><i class="fas fa-store text-orange"></i> สาขาที่ทำรายการ:</label>
+                <select class="form-select form-select-sm border-orange fw-bold" id="posBranchSelect" onchange="app.pos.checkCriteria()">
+                  <option value="">-- เลือกช่องทางก่อน --</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="card-body d-flex flex-column h-100 p-0 position-relative">
+            <div id="criteriaOverlay" class="position-absolute top-0 start-0 w-100 h-100 bg-light bg-opacity-75 d-flex align-items-center justify-content-center z-2">
+              <h5 class="text-muted"><i class="fas fa-lock"></i> กรุณาเลือก "ช่องทาง" และ "สาขา" ให้ครบถ้วน</h5>
+            </div>
+            <div class="p-2 border-bottom bg-white">
+              <input type="text" class="form-control form-control-sm bg-light" id="searchProduct" placeholder="🔍 ค้นหาสินค้า (ชื่อ, SKU)..." onkeyup="app.pos.filter()">
+            </div>
+            <div class="p-2 flex-grow-1 overflow-auto bg-light" id="productGrid"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4 d-flex flex-column h-100 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm rounded-4 flex-grow-1 d-flex flex-column overflow-hidden">
+          <div class="bg-orange text-white p-2 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold"><i class="fas fa-shopping-cart"></i> ตะกร้าสินค้า</h6>
+            <span class="badge bg-white text-orange rounded-pill" id="cartCount">0</span>
+          </div>
+          <div class="flex-grow-1 overflow-auto p-2" id="cartItems">
+            <div class="text-center text-muted mt-5 small">ยังไม่มีสินค้าในตะกร้า</div>
+          </div>
+          <div class="p-2 bg-light border-top">
+            <select class="form-select form-select-sm mb-2" id="cartPromo" onchange="app.pos.updateTotal()"><option value="">-- เลือกโปรโมชั่นท้ายบิล --</option></select>
+            <div class="d-flex justify-content-between mb-1 small"><span class="text-muted">รวมเงิน</span><strong id="cartSubtotal">฿0.00</strong></div>
+            <div class="d-flex justify-content-between mb-2 text-danger small"><span>ส่วนลดท้ายบิล</span><strong id="cartDiscount">-฿0.00</strong></div>
+            <div class="d-flex justify-content-between align-items-center mb-2"><span class="fw-bold">ยอดสุทธิ</span><h5 class="mb-0 text-success fw-bold" id="cartTotal">฿0.00</h5></div>
+            <button class="btn btn-orange w-100 fw-bold" onclick="app.pos.openCheckoutModal()">ดำเนินการ <i class="fas fa-arrow-right"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="addToCartModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content !rounded-3xl border-none shadow-2xl overflow-hidden">
+          <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+            <h6 class="text-base font-bold uppercase tracking-wider">รายละเอียดสินค้า</h6>
+            <button type="button" class="text-white/50 hover:text-white transition-colors" data-bs-dismiss="modal"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="p-8 space-y-6">
+            <div class="flex items-center space-x-6">
+              <div class="w-32 h-32 bg-slate-50 rounded-2xl border border-slate-100 p-4 flex items-center justify-center shrink-0">
+                <img id="modalProdImg" src="" class="max-h-full max-w-full object-contain">
+              </div>
+              <div class="min-w-0">
+                <h6 id="modalProdName" class="text-lg font-bold text-slate-900 leading-tight mb-2"></h6>
+                <div class="text-2xl font-black text-brand-orange" id="modalProdPrice"></div>
+                <input type="hidden" id="modalProdSKU">
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-1 gap-4">
+              <div class="space-y-2">
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">จำนวน <span class="text-brand-orange" id="modalProdStock"></span></label>
+                <div class="flex items-center bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden p-1">
+                  <button class="w-12 h-12 flex items-center justify-center text-slate-400 hover:bg-white rounded-xl transition-all" onclick="document.getElementById('modalProdQty').stepDown()"><i class="fas fa-minus"></i></button>
+                  <input type="number" class="flex-1 bg-transparent border-none text-center text-lg font-black text-slate-900 focus:ring-0 outline-none" id="modalProdQty" value="1" min="1">
+                  <button class="w-12 h-12 flex items-center justify-center text-slate-400 hover:bg-white rounded-xl transition-all" onclick="document.getElementById('modalProdQty').stepUp()"><i class="fas fa-plus"></i></button>
+                </div>
+              </div>
+              
+              <div class="space-y-2">
+                <label class="text-xs font-bold text-emerald-600 uppercase tracking-widest ml-1"><i class="fas fa-gift mr-1"></i> เลือกรับของแถมแบรนด์</label>
+                <div id="modalBrandGifts" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 max-h-40 overflow-y-auto"></div>
+              </div>
+              
+              <div class="space-y-2">
+                <label class="text-xs font-bold text-sky-600 uppercase tracking-widest ml-1"><i class="fas fa-gift mr-1"></i> เลือกรับของแถมช่องทาง</label>
+                <div id="modalChannelGifts" class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 max-h-40 overflow-y-auto"></div>
+              </div>
+            </div>
+          </div>
+          <div class="p-6 bg-slate-50 flex gap-4">
+            <button type="button" class="flex-1 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors" data-bs-dismiss="modal">ยกเลิก</button>
+            <button type="button" class="flex-[2] py-3 text-sm font-black text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-[0.98]" onclick="app.pos.confirmAddToCart()">เพิ่มลงตะกร้า</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="checkoutModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content !rounded-3xl border-none shadow-2xl overflow-hidden">
+          <div class="bg-brand-orange p-6 text-white flex justify-between items-center">
+            <h5 class="text-lg font-black uppercase tracking-widest">ข้อมูลลูกค้าและการจอง</h5>
+            <button type="button" class="text-white/50 hover:text-white transition-colors" data-bs-dismiss="modal"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="p-8 bg-slate-50 space-y-6">
+            <!-- Section 1 -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise">
+              <h6 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center border-b border-slate-50 pb-4">
+                <i class="fas fa-user text-brand-orange mr-3"></i> 1. ข้อมูลลูกค้า (จำเป็น)
+              </h6>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ชื่อ-สกุล <span class="text-rose-500">*</span></label>
+                  <input type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="coCustomer" required>
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">เบอร์ติดต่อ <span class="text-rose-500">*</span></label>
+                  <input type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="coPhone" required>
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email <span class="text-rose-500">*</span></label>
+                  <input type="email" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="coEmail" required>
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ID Card / Passport <span class="text-rose-500">*</span></label>
+                  <input type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="coIdCard" required>
+                </div>
+                <div class="space-y-1 md:col-span-2">
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Code Handraiser (ถ้ามี)</label>
+                  <input type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="coCodeHandraiser">
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 2 -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise">
+              <h6 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center border-b border-slate-50 pb-4">
+                <i class="fas fa-list-check text-sky-500 mr-3"></i> 2. ความสนใจลูกค้า
+              </h6>
+              <div id="dynamicInterests" class="grid grid-cols-2 gap-4">
+                <span class="text-slate-400 text-sm italic">Loading...</span>
+              </div>
+            </div>
+
+            <!-- Section 3 -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-enterprise">
+              <h6 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center border-b border-slate-50 pb-4">
+                <i class="fas fa-clipboard-check text-emerald-500 mr-3"></i> 3. ข้อมูลการรับจอง
+              </h6>
+              <div class="space-y-6">
+                <div class="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                  <label class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-3 block">สถานะการจอง <span class="text-rose-500">*</span></label>
+                  <div class="flex gap-6">
+                    <label class="flex items-center space-x-3 cursor-pointer group">
+                      <div class="relative w-5 h-5">
+                        <input type="radio" name="resStatus" id="radResT" value="จอง T (มีการจอง)" class="peer sr-only">
+                        <div class="w-full h-full bg-white border-2 border-slate-200 rounded-full peer-checked:border-brand-orange peer-checked:bg-brand-orange transition-all"></div>
+                        <div class="absolute inset-1 bg-white rounded-full scale-0 peer-checked:scale-100 transition-transform"></div>
+                      </div>
+                      <span class="text-sm font-bold text-slate-700 group-hover:text-slate-900 transition-colors">จอง T (มีการจอง)</span>
+                    </label>
+                    <label class="flex items-center space-x-3 cursor-pointer group">
+                      <div class="relative w-5 h-5">
+                        <input type="radio" name="resStatus" id="radResF" value="จอง F (สวมสิทธิ์การจอง)" class="peer sr-only">
+                        <div class="w-full h-full bg-white border-2 border-slate-200 rounded-full peer-checked:border-brand-orange peer-checked:bg-brand-orange transition-all"></div>
+                        <div class="absolute inset-1 bg-white rounded-full scale-0 peer-checked:scale-100 transition-transform"></div>
+                      </div>
+                      <span class="text-sm font-bold text-slate-700 group-hover:text-slate-900 transition-colors">จอง F (สวมสิทธิ์การจอง)</span>
+                    </label>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">ชื่อพนักงานรับจอง</label>
+                    <input type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="bkStaffName">
+                  </div>
+                  <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">เบอร์โทรพนักงาน</label>
+                    <input type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="bkPhone">
+                  </div>
+                </div>
+                
+                <div class="space-y-1">
+                  <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">หมายเหตุเพิ่มเติม</label>
+                  <textarea class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand-orange outline-none transition-all" id="coRemark" rows="3"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="p-8 bg-white border-t border-slate-100 flex gap-4">
+            <button type="button" class="flex-1 py-4 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-colors" data-bs-dismiss="modal">ยกเลิก</button>
+            <button type="button" class="flex-[2] py-4 text-lg font-black text-white bg-emerald-600 rounded-2xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-[0.98]" onclick="app.pos.submitCheckout()">ยืนยันสร้าง Order</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tmpl-datagrid">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-enterprise overflow-hidden flex flex-col h-full">
+      <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="relative max-w-md w-full">
+          <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="text" class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-orange focus:bg-white outline-none transition-all" id="gridSearch" placeholder="ค้นหาข้อมูล..." onkeyup="app.grid.filter()">
+        </div>
+        <button id="gridAddBtn" class="flex items-center px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm" onclick="app.grid.openForm()">
+          <i class="fas fa-plus mr-2"></i> เพิ่มข้อมูลใหม่
+        </button>
+      </div>
+      
+      <div class="flex-1 overflow-x-auto">
+        <table class="w-full text-left border-collapse" id="dataTable">
+          <thead id="dataGridHead" class="sticky top-0 z-10">
+            <!-- Headers will be injected here -->
+          </thead>
+          <tbody id="dataGridBody" class="divide-y divide-slate-100">
+            <!-- Rows will be injected here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Dynamic Form Modal -->
+    <div class="modal fade" id="formModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content !rounded-3xl border-none shadow-2xl overflow-hidden">
+          <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+            <h5 class="text-base font-bold uppercase tracking-wider" id="formModalTitle">จัดการข้อมูล</h5>
+            <button type="button" class="text-white/50 hover:text-white transition-colors" data-bs-dismiss="modal"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="p-8 max-h-[70vh] overflow-y-auto bg-slate-50">
+            <form id="dynamicForm" class="space-y-4"></form>
+          </div>
+          <div class="p-6 bg-white border-t border-slate-100 flex gap-4">
+            <button type="button" class="flex-1 py-3 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors" data-bs-dismiss="modal">ยกเลิก</button>
+            <button type="button" class="flex-[2] py-3 text-sm font-black text-white bg-brand-orange rounded-xl hover:bg-brand-orange-dark shadow-lg shadow-brand-orange/20 transition-all active:scale-[0.98]" onclick="app.grid.saveForm()">บันทึกข้อมูล</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <?!= include('JS'); ?>
+</body>
+</html>

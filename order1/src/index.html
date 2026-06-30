@@ -42,6 +42,9 @@
       border-bottom: 1px solid #e5e7eb !important;
       font-size: 10px !important;
       color: #374151 !important;
+      position: sticky !important;
+      top: 0;
+      z-index: 10;
     }
     table.dataTable tbody td {
       font-size: 10px !important;
@@ -73,28 +76,66 @@
 
 <body class="bg-gray-50 pt-16">
 
+  <!-- Login Screen -->
+  <div id="login_screen" class="fixed inset-0 z-[200] flex items-center justify-center bg-gray-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 border border-gray-100">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-800">เข้าสู่ระบบเบิกสินค้า</h2>
+        <p class="text-gray-500 mt-2">กรุณาระบุข้อมูลผู้เบิกเพื่อเริ่มต้น</p>
+      </div>
+      <form id="login_form" class="space-y-6">
+        <div>
+          <label for="login_name" class="block text-sm font-semibold text-gray-700 mb-1">ชื่อผู้เบิก</label>
+          <input type="text" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="login_name" placeholder="ชื่อ-นามสกุล" required>
+        </div>
+        <div>
+          <label for="login_celular" class="block text-sm font-semibold text-gray-700 mb-1">เบอร์โทรผู้เบิก</label>
+          <input type="text" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="login_celular" placeholder="08x-xxx-xxxx" required>
+        </div>
+        <div>
+          <label for="login_address" class="block text-sm font-semibold text-gray-700 mb-1">เลือกสาขา</label>
+          <select class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="login_address" required>
+            <option value="" disabled selected>เลือกสาขา</option>
+            <? let branches = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('สาขา').getDataRange().getDisplayValues().slice(1).map(r => r[0]).filter(a => a && a.trim() !== '') ?>
+            <? branches.forEach(a => { ?>
+              <option value="<?= a ?>"><?= a ?></option>
+            <? }) ?>
+          </select>
+        </div>
+        <button type="button" onclick="app.login()" class="w-full bg-primary hover:bg-red-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-200 transition-all transform hover:scale-[1.02]">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Navigation -->
   <nav class="bg-primary fixed top-0 left-0 right-0 z-50 shadow-lg">
     <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-      <a class="text-white font-bold text-lg sm:text-xl truncate" href="#">
-        เบิกสินค้าขาย ตัดรอบ 09.00น.
-      </a>
-      <div class="hidden md:flex space-x-6 items-center">
-        <a class="text-white hover:text-red-100 transition-colors font-medium" href="#">ฝ่ายขายปลีก</a>
-        <a class="text-white hover:text-red-100 transition-colors flex items-center space-x-1" href="mailto:Salr@tgtogo.com">
-          <svg width="1.2em" height="1.2em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2zm13 2.383l-4.758 2.855L15 11.114v-5.73zm-.034 6.878L9.271 8.82 8 9.583 6.728 8.82l-5.694 3.44A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.739zM1 11.114l4.758-2.876L1 5.383v5.73z"/></svg>
-          <span class="hidden lg:inline">Salr@tgtogo.com</span>
+      <div class="flex items-center space-x-4">
+        <a class="text-white font-bold text-lg sm:text-xl truncate" href="#">
+          เบิกสินค้าขาย ตัดรอบ 09.00น.
         </a>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div id="user_info_nav" class="hidden sm:flex flex-col items-end text-white text-xs mr-4">
+          <span id="nav_user_name" class="font-bold"></span>
+          <span id="nav_user_branch" class="opacity-80"></span>
+        </div>
+        <button onclick="app.logout()" class="text-white hover:bg-red-600 p-2 rounded-lg transition-colors flex items-center space-x-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+          <span class="hidden md:inline">ออกจากระบบ</span>
+        </button>
       </div>
     </div>
   </nav>
 
   <!-- Page Content -->
-  <div class="container mx-auto px-4 py-8">
+  <div id="main_content" class="container mx-auto px-4 py-8 hidden">
 
     <div class="flex flex-col lg:flex-row gap-8">
 
-      <div class="w-full lg:w-1/4">
+      <div class="w-full lg:w-1/5">
 
         <div class="mb-6">
           <div class="flex shadow-sm rounded-lg overflow-hidden border border-gray-200 focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all">
@@ -129,13 +170,14 @@
 
 
 
-      <div class="w-full lg:w-3/4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="w-full lg:w-4/5 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
           <table id="productTable" class="w-full display hover row-border stripe">
             <thead>
               <tr>
-                <th class="text-left">ชื่อสินค้า</th>
                 <th class="text-left">หมวดหมู่</th>
+                <th class="text-left">ชื่อสินค้า</th>
+                <th class="text-center w-24">คงเหลือ</th>
                 <th class="text-center w-24">ระบุจำนวน</th>
                 <th class="text-center w-20">จัดการ</th>
               </tr>
@@ -189,27 +231,6 @@
             <tbody class="divide-y divide-gray-50"></tbody>
           </table>
         </div>
-
-        <form class="space-y-4">
-          <div>
-            <label for="txt_name" class="block text-sm font-semibold text-gray-700 mb-1">ชื่อผู้เบิก</label>
-            <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="txt_name">
-          </div>
-          <div>
-            <label for="txt_celular" class="block text-sm font-semibold text-gray-700 mb-1">เบอร์โทรผู้เบิก</label>
-            <input type="text" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="txt_celular">
-          </div>
-          <div>
-            <label for="txt_address" class="block text-sm font-semibold text-gray-700 mb-1">เลือกสาขา</label>
-            <select class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" id="txt_address">
-              <option value="" disabled selected>เลือกสาขาหรือพิมพ์ค้นหา</option>
-              <? let data = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('สาขา').getDataRange().getDisplayValues().slice(1).map(r => r[0]).filter(a => a && a.trim() !== '') ?>
-              <? data.forEach(a => { ?>
-                <option value="<?= a ?>"><?= a ?></option>
-              <? }) ?>
-            </select>
-          </div>
-        </form>
       </div>
 
       <div class="p-6 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
