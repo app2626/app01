@@ -1,0 +1,188 @@
+<script>
+  let admin = "";
+
+function getData(){
+    google.script.run.withSuccessHandler(showData).withFailureHandler(function(error) {
+        console.error("getData error:", error);
+        loadingEnd();
+        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้ กรุณารีเฟรชหน้าจออีกครั้ง', 'error');
+    }).getData(admin);
+  }
+
+  var table
+  function showData(dataArray){
+    window.globalData = dataArray;
+    let allCount = dataArray.length;
+    let waitCount = 0;
+    let waitSOCount = 0;
+    let waitInvCount = 0;
+    let doneCount = 0;
+    let disappCount = 0;
+    dataArray.forEach(r => {
+       let st = (r[32] || '').trim();
+       if (st === 'รออนุมัติ' || st === '') waitCount++;
+       else if (st === 'รอเปิด SO' || st === 'อนุมัติแล้ว') waitSOCount++;
+       else if (st === 'รอเปิด Invoice') waitInvCount++;
+       else if (st === 'เสร็จสมบูรณ์') doneCount++;
+       else if (st === 'ไม่อนุมัติ') disappCount++;
+       else waitCount++;
+    });
+    
+    let elAll = document.getElementById('countAll');
+    let elWait = document.getElementById('countWait');
+    let elWaitSO = document.getElementById('countWaitSO');
+    let elWaitInv = document.getElementById('countWaitInv');
+    let elDone = document.getElementById('countDone');
+    let elRej = document.getElementById('countReject');
+    
+    if(elAll) elAll.innerHTML = allCount;
+    if(elWait) elWait.innerHTML = waitCount;
+    if(elWaitSO) elWaitSO.innerHTML = waitSOCount;
+    if(elWaitInv) elWaitInv.innerHTML = waitInvCount;
+    if(elDone) elDone.innerHTML = doneCount;
+    if(elRej) elRej.innerHTML = disappCount;
+
+
+
+    $(document).ready(function(){
+      loadingEnd();
+      table = $('#datatable').DataTable({
+        destroy: true,
+        responsive: {
+            details: {
+                display: $.fn.dataTable.Responsive.display.modal({
+                    header: function (row) {
+                        var data = row.data();
+                        return 'รายละเอียดข้อมูล: ' + data[7]; // แสดงชื่อลูกค้าบนหัว popup
+                    }
+                }),
+                renderer: $.fn.dataTable.Responsive.renderer.tableAll({
+                    tableClass: 'table table-bordered table-striped'
+                })
+            }
+        },
+        data: dataArray,
+
+    columnDefs:[
+                
+                (userRole !== "แอดมิน" && userRole !== "บัญชี")?{targets: [32],visible: false}:{targets: [32],visible: true}, 
+
+                (userRole !== "แอดมิน" && userRole !== "บัญชี")?{targets: [2,30,31,32,33,34,35,36,37,38,39,40],className: 'all'}:{targets: [2,30,31,32,33,34,35,36,37,38,39,40,41],className: 'all'}
+                ],
+
+     columns: [
+      { title: "ID :" },
+      { title: "วันที่ขออนุมัติ" },
+      { title: "สาขา :" },
+      { title: "รหัสพนักงาน :" },
+      { title: "ชื่อ-สกุล(พนง.) :" },
+      { title: "เบอร์ติดต่อ(พนง.) :" },
+      { title: "เลขบัตรประชาชน :" },
+      { title: "ชื่อตัวและสกุล (ลูกค้า) :" },
+      { title: "เบอร์ติดต่อลูกค้า :" },
+      { title: "ที่อยู่ :" },
+      { title: "หมู่ที่ :" },
+      { title: "ตำบล/แขวง :" },
+      { title: "อำเภอ/เขต :" },
+      { title: "จังหวัด :" },
+      { title: "รหัสไปรษณีย์ :" },
+      { title: "ชื่อรุ่นสินค้า" },
+      { title: "IMEI :" },
+      { title: "PREMIUM :" },
+      { title: "การรับประกันจอแตก :" },
+      { title: "ราคาขายปลีกปกติ :" },
+      { title: "เงินดาวน์ :" },
+      { title: "ส่วนลด เปิดเบอร์ AIS :" },
+      { title: "ส่วนลด promotion :" },
+      { title: "ส่วนลด Trade in :" },
+      { title: "ส่วนลด Trade up :" },
+      { title: "ส่วนลด Big point :" },
+      { title: "ค่าธรรมเนียม :" },
+      { title: "ราคาสุทธิ :" },
+      { title: "จำนวนงวด :" },
+      { title: "งวดละ :" },
+      { title: "รูปสลิปเงินโอน :" ,
+      render: function (data) {    
+        data = `<img src="${data}" type='button' height='30px' onclick='showPic(this)'>`;
+        return data;
+         }
+       },
+      { title: "ไฟล์หนังสือสัญญา",
+        render: function (data) {
+          // FIX: เปลี่ยนจาก external HTTP image เป็น Font Awesome icon (ไม่ขึ้นกับ URL ภายนอก)
+          if (!data) return '<span class="text-muted">-</span>';
+          return `<a href="${data}" target="_blank" title="ดูหนังสือสัญญา"><i class="fa-solid fa-file-pdf text-danger fa-lg"></i></a>`;
+         }
+       },
+       { title: "ปุ่มจัดการ", name: "manage", data: null,
+         render: function(data, type, row) {
+           return "<button type='button' class='btn shadow-sm' style='background-color: #dc3545 !important; color: white !important; border: none;' onclick='statusData(this);'><i class='fa-solid fa-user-pen me-1'></i> จัดการ</button>";
+         }
+       },
+       { title: "สถานะ", name: "status", data: 32,
+         render: function (data, type) {    
+          let st = typeof data === 'string' ? data.trim() : (data || '');
+          if (type === 'display') {
+            if(st ==="" || st ==="รออนุมัติ"){
+            return "<span class='text-warning sfont' style='text-shadow: 0.5px 0.5px 0px rgba(0,0,0,0.1);'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>"; 
+            }else if(st ==="รอเปิด SO" || st ==="อนุมัติแล้ว"){
+            return "<span class='text-info sfont'><i class='fa-solid fa-file-invoice'></i> รอเปิด SO</span>";
+            }else if(st ==="รอเปิด Invoice"){
+            return "<span class='text-primary sfont'><i class='fa-solid fa-file-invoice-dollar'></i> รอเปิด Invoice</span>";
+            }else if(st ==="เสร็จสมบูรณ์"){
+            return "<span class='text-success sfont'><i class='fa-solid fa-check-double'></i> เสร็จสมบูรณ์</span>";
+            }else if(st ==="ไม่อนุมัติ"){
+            return "<span class='text-danger sfont'><i class='fa-solid fa-circle-xmark'></i> ไม่อนุมัติ</span>";
+            }
+          } else if (type === 'filter' || type === 'sort') {
+            // FIX: normalize "อนุมัติแล้ว" → "รอเปิด SO" เพื่อให้ filter ทำงานถูกต้อง
+            if(st ==="" || st ==="รออนุมัติ") return "รออนุมัติ";
+            if(st ==="รอเปิด SO" || st ==="อนุมัติแล้ว") return "รอเปิด SO";
+            return st;
+          }
+          return data;
+        }
+       },
+       { title: "Remark(การเงิน) :", data: 33 },
+       { title: "ยอดเงินโอนที่ได้รับ(การเงิน) :", data: 34 },
+       { title: "Remark(การเงิน)ใส่หมายเหตุเพิ่มถ้ามี :", data: 35 },
+       { title: "Remark(SO) :", data: 36 },
+       { title: "Sales Order created :", data: 37 },
+       { title: "Remark(SO)ใส่หมายเหตุเพิ่มถ้ามี :", data: 38 },
+       { title: "Invoice บัญชี :", data: 39 },
+       { title: "AR ใส่หมายเกตุถ้ามี :", data: 40 }
+      ],
+    lengthMenu: [[20, 30, 50, 100, -1], [20, 30, 50, 100, "all"]],
+    order: false,
+    destroy:true, 
+
+     //Thai language of the pagination menu
+            language: {
+              url: 'https://cdn.datatables.net/plug-ins/1.11.3/i18n/th.json',
+              sZeroRecords: "ไม่พบสถานะ",
+      sInfo: '<i class="fas fa-angle-double-left"></i> _START_ ถึง _END_ จาก _TOTAL_ <i class="fas fa-angle-double-right"></i>',
+              paginate: {
+              previous: '<i class="fa-solid fa-chevron-left"></i>',
+              next: '<i class="fa-solid fa-chevron-right"></i>'
+              }
+            },
+         initComplete: function(settings){
+           // ไม่มีปุ่มกรองสถานะแล้ว จึงเว้นว่างไว้เผื่อใส่อย่างอื่นในอนาคต
+         }
+      });    
+  });
+        //It will show only 4 pager buttons.
+    $.fn.DataTable.ext.pager.numbers_length = 4;
+}
+function filterTableByStatus(status) {
+  if (!table) return;
+  if (status === 'ทั้งหมด') {
+    table.column('status:name').search('').draw();
+  } else {
+    // ใช้ Regex ค้นหาแบบตรงตัว
+    table.column('status:name').search('^' + status + '$', true, false).draw();
+  }
+}
+
+</script>
+

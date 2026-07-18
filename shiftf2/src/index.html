@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <title>รายละเอียดข้อมูลกดshift F2</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
+     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/2.4.0/luxon.min.js" integrity="sha512-v1zUTZ9zv9Wb2scL/ANxXM6m7yegm/W5SN8SRHNFADdZIuSFFkrEBjNxO803DdFkjoCcJ88g1WHRVlLN6K/O1A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+     <link href="https://ltschool.web.app/css/Bootstrapcolor.css" rel="stylesheet" type="text/css">
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9YAA1QvwINks4PhcElQSvqcyVLLD9aMhXd13uQjoXtEKNosOWaZqXgel0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+     <!-- ApexCharts -->
+     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+     <?!= include('css'); ?>
+   
+  </head>
+   <body class="relative bg-slate-50">
+    <?!= include('login'); ?>
+    <div id="app-container" class="container mx-auto max-w-[1856px] px-2 sm:px-4 py-4 hidden">
+<nav class="navbar border-0 rounded-2xl px-4 py-3 bg-gradient-to-r from-green-600 to-green-800 shadow-md mb-4">
+  <div class="container-fluid d-flex flex-column flex-md-row gap-3 p-0">
+    <!-- Top section: Logo + Add Button -->
+    <div class="d-flex align-items-center justify-content-between w-100" style="max-width: 100%;">
+      <span class="navbar-brand text-white font-semibold text-lg tracking-tight m-0 drop-shadow-sm">
+        <i class="fa-solid fa-table-list text-green-100 me-2"></i> ขออนุมัติปรับShift F2
+      </span>
+      
+      <div class="d-flex align-items-center gap-2">
+        <button id="btnViewSettings" type="button" class="btn text-slate-500 bg-white border border-slate-200 shadow-sm hover:shadow-md hover:text-slate-700 transition-colors duration-200 rounded-lg px-4 py-2 font-medium text-sm d-none align-items-center flex-shrink-0" onclick="showSettings()">
+          <i class="fa-solid fa-gear me-2"></i> <span>ตั้งค่าระบบ</span>
+        </button>
+        <button type="button" class="btn text-red-500 bg-white border border-red-200 shadow-sm hover:shadow-md hover:text-red-700 hover:bg-red-50 transition-colors duration-200 rounded-lg px-4 py-2 font-medium text-sm d-flex align-items-center flex-shrink-0" onclick="handleLogout()">
+          <i class="fa-solid fa-arrow-right-from-bracket me-2"></i> <span>ออกจากระบบ</span>
+        </button>
+      </div>
+    </div>
+
+
+  </div>
+</nav>
+
+    <!-- View Toggles -->
+    <div class="flex justify-center mt-2 mb-4 animate__animated animate__fadeIn">
+        <div class="bg-white border border-slate-200 rounded-xl p-1 shadow-sm inline-flex flex-wrap justify-center gap-1">
+            <button type="button" class="px-4 py-2 text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 shadow-sm transition-all focus:outline-none flex items-center" data-bs-toggle="modal" data-bs-target="#staticBackdrop2"><i class="fa-solid fa-plus me-2"></i>คีย์ข้อมูลใหม่</button>
+            <button id="btnViewTable" class="px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 shadow-sm text-green-700 transition-all focus:outline-none"><i class="fa-solid fa-table me-2"></i>ตารางข้อมูล</button>
+            <button id="btnViewChart" class="px-4 py-2 text-sm font-medium rounded-lg text-slate-500 hover:text-slate-700 transition-all focus:outline-none"><i class="fa-solid fa-chart-pie me-2"></i>แดชบอร์ดสรุปผล</button>
+        </div>
+    </div>
+
+    <!-- Dashboard Container -->
+    <div id="dashboard-container" class="hidden mt-4 mb-5 animate__animated animate__fadeIn">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Chart 1: Status -->
+            <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4"><i class="fa-solid fa-chart-pie text-green-500 me-2"></i>สรุปสถานะการอนุมัติ</h3>
+                <div id="chart-status" class="min-h-[300px] flex justify-center"></div>
+            </div>
+            <!-- Chart 4: Month Timeline -->
+            <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4"><i class="fa-solid fa-chart-line text-orange-500 me-2"></i>จำนวนปรับ shift เดือน</h3>
+                <div id="chart-month" class="min-h-[300px]"></div>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Chart 2: Topic -->
+            <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4"><i class="fa-solid fa-chart-bar text-purple-500 me-2"></i>เรื่องปรับ shift</h3>
+                <div id="chart-topic" class="min-h-[300px]"></div>
+            </div>
+            <!-- Chart 3: Branches -->
+            <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-6">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4"><i class="fa-solid fa-chart-column text-blue-500 me-2"></i>ปรับ shift top10</h3>
+                <div id="chart-branch" class="min-h-[300px]"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="table-container" class="animate__animated animate__fadeIn">
+        <!-- Status Summary Cards -->
+        <div class="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
+            <div class="bg-orange-500 border border-orange-600 rounded-lg p-1 shadow flex flex-col justify-center items-center transition-transform hover:-translate-y-1 h-[2cm] w-[3.5cm]">
+                <h4 class="text-[11px] sm:text-xs font-medium text-orange-100 m-0 leading-tight mb-1">รออนุมัติ</h4>
+                <p class="text-lg font-bold text-white drop-shadow-sm m-0 leading-tight" id="sum-pending">0</p>
+            </div>
+            <div class="bg-green-500 border border-green-600 rounded-lg p-1 shadow flex flex-col justify-center items-center transition-transform hover:-translate-y-1 h-[2cm] w-[3.5cm]">
+                <h4 class="text-[11px] sm:text-xs font-medium text-green-100 m-0 leading-tight mb-1">อนุมัติแล้ว</h4>
+                <p class="text-lg font-bold text-white drop-shadow-sm m-0 leading-tight" id="sum-approved">0</p>
+            </div>
+            <div class="bg-red-500 border border-red-600 rounded-lg p-1 shadow flex flex-col justify-center items-center transition-transform hover:-translate-y-1 h-[2cm] w-[3.5cm]">
+                <h4 class="text-[11px] sm:text-xs font-medium text-red-100 m-0 leading-tight mb-1">ไม่อนุมัติ</h4>
+                <p class="text-lg font-bold text-white drop-shadow-sm m-0 leading-tight" id="sum-rejected">0</p>
+            </div>
+            <div class="bg-blue-500 border border-blue-600 rounded-lg p-1 shadow flex flex-col justify-center items-center transition-transform hover:-translate-y-1 h-[2cm] w-[3.5cm]">
+                <h4 class="text-[11px] sm:text-xs font-medium text-blue-100 m-0 leading-tight mb-1">ทั้งหมด</h4>
+                <p class="text-lg font-bold text-white drop-shadow-sm m-0 leading-tight" id="sum-all">0</p>
+            </div>
+        </div>
+
+        <!-- Status Tabs -->
+        <div class="border-b border-slate-200 mb-4 px-2 overflow-x-auto">
+            <nav class="-mb-px flex space-x-6" aria-label="Tabs" id="statusTabs">
+                <button data-val="รออนุมัติ" class="tab-btn whitespace-nowrap border-b-2 border-green-500 py-3 px-2 text-sm font-semibold text-green-600 transition-colors">รออนุมัติ</button>
+                <button data-val="อนุมัติ" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-3 px-2 text-sm font-medium text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors">อนุมัติแล้ว</button>
+                <button data-val="ไม่อนุมัติ" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-3 px-2 text-sm font-medium text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors">ไม่อนุมัติ</button>
+                <button data-val="" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-3 px-2 text-sm font-medium text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors">ทั้งหมด</button>
+            </nav>
+        </div>
+        
+        <!-- Search Box -->
+        <div class="flex justify-end mb-2 px-2">
+            <div class="d-flex align-items-center gap-2 w-100" style="max-width: 300px;">
+                <input class="form-control rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-colors flex-grow-1 w-100" type="search" id="search" placeholder="ค้นหา..." aria-label="Search">
+            </div>
+        </div>
+
+        <div id="data-table" class="data-table mt-2 shadow-sm rounded-2xl overflow-hidden border border-slate-200 bg-white"></div>
+    </div>
+    
+    <div id="alerts" class="mt-4"></div>
+    </div>
+    
+<!-- Modal -->
+<div class="modal fade" id="staticBackdrop2" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="staticBackdropLabel">แบบฟอร์มแจ้งรายละเอียด</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="customForm" onsubmit="submitCustomForm(event)">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">เรื่อง</label>
+              <select class="form-control" name="topic" id="topicSelect" required>
+                <option value="">-- กรุณาเลือกเรื่อง --</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">สาขา</label>
+              <select class="form-control" name="branch" id="branchSelect" required>
+                <option value="">-- กรุณาเลือกสาขา --</option>
+              </select>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">รายละเอียดสินค้า</label>
+              <input type="text" class="form-control" name="productDetail" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">บาร์ขาย</label>
+              <input type="text" class="form-control" name="barcode" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ราคาในระบบ</label>
+              <input type="text" class="form-control" name="systemPrice" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">กดShift F2 (ปรับราคาขาย)</label>
+              <input type="text" class="form-control" name="shiftF2Price" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ราคาสุทธิ</label>
+              <input type="text" class="form-control" name="netPrice" required>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">ระยะเวลาโปรโมชั่น</label>
+              <input type="text" class="form-control bg-white" name="promotionPeriod" placeholder="คลิกเพื่อเลือกวันเริ่มต้น - สิ้นสุด" required readonly>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">ชื่อ-นามสกุล/เบอร์โทรลูกค้า</label>
+              <input type="text" class="form-control" name="customerInfo" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">แพ็คเกจAIS</label>
+              <input type="text" class="form-control" name="aisPackage" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">IMEIเครื่องที่เอามาTrade(เครื่องเก่า)</label>
+              <input type="text" class="form-control" name="imeiTrade" required>
+            </div>
+          </div>
+          <div class="mt-4 text-end">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header border-b border-gray-100">
+        <h5 class="modal-title text-gray-800 font-semibold"><i class="fa-solid fa-list-ul text-green-600 me-2"></i>รายละเอียดข้อมูล</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-6" id="detailsModalBody">
+      </div>
+      <div class="modal-footer border-t border-gray-100">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <!--Footer -->
+  <footer class="text-muted text-center mt-2">
+      <p style="font-size:12px;"><a style="color:black" href="https://lin.ee/ycYRIU7" target="_blank">ติดต่อ</a> &copy; 2026 <a style="color:#0d6efd;" href="https://lin.ee/ycYRIU7" target="_blank">ผู้พัฒนา</a></p>
+  </footer> 
+
+  <?!= include('admin'); ?>
+      <script>
+       let currentUser = null;
+       const element = {}
+       let myTableInstance = null;
+       let currentTableData = [];
+       let tableState = null;
+       let tableOptions = null;
+       let updateDOM = null;
+       let chartStatusObj = null;
+       let chartBranchObj = null;
+       let chartTopicObj = null;
+       let chartMonthObj = null;
+
+       function handleLogin(e) {
+           e.preventDefault();
+           const btn = e.target.querySelector('button');
+           const originalText = btn.innerHTML;
+           btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบ...';
+           btn.disabled = true;
+           
+           google.script.run
+               .withSuccessHandler(res => {
+                   btn.innerHTML = originalText;
+                   btn.disabled = false;
+                   if (res.success) {
+                       currentUser = res;
+                       localStorage.setItem('shiftF2User', JSON.stringify(res));
+                       localStorage.setItem('shiftF2LoginTime', new Date().getTime().toString());
+                       
+                       document.getElementById('login-container').classList.add('hidden');
+                       document.getElementById('app-container').classList.remove('hidden');
+                       
+                       applyRolePermissions();
+                       
+                       Swal.fire({
+                           toast: true,
+                           position: 'top-end',
+                           icon: 'success',
+                           title: `ยินดีต้อนรับ ${res.name} (${res.role})`,
+                           showConfirmButton: false,
+                           timer: 3000
+                       });
+                       
+                       if(myTableInstance && updateDOM) updateDOM();
+                   } else {
+                       Swal.fire('เข้าสู่ระบบไม่สำเร็จ', res.message, 'error');
+                   }
+               })
+               .withFailureHandler(err => {
+                   btn.innerHTML = originalText;
+                   btn.disabled = false;
+                   Swal.fire('ข้อผิดพลาด', err.message, 'error');
+               })
+               .checkLogin(document.getElementById('username').value, document.getElementById('password').value);
+       }
+
+       function applyRolePermissions() {
+           if (currentUser && currentUser.role === 'แอดมิน') {
+               document.getElementById('btnViewSettings').classList.remove('d-none');
+               document.getElementById('btnViewSettings').classList.add('d-flex');
+           } else {
+               document.getElementById('btnViewSettings').classList.remove('d-flex');
+               document.getElementById('btnViewSettings').classList.add('d-none');
+           }
+       }
+
+       function handleLogout() {
+           Swal.fire({
+               title: 'ยืนยันการออกจากระบบ?',
+               text: "คุณต้องการออกจากระบบใช่หรือไม่?",
+               icon: 'question',
+               showCancelButton: true,
+               confirmButtonColor: '#2563eb',
+               cancelButtonColor: '#d33',
+               confirmButtonText: 'ใช่, ออกจากระบบ',
+               cancelButtonText: 'ยกเลิก'
+           }).then((result) => {
+               if (result.isConfirmed) {
+                   currentUser = null;
+                   localStorage.removeItem('shiftF2User');
+                   localStorage.removeItem('shiftF2LoginTime');
+                   
+                   // Reset UI views
+                   document.getElementById('app-container').classList.add('hidden');
+                   document.getElementById('login-container').classList.remove('hidden');
+                   
+                   // Make sure dashboard and table containers reset if needed, or leave them as is since app-container hides all
+                   
+                   // Clear inputs
+                   document.getElementById('username').value = '';
+                   document.getElementById('password').value = '';
+                   
+                   Swal.fire({
+                       toast: true,
+                       position: 'top-end',
+                       icon: 'success',
+                       title: 'ออกจากระบบเรียบร้อยแล้ว',
+                       showConfirmButton: false,
+                       timer: 2000
+                   });
+               }
+           });
+       }
+       function checkSession() {
+           const storedUser = localStorage.getItem('shiftF2User');
+           const loginTime = localStorage.getItem('shiftF2LoginTime');
+           
+           if (storedUser && loginTime) {
+               const now = new Date().getTime();
+               const daysPassed = (now - parseInt(loginTime)) / (1000 * 60 * 60 * 24);
+               if (daysPassed < 120) {
+                   currentUser = JSON.parse(storedUser);
+                   document.getElementById('login-container').classList.add('hidden');
+                   document.getElementById('app-container').classList.remove('hidden');
+                   applyRolePermissions();
+                   return;
+               } else {
+                   localStorage.removeItem('shiftF2User');
+                   localStorage.removeItem('shiftF2LoginTime');
+               }
+           }
+           
+           document.getElementById('login-container').classList.remove('hidden');
+           document.getElementById('app-container').classList.add('hidden');
+       }
+       
+       document.addEventListener('DOMContentLoaded',pageLoad)
+       function pageLoad(){
+          checkSession();
+          element.alerts = document.getElementById("alerts");
+          element.search = document.getElementById("search");
+
+          // Toggles
+          document.getElementById('btnViewTable').addEventListener('click', () => {
+              document.getElementById('table-container').classList.remove('hidden');
+              document.getElementById('dashboard-container').classList.add('hidden');
+              document.getElementById('settings-container').classList.add('hidden');
+              
+              document.getElementById('btnViewTable').classList.add('bg-slate-100', 'shadow-sm', 'text-green-700');
+              document.getElementById('btnViewTable').classList.remove('text-slate-500', 'hover:text-slate-700');
+              
+              document.getElementById('btnViewChart').classList.remove('bg-slate-100', 'shadow-sm', 'text-green-700');
+              document.getElementById('btnViewChart').classList.add('text-slate-500', 'hover:text-slate-700');
+
+              document.getElementById('btnViewSettings').classList.remove('bg-slate-100', 'shadow-sm', 'text-green-700');
+              document.getElementById('btnViewSettings').classList.add('text-slate-500', 'hover:text-slate-700');
+           });
+
+          document.getElementById('btnViewChart').addEventListener('click', () => {
+              document.getElementById('table-container').classList.add('hidden');
+              document.getElementById('dashboard-container').classList.remove('hidden');
+              document.getElementById('settings-container').classList.add('hidden');
+              
+              document.getElementById('btnViewChart').classList.add('bg-slate-100', 'shadow-sm', 'text-green-700');
+              document.getElementById('btnViewChart').classList.remove('text-slate-500', 'hover:text-slate-700');
+              
+              document.getElementById('btnViewTable').classList.remove('bg-slate-100', 'shadow-sm', 'text-green-700');
+              document.getElementById('btnViewTable').classList.add('text-slate-500', 'hover:text-slate-700');
+
+              document.getElementById('btnViewSettings').classList.remove('bg-slate-100', 'shadow-sm', 'text-green-700');
+              document.getElementById('btnViewSettings').classList.add('text-slate-500', 'hover:text-slate-700');
+              
+              if(chartStatusObj) window.dispatchEvent(new Event('resize'));
+          });
+
+          element.search.addEventListener("input", searchData)
+          
+          // Status Tabs Logic
+          document.querySelectorAll('.tab-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                  // Update Active State
+                  document.querySelectorAll('.tab-btn').forEach(b => {
+                      b.classList.remove('border-green-500', 'text-green-600', 'font-semibold');
+                      b.classList.add('border-transparent', 'text-slate-500', 'font-medium');
+                  });
+                  e.currentTarget.classList.remove('border-transparent', 'text-slate-500', 'font-medium');
+                  e.currentTarget.classList.add('border-green-500', 'text-green-600', 'font-semibold');
+                  
+                  // Filter Table
+                  if (myTableInstance) {
+                      const val = e.currentTarget.getAttribute('data-val');
+                      if (val) {
+                          tableState.columnFilters = [{ id: 'สถานะ', value: val }];
+                      } else {
+                          tableState.columnFilters = [];
+                      }
+                      myTableInstance.setOptions(tableOptions);
+                      if(updateDOM) updateDOM();
+                  }
+              });
+          });
+
+         loadData()
+
+         google.script.run.withSuccessHandler(function(data) {
+             const topicSelect = document.getElementById('topicSelect');
+             if(topicSelect) {
+                 data.topics.forEach(function(topic) {
+                    const opt = document.createElement('option');
+                    opt.value = topic;
+                    opt.innerHTML = topic;
+                    topicSelect.appendChild(opt);
+                 });
+             }
+             
+             const branchSelect = document.getElementById('branchSelect');
+             if(branchSelect) {
+                 data.locations.forEach(function(loc) {
+                    const opt = document.createElement('option');
+                    opt.value = loc;
+                    opt.innerHTML = loc;
+                    branchSelect.appendChild(opt);
+                 });
+             }
+
+             $('#topicSelect').select2({
+                 theme: 'bootstrap-5',
+                 dropdownParent: $('#staticBackdrop2'),
+                 width: '100%',
+                 placeholder: '-- กรุณาเลือกเรื่อง --'
+             });
+             $('#branchSelect').select2({
+                 theme: 'bootstrap-5',
+                 dropdownParent: $('#staticBackdrop2'),
+                 width: '100%',
+                 placeholder: '-- กรุณาเลือกสาขา --'
+             });
+
+             // Initialize Flatpickr for promotion period
+             flatpickr("input[name='promotionPeriod']", {
+                 mode: "range",
+                 locale: "th",
+                 dateFormat: "d/m/Y",
+                 allowInput: false
+             });
+          }).getDropdownOptions();
+       }
+  function loadData(){
+    const loadingToast = Swal.fire({
+        toast: true,
+        position: 'top-end',
+        title: 'กำลังโหลดข้อมูล...',
+        showConfirmButton: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    google.script.run
+    .withSuccessHandler((tabledata)=>{
+        renderTanStackTable(tabledata);
+        renderCharts(tabledata);
+        updateSummaryCards(tabledata);
+        loadingToast.close();
+    })
+    .withFailureHandler((er)=>{
+        loadingToast.close();
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาดในการโหลดข้อมูล',
+            showConfirmButton: false,
+            timer: 3000
+        });
+    })
+    .getData()
+  }
+
+function updateSummaryCards(data) {
+    if (!data) return;
+    let counts = { "อนุมัติ": 0, "ไม่อนุมัติ": 0, "รออนุมัติ": 0, "ทั้งหมด": data.length };
+    data.forEach(row => {
+        const status = row['สถานะ'] || "รออนุมัติ";
+        if (counts[status] !== undefined) counts[status]++;
+    });
+    
+    const elAll = document.getElementById("sum-all");
+    const elPending = document.getElementById("sum-pending");
+    const elApproved = document.getElementById("sum-approved");
+    const elRejected = document.getElementById("sum-rejected");
+    
+    if (elAll) elAll.textContent = counts["ทั้งหมด"];
+    if (elPending) elPending.textContent = counts["รออนุมัติ"];
+    if (elApproved) elApproved.textContent = counts["อนุมัติ"];
+    if (elRejected) elRejected.textContent = counts["ไม่อนุมัติ"];
+}
+
+function renderCharts(data) {
+    if (!data || data.length === 0) return;
+    
+    let statusCounts = { "อนุมัติ": 0, "ไม่อนุมัติ": 0, "รออนุมัติ": 0 };
+    let branchCounts = {};
+    let topicCounts = {};
+    let monthCounts = {};
+    
+    data.forEach(row => {
+        const status = row['สถานะ'] || "รออนุมัติ";
+        const branch = row['สาขา'] || "ไม่ระบุ";
+        const topic = row['เรื่อง'] || "ไม่ระบุ";
+        
+        let sortKey = "";
+        let monthName = "";
+        const idTimestamp = parseInt(row['ID'] || row['Timestamp'] || row['ประทับเวลา'] || 0);
+        if(idTimestamp > 1000000000000) {
+            const d = new Date(idTimestamp);
+            const m = d.getMonth();
+            const y = d.getFullYear();
+            const thaiMonths = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+            monthName = thaiMonths[m] + " " + (y+543).toString().substring(2);
+            sortKey = `${y}-${(m+1).toString().padStart(2, '0')}`;
+        } else if (row['Timestamp'] || row['ประทับเวลา']) {
+            const dateStr = row['Timestamp'] || row['ประทับเวลา'];
+            const d = new Date(dateStr);
+            if(!isNaN(d)) {
+                const m = d.getMonth();
+                const y = d.getFullYear();
+                const thaiMonths = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+                monthName = thaiMonths[m] + " " + (y+543).toString().substring(2);
+                sortKey = `${y}-${(m+1).toString().padStart(2, '0')}`;
+            }
+        }
+        
+        if(statusCounts[status] !== undefined) statusCounts[status]++;
+        else statusCounts[status] = 1;
+        
+        branchCounts[branch] = (branchCounts[branch] || 0) + 1;
+        topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+        
+        if(sortKey) {
+            if(!monthCounts[sortKey]) monthCounts[sortKey] = { name: monthName, count: 0 };
+            monthCounts[sortKey].count++;
+        }
+    });
+
+    const statusOptions = {
+        series: [statusCounts["อนุมัติ"], statusCounts["ไม่อนุมัติ"], statusCounts["รออนุมัติ"]],
+        labels: ["อนุมัติ", "ไม่อนุมัติ", "รออนุมัติ"],
+        chart: { type: 'donut', height: 320, fontFamily: 'Kanit, sans-serif' },
+        colors: ['#16a34a', '#dc2626', '#eab308'],
+        plotOptions: { donut: { size: '65%' } },
+        dataLabels: { enabled: true, formatter: function (val, opts) { return opts.w.globals.seriesTotals[opts.seriesIndex] } },
+        legend: { position: 'bottom' },
+        stroke: { show: true, width: 2, colors: ['transparent'] }
+    };
+    
+    if (chartStatusObj) {
+        chartStatusObj.updateOptions(statusOptions);
+    } else {
+        chartStatusObj = new ApexCharts(document.querySelector("#chart-status"), statusOptions);
+        chartStatusObj.render();
+    }
+
+    const branchNames = Object.keys(branchCounts).sort((a,b) => branchCounts[b] - branchCounts[a]).slice(0, 10);
+    const branchValues = branchNames.map(name => branchCounts[name]);
+
+    const branchOptions = {
+        series: [{ name: 'จำนวนคำขอ', data: branchValues }],
+        chart: { type: 'bar', height: 320, fontFamily: 'Kanit, sans-serif', toolbar: { show: false } },
+        colors: ['#0ea5e9'],
+        plotOptions: { bar: { borderRadius: 6, horizontal: true, dataLabels: { position: 'top' } } },
+        dataLabels: { enabled: true, offsetX: 20, style: { colors: ['#333'] } },
+        xaxis: { categories: branchNames },
+        grid: { strokeDashArray: 4 }
+    };
+
+    if (chartBranchObj) {
+        chartBranchObj.updateOptions(branchOptions);
+    } else {
+        chartBranchObj = new ApexCharts(document.querySelector("#chart-branch"), branchOptions);
+        chartBranchObj.render();
+    }
+
+    const topicNames = Object.keys(topicCounts).sort((a,b) => topicCounts[b] - topicCounts[a]);
+    const topicValues = topicNames.map(name => topicCounts[name]);
+
+    const topicOptions = {
+        series: [{ name: 'จำนวนคำขอ', data: topicValues }],
+        chart: { type: 'bar', height: 320, fontFamily: 'Kanit, sans-serif', toolbar: { show: false } },
+        colors: ['#a855f7'],
+        plotOptions: { bar: { borderRadius: 6, horizontal: true, dataLabels: { position: 'top' } } },
+        dataLabels: { enabled: true, offsetX: 20, style: { colors: ['#333'] } },
+        xaxis: { categories: topicNames },
+        grid: { strokeDashArray: 4 }
+    };
+
+    if (chartTopicObj) {
+        chartTopicObj.updateOptions(topicOptions);
+    } else {
+        chartTopicObj = new ApexCharts(document.querySelector("#chart-topic"), topicOptions);
+        chartTopicObj.render();
+    }
+
+    // Render Month Timeline
+    const sortedMonthKeys = Object.keys(monthCounts).sort();
+    const monthNames = sortedMonthKeys.map(k => monthCounts[k].name);
+    const monthValues = sortedMonthKeys.map(k => monthCounts[k].count);
+
+    const monthOptions = {
+        series: [{ name: 'จำนวนคำขอ', data: monthValues }],
+        chart: { type: 'area', height: 320, fontFamily: 'Kanit, sans-serif', toolbar: { show: false } },
+        colors: ['#f97316'],
+        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.1, stops: [0, 90, 100] } },
+        dataLabels: { enabled: true, style: { colors: ['#333'] } },
+        stroke: { curve: 'smooth', width: 3 },
+        xaxis: { categories: monthNames },
+        grid: { strokeDashArray: 4 }
+    };
+
+    if (chartMonthObj) {
+        chartMonthObj.updateOptions(monthOptions);
+    } else {
+        chartMonthObj = new ApexCharts(document.querySelector("#chart-month"), monthOptions);
+        chartMonthObj.render();
+    }
+}
+
+function renderTanStackTable(data) {
+    currentTableData = data;
+    const container = document.getElementById("data-table");
+    
+    // Create the DOM shell only if it doesn't exist yet
+    if (!myTableInstance) {
+        container.innerHTML = `
+          <div class="tanstack-table-wrapper w-full overflow-y-auto overflow-x-auto rounded-2xl bg-white border-b border-slate-200 relative" style="max-height: 75vh;">
+            <table class="w-full text-left border-collapse min-w-max">
+              <thead class="bg-green-700 border-b border-green-800 sticky top-0 z-10 shadow-md"></thead>
+              <tbody class="bg-white"></tbody>
+            </table>
+          </div>
+          <div class="pagination flex flex-wrap items-center justify-center p-3 bg-white border-t border-slate-200 gap-3 rounded-b-2xl"></div>
+        `;
+        container.className = "mt-4 mb-5 shadow-sm rounded-2xl overflow-hidden border border-slate-200 bg-white animate__animated animate__fadeIn"; 
+    }
+
+    const thead = container.querySelector('thead');
+    const tbody = container.querySelector('tbody');
+    const paginationEl = container.querySelector('.pagination');
+
+    const columns = [
+     {
+         id: 'expander',
+         header: '',
+         accessorFn: () => '',
+         cell: (info) => {
+             return `<button class="btn-expand w-8 h-8 rounded-full text-white bg-green-600 hover:bg-green-700 flex items-center justify-center lg:hidden transition-all shadow-sm" data-rowid="${info.row.id}"><i class="fa-solid fa-plus text-xs pointer-events-none"></i></button>`;
+         },
+         meta: { className: 'w-14 text-center lg:hidden' }
+     },
+     {header:'<i class="fa-brands fa-dropbox text-green-200 me-1"></i> เรื่อง', accessorKey:"เรื่อง", meta: { className: 'min-w-[150px]' }},
+     {header:'<i class="fa-brands fa-slack text-green-200 me-1"></i> สาขา', accessorKey:"สาขา", meta: { className: 'min-w-[120px]' }},
+     {header:'<i class="fa-brands fa-deezer text-green-200 me-1"></i> รายละเอียดสินค้า', accessorKey:"รายละเอียดสินค้า", meta: { className: 'hidden lg:table-cell min-w-[200px]' }},
+     {header:'<i class="fa-brands fa-evernote text-green-200 me-1"></i> บาร์ขาย', accessorKey:"บาร์ขาย", meta: { className: 'hidden lg:table-cell' }},
+     {header:'<i class="fa-brands fa-bitcoin text-green-200 me-1"></i> ราคาในระบบ', accessorKey:"ราคาในระบบ", meta: { className: 'hidden lg:table-cell' }},
+     {header:'<i class="fa-brands fa-bitcoin text-green-200 me-1"></i> กดShift F2(ปรับราคาขาย)', accessorKey:"กดShift F2(ปรับราคาขาย)", meta: { className: 'hidden lg:table-cell' }},
+     {header:'<i class="fa-brands fa-bitcoin text-green-200 me-1"></i> ราคาสุทธิ', accessorKey:"ราคาสุทธิ", meta: { className: 'hidden lg:table-cell' }},
+     {header:'<i class="fa-brands fa-bitcoin text-green-200 me-1"></i> ระยะเวลาโปรโมชั่น', accessorKey:"ระยะเวลาโปรโมชั่น", meta: { className: 'hidden lg:table-cell' }},
+     {header:'<i class="fa-brands fa-themeco text-green-200 me-1"></i> ชื่อ-นามสกุล/เบอร์โทรลูกค้า', accessorKey:"ชื่อ-นามสกุล/เบอร์โทรลูกค้า", meta: { className: 'hidden lg:table-cell min-w-[200px]' }},
+     {header:'<i class="fa-brands fa-buysellads text-green-200 me-1"></i> แพ็คเกจAIS', accessorKey:"แพ็คเกจAIS", meta: { className: 'hidden lg:table-cell' }},
+     {header:'<i class="fa-brands fa-themeco text-green-200 me-1"></i> IMEIเครื่องที่เอามาTrade', accessorKey:"IMEIเครื่องที่เอามาTrade(เครื่องเก่า)", meta: { className: 'hidden lg:table-cell' }},
+     {
+        id: 'สถานะ',
+        header:'<i class="fa-brands fa-staylinked text-green-200 me-1"></i> สถานะ', 
+        accessorKey:"สถานะ",
+        meta: { className: 'min-w-[120px]' },
+        filterFn: (row, columnId, filterValue) => {
+            return String(row.getValue(columnId) || "") === String(filterValue || "");
+        },
+        cell: (info) => {
+            const val = info.getValue() || "";
+            let badgeClass = "bg-gray-100 text-gray-700 border border-gray-200";
+            if (val === "อนุมัติ") badgeClass = "bg-green-50 text-green-700 border border-green-200";
+            else if (val === "ไม่อนุมัติ") badgeClass = "bg-red-50 text-red-700 border border-red-200";
+            else if (val === "รออนุมัติ") badgeClass = "bg-yellow-50 text-yellow-700 border border-yellow-200";
+            
+            const rowId = info.row.original.ID || info.row.original['ประทับเวลา'] || info.row.original.Timestamp || '';
+            return `<span class="px-3 py-1 rounded-md text-xs font-medium cursor-pointer status-editable hover:bg-opacity-70 transition-colors inline-block ${badgeClass}" data-id="${rowId}" data-name="${info.row.original['เรื่อง']}" data-val="${val}">${val || "รออนุมัติ"} <i class="fa-solid fa-pen ms-1 text-[10px] text-gray-400"></i></span>`;
+        }
+     },
+    ];
+
+    const { createTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel } = TableCore;
+
+    if (!myTableInstance) {
+        tableOptions = {
+            data: currentTableData,
+            columns,
+            getCoreRowModel: getCoreRowModel(),
+            getFilteredRowModel: getFilteredRowModel(),
+            getPaginationRowModel: getPaginationRowModel(),
+            globalFilterFn: (row, columnId, filterValue) => {
+                const val = String(row.getValue(columnId) || "").toLowerCase();
+                return val.includes(String(filterValue).toLowerCase());
+            },
+        };
+        
+        // 1. Create table to let it generate initialState
+        myTableInstance = createTable(tableOptions);
+        
+        // 2. Extract default state and inject our overrides
+        if (!tableState) {
+            tableState = {
+                ...myTableInstance.initialState,
+                pagination: { pageIndex: 0, pageSize: 15 },
+                globalFilter: '',
+                columnFilters: [{ id: 'สถานะ', value: 'รออนุมัติ' }] // Default to Pending
+            };
+        }
+        
+        // 3. Setup state management and onStateChange
+        tableOptions.state = tableState;
+        tableOptions.onStateChange = (updater) => {
+            tableState = typeof updater === 'function' ? updater(tableState) : updater;
+            tableOptions.state = tableState;
+            myTableInstance.setOptions(tableOptions);
+            if(updateDOM) updateDOM();
+        };
+        
+        // 4. Update the table with the fully controlled options
+        myTableInstance.setOptions(tableOptions);
+    } else {
+        // Just update data and optionally global filter if it was changed
+        tableOptions.data = currentTableData;
+        tableOptions.state.globalFilter = element.search.value || '';
+        // Don't overwrite columnFilters, keep whatever tableState has
+        myTableInstance.setOptions(tableOptions);
+    }
+
+    function flexRender(comp, props) {
+        return typeof comp === 'function' ? comp(props) : comp;
+    }
+
+    updateDOM = function() {
+        thead.innerHTML = '';
+        myTableInstance.getHeaderGroups().forEach(headerGroup => {
+            const tr = document.createElement('tr');
+            headerGroup.headers.forEach(header => {
+                const th = document.createElement('th');
+                const customClass = header.column.columnDef.meta?.className || '';
+                th.className = `py-3 px-4 text-[16px] font-bold text-white uppercase tracking-wider text-left align-middle whitespace-nowrap bg-green-700 border-x border-b border-green-800 ${customClass}`;
+                th.innerHTML = flexRender(header.column.columnDef.header, header.getContext());
+                tr.appendChild(th);
+            });
+            thead.appendChild(tr);
+        });
+
+        tbody.innerHTML = '';
+        const rows = myTableInstance.getRowModel().rows;
+        if(rows.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="${columns.length}" class="py-8 text-center text-gray-500 font-medium">ไม่พบข้อมูล</td>`;
+            tbody.appendChild(tr);
+        } else {
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-200 hover:bg-slate-50 transition-colors duration-200';
+                
+                row.getVisibleCells().forEach(cell => {
+                    const td = document.createElement('td');
+                    const customClass = cell.column.columnDef.meta?.className || '';
+                    td.className = `py-3 px-4 text-[14px] text-slate-800 text-left align-middle border-x border-slate-200 ${customClass}`;
+                    td.innerHTML = flexRender(cell.column.columnDef.cell, cell.getContext());
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        const totalRows = myTableInstance.getPrePaginationRowModel().rows.length;
+        const pageCount = myTableInstance.getPageCount();
+        const currentPage = myTableInstance.getState().pagination.pageIndex + 1;
+        
+        paginationEl.innerHTML = `
+            <div class="text-sm text-gray-500 flex items-center">
+                แสดง <span class="font-medium text-gray-900 mx-1">${myTableInstance.getRowModel().rows.length}</span> จาก <span class="font-medium text-gray-900 mx-1">${totalRows}</span> แถว
+            </div>
+            <div class="flex space-x-2 items-center">
+                <select class="form-select border border-gray-300 rounded-md text-sm text-gray-700 bg-white shadow-sm outline-none px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-auto" id="pageSizeSelect">
+                    ${[100, 200, 300, 500, 1000].map(size => `<option value="${size}" ${myTableInstance.getState().pagination.pageSize === size ? 'selected' : ''}>แสดง ${size}</option>`).join('')}
+                </select>
+                <button class="px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors shadow-sm disabled:opacity-50 disabled:hover:bg-white" id="btnFirst" ${!myTableInstance.getCanPreviousPage() ? 'disabled' : ''}><i class="fa-solid fa-angles-left"></i></button>
+                <button class="px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors shadow-sm disabled:opacity-50 disabled:hover:bg-white" id="btnPrev" ${!myTableInstance.getCanPreviousPage() ? 'disabled' : ''}><i class="fa-solid fa-angle-left"></i></button>
+                <span class="px-3 py-1.5 text-sm text-gray-900 font-medium bg-gray-100 rounded-md border border-gray-200">หน้า ${currentPage}/${pageCount || 1}</span>
+                <button class="px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors shadow-sm disabled:opacity-50 disabled:hover:bg-white" id="btnNext" ${!myTableInstance.getCanNextPage() ? 'disabled' : ''}><i class="fa-solid fa-angle-right"></i></button>
+                <button class="px-2 py-1.5 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors shadow-sm disabled:opacity-50 disabled:hover:bg-white" id="btnLast" ${!myTableInstance.getCanNextPage() ? 'disabled' : ''}><i class="fa-solid fa-angles-right"></i></button>
+            </div>
+        `;
+
+        document.getElementById('pageSizeSelect').addEventListener('change', e => {
+            myTableInstance.setPageSize(Number(e.target.value));
+        });
+        document.getElementById('btnFirst').addEventListener('click', () => { myTableInstance.setPageIndex(0); });
+        document.getElementById('btnPrev').addEventListener('click', () => { myTableInstance.previousPage(); });
+        document.getElementById('btnNext').addEventListener('click', () => { myTableInstance.nextPage(); });
+        document.getElementById('btnLast').addEventListener('click', () => { myTableInstance.setPageIndex(pageCount - 1); });
+
+        document.querySelectorAll('.btn-expand').forEach(el => {
+            el.addEventListener('click', (e) => {
+                const rowId = e.currentTarget.getAttribute('data-rowid');
+                const row = myTableInstance.getRowModel().rows.find(r => r.id === rowId);
+                
+                if (row) {
+                    let detailsHTML = `<div class="grid grid-cols-1 gap-4">`;
+                    row.getAllCells().forEach(cell => {
+                        if (cell.column.id !== 'expander' && cell.column.id !== 'ID') {
+                            const headerText = cell.column.columnDef.header.replace(/<[^>]*>?/gm, '').trim(); 
+                            const val = flexRender(cell.column.columnDef.cell, cell.getContext());
+                            detailsHTML += `
+                                <div class="flex flex-col border-b border-gray-100 pb-3">
+                                    <span class="text-[13px] text-gray-500 font-medium mb-1">${headerText}</span>
+                                    <span class="text-[15px] text-gray-900 font-medium break-words whitespace-normal">${val}</span>
+                                </div>
+                            `;
+                        }
+                    });
+                    detailsHTML += `</div>`;
+                    
+                    document.getElementById('detailsModalBody').innerHTML = detailsHTML;
+                    
+                    document.getElementById('detailsModalBody').querySelectorAll('.status-editable').forEach(el => {
+                        el.addEventListener('click', (e) => {
+                            if(typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'พนักงาน') {
+                                Swal.fire('ไม่มีสิทธิ์', 'เฉพาะหัวหน้างานหรือแอดมินเท่านั้นที่สามารถเปลี่ยนสถานะได้', 'warning');
+                                return;
+                            }
+                            // Close modal before opening sweetalert
+                            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('detailsModal'));
+                            if(modalInstance) modalInstance.hide();
+                            
+                            handleStatusClick(e);
+                        });
+                    });
+
+                    const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+                    modal.show();
+                }
+            });
+        });
+
+        document.querySelectorAll('.status-editable').forEach(el => {
+            el.addEventListener('click', (e) => {
+                if(typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'พนักงาน') {
+                    Swal.fire('ไม่มีสิทธิ์', 'เฉพาะหัวหน้างานหรือแอดมินเท่านั้นที่สามารถเปลี่ยนสถานะได้', 'warning');
+                    return;
+                }
+                handleStatusClick(e);
+            });
+        });
+    };
+
+    updateDOM();
+}
+
+function handleStatusClick(e) {
+    const el = e.currentTarget;
+    const id = el.getAttribute('data-id');
+    const name = el.getAttribute('data-name');
+    const currentVal = el.getAttribute('data-val');
+
+    Swal.fire({
+        title: 'เลือกสถานะ',
+        input: 'select',
+        inputOptions: {
+            'อนุมัติ': 'อนุมัติ',
+            'รออนุมัติ': 'รออนุมัติ',
+            'ไม่อนุมัติ': 'ไม่อนุมัติ'
+        },
+        inputValue: currentVal,
+        showCancelButton: true,
+        confirmButtonText: 'ตกลง',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#2563eb'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const newVal = result.value;
+            if(newVal !== currentVal) {
+                updateStatusDirectly(id, name, 'สถานะ', newVal);
+            }
+        }
+    });
+}
+
+function updateStatusDirectly(id, name, field, val) {
+    element.alerts.textContent = "กำลังบันทึกข้อมูล..";
+    $.LoadingOverlay("show", {
+        image       : "",
+        fontawesome : "fa fa-cog fa-spin fa-xs",
+        fontawesomeAnimation : "rotate_right 1.5s",
+        textAutoResize : false,
+        textResizeFactor : 0.25,
+        text : "กำลังบันทึก..." ,
+    });
+    google.script.run
+    .withSuccessHandler(()=>{
+        Swal.fire({
+            position: 'top',
+            icon: 'success',
+            html: '<h2><b style="color:blue">'+name+'</b></h2><h4>แก้ไข  <b style="color:blue">'+field+'</b> เป็น<h2 style="color:red">'+val+'</h2></h4>',
+            confirmButtonColor: '#2563eb',
+            confirmButtonText: 'ตกลง',
+        });
+        $.LoadingOverlay("hide");
+        element.alerts.textContent = "บันทึกข้อมูลสำเร็จแล้ว";
+        clearAlerts(element.alerts);
+        
+        const rowIdx = currentTableData.findIndex(r => {
+            const rId = r.ID || r['ประทับเวลา'] || r.Timestamp;
+            return String(rId) === String(id);
+        });
+        if(rowIdx > -1) {
+            currentTableData[rowIdx][field] = val;
+            // Force data reference update for TanStack
+            currentTableData = [...currentTableData];
+            tableOptions.data = currentTableData;
+            myTableInstance.setOptions(tableOptions);
+            updateSummaryCards(currentTableData);
+            if(updateDOM) updateDOM();
+        } else {
+            loadData();
+        }
+    })
+    .withFailureHandler((er)=>{
+        element.alerts.textContent = "บันทึกข้อมูล..ไม่สำเร็จ";
+        clearAlerts(element.alerts);
+        $.LoadingOverlay("hide");
+    })
+    .editCell({id:id, val:val, field:field});
+}
+
+
+function clearAlerts(el){
+  setTimeout(()=>{
+    el.textContent = ""
+  },2500)
+}
+
+function searchData(e){
+  if(myTableInstance) {
+      myTableInstance.setGlobalFilter(e.target.value);
+  }
+}
+ 
+ function success(){
+      loadData()
+          Swal.fire({
+          position: 'top',
+          icon: 'success',
+          title: 'ขอบคุณครับ',
+          showConfirmButton: false,
+          timer: 1500
+          })
+ }
+
+ function submitCustomForm(event) {
+   event.preventDefault();
+   const form = event.target;
+   
+   const promoVal = form.promotionPeriod.value ? form.promotionPeriod.value.trim() : "";
+   if (!promoVal || (!promoVal.includes(" to ") && !promoVal.includes("ถึง") && !promoVal.includes("-"))) {
+     Swal.fire({
+       icon: 'warning',
+       title: 'แจ้งเตือน',
+       text: 'กรุณาระบุระยะเวลาโปรโมชั่นให้ครบถ้วน (วันเริ่มต้น ถึง วันสิ้นสุด)'
+     });
+     return;
+   }
+   
+   const formData = {
+     topic: form.topic.value,
+     branch: form.branch.value,
+     productDetail: form.productDetail.value,
+     barcode: form.barcode.value,
+     systemPrice: form.systemPrice.value,
+     shiftF2Price: form.shiftF2Price.value,
+     netPrice: form.netPrice.value,
+     promotionPeriod: form.promotionPeriod.value,
+     customerInfo: form.customerInfo.value,
+     aisPackage: form.aisPackage.value,
+     imeiTrade: form.imeiTrade.value
+   };
+
+   $('#staticBackdrop2').modal('hide');
+   $.LoadingOverlay("show", {
+     text: "กำลังบันทึกข้อมูล..."
+   });
+
+   google.script.run
+     .withSuccessHandler(function() {
+       $.LoadingOverlay("hide");
+       form.reset();
+       $('#topicSelect').val('').trigger('change');
+       $('#branchSelect').val('').trigger('change');
+       const fp = document.querySelector("input[name='promotionPeriod']")._flatpickr;
+       if(fp) fp.clear();
+       loadData();
+       Swal.fire({
+         position: 'top',
+         icon: 'success',
+         title: 'บันทึกข้อมูลเรียบร้อย',
+         showConfirmButton: false,
+         timer: 1500
+       });
+     })
+     .withFailureHandler(function(error) {
+       $.LoadingOverlay("hide");
+       Swal.fire('ข้อผิดพลาด', error.message, 'error');
+     })
+     .submitNewForm(formData);
+ }
+     </script>
+     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+     <script src="https://npmcdn.com/flatpickr/dist/l10n/th.js"></script>
+      <script src="https://unpkg.com/@tanstack/table-core@8.20.5/build/umd/index.production.js"></script>
+          <script src="https://cdn.jsdelivr.net/npm/gasparesganga-jquery-loading-overlay@2.1.7/dist/loadingoverlay.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js" integrity="sha384-7+zCNj/IqJ95wo16oMtfsKbZ9ccEh31eOz1HGyDuCQ6wgnyJNSYdrPa03rtR1zdB" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js" integrity="sha384-QJHtvGhmr9XOIpI6YVutG+2QOK9T+ZnN4kzFN1RtK3zEFEIsxhlmWl5/YESvpZ13" crossorigin="anonymous"></script>
+  </body>
+</html>
+

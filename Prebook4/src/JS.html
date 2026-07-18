@@ -599,21 +599,24 @@ const app = {
         bSel.innerHTML='<option value="">-- เลือกช่องทางก่อน --</option>'; 
         chSel.disabled = false; bSel.disabled = false;
       }
-      this.populateSelects(); this.renderProducts(app.globalData.products); this.renderCart(); this.checkCriteria();
+      this.populateSelects(); 
+      this.filter(); // Always run filter initially to handle Sales role and default state
+      this.renderCart(); 
+      this.checkCriteria();
     },
     populateSelects: function() {
       const pSel=document.getElementById('cartPromo'); 
       if(pSel) { 
         pSel.innerHTML='<option value="">-- เลือกโปร (ถ้ามี) --</option>'; 
         app.globalData.promotions.forEach(p=>{ 
-          if(p.Status==='เปิด') pSel.innerHTML+='<option value="' + p.Value + '">' + p['Promo Name'] + '</option>';
+          if((p.Status || '').toString().includes('เปิด')) pSel.innerHTML+='<option value="' + p.Value + '">' + p['Promo Name'] + '</option>';
         }); 
       }
       const intContainer=document.getElementById('dynamicInterests'); 
       if(intContainer) { 
         intContainer.innerHTML=''; 
         app.globalData.interests.forEach((i, idx)=>{ 
-          if(i.Status==='เปิด') {
+          if((i.Status || '').toString().includes('เปิด')) {
             intContainer.innerHTML += `
               <label class="flex items-center p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-white hover:border-brand-orange/30 transition-all group">
                 <div class="relative w-5 h-5 shrink-0">
@@ -637,52 +640,101 @@ const app = {
     checkCriteria: function() {
       const ch = document.getElementById('posChannelSelect'); const br = document.getElementById('posBranchSelect'); const ov = document.getElementById('criteriaOverlay');
       if(!ch || !br || !ov) return;
-      if(ch.value && br.value) ov.classList.add('d-none');
-      else ov.classList.remove('d-none');
+      if(ch.value && br.value) {
+        ov.classList.add('hidden');
+        ov.style.display = 'none';
+      } else {
+        ov.classList.remove('hidden');
+        ov.style.display = 'flex';
+      }
     },
     filter: function() {
-      const term = document.getElementById('searchProduct').value.toLowerCase();
-      const currentChannel = document.getElementById('posChannelSelect').value;
+      const term = (document.getElementById('searchProduct') ? document.getElementById('searchProduct').value : '').toLowerCase();
+      const currentChannel = document.getElementById('posChannelSelect') ? document.getElementById('posChannelSelect').value : '';
       app.globalData.products = app.globalData.products || [];
-      this.renderProducts(app.globalData.products.filter(p => {
-        const matchType = p.Status==='เปิด'; 
-        const matchSearch = (p['Product Name']||'').toLowerCase().includes(term)||(p.SKU||'').toString().toLowerCase().includes(term);
-        const matchChannel = (currentChannel && p.Channel) ? p.Channel.includes(currentChannel) : true;
+      const filtered = app.globalData.products.filter(p => {
+        const status = (p.Status || '').toString();
+        // Allow products that are 'เปิด' or have no status set (forgiving)
+        const matchType = status.includes('เปิด') || status.trim() === ''; 
+        const matchSearch = (p['Product Name']||'').toString().toLowerCase().includes(term)||(p.SKU||'').toString().toLowerCase().includes(term);
+        // If currentChannel is 'ALL' or empty, or product channel matches, show it
+        const matchChannel = (!currentChannel || currentChannel === 'ALL' || !p.Channel) ? true : p.Channel.toString().includes(currentChannel);
         return matchType && matchSearch && matchChannel;
-      }));
+      });
+      this.renderProducts(filtered);
     },
     renderProducts: function(products) {
       const row = document.getElementById('productGrid'); 
       if(!row) return;
-      row.innerHTML = '<div class="grid-container"></div>'; 
-      const r = row.querySelector('.grid-container');
       
-      products.forEach(p => {
-        if(p.Status !== 'เปิด') return; 
-        const isGift = (p.Category||'').includes('ของแถม');
-        const price = p.Price ? parseFloat(p.Price.toString().replace(/,/g,'')).toLocaleString() : '0';
-        const stockCls = p.Stock > 5 ? 'bg-success' : (p.Stock > 0 ? 'bg-warning text-dark' : 'bg-danger');
-        const imgUrl = app.formatImageUrl(p['Image URL']);
-        
-        const clickAction = isGift ? '' : 'onclick="app.pos.openAddToCartModal(\'' + p.SKU + '\')"';
-        const cursorStyle = isGift ? 'cursor: default; background-color: #f8f9fa; opacity: 0.85;' : 'cursor: pointer;';
-        const giftTag = isGift ? '<div class="position-absolute top-0 start-0 m-1 badge bg-secondary" style="font-size: 0.55rem; z-index: 5;">ดูอย่างเดียว</div>' : '';
-        const hoverClass = isGift ? '' : 'product-card-hover';
+      const validProducts = products.filter(p => !(p.Status || '').toString().includes('ปิด'));
 
-        let html = '';
-        html += '<div class="grid-item">';
-        html += '  <div class="card product-card ' + hoverClass + ' text-center shadow-sm position-relative" style="' + cursorStyle + '" ' + clickAction + '>';
-        html +=      giftTag;
-        html += '    <div class="product-img-wrapper bg-white border-bottom">';
-        html += '       <img src="' + imgUrl + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://via.placeholder.com/150?text=No+Image\';" alt="' + p['Product Name'] + '">';
-        html += '    </div>';
-        html += '    <div class="card-body p-1 d-flex flex-column justify-content-between">';
-        html += '      <div class="fw-bold product-title" title="' + p['Product Name'] + '">' + p['Product Name'] + '</div>';
-        html += '      <div class="text-orange fw-bold product-price">฿' + price + '</div>';
-        html += '    </div>';
-        html += '    <div class="badge ' + stockCls + ' stock-badge">สต๊อก: ' + p.Stock + '</div>';
-        html += '  </div>';
-        html += '</div>';
+      if (!validProducts || validProducts.length === 0) {
+        row.innerHTML = `
+          <div class="flex flex-col items-center justify-center h-full text-slate-400 py-20 w-full col-span-full animate-in fade-in duration-500">
+            <i class="fas fa-box-open fa-4x mb-4 opacity-20"></i>
+            <p class="text-sm font-black uppercase tracking-widest opacity-50">ไม่พบรายการสินค้า</p>
+            <p class="text-[10px] mt-2 text-slate-400 font-medium">โปรดตรวจสอบช่องทางการขาย สาขา หรือคำค้นหาอีกครั้ง</p>
+          </div>
+        `;
+        return;
+      }
+
+      row.innerHTML = '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>'; 
+      const r = row.querySelector('.grid');
+      
+      validProducts.forEach(p => {
+        const isGift = (p.Category||'').toString().includes('ของแถม');
+        const price = p.Price ? parseFloat(p.Price.toString().replace(/,/g,'')).toLocaleString() : '0';
+        const stock = parseInt(p.Stock || 0);
+        
+        let stockColor = 'text-emerald-600 bg-emerald-50 border-emerald-100';
+        if (stock <= 0) stockColor = 'text-rose-600 bg-rose-50 border-rose-100';
+        else if (stock <= 5) stockColor = 'text-amber-600 bg-amber-50 border-amber-100';
+
+        const imgUrl = app.formatImageUrl(p['Image URL']);
+        const clickAction = isGift ? '' : 'onclick="app.pos.openAddToCartModal(\'' + p.SKU + '\')"';
+        
+        let html = `
+          <div class="product-card-jay group relative flex flex-col h-full cursor-pointer active:scale-[0.98]" ${clickAction}>
+            <div class="aspect-square bg-slate-50/50 rounded-2xl overflow-hidden mb-4 p-4 flex items-center justify-center relative border border-slate-50 group-hover:border-brand-orange/10 transition-colors">
+              <img src="${imgUrl}" class="max-h-full max-w-full object-contain group-hover:scale-110 transition-transform duration-700 ease-out" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/150?text=No+Image';">
+              <div class="absolute top-2 right-2 badge-premium ${stockColor}">
+                Stock: ${stock}
+              </div>
+              ${p.Category ? `
+                <div class="absolute bottom-2 left-2 px-2 py-0.5 bg-slate-900/80 backdrop-blur-md text-white text-[7px] font-black uppercase tracking-[0.2em] rounded-md border border-white/10">
+                  ${p.Category}
+                </div>
+              ` : ''}
+            </div>
+            
+            <div class="flex-grow space-y-1.5 flex flex-col justify-between">
+              <div>
+                <h3 class="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-0.5">${p.SKU}</h3>
+                <h2 class="text-xs font-bold text-slate-800 leading-snug line-clamp-2 min-h-[2.8em] group-hover:text-brand-orange transition-colors">
+                  ${p['Product Name']}
+                </h2>
+              </div>
+              
+              <div class="mt-3 pt-3 border-t border-slate-50 flex items-center justify-between">
+                <div class="flex flex-col">
+                  <span class="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">Sale Price</span>
+                  <span class="text-sm font-black text-brand-orange tabular-nums">฿${price}</span>
+                </div>
+                <div class="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center group-hover:bg-brand-orange group-hover:text-white transition-all shadow-sm active:scale-90">
+                  <i class="fas fa-shopping-basket text-[10px]"></i>
+                </div>
+              </div>
+            </div>
+            
+            ${isGift ? `
+              <div class="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center rounded-3xl z-10">
+                <span class="bg-slate-900 text-white text-[9px] font-black px-4 py-2 rounded-full uppercase tracking-widest shadow-2xl border border-white/20">Display Only</span>
+              </div>
+            ` : ''}
+          </div>
+        `;
         r.innerHTML += html;
       });
     },
@@ -775,35 +827,55 @@ const app = {
     renderCart: function() {
       const cD = document.getElementById('cartItems'); const cL = document.getElementById('cartCount');
       if(!cD) return;
-      if(this.cartData.length===0){ cD.innerHTML='<div class="text-center text-muted mt-5">ตะกร้าว่าง</div>'; if(cL) cL.innerText='0'; return; }
+      if(this.cartData.length===0){ 
+        cD.innerHTML='<div class="flex flex-col items-center justify-center h-full text-slate-300 py-10"><i class="fas fa-shopping-cart fa-3x mb-4 opacity-20"></i><p class="text-[10px] font-black uppercase tracking-widest opacity-40">ยังไม่มีสินค้าในตะกร้า</p></div>'; 
+        if(cL) cL.innerText='0'; 
+        return; 
+      }
       let h=''; let c=0; this.cartData.forEach((i, idx)=>{ 
         c+=i.qty; let gHtml=''; 
         
         if(i.channelGifts && i.channelGifts.length > 0) {
-            gHtml += '<div class="fw-bold text-primary mt-2" style="font-size:0.75rem;">ของแถมช่องทาง</div>';
-            i.channelGifts.forEach(g => gHtml+='<div class="small ms-2 text-wrap-break text-muted">- ' + g.name + (g.qty > 1 ? ' (x' + g.qty + ')' : '') + '</div>'); 
+            gHtml += '<div class="text-[9px] font-black text-sky-600 uppercase tracking-widest mb-1 flex items-center"><i class="fas fa-gift mr-1.5"></i>ของแถมช่องทาง</div>';
+            i.channelGifts.forEach(g => gHtml+='<div class="text-[10px] font-bold text-slate-500 ml-3 truncate border-l-2 border-sky-100 pl-2 mb-1">' + g.name + (g.qty > 1 ? ' <span class="font-black text-slate-700 ml-1">x' + g.qty + '</span>' : '') + '</div>'); 
         }
         if(i.brandGifts && i.brandGifts.length > 0) {
-            gHtml += '<div class="fw-bold text-success mt-2" style="font-size:0.75rem;">ของแถมแบรนด์</div>';
-            i.brandGifts.forEach(g => gHtml+='<div class="small ms-2 text-wrap-break text-muted">- ' + g.name + (g.qty > 1 ? ' (x' + g.qty + ')' : '') + '</div>'); 
+            gHtml += '<div class="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 mt-2 flex items-center"><i class="fas fa-gift mr-1.5"></i>ของแถมแบรนด์</div>';
+            i.brandGifts.forEach(g => gHtml+='<div class="text-[10px] font-bold text-slate-500 ml-3 truncate border-l-2 border-emerald-100 pl-2 mb-1">' + g.name + (g.qty > 1 ? ' <span class="font-black text-slate-700 ml-1">x' + g.qty + '</span>' : '') + '</div>'); 
         }
 
         let pPrice = i.Price ? parseFloat(i.Price.toString().replace(/,/g,'')).toLocaleString() : '0';
+        let imgUrl = app.formatImageUrl(i['Image URL']);
 
-        h+='<div class="mb-3 pb-3 border-bottom">';
-        h+='  <div class="fw-bold text-dark" style="font-size:0.85rem;">รายการ สินค้า</div>';
-        h+='  <div class="small ms-2 mb-1 text-wrap-break fw-bold text-orange">- ' + i['Product Name'] + '</div>';
-        h+=   gHtml;
-        h+='  <div class="d-flex justify-content-between align-items-end mt-2">';
-        h+='    <div class="text-dark fw-bold">฿' + pPrice + '</div>';
-        h+='    <div class="d-flex bg-white rounded border align-items-center">';
-        h+='      <button class="btn btn-sm py-0 px-2" onclick="app.pos.updateQtyInCart(' + idx + ',-1)">-</button>';
-        h+='      <span class="px-2 fw-bold" style="font-size:0.85rem;">' + i.qty + '</span>';
-        h+='      <button class="btn btn-sm py-0 px-2" onclick="app.pos.updateQtyInCart(' + idx + ',1)">+</button>';
-        h+='    </div>';
-        h+='    <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="app.pos.removeCartItem(' + idx + ')"><i class="fas fa-trash"></i></button>';
-        h+='  </div>';
-        h+='</div>'; 
+        h+= '<div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-subtle hover:shadow-md transition-shadow relative mb-4">';
+        h+= '  <div class="flex gap-4">';
+        h+= '    <div class="w-16 h-16 shrink-0 bg-slate-50/50 rounded-xl p-1.5 border border-slate-50 flex items-center justify-center">';
+        h+= '      <img src="' + imgUrl + '" class="max-w-full max-h-full object-contain" onerror="this.onerror=null;this.src=\'https://via.placeholder.com/150?text=No+Image\';">';
+        h+= '    </div>';
+        h+= '    <div class="flex-grow min-w-0 flex flex-col justify-between">';
+        h+= '      <div>';
+        h+= '        <h4 class="text-[8px] font-black text-slate-300 uppercase tracking-widest truncate mb-0.5">' + i.SKU + '</h4>';
+        h+= '        <h3 class="text-xs font-bold text-slate-800 leading-snug line-clamp-2">' + i['Product Name'] + '</h3>';
+        h+= '      </div>';
+        h+= '      <div class="flex items-end justify-between mt-3">';
+        h+= '        <div class="text-sm font-black text-brand-orange tabular-nums">฿' + pPrice + '</div>';
+        h+= '        <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-sm">';
+        h+= '          <button class="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-white hover:text-brand-orange transition-colors active:scale-90" onclick="app.pos.updateQtyInCart(' + idx + ',-1)"><i class="fas fa-minus text-[8px]"></i></button>';
+        h+= '          <span class="w-7 text-center text-xs font-black text-slate-700 tabular-nums">' + i.qty + '</span>';
+        h+= '          <button class="w-7 h-7 flex items-center justify-center text-slate-400 hover:bg-white hover:text-brand-orange transition-colors active:scale-90" onclick="app.pos.updateQtyInCart(' + idx + ',1)"><i class="fas fa-plus text-[8px]"></i></button>';
+        h+= '        </div>';
+        h+= '      </div>';
+        h+= '    </div>';
+        h+= '  </div>';
+        
+        if (gHtml !== '') {
+           h+= '  <div class="mt-4 pt-3 border-t border-slate-50 border-dashed">';
+           h+= gHtml;
+           h+= '  </div>';
+        }
+        
+        h+= '  <button class="absolute -top-2 -right-2 w-6 h-6 bg-white border border-slate-200 rounded-full text-slate-300 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm flex items-center justify-center" onclick="app.pos.removeCartItem(' + idx + ')"><i class="fas fa-times text-[10px]"></i></button>';
+        h+= '</div>'; 
       }); 
       cD.innerHTML=h; if(cL) cL.innerText=c;
     },
@@ -1015,19 +1087,6 @@ const app = {
       }
     }
   }
-};
-window.onload = () => app.init();
-</script>�ันการลบ?', icon:'warning', showCancelButton:true })).isConfirmed){
-        Swal.fire({ title:'Deleting...', didOpen:()=>Swal.showLoading()});
-        try {
-          const res = await app.api('DELETE_RECORD', { tableName:this.tableName, idField:this.idField, idValue:id });
-          if(res && res.status==='success') this.loadData(); else Swal.fire('Error',res ? res.message : 'Error','error');
-        } catch(e) {
-          Swal.fire('Error', e.message || 'Error', 'error');
-        }
-      }
-    }
-  }
-};
-window.onload = () => app.init();
-</script>
+  };
+  window.onload = () => app.init();
+  </script>

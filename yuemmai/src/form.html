@@ -1,0 +1,19 @@
+ <template id="formLogin">
+   <swal-html>
+ <form  onsubmit="event.preventDefault(); login(this)">
+                  <div class="h5 mb-3 p-2 bg-warning text-white">Login</div>
+                  <div class="input-group mb-3">
+                      <span class="input-group-text"><i class="fa-solid fa-circle-user"></i></span>
+                      <input type="text" class="form-control" id="username" placeholder="username" required>
+                    </div>
+                   <div class="input-group mb-3">
+                      <span class="input-group-text"><i class="fa-solid fa-key"></i></span>
+                      <input type="password" class="form-control" id="password" placeholder="password" required>
+                    </div>
+                  <button type="submit" class="btn btn-warning" id="btn-login"><i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
+                </form>
+                <div class="text-end">
+                <i class="text-warning fa-solid fa-circle-xmark fa-lg" type="button" onclick="Swal.close()"></i>
+                </div>
+    </swal-html>
+</template>

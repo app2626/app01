@@ -1,0 +1,47 @@
+<div id="login-container" class="min-h-screen flex items-center justify-center p-4 bg-slate-50 absolute inset-0 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl overflow-hidden flex w-full max-w-4xl animate__animated animate__fadeInUp">
+        <div class="w-1/2 bg-gradient-to-br from-green-600 to-green-800 hidden md:flex flex-col items-center justify-center p-12 text-white relative overflow-hidden">
+            <div class="absolute inset-0 bg-black opacity-10"></div>
+            <div class="relative z-10 text-center">
+                <i class="fa-solid fa-table-list text-7xl mb-6 drop-shadow-md"></i>
+                <h2 class="text-3xl font-bold mb-3 tracking-wide">Shift F2 System</h2>
+                <p class="text-green-100 text-lg">ระบบขออนุมัติปรับราคาสินค้า</p>
+                <div class="mt-8 pt-8 border-t border-green-500/30 text-sm text-green-50/70">
+                    จัดการข้อมูลและสิทธิ์การเข้าถึงอย่างเป็นระบบ
+                </div>
+            </div>
+        </div>
+        <div class="w-full md:w-1/2 p-8 sm:p-12 flex flex-col justify-center">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-600 mb-4 md:hidden">
+                    <i class="fa-solid fa-shield-halved text-3xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-800">เข้าสู่ระบบ</h3>
+                <p class="text-gray-500 text-sm mt-2">กรุณากรอกข้อมูลเพื่อเข้าใช้งานระบบ</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="mb-5">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="username">ชื่อผู้ใช้งาน</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-user text-gray-400"></i>
+                        </div>
+                        <input type="text" id="username" class="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-200 outline-none transition-all" required placeholder="กรอกชื่อผู้ใช้งาน">
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="password">รหัสผ่าน</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-lock text-gray-400"></i>
+                        </div>
+                        <input type="password" id="password" class="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-200 outline-none transition-all" required placeholder="กรอกรหัสผ่าน">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
+                    <span>เข้าสู่ระบบ</span> <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>

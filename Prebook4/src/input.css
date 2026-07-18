@@ -3,23 +3,59 @@
 @theme {
   --color-brand-orange: #f26522;
   --color-brand-orange-dark: #d45116;
-  --color-brand-orange-light: #fdf8f5;
+  --color-brand-orange-light: #fff5f0;
   
-  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  --color-slate-50: #f9fafb;
+  --color-slate-100: #f3f4f6;
+  --color-slate-200: #e5e7eb;
+  --color-slate-300: #d1d5db;
+  --color-slate-800: #1f2937;
+  --color-slate-900: #111827;
+
+  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-enterprise: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-premium: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+  
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
 }
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 font-sans antialiased;
+    @apply bg-white text-slate-900 font-sans antialiased;
   }
 }
 
 @layer components {
   .btn-brand {
-    @apply bg-brand-orange text-white font-semibold py-2 px-4 rounded-lg transition-all hover:bg-brand-orange-dark focus:ring-2 focus:ring-brand-orange focus:ring-offset-2;
+    @apply bg-brand-orange text-white font-bold py-3 px-6 rounded-2xl transition-all duration-300 hover:bg-brand-orange-dark hover:shadow-xl hover:shadow-brand-orange/20 active:scale-[0.98] focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-2;
   }
-  .card-enterprise {
-    @apply bg-white border border-slate-200 rounded-xl shadow-enterprise;
+  
+  .card-premium {
+    @apply bg-white border border-slate-100 rounded-3xl shadow-premium transition-all duration-300;
+  }
+  
+  .input-field {
+    @apply w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-semibold text-slate-700 transition-all duration-200 focus:bg-white focus:ring-4 focus:ring-brand-orange/5 focus:border-brand-orange outline-none;
+  }
+
+  .product-card-jay {
+    @apply bg-white border border-slate-100 rounded-3xl p-4 transition-all duration-500 hover:shadow-card-hover hover:border-brand-orange/10 hover:-translate-y-1;
+  }
+
+  .badge-premium {
+    @apply px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border shadow-sm;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-1.5 h-1.5;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
   }
 }

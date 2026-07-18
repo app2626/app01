@@ -1,0 +1,154 @@
+<script>
+  function statusData(el){
+     // FIX: ตรวจสอบสิทธิ์ role ก่อน — พนักงานไม่สามารถอนุมัติ/ปฏิเสธได้
+     if (userRole === 'พนักงาน') {
+       Swal.fire('ไม่มีสิทธิ์', 'คุณไม่มีสิทธิ์ดำเนินการนี้ กรุณาติดต่อผู้ดูแลระบบ', 'warning');
+       return;
+     }
+
+     let tr = $(el).closest('tr');
+     if (tr.hasClass('child')) {
+       tr = tr.prev('.parent');
+     }
+     let rowData = table.row(tr).data();
+     let id = rowData[0];
+     let status = rowData[32] || '';
+     let soCreated = rowData[37] || '';
+     let invoice = rowData[39] || '';
+     
+     let obj = {}
+         obj.record = id
+         obj.name = admin;
+
+     if (status.includes("รออนุมัติ") || status === "") {
+        Swal.fire({
+          position:'top',
+          icon: 'warning',
+          title: 'คุณต้องการอนุมัติหรือไม่?',
+          showDenyButton: true,
+          showCancelButton: true,
+          cancelButtonText: 'ยกเลิก',
+          confirmButtonText: 'อนุมัติ',
+          confirmButtonColor: '#198754',
+          denyButtonText: `ไม่อนุมัติ`,
+          allowOutsideClick: false,
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            obj.status = 'รอเปิด SO';
+            obj.action = 'approve';
+            const { value: formValues } = await Swal.fire({
+              title: 'ข้อมูลการเงิน',
+              html:
+                '<input id="swal-input1" class="swal2-input" placeholder="Remark(การเงิน)">' +
+                '<input id="swal-input2" class="swal2-input" placeholder="ยอดเงินโอนที่ได้รับ(การเงิน)">' +
+                '<textarea id="swal-input3" class="swal2-textarea" placeholder="Remark(การเงิน) ใส่หมายเหตุเพิ่มถ้ามี"></textarea>',
+              focusConfirm: false,
+              showCancelButton: true,
+              preConfirm: () => {
+                return [
+                  document.getElementById('swal-input1').value,
+                  document.getElementById('swal-input2').value,
+                  document.getElementById('swal-input3').value
+                ]
+              }
+            });
+            if (formValues) {
+              obj.Remark = formValues[0];
+              obj.financeAmount = formValues[1];
+              obj.financeRemarkExtra = formValues[2];
+              saveStatus(obj);
+            }
+          } else if (result.isDenied) {
+            obj.status = 'ไม่อนุมัติ';
+            obj.action = 'approve';
+            const { value: Remark } = await Swal.fire({
+              input: 'textarea',
+              inputLabel: 'หมายเหตุ (Remark)',
+              allowOutsideClick : false,
+              inputPlaceholder: 'กรอกหมายเหตุที่นี่...',
+              inputValidator: (value) => {
+                if (!value) return 'กรุณากรอกหมายเหตุ!'
+              },
+              showCancelButton: true
+            });
+            if (Remark !== undefined) {
+              obj.Remark = Remark;
+              saveStatus(obj);
+            }
+          }
+        });
+     } else if (status.includes("รอเปิด SO") || (status.includes("อนุมัติแล้ว") && soCreated === "")) {
+        obj.action = 'updateSO';
+        Swal.fire({
+          title: 'ข้อมูล Sales Order',
+          html:
+            '<input id="swal-so1" class="swal2-input" placeholder="Remark(SO)">' +
+            '<input id="swal-so2" class="swal2-input" placeholder="Sales Order created">' +
+            '<textarea id="swal-so3" class="swal2-textarea" placeholder="Remark(SO) ใส่หมายเหตุเพิ่มถ้ามี"></textarea>',
+          focusConfirm: false,
+          showCancelButton: true,
+          preConfirm: () => {
+            return [
+              document.getElementById('swal-so1').value,
+              document.getElementById('swal-so2').value,
+              document.getElementById('swal-so3').value
+            ]
+          }
+        }).then((result) => {
+          if (result.isConfirmed && result.value) {
+            obj.status = 'รอเปิด Invoice';
+            obj.soRemark = result.value[0];
+            obj.soCreated = result.value[1];
+            obj.soRemarkExtra = result.value[2];
+            saveStatus(obj);
+          }
+        });
+     } else if (status.includes("รอเปิด Invoice") || (status.includes("อนุมัติแล้ว") && soCreated !== "" && invoice === "")) {
+        obj.action = 'updateAR';
+        Swal.fire({
+          title: 'ข้อมูลบัญชี (AR)',
+          html:
+            '<input id="swal-ar1" class="swal2-input" placeholder="Invoice บัญชี">' +
+            '<textarea id="swal-ar2" class="swal2-textarea" placeholder="AR ใส่หมายเกตุถ้ามี"></textarea>',
+          focusConfirm: false,
+          showCancelButton: true,
+          preConfirm: () => {
+            return [
+              document.getElementById('swal-ar1').value,
+              document.getElementById('swal-ar2').value
+            ]
+          }
+        }).then((result) => {
+          if (result.isConfirmed && result.value) {
+            obj.status = 'เสร็จสมบูรณ์';
+            obj.invoice = result.value[0];
+            obj.arRemark = result.value[1];
+            saveStatus(obj);
+          }
+        });
+     } else {
+        Swal.fire('แจ้งเตือน', 'รายการนี้ดำเนินการครบถ้วนแล้ว หรือถูกไม่อนุมัติ', 'info');
+     }
+  }
+
+  function saveStatus(obj) {
+     loadingStart();
+     google.script.run.withSuccessHandler(()=>{
+       Swal.fire({
+          position:'top',
+          title:'บันทึกข้อมูลเรียบร้อย!',
+          icon:'success',
+          showConfirmButton: false,
+          timer: 1500
+       });
+       getData();
+     }).withFailureHandler((error) => {
+       loadingEnd();
+       Swal.fire({
+          title:'เกิดข้อผิดพลาด!',
+          text: error.message,
+          icon:'error'
+       });
+     }).statusRecordWithRemark(obj);
+  }
+</script>

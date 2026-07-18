@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACT SAMSUNG System V7.2 (Perfect Sequence Edition)</title>
+    <script>
+        (function() {
+            try {
+                var t = localStorage.getItem('actssTheme');
+                if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {}
+        })();
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.3/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        :root {
+            --navy: #0F1B33;
+            --navy-dark: #0A1226;
+            --gold: #C99A2E;
+            --gold-dark: #A97F1F;
+            --gold-light: #FBF3DC;
+            --accent-blue: #4C7EB0;
+            --accent-blue-dark: #3A6690;
+            --soft-panel: #EEF3FA;
+            --muted-green: #2E7D57;
+            --muted-red: #B23A3A;
+            --muted-amber: #C98A2E;
+            --border-gray: #dee2e6;
+            --bg-page: #f8fafc;
+        }
+
+        /* บังคับขนาดตัวอักษร 12px ทั้งระบบ */
+        body, table, .btn, .form-control, .form-select, .form-label, .small, .badge {
+            font-size: 12px !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        h2, h3, h4 { font-size: 18px !important; }
+        h5, h6 { font-size: 14px !important; }
+        .kpi-container h1 { font-size: 26px !important; }
+
+        body { background-color: var(--bg-page); }
+        .card { border-radius: 8px; box-shadow: 0 1px 3px rgba(16,35,63,0.08); margin-bottom: 20px; border: 1px solid var(--border-gray); }
+        .marquee-container { background: var(--gold-light); border-left: 4px solid var(--gold); padding: 10px 14px; border-radius: 6px; color: var(--navy); font-weight: 600; }
+        .form-locked { opacity: 0.5; pointer-events: none; }
+        .item-row { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e3e6f0; margin-bottom: 12px; position: relative; transition: all 0.2s; }
+        .item-row:hover { border-color: var(--gold); box-shadow: 0 2px 8px rgba(201,154,46,0.15); }
+        .btn-remove-row { position: absolute; top: -10px; right: -10px; border-radius: 50%; width: 24px; height: 24px; padding: 0; line-height: 1; z-index: 10; display: none; }
+        .item-row:not(:first-child) .btn-remove-row { display: block; }
+
+        th { white-space: nowrap; background-color: var(--soft-panel) !important; color: var(--navy) !important; font-weight: 600; border-bottom: 2px solid var(--gold) !important; }
+        table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control:before, table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control:before { background-color: var(--gold); }
+
+        .kpi-container { background: var(--gold-light); border: 1px solid var(--border-gray); border-left: 4px solid var(--gold); border-radius: 8px; color: var(--navy); padding: 16px 20px; text-align: left; box-shadow: 0 1px 3px rgba(16,35,63,0.06); transition: box-shadow 0.2s; }
+        .kpi-container:hover { box-shadow: 0 4px 10px rgba(16,35,63,0.12); }
+        .kpi-container h6 { color: #6c757d !important; opacity: 1 !important; }
+        .kpi-container h1 { color: var(--gold) !important; }
+        .kpi-container.kpi-sold { border-left-color: var(--muted-green); background: #E7F3EC; }
+        .kpi-container.kpi-unsold { border-left-color: var(--muted-amber); background: #FBF0DE; }
+        .select2-container--bootstrap-5 .select2-selection { min-height: 32px; font-size: 12px; }
+        td.model-details-control { cursor: pointer; }
+
+        /* ตัวกรอง Model แบบติ๊กหลายรายการ (checkbox style) */
+        #select2-filterModel-results .select2-results__option,
+        #select2-dashFilterModel-results .select2-results__option,
+        #select2-deepFilterModel-results .select2-results__option {
+            position: relative;
+            padding-left: 2rem;
+        }
+        #select2-filterModel-results .select2-results__option[aria-selected]:before,
+        #select2-dashFilterModel-results .select2-results__option[aria-selected]:before,
+        #select2-deepFilterModel-results .select2-results__option[aria-selected]:before {
+            content: "";
+            position: absolute;
+            left: 0.6rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 14px;
+            height: 14px;
+            border: 1px solid #6c757d;
+            border-radius: 3px;
+            background: #fff;
+        }
+        #select2-filterModel-results .select2-results__option[aria-selected="true"]:before,
+        #select2-dashFilterModel-results .select2-results__option[aria-selected="true"]:before,
+        #select2-deepFilterModel-results .select2-results__option[aria-selected="true"]:before {
+            background: var(--gold);
+            border-color: var(--gold);
+        }
+        #select2-filterModel-results .select2-results__option[aria-selected="true"]:after,
+        #select2-dashFilterModel-results .select2-results__option[aria-selected="true"]:after,
+        #select2-deepFilterModel-results .select2-results__option[aria-selected="true"]:after {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: 9px;
+            color: #fff;
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* ตัวเลือกที่ถูกติ๊กในช่อง Model ให้เป็นตัวอักษรเล็กลง ไม่รกจอ */
+        #filterModel + .select2-container .select2-selection__choice,
+        #dashFilterModel + .select2-container .select2-selection__choice,
+        #deepFilterModel + .select2-container .select2-selection__choice {
+            font-size: 10px !important;
+            padding: 1px 6px !important;
+            margin-top: 3px !important;
+        }
+        #filterModel + .select2-container .select2-selection__choice__display,
+        #dashFilterModel + .select2-container .select2-selection__choice__display,
+        #deepFilterModel + .select2-container .select2-selection__choice__display {
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        #filterModel + .select2-container .select2-selection__choice__remove,
+        #dashFilterModel + .select2-container .select2-selection__choice__remove,
+        #deepFilterModel + .select2-container .select2-selection__choice__remove {
+            font-size: 10px !important;
+        }
+        
+        /* HUD Loader แบบทางการ */
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .hud-loader { position: relative; width: 64px; height: 64px; margin: 0 auto; }
+        .hud-ring { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--gold-light); border-top-color: var(--gold); animation: spin 1s linear infinite; }
+        .hud-core { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tracking-wider { letter-spacing: 0.5px; }
+
+        .swal2-popup.custom-detail-popup { padding: 0 !important; overflow: hidden; }
+        .swal2-html-container { margin: 0 !important; padding: 0 !important; }
+
+        /* แถบ Header หลัก */
+        .app-header-bar { background: var(--soft-panel) !important; border-bottom: 2px solid var(--gold); }
+        .app-header-badge { background: #fff !important; color: var(--navy) !important; border: 1px solid var(--border-gray); }
+
+        /* แท็บหลัก: โทนอ่อน มินิมอล พื้นขาว ตัวหนังสือเข้มชัดเจน เส้นใต้ทองเมื่อ active */
+        #myTab { background: #fff !important; }
+        .nav-pills .nav-item .nav-link { border-radius: 4px 4px 0 0; border: none; border-bottom: 3px solid transparent; transition: all 0.2s; color: #5a5c69; background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 10px 16px; }
+        .nav-pills .nav-item .nav-link:hover { color: var(--navy); }
+        .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily { border-color: transparent !important; color: #5a5c69 !important; background: transparent !important; }
+        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active { background: transparent !important; color: var(--navy) !important; border-bottom: 3px solid var(--gold) !important; }
+
+        [data-theme="dark"] .app-header-bar { background: var(--navy) !important; border-bottom: 2px solid var(--gold); }
+        [data-theme="dark"] .app-header-badge { background: rgba(255,255,255,0.08) !important; color: var(--gold) !important; border: 1px solid rgba(201,154,46,0.5); }
+        [data-theme="dark"] #myTab { background: var(--navy) !important; }
+        [data-theme="dark"] .nav-pills .nav-item .nav-link { color: rgba(255,255,255,0.65); }
+        [data-theme="dark"] .nav-pills .nav-item .nav-link:hover { color: #fff; }
+        [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily { color: rgba(255,255,255,0.65) !important; }
+        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active { background: var(--navy-dark) !important; color: var(--gold) !important; }
+
+        /* กรอบบนของเนื้อหา (Pane) โทนเดียวกันทั้งระบบ */
+        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane { border-top: 3px solid var(--gold) !important; }
+
+        /* รีโทนสี Bootstrap utility ให้เป็นโทน Deep Navy + Gold ทั้งระบบ */
+        .bg-primary { background-color: var(--navy) !important; }
+        .bg-success { background-color: var(--muted-green) !important; }
+        .bg-danger { background-color: var(--muted-red) !important; }
+        .bg-warning { background-color: var(--muted-amber) !important; }
+        .text-warning { color: var(--muted-amber) !important; }
+        .text-primary { color: var(--navy) !important; }
+        .text-success { color: var(--muted-green) !important; }
+        .text-danger { color: var(--muted-red) !important; }
+        .text-info { color: var(--navy) !important; }
+        .border-primary { border-color: var(--navy) !important; }
+        .border-danger { border-color: var(--muted-red) !important; }
+        .border-info { border-color: var(--navy) !important; }
+        .btn-primary { background-color: var(--accent-blue) !important; border-color: var(--accent-blue) !important; color: #fff !important; }
+        .btn-primary:hover, .btn-primary:focus { background-color: var(--accent-blue-dark) !important; border-color: var(--accent-blue-dark) !important; color: #fff !important; }
+        .btn-success { background-color: var(--accent-blue) !important; border-color: var(--accent-blue) !important; color: #fff !important; }
+        .btn-success:hover, .btn-success:focus { background-color: var(--accent-blue-dark) !important; border-color: var(--accent-blue-dark) !important; color: #fff !important; }
+
+        [data-theme="dark"] .btn-primary, [data-theme="dark"] .btn-success { background-color: var(--navy) !important; border-color: var(--navy) !important; color: var(--gold) !important; }
+        [data-theme="dark"] .btn-primary:hover, [data-theme="dark"] .btn-primary:focus,
+        [data-theme="dark"] .btn-success:hover, [data-theme="dark"] .btn-success:focus { background-color: var(--navy-dark) !important; border-color: var(--navy-dark) !important; color: var(--gold) !important; }
+        .btn-danger { background-color: var(--muted-red) !important; border-color: var(--muted-red) !important; }
+        .btn-outline-danger { color: var(--muted-red) !important; border-color: var(--muted-red) !important; }
+        .btn-outline-danger:hover { background-color: var(--muted-red) !important; color: #fff !important; }
+        .text-gold { color: var(--gold) !important; }
+
+        /* ปุ่มสลับโหมดมืด/สว่าง */
+        .theme-toggle-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(201,154,46,0.5); color: var(--gold); border-radius: 6px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .theme-toggle-btn:hover { background: rgba(201,154,46,0.2); color: var(--gold); }
+
+        /* ===================== โหมดมืด (Dark Mode) ===================== */
+        [data-theme="dark"] { --bg-page: #0a0f1c; }
+        [data-theme="dark"] body { background-color: var(--bg-page); color: #dfe4ee; }
+        [data-theme="dark"] .card,
+        [data-theme="dark"] .item-row { background-color: #131b2e; border-color: #263252; color: #dfe4ee; }
+        [data-theme="dark"] .kpi-container { background-color: rgba(201,154,46,0.12); border-color: #263252; color: #dfe4ee; }
+        [data-theme="dark"] .kpi-container.kpi-sold { background-color: rgba(46,125,87,0.15); }
+        [data-theme="dark"] .kpi-container.kpi-unsold { background-color: rgba(201,138,46,0.15); }
+        [data-theme="dark"] .kpi-container h6 { color: #93a0b8 !important; }
+        [data-theme="dark"] th { background-color: var(--navy) !important; color: white !important; border-bottom: 2px solid var(--gold) !important; }
+        [data-theme="dark"] table.dataTable, [data-theme="dark"] table.dataTable td { color: #dfe4ee; background-color: #131b2e; }
+        [data-theme="dark"] table.dataTable.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #182238; box-shadow: none; }
+        [data-theme="dark"] .table-hover > tbody > tr:hover > * { background-color: #1d2944; color: #fff; }
+        [data-theme="dark"] .table-bordered, [data-theme="dark"] .table-bordered td, [data-theme="dark"] .table-bordered th { border-color: #263252; }
+        [data-theme="dark"] .bg-light { background-color: #101828 !important; }
+        [data-theme="dark"] .bg-white { background-color: #131b2e !important; }
+        [data-theme="dark"] .text-dark { color: #e7ebf3 !important; }
+        [data-theme="dark"] .text-secondary, [data-theme="dark"] .text-muted { color: #93a0b8 !important; }
+        [data-theme="dark"] .text-primary, [data-theme="dark"] .text-info { color: var(--gold) !important; }
+        [data-theme="dark"] .border-primary, [data-theme="dark"] .border-info { border-color: var(--gold) !important; }
+        [data-theme="dark"] .border, [data-theme="dark"] .border-top, [data-theme="dark"] .border-bottom { border-color: #263252 !important; }
+        [data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background-color: #101828; border-color: #2b3a5c; color: #e7ebf3; }
+        [data-theme="dark"] .form-control::placeholder { color: #6c7891; }
+        [data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { background-color: #101828; color: #e7ebf3; }
+        [data-theme="dark"] .input-group-text { background-color: #182238; border-color: #2b3a5c; color: #dfe4ee; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection { background-color: #101828; border-color: #2b3a5c; color: #e7ebf3; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection__rendered { color: #e7ebf3 !important; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-dropdown { background-color: #101828; border-color: #2b3a5c; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option { color: #e7ebf3; }
+        [data-theme="dark"] .select2-search__field { background-color: #101828 !important; color: #e7ebf3 !important; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] { background-color: #22304f !important; }
+        [data-theme="dark"] .select2-selection__choice { background-color: #1d2944 !important; border-color: #2b3a5c !important; color: #e7ebf3 !important; }
+        [data-theme="dark"] .select2-selection__choice__display { color: #e7ebf3 !important; }
+        [data-theme="dark"] .marquee-container { background: rgba(201,154,46,0.12); color: var(--gold); }
+        [data-theme="dark"] #overlay { background: rgba(10,15,28,0.97); }
+        [data-theme="dark"] #overlay .spinner-border { color: var(--gold) !important; }
+        [data-theme="dark"] .swal2-popup { background: #131b2e !important; color: #e7ebf3 !important; border: 1px solid #263252 !important; }
+        [data-theme="dark"] .swal2-container { background: rgba(10,15,28,0.85) !important; }
+        [data-theme="dark"] .hud-ring { border-color: #263252; border-top-color: var(--gold); }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div id="overlay">
+    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+    <div class="mt-3 text-secondary fw-bold">กำลังเชื่อมต่อฐานข้อมูล...</div>
+</div>
+
+<div class="container-fluid mt-3 px-3">
+    <div class="row mb-2">
+        <div class="col-12 d-flex justify-content-between align-items-center app-header-bar p-2 rounded shadow-sm">
+            <h3 class="text-primary m-0 fw-bold"><i class="fas fa-shield-halved text-gold"></i> ACT SAMSUNG System Control Panel</h3>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="theme-toggle-btn" id="themeToggleBtn" title="สลับโหมดมืด/สว่าง">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="badge app-header-badge p-2" id="currentDateDisplay"></div>
+            </div>
+        </div>
+        <div class="col-12 mt-2">
+            <div class="marquee-container">
+                <marquee id="promoMarquee">กำลังเชื่อมต่อข้อมูลโปรโมชั่น...</marquee>
+            </div>
+        </div>
+    </div>
+
+    <ul class="nav nav-pills mb-3 p-2 rounded shadow-sm" id="myTab" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link tab-form active fw-bold shadow-sm" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-pane" type="button"><i class="fas fa-edit"></i> ฟอร์มบันทึกข้อมูลหน้าสาขา</button>
+        </li>
+        <li class="nav-item ms-2">
+            <button class="nav-link tab-data fw-bold shadow-sm" id="data-tab" data-bs-toggle="tab" data-bs-target="#data-pane" type="button"><i class="fas fa-table"></i> ข้อมูลACTทั้งหมด</button>
+        </li>
+        <li class="nav-item ms-2">
+            <button class="nav-link tab-dash fw-bold shadow-sm" id="dash-tab" data-bs-toggle="tab" data-bs-target="#dash-pane" type="button"><i class="fas fa-chart-pie"></i> แดชบอร์ดสรุปผู้บริหาร</button>
+        </li>
+        <li class="nav-item ms-2">
+            <button class="nav-link tab-deep fw-bold shadow-sm" id="deep-tab" data-bs-toggle="tab" data-bs-target="#deep-pane" type="button"><i class="fas fa-search-plus"></i> เจาะลึกสต๊อกรายรุ่น</button>
+        </li>
+        <li class="nav-item ms-2">
+            <button class="nav-link tab-daily fw-bold shadow-sm" id="daily-dash-tab" data-bs-toggle="tab" data-bs-target="#daily-dash-pane" type="button"><i class="fas fa-calendar-day"></i> แดชบอร์ดสรุปรายวัน</button>
+        </li>
+    </ul>
+
+    <div class="tab-content border-0" id="myTabContent">
+        
+        <div class="tab-pane fade show active bg-white p-3 rounded shadow-sm" id="form-pane">
+            <div id="timeAlert" class="alert alert-danger d-none fw-bold shadow-sm">
+                <i class="fas fa-lock-open"></i> นอกเวลาทำการ ระบบจะไม่บันทึกข้อมูลหลัก แต่สามารถดูรายงานและเปลี่ยนสเตตัสได้
+            </div>
+            
+            <form id="actForm">
+                <div class="card p-3 bg-light border-0">
+                    <h5 class="text-primary fw-bold mb-3 border-bottom pb-2">ข้อมูลหลักผู้ทำรายการ</h5>
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label text-secondary fw-bold">วันที่ปฏิบัติการ ACT</label>
+                            <input type="date" class="form-control" id="actDate" required>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label text-secondary fw-bold">สาขาที่ปฏิบัติการ(Location)</label>
+                            <select class="form-select" id="locationSelect" required><option></option></select>
+                            <input type="hidden" id="locCode"><input type="hidden" id="locName">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label text-secondary fw-bold">ชื่อพนักงาน</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white text-primary fw-bold" id="locPrefix">สาขา+</span>
+                                <input type="text" class="form-control" id="empName" placeholder="ระบุชื่อพนักงาน" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="text-dark fw-bold m-0"><i class="fas fa-shopping-cart text-primary"></i> รายการสินค้าในบิล</h5>
+                    <button type="button" class="btn btn-primary fw-bold" id="btnAddRow"><i class="fas fa-plus-circle"></i> กดเพิ่มรายการสินค้า</button>
+                </div>
+                
+                <div id="itemsContainer">
+                    <div class="item-row row shadow-sm align-items-center">
+                        <button type="button" class="btn btn-danger btn-remove-row"><i class="fas fa-times"></i></button>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label fw-bold text-muted">รหัสสินค้า (SKU)</label>
+                            <select class="form-select select-sku" required><option></option></select>
+                            <input type="hidden" class="input-desc">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label fw-bold text-muted">หมายเลขเครื่อง (IMEI)</label>
+                            <select class="form-select select-imei" required><option></option></select>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label fw-bold text-muted">สถานะการจำหน่าย</label>
+                            <select class="form-select input-status fw-bold text-primary" required>
+                                <option value="ยังไม่ขาย">ยังไม่ขาย</option>
+                                <option value="ขายแล้ว">ขายแล้ว</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3 border-top pt-3 text-end">
+                    <button type="submit" class="btn btn-success fw-bold px-4 py-2 shadow" id="btnSubmit"><i class="fas fa-save"></i> บันทึกรายการลงฐานข้อมูล</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="data-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-dark m-0"><i class="fas fa-file-invoice"></i> ตารางบันทึกรายงานสถานะสินค้าทั้งหมด</h5>
+                <button class="btn btn-primary fw-bold" onclick="requestExportCsv()"><i class="fas fa-cloud-download-alt"></i> ดาวน์โหลด CSV</button>
+            </div>
+
+            <div class="row mb-3 bg-light p-3 rounded mx-0 border shadow-sm">
+                <h6 class="text-primary fw-bold mb-3"><i class="fas fa-search-plus"></i> ระบบกรองดัชนีสืบค้นมัลติแชนแนล และ ห้วงเวลา <button class="btn btn-sm btn-outline-danger float-end py-0 px-2" onclick="clearFilters('data')"><i class="fas fa-times"></i> ล้างตัวกรอง</button></h6>
+                
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-info"><i class="far fa-calendar-alt"></i> ตั้งแต่วันที่ (Start)</label>
+                    <input type="date" id="filterStartDate" class="form-control border-info">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-info"><i class="far fa-calendar-alt"></i> ถึงวันที่ (End)</label>
+                    <input type="date" id="filterEndDate" class="form-control border-info">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold">สถานะ (Status)</label>
+                    <select id="filterStatus" class="form-select">
+                        <option value="">-- ทุกสถานะ --</option>
+                        <option value="ยังไม่ขาย">ยังไม่ขาย</option>
+                        <option value="ขายแล้ว">ขายแล้ว</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold">หมายเลขเครื่อง (IMEI)</label>
+                    <input type="text" id="filterImei" class="form-control" placeholder="พิมพ์ IMEI...">
+                </div>
+
+                <div class="col-md-3 mb-2 mt-2">
+                    <label class="fw-bold">กรองแอเรีย (Area)</label>
+                    <select id="filterArea" class="form-select"><option value="">-- ทุกพื้นที่ --</option></select>
+                </div>
+                <div class="col-md-3 mb-2 mt-2">
+                    <label class="fw-bold">รหัส/ชื่อสาขา (Location)</label>
+                    <select id="filterLoc" class="form-select"><option value="">-- ทุกสาขา --</option></select>
+                </div>
+                <div class="col-md-3 mb-2 mt-2">
+                    <label class="fw-bold">รหัสสินค้า / ชื่อสินค้า</label>
+                    <select id="filterProduct" class="form-select"><option value="">-- ทุกสินค้า --</option></select>
+                </div>
+                <div class="col-md-3 mb-2 mt-2">
+                    <label class="fw-bold">กรองรุ่น (Model) <span class="text-muted fw-normal">(ติ๊กได้หลายรายการ)</span></label>
+                    <select id="filterModel" class="form-select" multiple></select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="dataTable" class="table table-hover table-bordered w-100 shadow-sm dt-responsive nowrap">
+                    <thead>
+                        <tr>
+                            <th data-priority="1">รายละเอียดสินค้า (Full Desc)</th>
+                            <th data-priority="1">รหัสสินค้า (SKU)</th>
+                            <th data-priority="1">หมายเลข IMEI</th>
+                            <th data-priority="2">ราคาป้าย (RRP)</th>
+                            <th data-priority="2">ส่วนลด (Discount)</th>
+                            <th data-priority="2">ราคาโปร (Promo Price)</th>
+                            <th data-priority="3">Loc. Code</th>
+                            <th data-priority="3">สถานที่ตั้งสาขา</th>
+                            <th data-priority="3">Area</th>
+                            <th data-priority="4">ตัดบาร์ส่วนลด</th>
+                            <th data-priority="4">ราคาแนะนำขาย</th>
+                            <th class="desktop">ประทับตราวันที่</th>
+                            <th data-priority="3">พนักงานผู้บันทึก</th>
+                            <th data-priority="3">วันที่ ACT</th>
+                            <th data-priority="1">อายุสต๊อก</th>
+                            <th data-priority="1">สถานะปัจจุบัน</th>
+                            <th data-priority="1">จัดการ</th>
+                            <th>Model</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="dash-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="mb-0 text-dark fw-bold"><i class="fas fa-tachometer-alt text-primary"></i> แดชบอร์ดสรุปผลการปฏิบัติการ</h5>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-4 mb-2">
+                    <div class="kpi-container">
+                        <h6 class="m-0"><i class="fas fa-boxes"></i> ทำรายการทั้งหมด (เครื่อง)</h6>
+                        <h1 id="kpi-total" class="fw-bold mt-1 m-0">0</h1>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <div class="kpi-container kpi-sold">
+                        <h6 class="m-0"><i class="fas fa-check-circle"></i> สรุปขายแล้ว (เครื่อง)</h6>
+                        <h1 id="kpi-sold" class="fw-bold mt-1 m-0">0</h1>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <div class="kpi-container kpi-unsold">
+                        <h6 class="m-0 fw-bold"><i class="fas fa-warehouse"></i> คงเหลือ / ยังไม่ขาย (เครื่อง)</h6>
+                        <h1 id="kpi-unsold" class="fw-bold mt-1 m-0">0</h1>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-3 bg-light p-2 rounded mx-0 border">
+                <h6 class="text-primary fw-bold mb-2"><i class="fas fa-filter"></i> กรองข้อมูลแดชบอร์ด <button class="btn btn-sm btn-outline-danger float-end py-0 px-2" onclick="clearFilters('dash')"><i class="fas fa-times"></i> ล้างตัวกรอง</button></h6>
+                <div class="col-md-4 mb-2">
+                    <label class="fw-bold text-secondary">กรองแอเรีย (Area)</label>
+                    <select id="dashFilterArea" class="form-select"><option value="">-- ทุกพื้นที่ --</option></select>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="fw-bold text-secondary">กรองรุ่น (Model) <span class="text-muted fw-normal">(ติ๊กได้หลายรายการ)</span></label>
+                    <select id="dashFilterModel" class="form-select" multiple></select>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="fw-bold text-secondary">อายุสต๊อก (Aging)</label>
+                    <select id="dashFilterAging" class="form-select">
+                        <option value="">-- ทุกช่วงอายุ --</option>
+                        <option value="30">&lt;=30 วัน</option>
+                        <option value="60">31-60 วัน</option>
+                        <option value="90">61-90 วัน</option>
+                        <option value="120">91-120 วัน</option>
+                        <option value="121">&gt;120 วัน</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <div class="card p-2 shadow-sm border h-100">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 m-2"><i class="fas fa-list text-primary"></i> สต๊อกคงค้างตามรายรุ่น (Model)</h6>
+                        <div class="table-responsive p-2">
+                            <table id="modelTable" class="table table-striped table-bordered w-100">
+                                <thead class="table-dark"><tr><th>รุ่น (Model)</th><th class="text-center">คงเหลือ</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-12 mb-3">
+                    <div class="card p-2 shadow-sm border h-100 bg-light">
+                        <h6 class="fw-bold text-danger border-bottom pb-2 m-2"><i class="fas fa-exclamation-triangle"></i> อายุสต๊อกคงค้างราย Area (Aging)</h6>
+                        <div class="table-responsive p-2">
+                            <table id="areaAgingTable" class="table table-striped table-bordered w-100">
+                                <thead class="table-danger">
+                                    <tr>
+                                        <th>แอเรีย (Area)</th>
+                                        <th class="text-center">ยอดรวม</th>
+                                        <th class="text-center"><=30 วัน</th>
+                                        <th class="text-center">31-60 วัน</th>
+                                        <th class="text-center">61-90 วัน</th>
+                                        <th class="text-center">91-120 วัน</th>
+                                        <th class="text-center">>120 วัน</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="deep-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="text-dark fw-bold m-0"><i class="fas fa-search-dollar text-success"></i> เจาะลึกสต๊อกรายรุ่น 3 ระดับ</h5>
+            </div>
+
+            <div class="row mb-3 bg-light p-2 rounded mx-0 border">
+                <h6 class="text-success fw-bold mb-2"><i class="fas fa-filter"></i> เงื่อนไขตรวจสอบพิกัดสินค้า <button class="btn btn-sm btn-outline-danger float-end py-0 px-2" onclick="clearFilters('deep')"><i class="fas fa-times"></i> ล้างตัวกรอง</button></h6>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">กรองแอเรีย (Area)</label>
+                    <select id="deepFilterArea" class="form-select"><option value="">-- ทุกพื้นที่ --</option></select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">กรองสาขา (Location)</label>
+                    <select id="deepFilterLoc" class="form-select"><option value="">-- ทุกสาขา --</option></select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">กรองรุ่น (Model) <span class="text-muted fw-normal">(ติ๊กได้หลายรายการ)</span></label>
+                    <select id="deepFilterModel" class="form-select" multiple></select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">อายุสต๊อก (Aging)</label>
+                    <select id="deepFilterAging" class="form-select">
+                        <option value="">-- ทุกช่วงอายุ --</option>
+                        <option value="30">&lt;=30 วัน</option>
+                        <option value="60">31-60 วัน</option>
+                        <option value="90">61-90 วัน</option>
+                        <option value="120">91-120 วัน</option>
+                        <option value="121">&gt;120 วัน</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="modelDetailTable" class="table table-hover table-bordered w-100 shadow-sm nowrap">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-center" style="width: 1%; white-space: nowrap;">เจาะลึก</th>
+                            <th style="width: auto;">รุ่นผลิตภัณฑ์ (Model)</th>
+                            <th class="text-center" style="width: 1%; white-space: nowrap;">สต๊อกภาพรวม (เครื่อง)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="daily-dash-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="mb-0 text-dark fw-bold"><i class="fas fa-calendar-day text-primary"></i> แดชบอร์ดสรุปยอดรายวัน</h5>
+            </div>
+            
+            <div class="row mb-3 bg-light p-2 rounded mx-0 border">
+                <h6 class="text-primary fw-bold mb-2"><i class="fas fa-filter"></i> กรองช่วงเวลา (เริ่มต้น - สิ้นสุด) <button class="btn btn-sm btn-outline-danger float-end py-0 px-2" onclick="clearFilters('daily')"><i class="fas fa-times"></i> ล้างตัวกรอง</button></h6>
+                <div class="col-md-6 mb-2">
+                    <label class="fw-bold text-secondary">วันที่เริ่มต้น</label>
+                    <input type="date" id="dailyFilterStartDate" class="form-control">
+                </div>
+                <div class="col-md-6 mb-2">
+                    <label class="fw-bold text-secondary">วันที่สิ้นสุด</label>
+                    <input type="date" id="dailyFilterEndDate" class="form-control">
+                </div>
+            </div>
+
+            <div class="table-responsive mt-3">
+                <table id="dailyModelTable" class="table table-striped table-bordered w-100">
+                    <thead class="table-primary"><tr><th style="width: 30px;"></th><th>วันที่</th><th>รุ่น (Model)</th><th class="text-center">ทำรายการทั้งหมด</th><th class="text-center">ขายแล้ว</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.3/dist/sweetalert2.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    // 💡 ป้องกัน Error ด้วยการประกาศตัวแปรให้เป็น Global Scope 100%
+    var rawLocations = [];
+    var branchStock = [];
+    var globalAllRecords = [];
+    var globalUnsoldPool = []; 
+    var masterProductMap = {}; 
+    
+    var dataTableInstance = null;
+    var modelTableInstance = null; 
+    var areaAgingTableInstance = null;
+    var modelDetailTableInstance = null;
+
+    var dailyModelTableInstance = null;
+
+    // 💡 ฟังก์ชันคำนวณอายุถูกประกาศไว้ด้านนอกสุด เพื่อป้องกันบั๊ก "is not defined"
+    function computeAgingDays(dateString) {
+        if(!dateString) return 0;
+        var cleanDate = dateString.toString().replace(/'/g, "").trim().split(" ")[0];
+        var segments = cleanDate.split(/[-/]/);
+        if(segments.length !== 3) return 0;
+        var targetDate;
+        if(segments[0].length === 4) { targetDate = new Date(segments[0], segments[1] - 1, segments[2]); } 
+        else { targetDate = new Date(segments[2], segments[1] - 1, segments[0]); }
+        var current = new Date();
+        current.setHours(0,0,0,0);
+        targetDate.setHours(0,0,0,0);
+        var diff = current.getTime() - targetDate.getTime();
+        var calculatedDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+        return calculatedDays >= 0 ? calculatedDays : 0;
+    }
+
+    // 💡 ฟังก์ชัน HUD Loader ย้ายมาเป็นฟังก์ชันอิสระ
+    function showHUDLoader(msg) {
+        Swal.fire({
+            html: '<div class="hud-loader"><div class="hud-ring"></div><div class="hud-core"><i class="fas fa-shield-halved fa-2x text-primary"></i></div></div><div class="mt-4 fw-bold text-primary tracking-wider">กำลังประมวลผลข้อมูล</div><div class="small text-muted mt-2">' + msg + '</div>',
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            background: '#ffffff',
+            backdrop: 'rgba(255, 255, 255, 0.95)',
+            customClass: { popup: 'rounded-3 shadow-lg border p-4' }
+        });
+    }
+
+    // 💡 ฟังก์ชันเริ่มกระบวนการ HUD -> Data Table 
+    function startHUDAndLoadTable() {
+        showHUDLoader('กำลังสร้างมิติโครงสร้างข้อมูลและซิงโครไนซ์ตาราง...');
+        loadDataTable();
+    }
+
+    function clearFilters(type) {
+        if(type === 'data') {
+            $('#filterArea, #filterLoc, #filterProduct').val('').trigger('change');
+            $('#filterModel').val(null).trigger('change');
+            $('#filterImei').val('').trigger('keyup');
+            $('#filterStatus').val('').trigger('change');
+            $('#filterStartDate, #filterEndDate').val('').trigger('change');
+        } else if(type === 'dash') {
+            $('#dashFilterArea, #dashFilterAging').val('').trigger('change');
+            $('#dashFilterModel').val(null).trigger('change');
+        } else if(type === 'deep') {
+            $('#deepFilterArea, #deepFilterLoc, #deepFilterAging').val('').trigger('change');
+            $('#deepFilterModel').val(null).trigger('change');
+        } else if(type === 'daily') {
+            $('#dailyFilterStartDate, #dailyFilterEndDate').val('').trigger('change');
+        }
+    }
+
+    function updateThemeIcon(theme) {
+        $('#themeToggleBtn i').attr('class', theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon');
+    }
+
+    $(document).ready(function() {
+        var todayDate = new Date();
+        document.getElementById('actDate').valueAsDate = todayDate;
+        $('#currentDateDisplay').html('<i class="far fa-clock"></i> ข้อมูล ณ วันที่: ' + todayDate.getDate() + '/' + (todayDate.getMonth()+1) + '/' + todayDate.getFullYear());
+
+        updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+        $('#themeToggleBtn').on('click', function() {
+            var newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            try { localStorage.setItem('actssTheme', newTheme); } catch(e) {}
+            updateThemeIcon(newTheme);
+        });
+
+        // 💡 1. เข้าเว็บครั้งแรก ให้ดึงข้อมูลเงียบๆ ยังไม่ขึ้น HUD (มีหน้าจอขาวขุ่น Overlay บังไว้บางๆ)
+        google.script.run.withSuccessHandler(initializeUI).getAppData();
+        
+        // ระบบค้นหาแบบช่วงเวลา และรหัส/ชื่อสินค้าของ DataTables
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            if (settings.nTable.id !== 'dataTable') return true; 
+
+            var filterProductStr = $('#filterProduct').val() ? $('#filterProduct').val().toLowerCase() : "";
+            if (filterProductStr) {
+                var descCol = data[0] ? data[0].toLowerCase() : "";
+                var skuCol = data[1] ? data[1].toLowerCase() : "";
+                if (descCol.indexOf(filterProductStr) === -1 && skuCol.indexOf(filterProductStr) === -1) {
+                    return false;
+                }
+            }
+
+            var selectedModels = $('#filterModel').val() || [];
+            if (selectedModels.length > 0) {
+                var modelCol = data[17] ? data[17].toString() : "";
+                if (selectedModels.indexOf(modelCol) === -1) return false;
+            }
+
+            var minDateStr = $('#filterStartDate').val();
+            var maxDateStr = $('#filterEndDate').val();
+            var dateCol = data[11]; 
+
+            if (!minDateStr && !maxDateStr) return true;
+            if (!dateCol) return false;
+
+            var cleanDate = dateCol.toString().replace(/'/g, "").trim().split(" ")[0];
+            var parts = cleanDate.split(/[-/]/);
+            if(parts.length !== 3) return false;
+
+            var rowDate;
+            if(parts[0].length === 4) { rowDate = new Date(parts[0], parts[1] - 1, parts[2]); } 
+            else { rowDate = new Date(parts[2], parts[1] - 1, parts[0]); }
+            rowDate.setHours(0,0,0,0);
+
+            var minD = minDateStr ? new Date(minDateStr) : null;
+            if(minD) minD.setHours(0,0,0,0);
+            
+            var maxD = maxDateStr ? new Date(maxDateStr) : null;
+            if(maxD) maxD.setHours(23,59,59,999);
+
+            if (minD && maxD) return rowDate >= minD && rowDate <= maxD;
+            else if (minD) return rowDate >= minD;
+            else if (maxD) return rowDate <= maxD;
+            return true;
+        });
+
+        $('#filterStartDate, #filterEndDate').on('change', function() {
+            if(dataTableInstance) dataTableInstance.draw();
+        });
+
+        $('#filterArea').on('change', function() { if(dataTableInstance) dataTableInstance.column(8).search(this.value).draw(); });
+        $('#filterLoc').on('change', function() { if(dataTableInstance) dataTableInstance.column(6).search(this.value).draw(); });
+        $('#filterImei').on('keyup', function() { if(dataTableInstance) dataTableInstance.column(2).search(this.value).draw(); });
+        $('#filterStatus').on('change', function() { if(dataTableInstance) dataTableInstance.column(15).search(this.value).draw(); });
+        $('#filterProduct').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
+        $('#filterModel').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
+
+        $('#deepFilterArea, #deepFilterLoc, #deepFilterModel, #deepFilterAging').on('change', function() { renderDeepDiveTable(); });
+        $('#dashFilterArea, #dashFilterModel, #dashFilterAging').on('change', function() { generateExecutiveDashboard(globalAllRecords, globalUnsoldPool); });
+
+        $('#dailyFilterStartDate, #dailyFilterEndDate').on('change', function() { generateDailyDashboard(); });
+        $('#daily-dash-tab').on('shown.bs.tab', function() { generateDailyDashboard(); });
+
+        $('#btnAddRow').click(function() {
+            if(!$('#locCode').val()) { Swal.fire('ข้อกำหนดระบบ', 'โปรดระบุสถานที่ตั้งสาขาก่อนเพิ่มสินค้า', 'warning'); return; }
+            $('.select-sku').select2('destroy');
+            $('.select-imei').select2('destroy');
+            var newRow = $('.item-row').first().clone();
+            newRow.find('.input-desc').val('');
+            newRow.appendTo('#itemsContainer');
+            initRowSelect2();
+            populateSkuDropdown(newRow.find('.select-sku'));
+            newRow.find('.select-imei').empty().append('<option></option>');
+        });
+
+        $(document).on('click', '.btn-remove-row', function() { $(this).closest('.item-row').fadeOut(200, function() { $(this).remove(); }); });
+
+        $('#locationSelect').on('select2:select', function (e) {
+            var code = e.params.data.id;
+            var text = e.params.data.text;
+            $('#locCode').val(code); 
+            $('#locName').val(text.replace(code + ' - ', '')); 
+            $('#locPrefix').text(code + " +");
+
+            showHUDLoader('กำลังตรวจสอบพิกัดคลังและเช็คยอดสต๊อก...');
+            
+            google.script.run.withSuccessHandler(function(stock) {
+                branchStock = stock;
+                Swal.close();
+                $('.item-row:not(:first)').remove();
+                $('.select-sku').each(function() { populateSkuDropdown($(this)); });
+                $('.select-imei').empty().append('<option></option>');
+
+                if(stock.length === 0) { Swal.fire('แจ้งคลังสินค้า', 'ไม่พบยอดสต๊อกผลิตภัณฑ์ที่สาขานี้', 'info'); }
+            }).getStockByBranch(code);
+        });
+
+        $(document).on('select2:select', '.select-sku', function(e) {
+            var selectedSku = e.params.data.id;
+            var row = $(this).closest('.item-row');
+            var matchedItem = branchStock.find(function(i) { return i.sku === selectedSku; });
+            if(matchedItem) row.find('.input-desc').val(matchedItem.desc);
+            var imeiList = branchStock.filter(function(i) { return i.sku === selectedSku; });
+            var imeiDropdown = row.find('.select-imei');
+            imeiDropdown.empty().append('<option></option>');
+            imeiList.forEach(function(i) { imeiDropdown.append('<option value="' + i.imei + '">' + i.imei + '</option>'); });
+        });
+
+        $(document).on('change', '.select-imei', function() {
+            var currentVal = $(this).val();
+            var currentDropdown = this;
+            if(currentVal) {
+                var isDuplicate = false;
+                $('.select-imei').not(currentDropdown).each(function() {
+                    if($(this).val() === currentVal) {
+                        Swal.fire('ข้อผิดพลาด', 'หมายเลข IMEI ถูกระบุซ้ำในบิลเดียวกัน', 'error');
+                        $(currentDropdown).val(null).trigger('change');
+                        isDuplicate = true;
+                    }
+                });
+                
+                if(!isDuplicate) {
+                    var matchedItem = branchStock.find(function(i) { return i.imei === currentVal; });
+                    if(matchedItem && matchedItem.originalLoc === "Warehouse Transfer" && $(currentDropdown).data('confirmedVal') !== currentVal) {
+                        Swal.fire({
+                            title: 'ยืนยันสต๊อกสินค้า',
+                            text: 'กรุณายืนยันว่า IMEI นี้มีสินค้าอยู่ในสาขาจริง',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                            confirmButtonText: 'ยืนยัน',
+                            cancelButtonText: 'ยกเลิก',
+                            allowOutsideClick: false
+                        }).then(function(result) {
+                            if (result.isConfirmed) {
+                                $(currentDropdown).data('confirmedVal', currentVal);
+                            } else {
+                                $(currentDropdown).val(null).trigger('change');
+                            }
+                        });
+                    }
+                }
+            }
+        });
+
+        $('#actForm').on('submit', function(e) {
+            e.preventDefault();
+            var payload = { actDate: $('#actDate').val(), empName: $('#empName').val(), locCode: $('#locCode').val(), locName: $('#locName').val(), items: [] };
+            var validationError = false;
+
+            $('.item-row').each(function() {
+                var sku = $(this).find('.select-sku').val();
+                var desc = $(this).find('.input-desc').val();
+                var imei = $(this).find('.select-imei').val();
+                var status = $(this).find('.input-status').val();
+                if(!sku || !imei) validationError = true;
+                payload.items.push({ sku: sku, desc: desc, imei: imei, status: status });
+            });
+
+            if(validationError) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุให้ครบถ้วน', 'warning'); return; }
+
+            showHUDLoader('กำลังบันทึกโครงสร้างข้อมูลลงฐานระบบหลัก...');
+            google.script.run.withSuccessHandler(function(res) {
+                if(res.success) {
+                    Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
+                    $('.item-row:not(:first)').remove();
+                    $('.select-sku').val(null).trigger('change');
+                    $('.select-imei').empty().append('<option></option>').val(null).trigger('change');
+                    $('#empName').val('');
+                    // โหลดตารางใหม่แบบเงียบๆ ไม่ต้องแสดง HUD อีก
+                    google.script.run.withSuccessHandler(function(records){ processRecords(records); }).getRecords();
+                } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+            }).saveBatchRecords(payload);
+        });
+    });
+
+    function initRowSelect2() {
+        $('.select-sku').select2({ theme: 'bootstrap-5', placeholder: "ค้นหา SKU", allowClear: true, width: '100%' });
+        $('.select-imei').select2({ theme: 'bootstrap-5', placeholder: "เลือก IMEI", allowClear: true, width: '100%' });
+    }
+
+    function populateSkuDropdown(dropdownElement) {
+        var skuList = [];
+        branchStock.forEach(function(item) { if (skuList.indexOf(item.sku) === -1) skuList.push(item.sku); });
+        dropdownElement.empty().append('<option></option>');
+        skuList.forEach(function(sku) {
+            var desc = branchStock.find(function(i) { return i.sku == sku; }).desc;
+            dropdownElement.append('<option value="' + sku + '">' + sku + ' - ' + desc + '</option>');
+        });
+    }
+
+    // 💡 2. ด่านการแสดงผล: เมื่อดึงข้อมูล Header พื้นฐานเสร็จ 
+    function initializeUI(data) {
+        // ปิด Overlay หน้ากากสีขาวขุ่น
+        $('#overlay').fadeOut();
+
+        rawLocations = data.locations;
+        masterProductMap = data.productMap || {}; 
+
+        var areaSet = [];
+        var locSet = [];
+        var locDisplayMap = {};
+
+        rawLocations.forEach(function(loc) {
+            $('#locationSelect').append('<option value="' + loc.code + '">' + loc.code + ' - ' + loc.name + ' [' + loc.area + ']</option>');
+            locDisplayMap[loc.code] = loc.code + ' - ' + loc.name;
+            if(areaSet.indexOf(loc.area) === -1) areaSet.push(loc.area);
+            if(locSet.indexOf(loc.code) === -1) locSet.push(loc.code);
+        });
+        
+        areaSet.sort().forEach(function(a) { 
+            $('#filterArea').append('<option value="' + a + '">' + a + '</option>'); 
+            $('#deepFilterArea').append('<option value="' + a + '">' + a + '</option>'); 
+            $('#dashFilterArea').append('<option value="' + a + '">' + a + '</option>'); 
+        });
+        locSet.sort().forEach(function(c) { 
+            var display = locDisplayMap[c] || c;
+            $('#filterLoc').append('<option value="' + c + '">' + display + '</option>'); 
+            $('#deepFilterLoc').append('<option value="' + c + '">' + display + '</option>'); 
+        });
+
+        $('#locationSelect').select2({ theme: 'bootstrap-5', placeholder: "ระบุหรือกรอกคีย์เวิร์ดชื่อสาขา...", allowClear: true, width: '100%' });
+        $('#filterArea, #filterLoc, #filterProduct, #deepFilterArea, #deepFilterLoc, #deepFilterAging, #dashFilterArea, #dashFilterAging').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "แสดงข้อมูลทั้งหมด..." });
+        $('#filterModel, #dashFilterModel, #deepFilterModel').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, closeOnSelect: false, placeholder: "ติ๊กเลือกรุ่นได้หลายรายการ..." });
+        initRowSelect2();
+
+        if(!data.timeValid) {
+            $('#actForm').addClass('form-locked');
+            $('#btnSubmit').prop('disabled', true);
+            $('#timeAlert').removeClass('d-none');
+        }
+
+        if(data.promotions && data.promotions.length > 0) {
+            var promoArray = data.promotions.map(function(p) { return '📢 ข่าวสารการตลาด: ' + p.title + ' <a href="' + p.link + '" target="_blank" class="text-danger fw-bold">คลิกดูรายละเอียด</a>'; });
+            $('#promoMarquee').html(promoArray.join(' &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp; '));
+        }
+
+        // 💡 3. เช็คว่ามี "ประกาศ" หรือไม่ ถ้ามีให้โชว์ก่อนโหลดตาราง
+        if(data.announcement && data.announcement.title && data.announcement.title !== "") {
+            Swal.fire({
+                title: '<div class="text-start border-bottom pb-2 text-primary fw-bold"><i class="fas fa-bullhorn"></i> ' + data.announcement.title + '</div>',
+                text: data.announcement.detail,
+                icon: 'info',
+                confirmButtonText: '<i class="fas fa-check-circle"></i> รับทราบและตกลง',
+                customClass: { popup: 'rounded-4 shadow-lg p-3', confirmButton: 'btn btn-primary fw-bold' },
+                allowOutsideClick: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // 💡 4. กดยอมรับประกาศเสร็จ จึงเปิดระบบ HUD Loader หมุน แล้วค่อยดึงตาราง
+                    startHUDAndLoadTable();
+                }
+            });
+        } else {
+            // ถ้าไม่มีประกาศ ก็เริ่มโหลดตารางพร้อมโชว์ HUD ได้เลย
+            startHUDAndLoadTable();
+        }
+    }
+
+    function loadDataTable() {
+        google.script.run
+        .withFailureHandler(function(err) {
+            console.error(err);
+            Swal.fire('ข้อผิดพลาดเครือข่าย', 'ระบบล้มเหลวในการเชื่อมโยงตาราง: ' + err.message, 'error');
+        })
+        .withSuccessHandler(function(records) {
+            processRecords(records);
+            // 💡 5. เมื่อโหลดข้อมูลและวาดตารางเสร็จสิ้นทั้งหมด ปิด HUD ทิ้ง
+            Swal.close();
+        }).getRecords();
+    }
+
+    // แยกส่วนการประมวลผลตารางออกมา เพื่อให้เรียกซ้ำตอนบันทึกข้อมูลได้โดยไม่ต้องโชว์ HUD
+    function processRecords(records) {
+        if (dataTableInstance) { dataTableInstance.destroy(); }
+        var tbody = '';
+        var unsoldPool = [];
+        var productSet = new Set();
+        var filterModelSet = new Set();
+
+        if(records && records.length > 0) {
+            records.forEach(function(r) {
+                var displayTimestamp = r.timestamp ? r.timestamp.toString().replace(/'/g, "").trim() : "";
+                var displayActDate = r.actDate ? r.actDate.toString().replace(/'/g, "").trim() : "";
+                var ageDays = computeAgingDays(displayActDate);
+                var ageBadgeColor = ageDays > 15 ? 'bg-danger' : (ageDays > 7 ? 'bg-warning text-dark' : 'bg-success');
+                var statusStyle = r.status === 'ขายแล้ว' ? 'bg-success' : 'bg-danger';
+
+                var cleanSku = r.sku ? r.sku.toString().trim() : "";
+                var mappedModelName = (masterProductMap[cleanSku] && masterProductMap[cleanSku] !== "") ? masterProductMap[cleanSku] : r.desc;
+                
+                if (cleanSku !== "") productSet.add(cleanSku + "|||[" + cleanSku + "] " + r.desc);
+                if (mappedModelName) filterModelSet.add(mappedModelName);
+
+                if(r.status === 'ยังไม่ขาย') {
+                    unsoldPool.push({ model: mappedModelName, sku: cleanSku, desc: r.desc, area: r.area, locCode: r.locCode, locName: r.locName, imei: r.imei, age: ageDays });
+                }
+
+                var btnManage = '<button class="btn btn-sm btn-primary fw-bold" onclick="changeStatus(' + r.rowId + ', \'' + r.status + '\')"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
+
+                tbody += '<tr>' +
+                    '<td>' + r.desc + '</td>' +                          
+                    '<td>' + r.sku + '</td>' +                           
+                    '<td>' + r.imei + '</td>' +                          
+                    '<td>' + r.rrp + '</td>' +                           
+                    '<td>' + r.discount + '</td>' +                      
+                    '<td>' + r.promoPrice + '</td>' +                    
+                    '<td>' + r.locCode + '</td>' +                       
+                    '<td>' + r.locName + '</td>' +                       
+                    '<td class="fw-bold text-dark">' + r.area + '</td>' +
+                    '<td>' + r.cutBarcode + '</td>' +                    
+                    '<td>' + r.suggestPrice + '</td>' +                  
+                    '<td>' + displayTimestamp + '</td>' +                
+                    '<td>' + r.empName + '</td>' +                       
+                    '<td>' + displayActDate + '</td>' +                  
+                    '<td><span class="badge ' + ageBadgeColor + ' rounded-pill">' + ageDays + ' วัน</span></td>' + 
+                    '<td><span class="badge ' + statusStyle + '">' + r.status + '</span></td>' +
+                    '<td>' + btnManage + '</td>' +
+                    '<td>' + mappedModelName + '</td>' +
+                '</tr>';
+            });
+        } else {
+            tbody = '<tr><td colspan="18" class="text-center text-muted py-4">ยังไม่มีบันทึกข้อมูลในฐานระบบ</td></tr>';
+        }
+        
+        $('#dataTable tbody').html(tbody);
+        
+        var existingProduct = $('#filterProduct').val();
+        $('#filterProduct').empty().append('<option value="">-- ทุกสินค้า --</option>');
+        Array.from(productSet).sort().forEach(function(item) {
+            var parts = item.split("|||");
+            $('#filterProduct').append('<option value="' + parts[0] + '">' + parts[1] + '</option>');
+        });
+        if(existingProduct) $('#filterProduct').val(existingProduct);
+
+        var existingFilterModel = $('#filterModel').val();
+        $('#filterModel').empty();
+        Array.from(filterModelSet).sort().forEach(function(m) {
+            $('#filterModel').append('<option value="' + m + '">' + m + '</option>');
+        });
+        if(existingFilterModel && existingFilterModel.length) $('#filterModel').val(existingFilterModel);
+
+        dataTableInstance = $('#dataTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [[11, "desc"]],
+            "columnDefs": [{ targets: 17, visible: false, searchable: true }],
+            "responsive": {
+                details: {
+                    display: function (row, update, render) {
+                        if (update) return; 
+                        var html = render();
+                        if (html !== false) {
+                            Swal.fire({
+                                title: '<div class="text-start border-bottom pb-2 m-0"><i class="fas fa-info-circle text-primary"></i> <span class="fw-bold text-dark" style="font-size: 14px;">รายละเอียดข้อมูลสินค้า</span></div>',
+                                html: html,
+                                showCloseButton: true,
+                                showConfirmButton: false,
+                                width: '95%',
+                                customClass: { popup: 'rounded-4 shadow-lg custom-detail-popup', htmlContainer: 'p-0 m-0' }
+                            });
+                        }
+                    },
+                    renderer: function (api, rowIdx, columns) {
+                        var html = '<div class="container-fluid px-3 py-2 text-start">';
+                        var actionBtnHtml = ''; 
+
+                        columns.forEach(function (col) {
+                            if (!col.title) return;
+                            if (col.title === 'จัดการ') {
+                                actionBtnHtml = '<div class="mt-3 mb-2 px-2 text-center">' + col.data.replace('btn-sm', 'btn-md w-100 shadow-sm fs-6') + '</div>';
+                                return;
+                            }
+                            html += '<div class="row border-bottom py-2 mx-0 align-items-center" style="font-size: 12px; line-height: 1.5;">' +
+                                        '<div class="col-5 text-muted fw-bold p-0">' + col.title + '</div>' +
+                                        '<div class="col-7 text-end text-dark fw-bold p-0 text-wrap">' + col.data + '</div>' +
+                                    '</div>';
+                        });
+                        html += actionBtnHtml + '</div>';
+                        return html;
+                    }
+                }
+            }
+        });
+
+        globalAllRecords = records;
+        globalUnsoldPool = unsoldPool;
+
+        var existingDashModel = $('#dashFilterModel').val();
+        $('#dashFilterModel').empty();
+        var allModels = new Set();
+        unsoldPool.forEach(function(item) { allModels.add(item.model); });
+        Array.from(allModels).sort().forEach(function(m) {
+            $('#dashFilterModel').append('<option value="' + m + '">' + m + '</option>');
+        });
+        if(existingDashModel && existingDashModel.length) $('#dashFilterModel').val(existingDashModel);
+
+        generateExecutiveDashboard(records, unsoldPool);
+        renderDeepDiveTable(); 
+        generateDailyDashboard();
+    }
+
+    function generateExecutiveDashboard(allRecords, unsoldPool) {
+        var selectedArea = $('#dashFilterArea').val();
+        var selectedModels = $('#dashFilterModel').val() || [];
+        var selectedAging = $('#dashFilterAging').val();
+
+        var filteredRecords = allRecords;
+        var filteredUnsold = unsoldPool;
+
+        if (selectedArea || selectedModels.length > 0 || selectedAging) {
+            filteredRecords = allRecords.filter(function(r) {
+                var cleanSku = r.sku ? r.sku.toString().trim() : "";
+                var m = (masterProductMap[cleanSku] && masterProductMap[cleanSku] !== "") ? masterProductMap[cleanSku] : r.desc;
+                var matchArea = selectedArea ? r.area === selectedArea : true;
+                var matchModel = selectedModels.length > 0 ? selectedModels.indexOf(m) !== -1 : true;
+                return matchArea && matchModel;
+            });
+            filteredUnsold = unsoldPool.filter(function(item) {
+                var matchArea = selectedArea ? item.area === selectedArea : true;
+                var matchModel = selectedModels.length > 0 ? selectedModels.indexOf(item.model) !== -1 : true;
+                var matchAging = true;
+                if(selectedAging) {
+                    if(selectedAging === "30") matchAging = item.age <= 30;
+                    else if(selectedAging === "60") matchAging = item.age > 30 && item.age <= 60;
+                    else if(selectedAging === "90") matchAging = item.age > 60 && item.age <= 90;
+                    else if(selectedAging === "120") matchAging = item.age > 90 && item.age <= 120;
+                    else if(selectedAging === "121") matchAging = item.age > 120;
+                }
+                return matchArea && matchModel && matchAging;
+            });
+        }
+
+        var totalAct = 0;
+        var totalSold = 0;
+        var totalUnsold = 0;
+
+        var modelAggregator = {};
+        var areaAgingAggregator = {};
+
+        filteredRecords.forEach(function(r) {
+            totalAct++;
+            if(r.status === 'ขายแล้ว') totalSold++;
+        });
+
+        filteredUnsold.forEach(function(item) {
+            totalUnsold++;
+            if(!modelAggregator[item.model]) modelAggregator[item.model] = 0;
+            modelAggregator[item.model]++;
+            
+            if(!areaAgingAggregator[item.area]) {
+                areaAgingAggregator[item.area] = { total: 0, d30: 0, d60: 0, d90: 0, d120: 0, over120: 0 };
+            }
+            areaAgingAggregator[item.area].total++;
+            if(item.age <= 30) {
+                areaAgingAggregator[item.area].d30++;
+            } else if(item.age <= 60) {
+                areaAgingAggregator[item.area].d60++;
+            } else if(item.age <= 90) {
+                areaAgingAggregator[item.area].d90++;
+            } else if(item.age <= 120) {
+                areaAgingAggregator[item.area].d120++;
+            } else {
+                areaAgingAggregator[item.area].over120++;
+            }
+        });
+
+        $('#kpi-total').text(totalAct);
+        $('#kpi-sold').text(totalSold);
+        $('#kpi-unsold').text(totalUnsold);
+
+        if(modelTableInstance) modelTableInstance.destroy();
+        var modelTbody = '';
+        for(var m in modelAggregator) { modelTbody += '<tr><td>' + m + '</td><td class="text-center fw-bold text-primary">' + modelAggregator[m] + '</td></tr>'; }
+        $('#modelTable tbody').html(modelTbody);
+        modelTableInstance = $('#modelTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [[1, "desc"]], "pageLength": 20, "lengthChange": false, "info": false
+        });
+
+
+        if(areaAgingTableInstance) areaAgingTableInstance.destroy();
+        var areaAgingTbody = '';
+        for(var a_ag in areaAgingAggregator) { 
+            var ag = areaAgingAggregator[a_ag];
+            areaAgingTbody += '<tr>' + 
+                '<td>' + a_ag + '</td>' + 
+                '<td class="text-center fw-bold text-primary">' + ag.total + '</td>' + 
+                '<td class="text-center">' + ag.d30 + '</td>' + 
+                '<td class="text-center">' + ag.d60 + '</td>' + 
+                '<td class="text-center text-warning">' + ag.d90 + '</td>' + 
+                '<td class="text-center text-danger">' + ag.d120 + '</td>' + 
+                '<td class="text-center text-danger fw-bold">' + ag.over120 + '</td>' + 
+            '</tr>'; 
+        }
+        $('#areaAgingTable tbody').html(areaAgingTbody);
+        areaAgingTableInstance = $('#areaAgingTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [[1, "desc"]], "pageLength": 20, "lengthChange": false, "info": false
+        });
+
+        var existingModel = $('#deepFilterModel').val();
+        $('#deepFilterModel').empty();
+        Object.keys(modelAggregator).sort().forEach(function(m) {
+            $('#deepFilterModel').append('<option value="' + m + '">' + m + '</option>');
+        });
+        if(existingModel && existingModel.length) $('#deepFilterModel').val(existingModel);
+    }
+
+    function generateDailyDashboard() {
+        var startDateStr = $('#dailyFilterStartDate').val();
+        var endDateStr = $('#dailyFilterEndDate').val();
+        
+        var minD = startDateStr ? new Date(startDateStr) : null;
+        if(minD) minD.setHours(0,0,0,0);
+        
+        var maxD = endDateStr ? new Date(endDateStr) : null;
+        if(maxD) maxD.setHours(23,59,59,999);
+
+        var dailyModelMap = {};
+
+        globalAllRecords.forEach(function(r) {
+            if(!r.timestamp) return;
+            var cleanDate = r.timestamp.toString().replace(/'/g, "").trim().split(' ')[0];
+            var dateParts = cleanDate.split(/[-/]/); 
+            if(dateParts.length !== 3) return;
+            
+            var d, m, y;
+            if(dateParts[0].length === 4) {
+                y = dateParts[0]; m = dateParts[1]; d = dateParts[2];
+            } else {
+                d = dateParts[0]; m = dateParts[1]; y = dateParts[2];
+            }
+            
+            var rowDate = new Date(y, m - 1, d);
+            rowDate.setHours(0,0,0,0);
+
+            if (minD && rowDate < minD) return;
+            if (maxD && rowDate > maxD) return;
+            
+            var dateKey = y + '-' + m + '-' + d; // YYYY-MM-DD for sorting
+            var displayDate = d + '/' + m + '/' + y;
+
+            var cleanSku = r.sku ? r.sku.toString().trim() : "";
+            var model = (masterProductMap[cleanSku] && masterProductMap[cleanSku] !== "") ? masterProductMap[cleanSku] : r.desc;
+            var area = r.area;
+            var isSold = r.status === 'ขายแล้ว' ? 1 : 0;
+
+            var mKey = dateKey + '_' + model;
+            if(!dailyModelMap[mKey]) dailyModelMap[mKey] = { date: displayDate, sortKey: dateKey, model: model, total: 0, sold: 0, areaDetails: {} };
+            dailyModelMap[mKey].total++;
+            dailyModelMap[mKey].sold += isSold;
+            
+            if(!dailyModelMap[mKey].areaDetails[area]) {
+                dailyModelMap[mKey].areaDetails[area] = { total: 0, sold: 0 };
+            }
+            dailyModelMap[mKey].areaDetails[area].total++;
+            dailyModelMap[mKey].areaDetails[area].sold += isSold;
+        });
+
+        if(dailyModelTableInstance) dailyModelTableInstance.destroy();
+        var tbodyModel = '';
+        Object.values(dailyModelMap).sort((a,b) => b.sortKey.localeCompare(a.sortKey) || a.model.localeCompare(b.model)).forEach(function(obj) {
+            var areaJson = JSON.stringify(obj.areaDetails).replace(/'/g, "&#39;");
+            tbodyModel += '<tr><td class="details-control text-center" style="cursor:pointer;" data-details=\'' + areaJson + '\'><i class="fas fa-plus-circle text-primary"></i></td>' + 
+                          '<td>' + obj.date + '</td><td>' + obj.model + '</td><td class="text-center">' + obj.total + '</td><td class="text-center text-success fw-bold">' + obj.sold + '</td></tr>';
+        });
+        $('#dailyModelTable tbody').html(tbodyModel);
+        dailyModelTableInstance = $('#dailyModelTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [], "pageLength": 20, "lengthChange": false
+        });
+
+        $('#dailyModelTable tbody').off('click', 'td.details-control').on('click', 'td.details-control', function () {
+            var tr = $(this).closest('tr');
+            var row = dailyModelTableInstance.row(tr);
+            var icon = $(this).find('i');
+
+            if (row.child.isShown()) {
+                row.child.hide();
+                tr.removeClass('shown');
+                icon.removeClass('fa-minus-circle text-danger').addClass('fa-plus-circle text-primary');
+            } else {
+                var areaDetails = $(this).data('details');
+                var childHtml = '<div class="p-3 bg-light border rounded m-2"><h6 class="fw-bold text-secondary"><i class="fas fa-map-marker-alt text-danger"></i> สรุปรายแอเรีย (Area)</h6><table class="table table-sm table-bordered bg-white w-auto mt-2"><thead><tr class="table-secondary"><th>แอเรีย</th><th class="text-center">ทำรายการทั้งหมด</th><th class="text-center">ขายแล้ว</th></tr></thead><tbody>';
+                
+                Object.keys(areaDetails).sort().forEach(function(areaName) {
+                    childHtml += '<tr><td>' + areaName + '</td><td class="text-center">' + areaDetails[areaName].total + '</td><td class="text-center text-success fw-bold">' + areaDetails[areaName].sold + '</td></tr>';
+                });
+                childHtml += '</tbody></table></div>';
+                
+                row.child(childHtml).show();
+                tr.addClass('shown');
+                icon.removeClass('fa-plus-circle text-primary').addClass('fa-minus-circle text-danger');
+            }
+        });
+
+    }
+
+    function renderDeepDiveTable() {
+        var selectedArea = $('#deepFilterArea').val();
+        var selectedLoc = $('#deepFilterLoc').val();
+        var selectedModels = $('#deepFilterModel').val() || [];
+        var selectedAging = $('#deepFilterAging').val();
+
+        var filteredPool = globalUnsoldPool.filter(function(item) {
+            var matchArea = selectedArea ? item.area === selectedArea : true;
+            var matchLoc = selectedLoc ? item.locCode === selectedLoc : true;
+            var matchModel = selectedModels.length > 0 ? selectedModels.indexOf(item.model) !== -1 : true;
+            var matchAging = true;
+            
+            if(selectedAging) {
+                if(selectedAging === "30") matchAging = item.age <= 30;
+                else if(selectedAging === "60") matchAging = item.age > 30 && item.age <= 60;
+                else if(selectedAging === "90") matchAging = item.age > 60 && item.age <= 90;
+                else if(selectedAging === "120") matchAging = item.age > 90 && item.age <= 120;
+                else if(selectedAging === "121") matchAging = item.age > 120;
+            }
+
+            return matchArea && matchLoc && matchModel && matchAging;
+        });
+
+        var modelDetailsMap = {};
+        filteredPool.forEach(function(item) {
+            if(!modelDetailsMap[item.model]) modelDetailsMap[item.model] = { count: 0, skus: {} };
+            modelDetailsMap[item.model].count++;
+
+            var skuKey = item.sku + '|||' + item.desc;
+            if(!modelDetailsMap[item.model].skus[skuKey]) {
+                modelDetailsMap[item.model].skus[skuKey] = { sku: item.sku, desc: item.desc, count: 0, locs: {} };
+            }
+            modelDetailsMap[item.model].skus[skuKey].count++;
+
+            var locKey = item.locCode + '|||' + item.locName;
+            if(!modelDetailsMap[item.model].skus[skuKey].locs[locKey]) {
+                modelDetailsMap[item.model].skus[skuKey].locs[locKey] = { locCode: item.locCode, locName: item.locName, count: 0, items: [] };
+            }
+            modelDetailsMap[item.model].skus[skuKey].locs[locKey].count++;
+            modelDetailsMap[item.model].skus[skuKey].locs[locKey].items.push({ imei: item.imei, age: item.age });
+        });
+
+        var deepDiveData = [];
+        for(var m_deep in modelDetailsMap) {
+            deepDiveData.push({ 
+                "model": m_deep, 
+                "count": modelDetailsMap[m_deep].count, 
+                "skus": Object.values(modelDetailsMap[m_deep].skus) 
+            });
+        }
+        
+        if(modelDetailTableInstance) modelDetailTableInstance.destroy();
+        modelDetailTableInstance = $('#modelDetailTable').DataTable({
+            data: deepDiveData,
+            columns: [
+                { className: 'model-details-control text-center align-middle', orderable: false, data: null, defaultContent: '<button class="btn btn-sm btn-primary rounded-circle shadow-sm" style="width:24px; height:24px; padding:0;"><i class="fas fa-plus" style="font-size:10px;"></i></button>' },
+                { data: 'model', className: 'align-middle fw-bold text-dark' },
+                { data: 'count', className: 'text-center align-middle fw-bold text-primary fs-6' }
+            ],
+            order: [[2, 'desc']], language: { url: "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" }, responsive: false
+        });
+
+        $('#modelDetailTable tbody').off('click', 'td.model-details-control');
+        $('#modelDetailTable tbody').on('click', 'td.model-details-control', function () {
+            var tr = $(this).closest('tr');
+            var row = modelDetailTableInstance.row(tr);
+            var btn = $(this).find('button i');
+            var btnShell = $(this).find('button');
+
+            if (row.child.isShown()) {
+                row.child.hide();
+                tr.removeClass('shown');
+                btn.removeClass('fa-minus').addClass('fa-plus');
+                btnShell.removeClass('btn-danger').addClass('btn-primary');
+            } else {
+                row.child(formatModelDetails(row.data())).show();
+                tr.addClass('shown');
+                btn.removeClass('fa-plus').addClass('fa-minus');
+                btnShell.removeClass('btn-primary').addClass('btn-danger');
+            }
+        });
+
+        $('#modelDetailTable tbody').off('click', '.btn-toggle-lvl3');
+        $('#modelDetailTable tbody').on('click', '.btn-toggle-lvl3', function () {
+            var targetId = $(this).data('target');
+            var $targetRow = $('#' + targetId);
+            var $icon = $(this).find('i');
+
+            if ($targetRow.hasClass('d-none')) {
+                $targetRow.removeClass('d-none');
+                $(this).removeClass('btn-info').addClass('btn-danger');
+                $icon.removeClass('fa-plus').addClass('fa-minus');
+            } else {
+                $targetRow.addClass('d-none');
+                $(this).removeClass('btn-danger').addClass('btn-info');
+                $icon.removeClass('fa-minus').addClass('fa-plus');
+            }
+        });
+    }
+
+    function formatModelDetails(d) {
+        var html = '<div class="p-3 bg-light rounded border border-primary shadow-sm">';
+        html += '<h6 class="fw-bold text-primary mb-3"><i class="fas fa-layer-group"></i> เลือกรหัสสินค้า (SKU) ภายใต้รุ่น: ' + d.model + '</h6>';
+        html += '<table class="table table-sm table-bordered bg-white shadow-sm mb-0">';
+        html += '<thead class="table-secondary"><tr><th class="text-center" style="width: 1%; white-space: nowrap;">เจาะลึก</th><th style="width: auto;">[Item No] Full Description</th><th class="text-center" style="width: 1%; white-space: nowrap;">จำนวน (เครื่อง)</th></tr></thead><tbody>';
+
+        d.skus.sort(function(a, b) { return b.count - a.count; });
+
+        d.skus.forEach(function(skuObj, idx) {
+            var uniqueId = 'lvl3-' + Math.random().toString(36).substr(2, 9);
+            html += '<tr>';
+            html += '<td class="text-center align-middle"><button class="btn btn-sm btn-info text-white rounded-circle shadow-sm btn-toggle-lvl3" data-target="' + uniqueId + '" style="width:24px; height:24px; padding:0;"><i class="fas fa-plus" style="font-size:10px;"></i></button></td>';
+            html += '<td class="fw-bold text-dark align-middle">[' + skuObj.sku + '] ' + skuObj.desc + '</td>';
+            html += '<td class="text-center fw-bold text-primary align-middle fs-6">' + skuObj.count + '</td>';
+            html += '</tr>';
+
+            html += '<tr id="' + uniqueId + '" class="d-none bg-white">';
+            html += '<td colspan="3" class="p-3 border-start border-4 border-info">';
+            html += '<table class="table table-sm table-hover mb-0 border">';
+            html += '<thead class="table-light"><tr><th style="width: 1%; white-space: nowrap;">[สาขา] ชื่อสาขา</th><th class="text-center" style="width: 1%; white-space: nowrap;">จำนวนรายตัว</th><th style="width: auto;">รายละเอียด (IMEI / อายุสต๊อก)</th></tr></thead><tbody>';
+
+            var locs = Object.values(skuObj.locs);
+            locs.sort(function(a, b) { return b.count - a.count; });
+
+            locs.forEach(function(locObj) {
+                locObj.items.sort(function(a, b) { return b.age - a.age; });
+                
+                var itemDetails = locObj.items.map(function(itm) {
+                    var ageBadge = itm.age > 15 ? 'text-danger' : (itm.age > 7 ? 'text-warning' : 'text-success');
+                    return '<div class="small mb-1 border-bottom pb-1"><i class="fas fa-barcode text-secondary"></i> ' + itm.imei + ' <span class="' + ageBadge + ' fw-bold ms-1">(' + itm.age + ' วัน)</span></div>';
+                }).join('');
+
+                html += '<tr>';
+                html += '<td class="text-dark fw-bold align-middle">[' + locObj.locCode + '] ' + locObj.locName + '</td>';
+                html += '<td class="text-center fw-bold text-success align-middle fs-6">' + locObj.count + '</td>';
+                html += '<td class="align-middle">' + itemDetails + '</td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></td></tr>';
+        });
+
+        html += '</tbody></table></div>';
+        return html;
+    }
+
+    function changeStatus(rowId, currentStatus) {
+        Swal.fire({
+            title: 'เปลี่ยนสเตตัสการขาย',
+            input: 'select',
+            inputOptions: { 'ยังไม่ขาย': 'ยังไม่ขาย', 'ขายแล้ว': 'ขายแล้ว' },
+            inputValue: currentStatus, showCancelButton: true
+        }).then(function(result) {
+            if (result.isConfirmed) {
+                showHUDLoader('กำลังบันทึกและซิงค์ข้อมูลสเตตัสใหม่...');
+                google.script.run.withSuccessHandler(function(res) {
+                    if(res.success) { Swal.fire('สำเร็จ', 'เปลี่ยนสเตตัสเรียบร้อย', 'success'); loadDataTable(); }
+                }).updateStatus(rowId, result.value);
+            }
+        });
+    }
+
+    function requestExportCsv() {
+        Swal.fire({ title: 'รหัส Admin PIN', input: 'password', showCancelButton: true }).then(function(result) {
+            if (result.isConfirmed) {
+                google.script.run.withSuccessHandler(function(res) {
+                    if(res.success) { downloadCSV(res.csvData, "ACT_SAMSUNG_Data_Master.csv"); Swal.fire('สำเร็จ', 'ดาวน์โหลดไฟล์เรียบร้อย', 'success'); } 
+                    else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                }).verifyAdminAndExport(result.value);
+            }
+        });
+    }
+
+    function downloadCSV(csvContent, filename) {
+        var blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        var link = document.createElement("a");
+        var url = URL.createObjectURL(blob);
+        link.setAttribute("href", url); link.setAttribute("download", filename); link.style.visibility = 'hidden';
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+</script>
+</body>
+</html>

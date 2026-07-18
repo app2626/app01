@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html>
+<script>
+  if (window.trustedTypes && window.trustedTypes.createPolicy) {
+    window.trustedTypes.createPolicy('default', {
+      createHTML: string => string,
+      createScriptURL: string => string,
+      createScript: string => string,
+    });
+  }
+</script>
+
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" />
+  <link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" type="text/css">
+  <link href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css" rel="stylesheet"
+    type="text/css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.2.0/dist/select2-bootstrap-5-theme.min.css" />
+  <!-- Auto Complete Thailand ที่อยู่ประเทศไทยอัตโนมัติ เครดิต https://earthchie.github.io/jquery.Thailand.js/  -->
+  <link rel="stylesheet" href="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dist/jquery.Thailand.min.css" />
+
+  <!-- FIX: โหลด JS ทั้งหมดใน <head> เพื่อให้พร้อมก่อน $(document).ready และ getData() ถูกเรียก -->
+  <script src="https://code.jquery.com/jquery-3.6.1.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.full.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script type="text/javascript" src="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dependencies/JQL.min.js"></script>
+  <script type="text/javascript" src="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dependencies/typeahead.bundle.js"></script>
+  <script type="text/javascript" src="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dist/jquery.Thailand.min.js"></script>
+
+  <?!= include('css'); ?>
+  <?!= include('dashboard'); ?>
+
+</head>
+
+
+<body>
+  <div id="loading" class="d-flex justify-content-center  align-items-center invisible">
+    <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
+    </div>
+  </div>
+  <div class="container-fluid">
+    <nav class="navbar navbar-expand-lg navbar-light bg-primary mb-3" id="mainNavbar" style="display: none;">
+      <div class="container-fluid d-flex flex-nowrap align-items-center">
+        <button class="btn btn-outline-light flex-shrink-0 me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarNav" aria-controls="sidebarNav">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <h5 class="text-white mb-0 text-truncate">ระบบบันทึกข้อมูล ผ่อนมั้ย</h5>
+        <span class="ms-auto"></span>
+      </div>
+    </nav>
+
+<!-- Sidebar Offcanvas -->
+<div class="offcanvas offcanvas-start bg-dark text-white" tabindex="-1" id="sidebarNav" style="width: 280px;">
+  <div class="offcanvas-header border-bottom border-secondary">
+    <h5 class="offcanvas-title"><i class="fa-solid fa-user-check"></i> เมนูหลัก</h5>
+    <button type="button" class="btn-close btn-close-white text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body p-0 mt-2 d-flex flex-column">
+    <div class="list-group list-group-flush mb-3">
+      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 text-white border-0" style="background-color: transparent;" onclick="switchView('form-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-plus me-2"></i> กรอกแบบฟอร์ม
+      </a>
+      
+      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 table-only text-white border-0" style="display:none; background-color: transparent;" onclick="switchView('table-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-table me-2"></i> ตารางข้อมูล
+      </a>
+      
+      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 dashboard-only text-white border-0" style="display:none; background-color: transparent;" onclick="switchView('dashboard-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-chart-line me-2"></i> แดชบอร์ด
+      </a>
+      
+      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 admin-only text-white border-0" style="display:none; background-color: transparent;" onclick="switchView('admin-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-gear me-2"></i> ตั้งค่าระบบ
+      </a>
+    </div>
+
+    <!-- ปุ่มออกจากระบบล่างสุด -->
+    <div class="mt-auto p-3 logout" style="display:none;">
+      <button class="btn btn-danger w-100 py-2" id="btnLogout" onclick="logout(); closeSidebar();">
+        <i class="fa-solid fa-right-from-bracket me-2"></i> ออกจากระบบ (<span id="msg-name"></span>)
+      </button>
+    </div>
+  </div>
+</div>
+<!-- End Sidebar -->
+
+<!-- หน้า Login View -->
+<div class="container-fluid align-items-center justify-content-center" id="login-view" style="min-height: 80vh; display: none;">
+  <div class="card shadow-lg border-0" style="width: 100%; max-width: 400px; border-radius: 16px;">
+    <div class="card-header bg-primary text-white text-center py-4" style="border-radius: 16px 16px 0 0;">
+      <i class="fa-solid fa-circle-user fa-3x mb-2"></i>
+      <h4 class="mb-0 fw-bold">เข้าสู่ระบบ</h4>
+    </div>
+    <div class="card-body p-4">
+      <form onsubmit="event.preventDefault(); login()">
+        <div class="input-group mb-3">
+          <span class="input-group-text bg-light text-primary border-end-0"><i class="fa-solid fa-user"></i></span>
+          <input type="text" class="form-control border-start-0" id="username" placeholder="ชื่อผู้ใช้งาน" required style="background-color: #f8f9fa;">
+        </div>
+        <div class="input-group mb-4">
+          <span class="input-group-text bg-light text-primary border-end-0"><i class="fa-solid fa-lock"></i></span>
+          <input type="password" class="form-control border-start-0" id="password" placeholder="รหัสผ่าน" required style="background-color: #f8f9fa;">
+        </div>
+        <div id="login-error" class="text-danger text-center mb-3 fw-bold" style="display: none; font-size: 0.9em;">
+          <i class="fa-solid fa-triangle-exclamation"></i> ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง!
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" style="border-radius: 8px;">
+          <i class="fa-solid fa-right-to-bracket me-2"></i> ล็อกอินเข้าระบบ
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!--เริ่มฟอร์ม-->
+       <div class="container-fluid" id="form-view" style="display: none;">
+       <div class="col-md-8 mx-auto">
+      <form id="myForm" onsubmit="event.preventDefault(); addData(this)" style="text-align:left;font-size:.875rem">
+        <div class="card mb-3 step-card" id="step1">
+          <div class="card-header bg-primary text-white">1. ข้อมูลพนักงานและสาขา</div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label>วันที่ขออนุมัติ</label>
+                <input type="date" class="form-control" id="date" name="date" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>สาขา</label>
+                <select class="form-control select2" id="location" name="location" required>
+                  <option disabled selected value="">เลือกสาขา</option>
+                </select>
+              </div>
+              <div class="col-md-4 mb-2">
+                <label>รหัสพนักงาน</label>
+                <input type="text" class="form-control" id="emp_id" name="emp_id" required >
+              </div>
+              <div class="col-md-4 mb-2">
+                <label>ชื่อ-สกุล(พนง.)</label>
+                <input type="text" class="form-control" id="emp_name" name="emp_name" required >
+              </div>
+              <div class="col-md-4 mb-2">
+                <label>เบอร์ติดต่อ(พนง.)</label>
+                <input type="tel" class="form-control" id="emp_phone" name="emp_phone" required pattern="[0-9]{10}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);" title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก">
+              </div>
+            </div>
+            <div class="d-flex justify-content-end mt-4">
+              <button type="button" class="btn btn-primary px-4" onclick="nextStep(1)">ถัดไป <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-3 step-card" id="step2" style="display: none;">
+          <div class="card-header bg-success text-white">2. ข้อมูลลูกค้า</div>
+          <div class="card-body">
+            <div class="row">
+
+              <div class="col-md-6 mb-2">
+                <label>เลขบัตรประชาชน</label>
+                <input type="text" class="form-control" id="id_card_number" name="id_card_number" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>ชื่อตัวและสกุล (ลูกค้า)</label>
+                <input type="text" class="form-control" id="customer_name" name="customer_name" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>ที่อยู่</label>
+                <input type="text" class="form-control" id="address" name="address" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>หมู่ที่</label>
+                <input type="text" class="form-control" id="road" name="road" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>ตำบล/แขวง</label>
+                <input type="text" class="form-control" id="district" name="district" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>อำเภอ/เขต</label>
+                <input type="text" class="form-control" id="amphoe" name="amphoe" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>จังหวัด</label>
+                <input type="text" class="form-control" id="province" name="province" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>รหัสไปรษณีย์</label>
+                <input type="text" class="form-control" id="zipcode" name="zipcode" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>เบอร์ติดต่อลูกค้า</label>
+                <input type="tel" class="form-control" id="customer_phone" name="customer_phone" required pattern="[0-9]{10}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);" title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก">
+              </div>
+            </div>
+            <div class="d-flex justify-content-between mt-4">
+              <button type="button" class="btn btn-secondary px-4" onclick="prevStep(2)"><i class="fa-solid fa-arrow-left"></i> ย้อนกลับ</button>
+              <button type="button" class="btn btn-success px-4" onclick="nextStep(2)">ถัดไป <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-3 step-card" id="step3" style="display: none;">
+          <div class="card-header bg-info text-dark">3. ข้อมูลสินค้าและการชำระเงิน</div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label>ชื่อรุ่นสินค้า</label>
+                <select class="form-control select2" id="productname" name="productname" required>
+                  <option disabled selected value="">เลือกชื่อสินค้า</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>IMEI</label>
+                <input type="text" class="form-control" id="imei" name="imei" required >
+              </div>
+              
+              <div class="col-md-12 mb-3 mt-3 border p-3 rounded bg-light">
+                <label class="fw-bold">PREMIUM (ของแถม)</label>
+                <div id="premium-container">
+                  <div class="input-group mb-2 premium-row">
+                    <select class="form-control premium-select select2" name="premium_dynamic">
+                      <option disabled selected value="">เลือกของแถม</option>
+                    </select>
+                    <button class="btn btn-outline-danger" type="button" onclick="removePremium(this)"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary mt-1" onclick="addPremium()"><i class="fa-solid fa-plus"></i> เพิ่มของแถม</button>
+                <input type="hidden" id="premium_combined" name="premium_combined" value="">
+              </div>
+              
+              <div class="col-md-6 mb-2">
+                <label>การรับประกันจอแตก</label>
+                <select class="form-control select2" id="guarantee" name="guarantee">
+                  <option disabled selected value="">เลือกการรับประกันจอแตก</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>ราคาขายปลีกปกติ</label>
+                <input type="number" class="form-control" id="price" name="price" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>เงินดาวน์</label>
+                <input type="number" class="form-control" id="down" name="down" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>บาร์ส่วนลด เปิดเบอร์ AIS</label>
+                <div class="input-group">
+                  <span class="input-group-text" title="บาร์ส่วนลด"><i class="fa-solid fa-barcode"></i></span>
+                  <input type="text" class="form-control" id="barcode_ais" name="barcode_ais" placeholder="บาร์ส่วนลด">
+                  <input type="number" class="form-control" id="discountais" name="discountais" placeholder="ยอดเงิน" required >
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>บาร์ส่วนลด promotion</label>
+                <div class="input-group">
+                  <span class="input-group-text" title="บาร์ส่วนลด"><i class="fa-solid fa-barcode"></i></span>
+                  <input type="text" class="form-control" id="barcode_promotion" name="barcode_promotion" placeholder="บาร์ส่วนลด">
+                  <input type="number" class="form-control" id="discountpromotion" name="discountpromotion" placeholder="ยอดเงิน" required >
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>บาร์ส่วนลด Trade in</label>
+                <div class="input-group">
+                  <span class="input-group-text" title="บาร์ส่วนลด"><i class="fa-solid fa-barcode"></i></span>
+                  <input type="text" class="form-control" id="barcode_tradein" name="barcode_tradein" placeholder="บาร์ส่วนลด">
+                  <input type="number" class="form-control" id="discounttradein" name="discounttradein" placeholder="ยอดเงิน" required >
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>บาร์ส่วนลด Trade up</label>
+                <div class="input-group">
+                  <span class="input-group-text" title="บาร์ส่วนลด"><i class="fa-solid fa-barcode"></i></span>
+                  <input type="text" class="form-control" id="barcode_tradeup" name="barcode_tradeup" placeholder="บาร์ส่วนลด">
+                  <input type="number" class="form-control" id="discounttradeup" name="discounttradeup" placeholder="ยอดเงิน" required >
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>บาร์ส่วนลด Big point</label>
+                <div class="input-group">
+                  <span class="input-group-text" title="บาร์ส่วนลด"><i class="fa-solid fa-barcode"></i></span>
+                  <input type="text" class="form-control" id="barcode_bigc" name="barcode_bigc" placeholder="บาร์ส่วนลด">
+                  <input type="number" class="form-control" id="discountbigc" name="discountbigc" placeholder="ยอดเงิน" required >
+                </div>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>ค่าธรรมเนียม</label>
+                <input type="number" class="form-control" id="dues" name="dues" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="fw-bold text-danger">ราคาสุทธิ</label>
+                <input type="number" class="form-control" id="netprice" name="netprice" required readonly>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>จำนวนงวด</label>
+                <input type="number" class="form-control" id="installments" name="installments" required >
+              </div>
+              <div class="col-md-6 mb-2">
+                <label>งวดละ</label>
+                <input type="number" class="form-control" id="installment_amount" name="installment_amount" required >
+              </div>
+            </div>
+            <div class="d-flex justify-content-between mt-4">
+              <button type="button" class="btn btn-secondary px-4" onclick="prevStep(3)"><i class="fa-solid fa-arrow-left"></i> ย้อนกลับ</button>
+              <button type="button" class="btn btn-info px-4" onclick="nextStep(3)">ถัดไป <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-3 step-card" id="step4" style="display: none;">
+          <div class="card-header bg-secondary text-white">4. เอกสารแนบ</div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-12 mb-2">
+                <label>รูปสลิปการโอนเงิน</label>
+                <input type="file" class="form-control" id="myFile" name="myFile" accept="image/*" required >
+              </div>
+              <div class="col-md-12 mb-2">
+                <label>แนบไฟล์ .PDF หนังสือสัญญา</label>
+                <input type="file" class="form-control" id="myFile2" name="myFile2" accept="application/pdf" required >
+              </div>
+              <div class="col-md-12 mb-2 mt-4">
+                <div class="d-flex justify-content-between">
+                  <button type="button" class="btn btn-secondary px-4" onclick="prevStep(4)"><i class="fa-solid fa-arrow-left"></i> ย้อนกลับ</button>
+                  <button type="submit" id="btnsubmit" class="btn btn-primary px-4"><i class="fa-solid fa-paper-plane"></i> บันทึกข้อมูลขออนุมัติ</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+     </div>
+<!--ปิดฟอร์ม-->
+<!--เริ่มตาราง-->
+    <div class="container-fluid" id="table-view" style="display: block;">
+      
+      <!-- Summary Boxes -->
+      <div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-2 mb-3 text-center">
+        <div class="col">
+          <div class="card bg-warning text-dark shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('รออนุมัติ')">
+            <div class="card-body p-2 d-flex flex-column justify-content-center">
+              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-clock"></i> รออนุมัติ</span>
+              <h4 class="card-text fw-bold mb-0" id="countWait">0</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card bg-info text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('รอเปิด SO')">
+            <div class="card-body p-2 d-flex flex-column justify-content-center">
+              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-file-invoice"></i> รอเปิด SO</span>
+              <h4 class="card-text fw-bold mb-0" id="countWaitSO">0</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card bg-primary text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('รอเปิด Invoice')">
+            <div class="card-body p-2 d-flex flex-column justify-content-center">
+              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-file-invoice-dollar"></i> รอเปิด Invoice</span>
+              <h4 class="card-text fw-bold mb-0" id="countWaitInv">0</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card bg-success text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('เสร็จสมบูรณ์')">
+            <div class="card-body p-2 d-flex flex-column justify-content-center">
+              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-check-double"></i> เสร็จสมบูรณ์</span>
+              <h4 class="card-text fw-bold mb-0" id="countDone">0</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card bg-danger text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('ไม่อนุมัติ')">
+            <div class="card-body p-2 d-flex flex-column justify-content-center">
+              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-circle-xmark"></i> ไม่อนุมัติ</span>
+              <h4 class="card-text fw-bold mb-0" id="countReject">0</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card bg-secondary text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('ทั้งหมด')">
+            <div class="card-body p-2 d-flex flex-column justify-content-center">
+              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-list"></i> ทั้งหมด</span>
+              <h4 class="card-text fw-bold mb-0" id="countAll">0</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- เอาปุ่มกรองออกตามที่ร้องขอ -->
+      <table id="datatable" class="display responsive nowrap" style="width:100%">
+        <thead class="bg-primary text-white"></thead>
+      </table>
+    </div>
+<!--ปิดตาราง-->
+
+<!--เริ่มแดชบอร์ด-->
+    <div class="container-fluid" id="dashboard-view" style="display: none;">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <div class="card h-100 shadow-sm">
+            <div class="card-header bg-primary text-white">สรุปยอดรายเดือน (เฉพาะอนุมัติแล้ว)</div>
+            <div class="card-body" style="height: 300px;">
+              <canvas id="monthlyChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 mb-3">
+          <div class="card h-100 shadow-sm">
+            <div class="card-header bg-success text-white">รุ่นสินค้าขายดี (เฉพาะอนุมัติแล้ว)</div>
+            <div class="card-body" style="height: 300px;">
+              <canvas id="modelChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-12 mb-3">
+          <div class="card h-100 shadow-sm">
+            <div class="card-header bg-info text-dark">10 สาขาขายดี (เฉพาะอนุมัติแล้ว)</div>
+            <div class="card-body" style="height: 300px;">
+              <canvas id="branchChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+<!--ปิดแดชบอร์ด-->
+  </div>
+
+  <!-- เริ่มหน้าแอดมินตั้งค่า -->
+  <div class="container-fluid" id="admin-view" style="display: none;">
+    <div class="col-md-10 mx-auto">
+      <div class="card mb-3 shadow-sm border-0">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+          <span><i class="fa-solid fa-gear"></i> ตั้งค่าระบบ (Admin Settings)</span>
+          <button class="btn btn-sm btn-danger" onclick="switchView('table-view')"><i class="fa-solid fa-xmark"></i> ปิด</button>
+        </div>
+        <div class="card-body bg-light">
+          <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-bold" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">ตั้งค่าแจ้งเตือน Telegram</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin-tab-pane" type="button" role="tab">Admin</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold" id="location-tab" data-bs-toggle="tab" data-bs-target="#location-tab-pane" type="button" role="tab">Location</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold" id="product-tab" data-bs-toggle="tab" data-bs-target="#product-tab-pane" type="button" role="tab">Product</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold" id="premium-tab" data-bs-toggle="tab" data-bs-target="#premium-tab-pane" type="button" role="tab">PREMIUM</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold" id="guarantee-tab" data-bs-toggle="tab" data-bs-target="#guarantee-tab-pane" type="button" role="tab">Guarantee</button>
+            </li>
+          </ul>
+          <div class="tab-content mt-3 bg-white p-3 border border-top-0 rounded-bottom" id="adminTabsContent">
+            <!-- General Settings (Telegram & Email) -->
+            <div class="tab-pane fade show active" id="general" role="tabpanel">
+              <h5 class="text-primary mb-3"><i class="fa-brands fa-telegram"></i> การตั้งค่าแจ้งเตือน Telegram</h5>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="fw-bold">1. แจ้งเตือนคำขอใหม่ (มีข้อมูลบันทึกลงระบบ)</label>
+                  <input type="text" class="form-control mb-2" id="notifyNewToken" placeholder="Bot Token">
+                  <input type="text" class="form-control" id="notifyNewChatId" placeholder="Chat ID">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="fw-bold">2. แจ้งเตือนสถานะ (อนุมัติแล้ว/ไม่อนุมัติ)</label>
+                  <input type="text" class="form-control mb-2" id="notifyApproveToken" placeholder="Bot Token">
+                  <input type="text" class="form-control" id="notifyApproveChatId" placeholder="Chat ID">
+                </div>
+              </div>
+              
+              <hr class="my-4">
+              
+              <h5 class="text-primary mb-3"><i class="fa-solid fa-envelope"></i> การตั้งค่าแจ้งเตือน Email</h5>
+              <div class="row mb-3">
+                <div class="col-md-6 mb-2">
+                  <label class="fw-bold d-flex justify-content-between align-items-center mb-2">
+                    <span>ส่งถึง (To):</span>
+                    <button class="btn btn-sm btn-outline-success" onclick="addEmailInput('to')"><i class="fa-solid fa-plus"></i> เพิ่มเมล์</button>
+                  </label>
+                  <div id="emailToContainer">
+                    <input type="email" class="form-control email-to-input mb-2" placeholder="example@gmail.com">
+                  </div>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="fw-bold d-flex justify-content-between align-items-center mb-2">
+                    <span>สำเนา (CC):</span>
+                    <button class="btn btn-sm btn-outline-success" onclick="addEmailInput('cc')"><i class="fa-solid fa-plus"></i> เพิ่มเมล์</button>
+                  </label>
+                  <div id="emailCcContainer">
+                    <input type="email" class="form-control email-cc-input mb-2" placeholder="example@gmail.com">
+                  </div>
+                </div>
+              </div>
+
+              <hr class="my-4">
+              
+              <h5 class="text-primary mb-3"><i class="fa-brands fa-google-drive"></i> การตั้งค่า Google Drive สำหรับจัดเก็บไฟล์</h5>
+              <div class="row mb-3">
+                <div class="col-md-12 mb-2">
+                  <label class="fw-bold">Google Drive Folder ID (สำหรับเก็บรูปสลิปและ PDF)</label>
+                  <input type="text" class="form-control mt-2" id="driveFolderId" placeholder="ตัวอย่าง: 1aD2usGtfsge4iwX8A2Bo7MGPQUbGuQSo">
+                </div>
+              </div>
+
+              <button class="btn btn-primary mt-2" onclick="saveGeneralConfig()"><i class="fa-solid fa-save"></i> บันทึกการตั้งค่าทั้งหมด</button>
+
+              <hr class="my-4">
+
+              <!-- ปุ่มสร้าง Sheet -->
+              <h5 class="text-danger mb-3"><i class="fa-solid fa-table-columns"></i> เครื่องมือระบบ</h5>
+              <div class="alert alert-warning d-flex align-items-start gap-2 py-2">
+                <i class="fa-solid fa-triangle-exclamation mt-1"></i>
+                <div style="font-size:.85rem;">
+                  ปุ่มด้านล่างจะ<strong>สร้าง Sheet และหัวตารางอัตโนมัติ</strong>ทุก Sheet ที่ระบบต้องการ<br>
+                  หาก Sheet มีอยู่แล้วและมีข้อมูล จะ<strong>ไม่เขียนทับ</strong>ข้อมูลเดิม
+                </div>
+              </div>
+              <button class="btn btn-danger" id="btnInitSheets" onclick="initAllSheets()">
+                <i class="fa-solid fa-database"></i> สร้าง Sheet ทั้งหมด &amp; ตั้งหัวตาราง
+              </button>
+              <!-- ผลลัพธ์ -->
+              <div id="initSheetsResult" class="mt-3" style="display:none;"></div>
+
+            </div>
+            <!-- Admin -->
+            <div class="tab-pane fade" id="admin-tab-pane" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0"><i class="fa-solid fa-users-gear"></i> จัดการผู้ใช้งาน (Admin)</h5>
+                <button class="btn btn-sm btn-success" onclick="addSetting('Admin')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="table-Admin" style="width:100%">
+                  <thead class="table-light"><tr><th>Username</th><th>Password</th><th>ชื่อผู้ใช้งาน</th><th>สิทธิ์</th><th>จัดการ</th></tr></thead>
+                  <tbody><tr><td colspan="5" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Location -->
+            <div class="tab-pane fade" id="location-tab-pane" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0"><i class="fa-solid fa-store"></i> จัดการสาขา (Location)</h5>
+                <button class="btn btn-sm btn-success" onclick="addSetting('location')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="table-location" style="width:100%">
+                  <thead class="table-light"><tr><th>ชื่อสาขา</th><th>จัดการ</th></tr></thead>
+                  <tbody><tr><td colspan="2" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Product -->
+            <div class="tab-pane fade" id="product-tab-pane" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0"><i class="fa-solid fa-mobile-screen"></i> จัดการสินค้ารุ่นต่างๆ (Product)</h5>
+                <button class="btn btn-sm btn-success" onclick="addSetting('Product')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="table-Product" style="width:100%">
+                  <thead class="table-light"><tr><th>ชื่อสินค้ารุ่นต่างๆ</th><th>จัดการ</th></tr></thead>
+                  <tbody><tr><td colspan="2" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- PREMIUM -->
+            <div class="tab-pane fade" id="premium-tab-pane" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0"><i class="fa-solid fa-gift"></i> จัดการของแถม (PREMIUM)</h5>
+                <button class="btn btn-sm btn-success" onclick="addSetting('Premium')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="table-Premium" style="width:100%">
+                  <thead class="table-light"><tr><th>รายการของแถม</th><th>จัดการ</th></tr></thead>
+                  <tbody><tr><td colspan="2" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Guarantee -->
+            <div class="tab-pane fade" id="guarantee-tab-pane" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary m-0"><i class="fa-solid fa-shield-halved"></i> จัดการประกันจอแตก (Guarantee)</h5>
+                <button class="btn btn-sm btn-success" onclick="addSetting('guarantee')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="table-guarantee" style="width:100%">
+                  <thead class="table-light"><tr><th>รายการรับประกันจอแตก</th><th>จัดการ</th></tr></thead>
+                  <tbody><tr><td colspan="2" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ปิดหน้าแอดมินตั้งค่า -->
+  
+  <script>
+    function switchView(viewId) {
+      document.getElementById('login-view').style.display = 'none';
+      document.getElementById('form-view').style.display = 'none';
+      document.getElementById('table-view').style.display = 'none';
+      document.getElementById('admin-view').style.display = 'none';
+      document.getElementById('dashboard-view').style.display = 'none';
+      
+      // จัดการ Navbar
+      if(viewId === 'login-view' || viewId === '') {
+        document.getElementById('mainNavbar').style.display = 'none';
+        document.getElementById('login-view').style.display = 'flex'; // แสดงหน้าล็อกอินหากระบุ
+      } else if (viewId) {
+        document.getElementById('mainNavbar').style.display = 'flex';
+        document.getElementById(viewId).style.display = 'block';
+      }
+      
+      if(viewId === 'admin-view') {
+        loadAllSettings();
+      } else if (viewId === 'form-view' && typeof resetSteps === 'function') {
+        resetSteps();
+      } else if (viewId === 'dashboard-view' && typeof renderDashboard === 'function') {
+        renderDashboard();
+      }
+    }
+    
+    function closeSidebar() {
+      var sidebarEl = document.getElementById('sidebarNav');
+      var offcanvas = bootstrap.Offcanvas.getInstance(sidebarEl);
+      if (offcanvas) {
+        offcanvas.hide();
+      }
+    }
+  </script>
+
+  <!--Footer -->
+  <footer class="container-fluid text-muted text-center mb-2">
+  </footer>
+  <!-- Auto Complete Thailand ที่อยู่ประเทศไทยอัตโนมัติ -->
+<script type="text/javascript">
+  /* ที่อยู่ลูกค้า */
+$.Thailand({
+    $district: $('#district'),
+    $amphoe: $('#amphoe'),
+    $province: $('#province'),
+    $zipcode: $('#zipcode'),
+    onDataFill: function(data) {
+        console.info('Data Filled', data);
+    },
+    onLoad: function() {
+        console.info('Autocomplete is ready!');
+        $('#loader, .demo').toggle();
+    }
+});
+// watch on change
+$('#district').change(function() {
+    console.log('ตำบล/แขวง', this.value);
+});
+$('#amphoe').change(function() {
+    console.log('อำเภอ/เขต', this.value);
+});
+$('#province').change(function() {
+    console.log('จังหวัด', this.value);
+});
+$('#zipcode').change(function() {
+    console.log('รหัสไปรษณีย์', this.value);
+});
+</script>
+  <?!= include('contact'); ?>
+  <?!= include('form'); ?>
+  <?!= include('Login-out'); ?>
+  <?!= include('dataTable'); ?>
+  <?!= include('showPic'); ?>
+  <?!= include('status'); ?>
+  <?!= include('jsAdd'); ?>
+</body>
+
+
+</html>
+
+
