@@ -1,0 +1,25 @@
+{
+  "name": "app01",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/app2626/app01#readme",
+  "bugs": {
+    "url": "https://github.com/app2626/app01/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/app2626/app01.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.3.2",
+    "tailwindcss": "^4.3.2"
+  },
+  "devDependencies": {}
+}
