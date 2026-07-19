@@ -121,7 +121,7 @@ window.app = {
     reader.readAsDataURL(file);
   },
 
-  // เก็บไฟล์รูปที่เลือกไว้แต่ยังไม่อัปโหลด คีย์ตามจุดที่ใช้ (gridImage / loginBg / banner-<rowIndex> / swalBanner)
+  // เก็บไฟล์รูปที่เลือกไว้แต่ยังไม่อัปโหลด คีย์ตามจุดที่ใช้ (gridImage / loginBg / banner-<rowIndex> / newBanner)
   // — อัปจริงตอนกด "บันทึกข้อมูล" ครั้งเดียว ไม่ใช่ทันทีที่เลือกไฟล์
   pendingImageUploads: {},
 
@@ -5033,7 +5033,7 @@ window.app = {
     init: async function(type, containerId) {
       this.currentType = type;
       if (containerId) this.containerId = containerId;
-      // เข้า/รีเฟรช tab ใหม่ทุกครั้ง — ล้างไฟล์รูปที่เลือกค้างจากการดูครั้งก่อน (banner-*, loginBg, swalBanner) กัน URL เก่าเผลอทับของใหม่ตอนบันทึก
+      // เข้า/รีเฟรช tab ใหม่ทุกครั้ง — ล้างไฟล์รูปที่เลือกค้างจากการดูครั้งก่อน (banner-*, loginBg, newBanner) กัน URL เก่าเผลอทับของใหม่ตอนบันทึก
       Object.keys(window.app.pendingImageUploads).forEach(k => { if (k !== 'gridImage') delete window.app.pendingImageUploads[k]; });
       const content = document.getElementById(this.containerId);
       if(!content) return;
@@ -5285,6 +5285,30 @@ window.app = {
           typeKey = 'popupbanner';
         }
         
+        // ฟอร์มเพิ่มใหม่: การ์ดแบบเดียวกับฟอร์มแก้ไข (inline, hidden ไว้ก่อน) แทน SweetAlert modal เดิม
+        // — สลับ visibility ด้วย classList.toggle ล้วนๆ เหมือนปุ่ม "แก้ไข" ของแต่ละการ์ด ไม่พึ่ง Swal.fire({html:...})
+        const addFormHtml = `
+          <div id="bannerAddForm" class="hidden col-span-full bg-white border-2 border-indigo-200 rounded-2xl shadow-sm p-4 space-y-2">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase">ลิงก์ภาพ (Image URL) *</label>
+            <div class="flex gap-2">
+              <input type="text" id="newBannerUrl" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="https://...">
+              <button type="button" id="newBannerUpBtn" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('newBannerFile').click()"><i class="fas fa-upload"></i></button>
+              <input type="file" id="newBannerFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'newBanner', function(localUrl){ const pv=document.getElementById('newBannerPreview'); if(pv){ pv.src=localUrl; pv.classList.remove('hidden'); } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
+            </div>
+            <img id="newBannerPreview" class="hidden h-16 w-16 object-cover rounded-lg border border-slate-200 shadow-sm">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mt-2">ลิงก์ปลายทาง (Target Link)</label>
+            <input type="text" id="newTargetLink" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="URL ให้คลิก (ปล่อยว่างได้)">
+            ${typeKey === 'promogrid' ? `
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mt-2">รายละเอียด (Details)</label>
+            <textarea id="newBannerDetails" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none" rows="2" placeholder="รายละเอียดแคมเปญ"></textarea>
+            ` : ''}
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" onclick="window.app.settingsManager.cancelAddItem()" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition-colors">ยกเลิก</button>
+              <button type="button" onclick="window.app.settingsManager.addItem('${typeKey}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors flex items-center" title="เพิ่มแบนเนอร์ใหม่"><i class="fas fa-save mr-1"></i> บันทึก</button>
+            </div>
+          </div>
+        `;
+
         let cardsHtml = '';
         if (list.length === 0) {
           cardsHtml = `
@@ -5338,12 +5362,13 @@ window.app = {
                 <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-images text-indigo-500 mr-2"></i> ${title}</h3>
                 <p class="text-xs text-slate-500 mt-1">${desc}</p>
               </div>
-              <button onclick="window.app.settingsManager.openAddModal('${typeKey}')" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center w-full sm:w-auto justify-center">
+              <button onclick="const f=document.getElementById('bannerAddForm'); if(f){ f.classList.remove('hidden'); f.scrollIntoView({behavior:'smooth', block:'center'}); }" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center w-full sm:w-auto justify-center">
                 <i class="fas fa-plus mr-2"></i> เพิ่มแบนเนอร์ใหม่
               </button>
             </div>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              ${addFormHtml}
               ${cardsHtml}
             </div>
           </div>
@@ -5416,77 +5441,44 @@ window.app = {
       }
     },
     
-    openAddModal: function(type) {
-      const isGrid = type === 'promogrid';
-      delete window.app.pendingImageUploads.swalBanner;
-      Swal.fire({
-        title: 'เพิ่มลิงก์แบนเนอร์ใหม่',
-        html: `
-          <div class="space-y-4 text-left px-2">
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">ลิงก์ภาพ (Image URL) *</label>
-              <div class="flex gap-2">
-                <input type="text" id="swal-url" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="https://...">
-                <button type="button" id="swal-upload-btn" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('swal-file').click()"><i class="fas fa-upload"></i></button>
-                <input type="file" id="swal-file" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'swalBanner', function(localUrl){ const pv=document.getElementById('swal-preview'); if(pv){ pv.src=localUrl; pv.classList.remove('hidden'); } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
-              </div>
-              <img id="swal-preview" class="hidden mt-2 h-16 w-16 object-cover rounded-lg border border-slate-200 shadow-sm">
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">ลิงก์ปลายทาง (Target Link)</label>
-              <input type="text" id="swal-link" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="ลิงก์สำหรับคลิก (ปล่อยว่างได้)">
-            </div>
-            ${isGrid ? `
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">รายละเอียด (Details)</label>
-              <textarea id="swal-details" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" rows="2" placeholder="รายละเอียดแคมเปญ"></textarea>
-            </div>
-            ` : ''}
-          </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'บันทึก',
-        cancelButtonText: 'ยกเลิก',
-        confirmButtonColor: '#254d71',
-        preConfirm: async () => {
-          let url = document.getElementById('swal-url').value.trim();
-          const link = document.getElementById('swal-link').value.trim();
-          const detailsEl = document.getElementById('swal-details');
-          const details = detailsEl ? detailsEl.value.trim() : '';
-          const hasPendingImage = !!window.app.pendingImageUploads.swalBanner;
-          if (!url && !hasPendingImage) {
-            Swal.showValidationMessage('กรุณากรอกลิงก์รูปภาพ!');
-            return false;
-          }
-          if (hasPendingImage) {
-            try {
-              url = await window.app.flushImageUpload('swalBanner');
-            } catch (e) {
-              Swal.showValidationMessage(e.message || 'อัปโหลดรูปไม่สำเร็จ');
-              return false;
-            }
-          }
-          return { url: url, targetLink: link, details: details };
-        }
-      }).then(async (result) => {
-        if (result.isConfirmed) {
-          window.app.showLoading('กำลังบันทึกข้อมูล...');
-          try {
-            const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, url: result.value.url, targetLink: result.value.targetLink, details: result.value.details });
-            if(res && res.status==='success') {
-              await window.app.refreshGlobalData();
-              Swal.fire({ icon: 'success', title: 'เพิ่มรูปภาพสำเร็จ', showConfirmButton: false, timer: 1200 });
-              this.init(this.currentType);
-            } else {
-              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
-            }
-          } catch(e) {
-            Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
-          }
-        }
-      });
+    // ยกเลิกฟอร์มเพิ่มใหม่: ซ่อนการ์ด + เคลียร์ค่าที่กรอกไว้กันเผลอเห็นข้อมูลเก่าตอนเปิดใหม่ในเรนเดอร์เดียวกัน
+    cancelAddItem: function() {
+      const f = document.getElementById('bannerAddForm');
+      if (f) f.classList.add('hidden');
+      delete window.app.pendingImageUploads.newBanner;
+      const urlEl = document.getElementById('newBannerUrl'); if (urlEl) urlEl.value = '';
+      const linkEl = document.getElementById('newTargetLink'); if (linkEl) linkEl.value = '';
+      const detailsEl = document.getElementById('newBannerDetails'); if (detailsEl) detailsEl.value = '';
+      const pv = document.getElementById('newBannerPreview'); if (pv) pv.classList.add('hidden');
     },
-    
+
+    addItem: async function(type) {
+      let url = document.getElementById('newBannerUrl').value.trim();
+      const targetLink = document.getElementById('newTargetLink').value.trim();
+      const detailsEl = document.getElementById('newBannerDetails');
+      const details = detailsEl ? detailsEl.value.trim() : '';
+      const hasPendingImage = !!window.app.pendingImageUploads.newBanner;
+      if (!url && !hasPendingImage) return Swal.fire('แจ้งเตือน', 'กรุณากรอกลิงก์รูปภาพ', 'warning');
+
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        if (hasPendingImage) url = await window.app.flushImageUpload('newBanner');
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, url: url, targetLink: targetLink, details: details });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'เพิ่มรูปภาพสำเร็จ', showConfirmButton: false, timer: 1200 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+
     deleteItem: async function(type, rowIndex, bannerId) {
       const confirm = await Swal.fire({
         title: 'ยืนยันการลบรูปภาพ?',
