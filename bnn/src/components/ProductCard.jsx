@@ -25,7 +25,25 @@ function PreOrderRibbon() {
   );
 }
 
-export default function ProductCard({ product, onClick, listMode }) {
+function CompareCheckbox({ product, isComparing, onToggleCompare }) {
+  if (!onToggleCompare) return null;
+  return (
+    <label
+      className="flex items-center gap-1.5 text-xs text-gray-500 mt-2 cursor-pointer w-fit"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="checkbox"
+        checked={!!isComparing}
+        onChange={() => onToggleCompare(product.id)}
+        className="rounded"
+      />
+      เปรียบเทียบ
+    </label>
+  );
+}
+
+export default function ProductCard({ product, onClick, listMode, isComparing, onToggleCompare }) {
   const brandStyle = BRAND_COLORS[product.brand] || { bg: "#000", text: "white" };
 
   if (listMode) {
@@ -72,8 +90,14 @@ export default function ProductCard({ product, onClick, listMode }) {
                 : `${formatTHB(product.priceMin)} - ${formatTHB(product.priceMax)}`}
             </div>
             {product.originalPrice && product.priceMin === product.priceMax && (
-              <div className="text-xs text-gray-400 line-through">{formatTHB(product.originalPrice)}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 line-through">{formatTHB(product.originalPrice)}</span>
+                <span className="text-[11px] font-medium text-green-600">
+                  ประหยัด {formatTHB(product.originalPrice - product.priceMin)}
+                </span>
+              </div>
             )}
+            <CompareCheckbox product={product} isComparing={isComparing} onToggleCompare={onToggleCompare} />
           </div>
         </div>
       </div>
@@ -119,6 +143,15 @@ export default function ProductCard({ product, onClick, listMode }) {
               ? formatTHB(product.priceMin)
               : `${formatTHB(product.priceMin)} - ${formatTHB(product.priceMax)}`}
           </div>
+          {product.originalPrice && product.priceMin === product.priceMax && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 line-through">{formatTHB(product.originalPrice)}</span>
+              <span className="text-[11px] font-medium text-green-600">
+                ประหยัด {formatTHB(product.originalPrice - product.priceMin)}
+              </span>
+            </div>
+          )}
+          <CompareCheckbox product={product} isComparing={isComparing} onToggleCompare={onToggleCompare} />
         </div>
       </div>
     </div>

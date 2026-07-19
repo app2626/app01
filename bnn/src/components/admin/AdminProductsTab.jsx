@@ -14,20 +14,20 @@ export default function AdminProductsTab({ member }) {
 
   const load = () => {
     setLoading(true);
-    callGas("getAdminProducts", [member.email], getAdminProductsLocal)
+    callGas("getAdminProducts", [member.token], getAdminProductsLocal)
       .then(res => {
         if (res.success) setProducts(res.products);
       })
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [member.email]);
+  useEffect(load, [member.token]);
 
   const openNew = () => { setEditing(null); setShowForm(true); };
   const openEdit = (p) => { setEditing(p); setShowForm(true); };
 
   const handleSave = async (payload) => {
-    const res = await callGas("saveProduct", [payload, member.email], saveProductLocal);
+    const res = await callGas("saveProduct", [payload, member.token], saveProductLocal);
     if (res.success) {
       setShowForm(false);
       load();
@@ -38,7 +38,7 @@ export default function AdminProductsTab({ member }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm("ยืนยันการลบสินค้านี้?")) return;
-    const res = await callGas("deleteProduct", [id, member.email], deleteProductLocal);
+    const res = await callGas("deleteProduct", [id, member.token], deleteProductLocal);
     if (res.success) load();
     else alert(res.message || "ลบไม่สำเร็จ");
   };

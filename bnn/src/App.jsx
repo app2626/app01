@@ -13,12 +13,14 @@ import CheckoutPage from "./pages/CheckoutPage";
 import OrdersPage from "./pages/OrdersPage";
 import WishlistPage from "./pages/WishlistPage";
 import AdminPage from "./pages/AdminPage";
+import ComparePage from "./pages/ComparePage";
+import CompareBar from "./components/CompareBar";
 import PromoPopupModal from "./components/PromoPopupModal";
 import { MOCK_PRODUCTS, GIFTS } from "./data/products";
 import { defaultFilters } from "./utils/filters";
 import { loadState, saveState, clearState, mergeCarts } from "./utils/storage";
 import { callGas } from "./utils/gas";
-import { getPromoPopupLocal, getHeroBannersLocal, getCouponsLocal, getPromotionsLocal, getInstallmentSettingsLocal, getCartLocal, saveCartLocal } from "./utils/localMock";
+import { getPromoPopupLocal, getHeroBannersLocal, getCouponsLocal, getPromotionsLocal, getInstallmentSettingsLocal, getCartLocal, saveCartLocal, logoutMemberLocal } from "./utils/localMock";
 
 function resolveLocalGifts(products) {
   return products.map(p => ({
@@ -69,6 +71,8 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [collectedCoupons, setCollectedCoupons] = useState(() => loadState("coupons", []));
   const [wishlist, setWishlist] = useState(() => loadState("wishlist", []));
+  const [compareList, setCompareList] = useState(() => loadState("compare", []));
+  const [toastMessage, setToastMessage] = useState("");
   const [promoPopup, setPromoPopup] = useState(null);
   const [heroBanners, setHeroBanners] = useState([]);
   const [coupons, setCoupons] = useState([]);
@@ -82,17 +86,17 @@ export default function App() {
       return;
     }
     setCartSynced(false);
-    callGas("getCart", [member.email], getCartLocal)
+    callGas("getCart", [member.token], getCartLocal)
       .then(serverCart => {
         setCart(prev => mergeCarts(serverCart, prev));
         setCartSynced(true);
       })
       .catch(() => setCartSynced(true));
-  }, [member?.email]);
+  }, [member?.token]);
 
   useEffect(() => {
     if (!member || !cartSynced) return;
-    callGas("saveCart", [member.email, cart], saveCartLocal).catch(() => {});
+    callGas("saveCart", [member.token, cart], saveCartLocal).catch(() => {});
   }, [cart, member, cartSynced]);
 
   useEffect(() => {
@@ -139,12 +143,14 @@ export default function App() {
   useEffect(() => { saveState("cart", cart); }, [cart]);
   useEffect(() => { saveState("coupons", collectedCoupons); }, [collectedCoupons]);
   useEffect(() => { saveState("wishlist", wishlist); }, [wishlist]);
+  useEffect(() => { saveState("compare", compareList); }, [compareList]);
   useEffect(() => {
     if (member) saveState("member", member);
     else clearState("member");
   }, [member]);
 
-  const showSuccessToast = () => {
+  const showSuccessToast = (message) => {
+    setToastMessage(message);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2000);
   };
@@ -171,7 +177,7 @@ export default function App() {
         selectedVariant: variant
       }];
     });
-    showSuccessToast();
+    showSuccessToast("เพิ่มสินค้าลงตะกร้าแล้ว");
   }, []);
 
   const removeFromCart = useCallback((id) => {
@@ -235,6 +241,34 @@ export default function App() {
     setWishlist(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
   };
 
+  const MAX_COMPARE = 4;
+
+  const handleToggleCompare = (productId) => {
+    setCompareList(prev => {
+      if (prev.includes(productId)) return prev.filter(id => id !== productId);
+      if (prev.length >= MAX_COMPARE) {
+        showSuccessToast(`เปรียบเทียบได้สูงสุด ${MAX_COMPARE} รายการ`);
+        return prev;
+      }
+      return [...prev, productId];
+    });
+  };
+
+  const handleRemoveCompare = (productId) => {
+    setCompareList(prev => prev.filter(id => id !== productId));
+  };
+
+  const compareProducts = compareList
+    .map(id => products.find(p => p.id === id))
+    .filter(Boolean);
+
+  const handleLogout = () => {
+    if (member?.token) {
+      callGas("logoutMember", [member.token], () => logoutMemberLocal(member.token)).catch(() => {});
+    }
+    setMember(null);
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center font-medium text-lg">กำลังโหลดข้อมูลสินค้า...</div>;
   }
@@ -250,7 +284,7 @@ export default function App() {
         onSelectCategory={handleSelectCategory}
         member={member}
         onLoginClick={() => setShowAuth(true)}
-        onLogout={() => setMember(null)}
+        onLogout={handleLogout}
         onNavigate={handleNavigate}
         wishlistCount={wishlist.length}
       />
@@ -268,6 +302,8 @@ export default function App() {
             onFiltersChange={setFilters}
             onProductClick={handleProductClick}
             onGoHome={goHome}
+            compareList={compareList}
+            onToggleCompare={handleToggleCompare}
           />
         )}
 
@@ -315,6 +351,10 @@ export default function App() {
           <WishlistPage products={products} wishlist={wishlist} onProductClick={handleProductClick} />
         )}
 
+        {page === "compare" && (
+          <ComparePage products={compareProducts} onRemove={handleRemoveCompare} onGoHome={goHome} />
+        )}
+
         {page === "admin" && (
           <AdminPage member={member} />
         )}
@@ -334,10 +374,25 @@ export default function App() {
       <AuthModal
         show={showAuth}
         onClose={() => setShowAuth(false)}
-        onLoggedIn={(m) => { setMember(m); setShowAuth(false); }}
+        onLoggedIn={(m) => {
+          setMember(m);
+          setShowAuth(false);
+          if (m.adminStatus === "pending") {
+            showSuccessToast("ลงทะเบียนสำเร็จ คำขอสิทธิ์แอดมินถูกส่งแล้ว รอการอนุมัติ");
+          }
+        }}
       />
 
-      <Toast show={showToast} message="เพิ่มสินค้าลงตะกร้าแล้ว" />
+      <Toast show={showToast} message={toastMessage} lifted={page !== "compare" && compareProducts.length > 0} />
+
+      {!["compare", "checkout", "admin"].includes(page) && (
+        <CompareBar
+          products={compareProducts}
+          onRemove={handleRemoveCompare}
+          onClear={() => setCompareList([])}
+          onCompare={() => handleNavigate("compare")}
+        />
+      )}
 
       {promoPopup && (
         <PromoPopupModal

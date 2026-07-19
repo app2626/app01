@@ -12,20 +12,20 @@ export default function AdminGiftsTab({ member, type, title }) {
 
   const load = () => {
     setLoading(true);
-    callGas("getAdminGifts", [member.email], getAdminGiftsLocal)
+    callGas("getAdminGifts", [member.token], getAdminGiftsLocal)
       .then(res => {
         if (res.success) setGifts(res.gifts.filter(g => (g.type === "store" ? "store" : "brand") === type));
       })
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [member.email, type]);
+  useEffect(load, [member.token, type]);
 
   const openNew = () => { setEditing(null); setShowForm(true); };
   const openEdit = (g) => { setEditing(g); setShowForm(true); };
 
   const handleSave = async (payload) => {
-    const res = await callGas("saveGift", [payload, member.email], saveGiftLocal);
+    const res = await callGas("saveGift", [payload, member.token], saveGiftLocal);
     if (res.success) {
       setShowForm(false);
       load();
@@ -36,7 +36,7 @@ export default function AdminGiftsTab({ member, type, title }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm("ยืนยันการลบของแถมนี้? (สินค้าที่แนบของแถมนี้ไว้จะไม่แสดงของแถมอีกต่อไป)")) return;
-    const res = await callGas("deleteGift", [id, member.email], deleteGiftLocal);
+    const res = await callGas("deleteGift", [id, member.token], deleteGiftLocal);
     if (res.success) load();
     else alert(res.message || "ลบไม่สำเร็จ");
   };

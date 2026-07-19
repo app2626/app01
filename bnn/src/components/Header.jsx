@@ -46,7 +46,7 @@ export default function Header({ cart, onCartClick, onLogoClick, searchQuery, on
           <img src={logo} alt="i7 Store" className="h-11 w-11 rounded-md object-cover" />
         </div>
 
-        <div className="flex-1 max-w-2xl hidden md:flex items-center border-2 border-[#FFD700] rounded-md overflow-hidden bg-white">
+        <div className="flex-1 max-w-2xl hidden md:flex items-center border-2 border-[#FF6B00] rounded-md overflow-hidden bg-white">
           <input
             type="text"
             placeholder="ค้นหาสินค้าที่ต้องการที่นี่..."
@@ -56,10 +56,10 @@ export default function Header({ cart, onCartClick, onLogoClick, searchQuery, on
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
           <button
-            className="bg-[#FFD700] px-4 py-2 flex items-center justify-center hover:bg-[#E6C200] transition-colors"
+            className="bg-[#FF6B00] px-4 py-2 flex items-center justify-center hover:bg-[#E65A00] transition-colors"
             onClick={handleSearch}
           >
-            <Search className="w-5 h-5 text-black" />
+            <Search className="w-5 h-5 text-white" />
           </button>
         </div>
 
@@ -107,7 +107,7 @@ export default function Header({ cart, onCartClick, onLogoClick, searchQuery, on
       </div>
 
       <div className="md:hidden px-4 pb-3">
-        <div className="flex items-center border-2 border-[#FFD700] rounded-md overflow-hidden bg-white">
+        <div className="flex items-center border-2 border-[#FF6B00] rounded-md overflow-hidden bg-white">
           <input
             type="text"
             placeholder="ค้นหาสินค้าที่ต้องการที่นี่..."
@@ -117,10 +117,10 @@ export default function Header({ cart, onCartClick, onLogoClick, searchQuery, on
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
           <button
-            className="bg-[#FFD700] px-4 py-2 flex items-center justify-center"
+            className="bg-[#FF6B00] px-4 py-2 flex items-center justify-center"
             onClick={handleSearch}
           >
-            <Search className="w-5 h-5 text-black" />
+            <Search className="w-5 h-5 text-white" />
           </button>
         </div>
       </div>

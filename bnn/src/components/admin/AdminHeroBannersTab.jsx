@@ -28,7 +28,7 @@ export default function AdminHeroBannersTab({ member }) {
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
-    const res = await callGas("saveHeroBanners", [slides, member.email], saveHeroBannersLocal);
+    const res = await callGas("saveHeroBanners", [slides, member.token], saveHeroBannersLocal);
     setSaving(false);
     if (res.success) {
       setSaved(true);
@@ -58,7 +58,7 @@ export default function AdminHeroBannersTab({ member }) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-medium text-gray-700">รูปพื้นหลัง (ไม่บังคับ)</label>
-                  <UploadButton adminEmail={member?.email} onUploaded={(urls) => update({ imageUrl: urls[0] })} />
+                  <UploadButton token={member?.token} onUploaded={(urls) => update({ imageUrl: urls[0] })} />
                 </div>
                 <input value={item.imageUrl} onChange={(e) => update({ imageUrl: e.target.value })} placeholder="URL รูปภาพ" className={inputClass} />
               </div>

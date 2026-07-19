@@ -9,18 +9,18 @@ export default function AdminReviewsTab({ member }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    callGas("getAdminReviews", [member.email], getAdminReviewsLocal)
+    callGas("getAdminReviews", [member.token], getAdminReviewsLocal)
       .then(res => {
         if (res.success) setReviews(res.reviews);
       })
       .finally(() => setLoading(false));
-  }, [member.email]);
+  }, [member.token]);
 
   const handleDelete = async (reviewId) => {
     if (!confirm("ลบรีวิวนี้ใช่หรือไม่?")) return;
     const prev = reviews;
     setReviews(r => r.filter(rv => rv.reviewId !== reviewId));
-    const res = await callGas("deleteReview", [reviewId, member.email], deleteReviewLocal);
+    const res = await callGas("deleteReview", [reviewId, member.token], deleteReviewLocal);
     if (!res.success) {
       setReviews(prev);
       alert(res.message || "ลบรีวิวไม่สำเร็จ");

@@ -51,22 +51,91 @@ function decorateProductStockLocal_(p) {
   };
 }
 
-export function registerMemberLocal({ name, email, password }) {
+// จำลอง session token เหมือนฝั่ง GAS จริง (public/Code.js) — ไม่เชื่ออีเมลที่ client ส่งมาตรงๆ
+// อีกต่อไป ต้อง resolve ผ่าน token ที่สร้างตอน login/register เท่านั้น
+function generateSessionTokenLocal_() {
+  return "tok_" + Math.random().toString(36).slice(2) + Date.now();
+}
+
+function resolveEmailByTokenLocal_(token) {
+  if (!token) return null;
+  const member = members.find(m => m.sessionToken === token);
+  if (!member || member.isBlocked) return null;
+  return member.email;
+}
+
+function isAdminLocal_(email) {
+  if (ADMIN_EMAILS.includes(email)) return true;
+  const member = members.find(m => m.email === email);
+  return !!member && member.adminStatus === "approved";
+}
+
+function requireAdminLocal_(token) {
+  const email = resolveEmailByTokenLocal_(token);
+  return email && isAdminLocal_(email) ? email : null;
+}
+
+export function logoutMemberLocal(token) {
+  const member = members.find(m => m.sessionToken === token);
+  if (member) delete member.sessionToken;
+  return { success: true };
+}
+
+export function registerMemberLocal({ name, email, password, requestAdmin }) {
   if (members.some(m => m.email === email)) {
     return { success: false, message: "อีเมลนี้ถูกใช้งานแล้ว" };
   }
-  const member = { id: "M" + Date.now(), name, email, points: 0, isAdmin: ADMIN_EMAILS.includes(email) };
-  members.push({ ...member, password });
-  return { success: true, member };
+  const token = generateSessionTokenLocal_();
+  const adminStatus = requestAdmin ? "pending" : "";
+  const member = { id: "M" + Date.now(), name, email, points: 0, adminStatus, isBlocked: false };
+  members.push({ ...member, password, sessionToken: token });
+  return { success: true, member: { ...member, isAdmin: isAdminLocal_(email), token } };
+}
+
+export function getAdminMembersLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  return {
+    success: true,
+    members: members.slice().reverse().map(m => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      points: m.points,
+      isSuperAdmin: ADMIN_EMAILS.includes(m.email),
+      adminStatus: m.adminStatus || "",
+      isBlocked: !!m.isBlocked
+    }))
+  };
+}
+
+export function setMemberAdminStatusLocal(memberId, status, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  const member = members.find(m => m.id === memberId);
+  if (!member) return { success: false, message: "ไม่พบสมาชิกนี้" };
+  member.adminStatus = status;
+  return { success: true };
+}
+
+export function setMemberBlockedLocal(memberId, blocked, token) {
+  const adminEmail = requireAdminLocal_(token);
+  if (!adminEmail) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  const member = members.find(m => m.id === memberId);
+  if (!member) return { success: false, message: "ไม่พบสมาชิกนี้" };
+  if (ADMIN_EMAILS.includes(member.email)) return { success: false, message: "ไม่สามารถบล็อกบัญชีผู้ดูแลระบบหลักได้" };
+  if (member.email === adminEmail) return { success: false, message: "ไม่สามารถบล็อกบัญชีของตัวเองได้" };
+  member.isBlocked = !!blocked;
+  return { success: true };
 }
 
 const cartsByEmail = {};
 
-export function getCartLocal(email) {
-  return cartsByEmail[email] || [];
+export function getCartLocal(token) {
+  const email = resolveEmailByTokenLocal_(token);
+  return email ? (cartsByEmail[email] || []) : [];
 }
 
-export function saveCartLocal(email, cart) {
+export function saveCartLocal(token, cart) {
+  const email = resolveEmailByTokenLocal_(token);
   if (!email) return { success: false, message: "ไม่พบสมาชิก" };
   cartsByEmail[email] = cart || [];
   return { success: true };
@@ -75,17 +144,53 @@ export function saveCartLocal(email, cart) {
 export function loginMemberLocal({ email, password }) {
   const match = members.find(m => m.email === email && m.password === password);
   if (!match) return { success: false, message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
-  const { password: _pw, ...member } = match;
-  return { success: true, member: { ...member, isAdmin: ADMIN_EMAILS.includes(member.email) } };
+  if (match.isBlocked) return { success: false, message: "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อร้านค้า" };
+  const token = generateSessionTokenLocal_();
+  match.sessionToken = token;
+  const { password: _pw, sessionToken: _st, ...member } = match;
+  return { success: true, member: { ...member, isAdmin: isAdminLocal_(member.email), token } };
+}
+
+function checkStockAvailableLocal_(items) {
+  const needed = {};
+  (items || []).forEach(item => {
+    if (!item.sku) return;
+    needed[item.sku] = (needed[item.sku] || 0) + (Number(item.qty) || 0);
+  });
+  const shortages = [];
+  Object.keys(needed).forEach(sku => {
+    const available = stockBySku[sku] !== undefined ? stockBySku[sku] : DEFAULT_STOCK;
+    if (needed[sku] > available) shortages.push({ sku, requested: needed[sku], available });
+  });
+  return shortages;
+}
+
+function giftStockItemsLocal_(items) {
+  const result = [];
+  (items || []).forEach(item => {
+    const product = products.find(p => p.id === item.productId);
+    resolveGiftsLocal_(product?.giftIds).forEach(g => {
+      if (g.sku) result.push({ sku: g.sku, qty: item.qty });
+    });
+  });
+  return result;
 }
 
 export function placeOrderLocal(data) {
+  const memberEmail = data.memberToken ? resolveEmailByTokenLocal_(data.memberToken) : null;
+
+  const shortages = checkStockAvailableLocal_((data.items || []).concat(giftStockItemsLocal_(data.items)));
+  if (shortages.length) {
+    const s = shortages[0];
+    return { success: false, message: `สินค้า SKU ${s.sku} เหลือไม่พอ (เหลือ ${s.available} ชิ้น, สั่ง ${s.requested} ชิ้น) กรุณาลดจำนวนหรือลองใหม่อีกครั้ง` };
+  }
+
   if (data.couponCode) {
     const coupon = coupons.find(c => c.code === data.couponCode);
     if (!coupon || !coupon.enabled) return { success: false, message: "ไม่พบคูปองนี้" };
     if (couponIsExpiredLocal_(coupon)) return { success: false, message: "คูปองนี้หมดอายุแล้ว" };
     if (couponIsExhaustedLocal_(coupon)) return { success: false, message: "คูปองนี้ถูกใช้ครบจำนวนแล้ว" };
-    const customerEmail = data.memberEmail || data.guestEmail;
+    const customerEmail = memberEmail || data.guestEmail;
     if (coupon.perCustomerLimit > 0 && countCouponUsageByCustomerLocal_(data.couponCode, customerEmail) >= coupon.perCustomerLimit) {
       return { success: false, message: "คุณใช้สิทธิ์คูปองนี้ครบจำนวนแล้ว" };
     }
@@ -96,8 +201,8 @@ export function placeOrderLocal(data) {
   const pointsEarned = Math.round((Number(data.total) || 0) * 0.01);
   let pointsBalance = null;
 
-  if (data.memberEmail) {
-    const member = members.find(m => m.email === data.memberEmail);
+  if (memberEmail) {
+    const member = members.find(m => m.email === memberEmail);
     if (member) {
       if (pointsRedeemed > member.points) {
         return { success: false, message: "แต้มสะสมไม่เพียงพอ" };
@@ -123,12 +228,15 @@ export function placeOrderLocal(data) {
   });
 
   const orderId = "ORD" + Date.now();
-  orders.push({ orderId, ...data, status: "รอดำเนินการ", createdAt: new Date().toISOString() });
-  if (data.memberEmail) {
-    console.log(`[local] ส่งอีเมลยืนยันคำสั่งซื้อ ${orderId} ไปที่ ${data.memberEmail}`);
-  } else if (data.guestEmail) {
-    console.log(`[local] ส่งอีเมลยืนยันคำสั่งซื้อ ${orderId} ไปที่ ${data.guestEmail} (guest)`);
-  }
+  const { memberToken: _memberToken, ...orderData } = data;
+  orders.push({
+    ...orderData,
+    orderId,
+    memberEmail: memberEmail || "",
+    status: "รอดำเนินการ",
+    createdAt: new Date().toISOString(),
+    trackingNumber: ""
+  });
   return { success: true, orderId, pointsBalance };
 }
 
@@ -157,21 +265,18 @@ export function resetPasswordLocal(email, code, newPassword) {
   return { success: true };
 }
 
-export function getMyOrdersLocal(email) {
+export function getMyOrdersLocal(token) {
+  const email = resolveEmailByTokenLocal_(token);
   return orders.filter(o => o.memberEmail === email).slice().reverse();
 }
 
-function isAdminLocal_(email) {
-  return ADMIN_EMAILS.includes(email);
-}
-
-export function getAdminProductsLocal(adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function getAdminProductsLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   return { success: true, products: products.map(decorateProductStockLocal_) };
 }
 
-export function saveProductLocal(product, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function saveProductLocal(product, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const id = product.id || ("p" + Date.now());
   const saved = { ...product, id };
   const idx = products.findIndex(p => p.id === id);
@@ -187,8 +292,8 @@ export function saveProductLocal(product, adminEmail) {
   return { success: true, id };
 }
 
-export function deleteProductLocal(id, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function deleteProductLocal(id, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const idx = products.findIndex(p => p.id === id);
   if (idx >= 0) {
     (products[idx].variants || []).forEach(v => { if (v.sku) delete stockBySku[v.sku]; });
@@ -197,9 +302,17 @@ export function deleteProductLocal(id, adminEmail) {
   return { success: true };
 }
 
-export function getAdminOrdersLocal(adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function getAdminOrdersLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   return { success: true, orders: orders.slice().reverse() };
+}
+
+export function updateOrderTrackingLocal(orderId, trackingNumber, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  const order = orders.find(o => o.orderId === orderId);
+  if (!order) return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
+  order.trackingNumber = trackingNumber || "";
+  return { success: true };
 }
 
 function restoreStockLocal_(items) {
@@ -218,8 +331,7 @@ function restoreStockLocal_(items) {
   });
 }
 
-export function updateOrderStatusLocal(orderId, status, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function setOrderStatusLocal_(orderId, status) {
   const order = orders.find(o => o.orderId === orderId);
   if (!order) return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
   order.status = status;
@@ -230,17 +342,37 @@ export function updateOrderStatusLocal(orderId, status, adminEmail) {
   return { success: true };
 }
 
+export function updateOrderStatusLocal(orderId, status, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  return setOrderStatusLocal_(orderId, status);
+}
+
+const CANCELLABLE_ORDER_STATUS_LOCAL_ = "รอดำเนินการ";
+
+export function requestCancelOrderLocal(orderId, token, reason) {
+  const email = resolveEmailByTokenLocal_(token);
+  if (!email) return { success: false, message: "กรุณาเข้าสู่ระบบก่อน" };
+  const order = orders.find(o => o.orderId === orderId);
+  if (!order || order.memberEmail !== email) return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
+  if (order.status !== CANCELLABLE_ORDER_STATUS_LOCAL_) {
+    return { success: false, message: "ไม่สามารถยกเลิกได้ เนื่องจากคำสั่งซื้อนี้เริ่มดำเนินการแล้ว กรุณาติดต่อร้านค้าโดยตรง" };
+  }
+  order.cancelReason = reason || "";
+  return setOrderStatusLocal_(orderId, "ยกเลิก");
+}
+
 function hasPurchasedLocal_(email, productId) {
   return orders.some(o => o.memberEmail === email && (o.items || []).some(it => it.productId === productId));
 }
 
 export function submitReviewLocal(data) {
-  if (!data.memberEmail) return { success: false, message: "กรุณาเข้าสู่ระบบก่อนรีวิวสินค้า" };
+  const memberEmail = data.memberToken ? resolveEmailByTokenLocal_(data.memberToken) : null;
+  if (!memberEmail) return { success: false, message: "กรุณาเข้าสู่ระบบก่อนรีวิวสินค้า" };
   const rating = Number(data.rating);
   if (!rating || rating < 1 || rating > 5) return { success: false, message: "กรุณาให้คะแนน 1-5 ดาว" };
 
-  const verified = hasPurchasedLocal_(data.memberEmail, data.productId);
-  const existing = reviews.find(r => r.productId === data.productId && r.memberEmail === data.memberEmail);
+  const verified = hasPurchasedLocal_(memberEmail, data.productId);
+  const existing = reviews.find(r => r.productId === data.productId && r.memberEmail === memberEmail);
   if (existing) {
     existing.rating = rating;
     existing.comment = data.comment || "";
@@ -252,7 +384,7 @@ export function submitReviewLocal(data) {
   reviews.push({
     reviewId: "RV" + Date.now(),
     productId: data.productId,
-    memberEmail: data.memberEmail,
+    memberEmail: memberEmail,
     memberName: data.memberName || "",
     rating,
     comment: data.comment || "",
@@ -269,16 +401,16 @@ export function getProductReviewsLocal(productId) {
   return { success: true, reviews: list, avg, count };
 }
 
-export function getAdminReviewsLocal(adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function getAdminReviewsLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const productNameMap = {};
   products.forEach(p => { productNameMap[p.id] = p.name; });
   const list = reviews.map(r => ({ ...r, productName: productNameMap[r.productId] || r.productId })).slice().reverse();
   return { success: true, reviews: list };
 }
 
-export function deleteReviewLocal(reviewId, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function deleteReviewLocal(reviewId, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const idx = reviews.findIndex(r => r.reviewId === reviewId);
   if (idx >= 0) reviews.splice(idx, 1);
   return { success: true };
@@ -290,8 +422,8 @@ export function getPromoPopupLocal() {
   return { ...promoPopup };
 }
 
-export function savePromoPopupLocal(data, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function savePromoPopupLocal(data, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   promoPopup = {
     enabled: !!data.enabled,
     imageUrl: data.imageUrl || "",
@@ -310,8 +442,8 @@ export function getHeroBannersLocal() {
   return heroBanners;
 }
 
-export function saveHeroBannersLocal(slides, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function saveHeroBannersLocal(slides, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   heroBanners = slides || [];
   return { success: true };
 }
@@ -322,8 +454,8 @@ export function getInstallmentSettingsLocal() {
   return installmentSettings;
 }
 
-export function saveInstallmentSettingsLocal(settings, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function saveInstallmentSettingsLocal(settings, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   installmentSettings = {
     enabled: !!settings.enabled,
     banks: Array.isArray(settings.banks)
@@ -343,8 +475,8 @@ function dateKey_(date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function getAdminDashboardStatsLocal(adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function getAdminDashboardStatsLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const CANCELLED = "ยกเลิก";
   let totalRevenue = 0;
@@ -398,13 +530,13 @@ export function getCouponsLocal() {
     .map(c => ({ ...c, expired: couponIsExpiredLocal_(c) }));
 }
 
-export function getAdminCouponsLocal(adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function getAdminCouponsLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   return { success: true, coupons: coupons.map(c => ({ ...c })) };
 }
 
-export function saveCouponLocal(coupon, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function saveCouponLocal(coupon, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const code = (coupon.code || "").trim().toUpperCase();
   if (!code) return { success: false, message: "กรุณาระบุโค้ดคูปอง" };
 
@@ -429,20 +561,20 @@ export function saveCouponLocal(coupon, adminEmail) {
   return { success: true, code };
 }
 
-export function deleteCouponLocal(code, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function deleteCouponLocal(code, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const idx = coupons.findIndex(c => c.code === code);
   if (idx >= 0) coupons.splice(idx, 1);
   return { success: true };
 }
 
-export function getAdminGiftsLocal(adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function getAdminGiftsLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   return { success: true, gifts: withVariantStockLocal_(gifts) };
 }
 
-export function saveGiftLocal(gift, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function saveGiftLocal(gift, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const id = gift.id || ("gift" + Date.now());
   const saved = {
     id,
@@ -462,8 +594,8 @@ export function saveGiftLocal(gift, adminEmail) {
   return { success: true, id };
 }
 
-export function deleteGiftLocal(id, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function deleteGiftLocal(id, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const idx = gifts.findIndex(g => g.id === id);
   if (idx >= 0) gifts.splice(idx, 1);
   return { success: true };
@@ -473,13 +605,13 @@ export function getPromotionsLocal() {
   return promotions.filter(p => p.enabled).map(p => ({ ...p }));
 }
 
-export function getAdminPromotionsLocal(adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function getAdminPromotionsLocal(token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   return { success: true, promotions: promotions.map(p => ({ ...p })) };
 }
 
-export function savePromotionLocal(promo, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function savePromotionLocal(promo, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const id = promo.id || ("promo" + Date.now());
   const saved = {
     id,
@@ -496,8 +628,8 @@ export function savePromotionLocal(promo, adminEmail) {
   return { success: true, id };
 }
 
-export function deletePromotionLocal(id, adminEmail) {
-  if (!isAdminLocal_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+export function deletePromotionLocal(id, token) {
+  if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const idx = promotions.findIndex(p => p.id === id);
   if (idx >= 0) promotions.splice(idx, 1);
   return { success: true };

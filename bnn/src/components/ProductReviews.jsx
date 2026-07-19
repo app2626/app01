@@ -42,7 +42,7 @@ export default function ProductReviews({ productId, member, onLoginRequired }) {
     setSubmitting(true);
     callGas("submitReview", [{
       productId,
-      memberEmail: member.email,
+      memberToken: member.token,
       memberName: member.name,
       rating: myRating,
       comment: myComment

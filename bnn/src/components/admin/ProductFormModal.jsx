@@ -50,10 +50,10 @@ export default function ProductFormModal({ product, member, onClose, onSave }) {
   const [giftCatalog, setGiftCatalog] = useState([]);
 
   useEffect(() => {
-    callGas("getAdminGifts", [member?.email], getAdminGiftsLocal)
+    callGas("getAdminGifts", [member?.token], getAdminGiftsLocal)
       .then(res => { if (res.success) setGiftCatalog(res.gifts); })
       .catch(() => {});
-  }, [member?.email]);
+  }, [member?.token]);
 
   const toggleGift = (giftId) => {
     setForm(prev => ({
@@ -154,7 +154,7 @@ export default function ProductFormModal({ product, member, onClose, onSave }) {
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-gray-700">รูปภาพ (1 URL ต่อบรรทัด)</h3>
               <UploadButton
-                adminEmail={member?.email}
+                token={member?.token}
                 onUploaded={(urls) => setForm(prev => ({
                   ...prev,
                   images: [prev.images, ...urls].filter(Boolean).join("\n")
@@ -181,7 +181,7 @@ export default function ProductFormModal({ product, member, onClose, onSave }) {
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-gray-500">รูปภาพเฉพาะสีนี้ (เว้นว่าง = ใช้รูปเริ่มต้นของสินค้า)</span>
                     <UploadButton
-                      adminEmail={member?.email}
+                      token={member?.token}
                       onUploaded={(urls) => update(prev => ({
                         ...prev,
                         images: [prev.images, ...urls].filter(Boolean).join("\n")

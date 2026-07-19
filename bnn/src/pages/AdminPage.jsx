@@ -9,6 +9,7 @@ import AdminCouponsTab from "../components/admin/AdminCouponsTab";
 import AdminGiftsTab from "../components/admin/AdminGiftsTab";
 import AdminPromotionsTab from "../components/admin/AdminPromotionsTab";
 import AdminInstallmentsTab from "../components/admin/AdminInstallmentsTab";
+import AdminMembersTab from "../components/admin/AdminMembersTab";
 
 export default function AdminPage({ member }) {
   const [tab, setTab] = useState("dashboard");
@@ -33,12 +34,6 @@ export default function AdminPage({ member }) {
           แดชบอร์ด
         </button>
         <button
-          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "products" ? "bg-white shadow-sm" : "text-gray-500"}`}
-          onClick={() => setTab("products")}
-        >
-          สินค้า
-        </button>
-        <button
           className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "orders" ? "bg-white shadow-sm" : "text-gray-500"}`}
           onClick={() => setTab("orders")}
         >
@@ -51,22 +46,10 @@ export default function AdminPage({ member }) {
           รีวิว
         </button>
         <button
-          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "promoPopup" ? "bg-white shadow-sm" : "text-gray-500"}`}
-          onClick={() => setTab("promoPopup")}
+          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "products" ? "bg-white shadow-sm" : "text-gray-500"}`}
+          onClick={() => setTab("products")}
         >
-          ป๊อปอัพ
-        </button>
-        <button
-          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "heroBanners" ? "bg-white shadow-sm" : "text-gray-500"}`}
-          onClick={() => setTab("heroBanners")}
-        >
-          แบนเนอร์
-        </button>
-        <button
-          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "coupons" ? "bg-white shadow-sm" : "text-gray-500"}`}
-          onClick={() => setTab("coupons")}
-        >
-          คูปอง
+          สินค้า
         </button>
         <button
           className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "giftsBrand" ? "bg-white shadow-sm" : "text-gray-500"}`}
@@ -87,24 +70,49 @@ export default function AdminPage({ member }) {
           โปรโมชั่น
         </button>
         <button
+          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "coupons" ? "bg-white shadow-sm" : "text-gray-500"}`}
+          onClick={() => setTab("coupons")}
+        >
+          คูปอง
+        </button>
+        <button
           className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "installments" ? "bg-white shadow-sm" : "text-gray-500"}`}
           onClick={() => setTab("installments")}
         >
           ผ่อนชำระ
         </button>
+        <button
+          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "promoPopup" ? "bg-white shadow-sm" : "text-gray-500"}`}
+          onClick={() => setTab("promoPopup")}
+        >
+          ป๊อปอัพ
+        </button>
+        <button
+          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "heroBanners" ? "bg-white shadow-sm" : "text-gray-500"}`}
+          onClick={() => setTab("heroBanners")}
+        >
+          แบนเนอร์
+        </button>
+        <button
+          className={`px-5 py-1.5 rounded text-sm font-medium ${tab === "members" ? "bg-white shadow-sm" : "text-gray-500"}`}
+          onClick={() => setTab("members")}
+        >
+          สมาชิก
+        </button>
       </div>
 
       {tab === "dashboard" && <AdminDashboardTab member={member} />}
-      {tab === "products" && <AdminProductsTab member={member} />}
       {tab === "orders" && <AdminOrdersTab member={member} />}
       {tab === "reviews" && <AdminReviewsTab member={member} />}
-      {tab === "promoPopup" && <AdminPromoPopupTab member={member} />}
-      {tab === "heroBanners" && <AdminHeroBannersTab member={member} />}
-      {tab === "coupons" && <AdminCouponsTab member={member} />}
+      {tab === "products" && <AdminProductsTab member={member} />}
       {tab === "giftsBrand" && <AdminGiftsTab member={member} type="brand" title="ของแถมแบรนด์" />}
       {tab === "giftsStore" && <AdminGiftsTab member={member} type="store" title="ของแถมทางร้าน" />}
       {tab === "promotions" && <AdminPromotionsTab member={member} />}
+      {tab === "coupons" && <AdminCouponsTab member={member} />}
       {tab === "installments" && <AdminInstallmentsTab member={member} />}
+      {tab === "promoPopup" && <AdminPromoPopupTab member={member} />}
+      {tab === "heroBanners" && <AdminHeroBannersTab member={member} />}
+      {tab === "members" && <AdminMembersTab member={member} />}
     </div>
   );
 }

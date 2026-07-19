@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { callGas } from "../../utils/gas";
-import { getAdminOrdersLocal, updateOrderStatusLocal } from "../../utils/localMock";
+import { getAdminOrdersLocal, updateOrderStatusLocal, updateOrderTrackingLocal } from "../../utils/localMock";
 import { formatTHB } from "../../utils/format";
 import { ORDER_STATUSES } from "../../data/orderStatuses";
 
@@ -9,17 +9,30 @@ export default function AdminOrdersTab({ member }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    callGas("getAdminOrders", [member.email], getAdminOrdersLocal)
+    callGas("getAdminOrders", [member.token], getAdminOrdersLocal)
       .then(res => {
         if (res.success) setOrders(res.orders);
       })
       .finally(() => setLoading(false));
-  }, [member.email]);
+  }, [member.token]);
 
   const handleStatusChange = async (orderId, status) => {
     setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status } : o));
-    const res = await callGas("updateOrderStatus", [orderId, status, member.email], updateOrderStatusLocal);
+    const res = await callGas("updateOrderStatus", [orderId, status, member.token], updateOrderStatusLocal);
     if (!res.success) alert(res.message || "อัปเดตสถานะไม่สำเร็จ");
+  };
+
+  const handleTrackingSave = async (orderId, trackingNumber) => {
+    const res = await callGas(
+      "updateOrderTracking",
+      [orderId, trackingNumber, member.token],
+      () => updateOrderTrackingLocal(orderId, trackingNumber, member.token)
+    );
+    if (res.success) {
+      setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, trackingNumber } : o));
+    } else {
+      alert(res.message || "บันทึกเลขพัสดุไม่สำเร็จ");
+    }
   };
 
   return (
@@ -38,6 +51,7 @@ export default function AdminOrdersTab({ member }) {
                 <th className="p-3 font-medium">ยอดรวม</th>
                 <th className="p-3 font-medium">วันที่</th>
                 <th className="p-3 font-medium">สถานะ</th>
+                <th className="p-3 font-medium">เลขพัสดุ</th>
               </tr>
             </thead>
             <tbody>
@@ -53,6 +67,16 @@ export default function AdminOrdersTab({ member }) {
                         {!o.memberEmail && o.guestEmail && <span className="text-gray-300"> (guest)</span>}
                       </div>
                     )}
+                    {o.needTaxInvoice && (
+                      <div className="text-xs text-blue-600 mt-1">
+                        📄 ใบกำกับภาษี: {o.taxInvoiceName} ({o.taxId})
+                      </div>
+                    )}
+                    {o.status === "ยกเลิก" && o.cancelReason && (
+                      <div className="text-xs text-red-500 mt-1">
+                        เหตุผลยกเลิก: {o.cancelReason}
+                      </div>
+                    )}
                   </td>
                   <td className="p-3 font-medium">{formatTHB(o.total)}</td>
                   <td className="p-3 text-xs text-gray-500">{new Date(o.createdAt).toLocaleString("th-TH")}</td>
@@ -64,6 +88,15 @@ export default function AdminOrdersTab({ member }) {
                     >
                       {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
+                  </td>
+                  <td className="p-3">
+                    <input
+                      type="text"
+                      defaultValue={o.trackingNumber}
+                      placeholder="ระบุเลขพัสดุ"
+                      onBlur={(e) => handleTrackingSave(o.orderId, e.target.value.trim())}
+                      className="border border-gray-300 rounded-md px-2 py-1 text-xs outline-none focus:border-[#FFD700] w-32"
+                    />
                   </td>
                 </tr>
               ))}

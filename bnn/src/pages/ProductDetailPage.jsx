@@ -92,6 +92,11 @@ export default function ProductDetailPage({ product, onAddToCart, onBuyNow, onBa
                 </span>
               )}
             </div>
+            {product.originalPrice && selectedVariant.price < product.originalPrice && (
+              <div className="text-sm font-medium text-green-600 mb-1">
+                ประหยัด {formatTHB(product.originalPrice - selectedVariant.price)}
+              </div>
+            )}
             <div className="text-xs text-gray-500 mb-3">รับคะแนนสะสม: {points.toLocaleString("th-TH")} คะแนน</div>
 
             <div className="flex flex-wrap gap-2">

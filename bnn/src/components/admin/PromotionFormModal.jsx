@@ -26,10 +26,10 @@ export default function PromotionFormModal({ promotion, member, onClose, onSave 
   const isEdit = !!promotion;
 
   useEffect(() => {
-    callGas("getAdminProducts", [member?.email], getAdminProductsLocal)
+    callGas("getAdminProducts", [member?.token], getAdminProductsLocal)
       .then(res => { if (res.success) setProducts(res.products); })
       .catch(() => {});
-  }, [member?.email]);
+  }, [member?.token]);
 
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 

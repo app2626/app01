@@ -13,20 +13,20 @@ export default function AdminCouponsTab({ member }) {
 
   const load = () => {
     setLoading(true);
-    callGas("getAdminCoupons", [member.email], getAdminCouponsLocal)
+    callGas("getAdminCoupons", [member.token], getAdminCouponsLocal)
       .then(res => {
         if (res.success) setCoupons(res.coupons);
       })
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [member.email]);
+  useEffect(load, [member.token]);
 
   const openNew = () => { setEditing(null); setShowForm(true); };
   const openEdit = (c) => { setEditing(c); setShowForm(true); };
 
   const handleSave = async (payload) => {
-    const res = await callGas("saveCoupon", [payload, member.email], saveCouponLocal);
+    const res = await callGas("saveCoupon", [payload, member.token], saveCouponLocal);
     if (res.success) {
       setShowForm(false);
       load();
@@ -37,7 +37,7 @@ export default function AdminCouponsTab({ member }) {
 
   const handleDelete = async (code) => {
     if (!window.confirm("ยืนยันการลบคูปองนี้?")) return;
-    const res = await callGas("deleteCoupon", [code, member.email], deleteCouponLocal);
+    const res = await callGas("deleteCoupon", [code, member.token], deleteCouponLocal);
     if (res.success) load();
     else alert(res.message || "ลบไม่สำเร็จ");
   };

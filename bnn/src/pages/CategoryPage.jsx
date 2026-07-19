@@ -13,7 +13,7 @@ function productsInCategory(allProducts, categorySlug) {
   return allProducts.filter(p => p.category === categorySlug);
 }
 
-export default function CategoryPage({ categorySlug, allProducts, filters, onFiltersChange, onProductClick, onGoHome }) {
+export default function CategoryPage({ categorySlug, allProducts, filters, onFiltersChange, onProductClick, onGoHome, compareList, onToggleCompare }) {
   const [showMobileFilter, setShowMobileFilter] = useState(false);
   const [listMode, setListMode] = useState(false);
 
@@ -126,6 +126,8 @@ export default function CategoryPage({ categorySlug, allProducts, filters, onFil
                 product={product}
                 onClick={onProductClick}
                 listMode={listMode}
+                isComparing={compareList?.includes(product.id)}
+                onToggleCompare={onToggleCompare}
               />
             ))}
           </div>

@@ -22,7 +22,7 @@ export default function AdminInstallmentsTab({ member }) {
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
-    const res = await callGas("saveInstallmentSettings", [form, member.email], saveInstallmentSettingsLocal);
+    const res = await callGas("saveInstallmentSettings", [form, member.token], saveInstallmentSettingsLocal);
     setSaving(false);
     if (res.success) {
       setSaved(true);

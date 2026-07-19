@@ -2,21 +2,55 @@ import { useState, useEffect } from "react";
 import { Package } from "lucide-react";
 import { formatTHB } from "../utils/format";
 import { callGas } from "../utils/gas";
-import { getMyOrdersLocal } from "../utils/localMock";
+import { getMyOrdersLocal, requestCancelOrderLocal } from "../utils/localMock";
+
+const CANCELLABLE_STATUS = "รอดำเนินการ";
 
 export default function OrdersPage({ member, onGoHome }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [cancelErrors, setCancelErrors] = useState({});
+  const [cancelBoxOpenId, setCancelBoxOpenId] = useState(null);
+  const [cancelReasons, setCancelReasons] = useState({});
 
   useEffect(() => {
     if (!member) {
       setLoading(false);
       return;
     }
-    callGas("getMyOrders", [member.email], getMyOrdersLocal)
+    callGas("getMyOrders", [member.token], getMyOrdersLocal)
       .then(setOrders)
       .finally(() => setLoading(false));
   }, [member]);
+
+  const openCancelBox = (orderId) => {
+    setCancelErrors(prev => ({ ...prev, [orderId]: "" }));
+    setCancelBoxOpenId(orderId);
+  };
+
+  const closeCancelBox = (orderId) => {
+    setCancelBoxOpenId(null);
+    setCancelReasons(prev => ({ ...prev, [orderId]: "" }));
+  };
+
+  const handleCancel = (orderId) => {
+    const reason = (cancelReasons[orderId] || "").trim();
+    if (!reason) return;
+    setCancellingId(orderId);
+    setCancelErrors(prev => ({ ...prev, [orderId]: "" }));
+    callGas("requestCancelOrder", [orderId, member.token, reason], () => requestCancelOrderLocal(orderId, member.token, reason))
+      .then(result => {
+        if (result.success) {
+          setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: "ยกเลิก" } : o));
+          setCancelBoxOpenId(null);
+        } else {
+          setCancelErrors(prev => ({ ...prev, [orderId]: result.message || "ยกเลิกไม่สำเร็จ" }));
+        }
+      })
+      .catch(() => setCancelErrors(prev => ({ ...prev, [orderId]: "เชื่อมต่อระบบไม่สำเร็จ กรุณาลองใหม่" })))
+      .finally(() => setCancellingId(null));
+  };
 
   if (!member) {
     return (
@@ -66,10 +100,59 @@ export default function OrdersPage({ member, onGoHome }) {
                 ))}
               </div>
 
+              {order.trackingNumber && (
+                <p className="text-sm text-gray-600 mb-2">
+                  เลขพัสดุ: <span className="font-mono font-medium text-gray-900">{order.trackingNumber}</span>
+                </p>
+              )}
+
               <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                 <span className="text-sm text-gray-500">ยอดรวม</span>
                 <span className="font-bold text-[#FF6B00]">{formatTHB(order.total)}</span>
               </div>
+
+              {order.status === CANCELLABLE_STATUS && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  {cancelBoxOpenId === order.orderId ? (
+                    <div className="space-y-2">
+                      <textarea
+                        autoFocus
+                        rows={2}
+                        placeholder="กรุณาระบุเหตุผลที่ต้องการยกเลิก"
+                        value={cancelReasons[order.orderId] || ""}
+                        onChange={(e) => setCancelReasons(prev => ({ ...prev, [order.orderId]: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-red-400 resize-none"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleCancel(order.orderId)}
+                          disabled={cancellingId === order.orderId || !(cancelReasons[order.orderId] || "").trim()}
+                          className="bg-red-500 text-white text-sm font-medium px-4 py-1.5 rounded-md hover:bg-red-600 disabled:opacity-50"
+                        >
+                          {cancellingId === order.orderId ? "กำลังยกเลิก..." : "ยืนยันยกเลิก"}
+                        </button>
+                        <button
+                          onClick={() => closeCancelBox(order.orderId)}
+                          disabled={cancellingId === order.orderId}
+                          className="text-sm text-gray-500 hover:text-gray-700"
+                        >
+                          ไม่ยกเลิก
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => openCancelBox(order.orderId)}
+                      className="text-sm text-red-500 hover:text-red-600 font-medium"
+                    >
+                      ยกเลิกคำสั่งซื้อ
+                    </button>
+                  )}
+                  {cancelErrors[order.orderId] && (
+                    <p className="text-xs text-red-500 mt-1">{cancelErrors[order.orderId]}</p>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

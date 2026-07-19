@@ -6,8 +6,153 @@ function doGet() {
 
 const ADMIN_EMAILS = ["mahalala123@gmail.com"];
 
+// ผู้ดูแลระบบมี 2 ระดับ: ADMIN_EMAILS (ผู้ดูแลหลัก ฝังในโค้ด แก้ไข/บล็อกไม่ได้) กับสมาชิกที่สมัครขอสิทธิ์แอดมิน
+// แล้วได้รับอนุมัติแล้ว (adminStatus === "approved" ในชีต Members)
 function isAdmin_(email) {
-  return ADMIN_EMAILS.indexOf(email) !== -1;
+  if (ADMIN_EMAILS.indexOf(email) !== -1) return true;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
+  if (!sheet) return false;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf("email");
+  const statusCol = headers.indexOf("adminStatus");
+  if (emailCol === -1 || statusCol === -1) return false;
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][emailCol] === email) return data[i][statusCol] === "approved";
+  }
+  return false;
+}
+
+// ===== ระบบ session token =====
+// เดิมทุกฟังก์ชันที่เช็คสิทธิ์ (ลูกค้า/แอดมิน) รับ "อีเมล" เป็นพารามิเตอร์ตรงๆ จาก client โดยไม่มีการตรวจสอบว่า
+// ผู้เรียกจริงเป็นเจ้าของอีเมลนั้นหรือไม่ — ใครก็เปิด console แล้วเรียก google.script.run ด้วยอีเมลคนอื่น(หรืออีเมลแอดมิน)
+// เพื่อดูข้อมูล/แก้ไขข้อมูลแทนคนอื่นได้เลย จึงเปลี่ยนมาใช้ token สุ่มที่สร้างตอน login/register แล้วตรวจสอบฝั่งเซิร์ฟเวอร์
+// กับ Members sheet ทุกครั้งแทนการเชื่ออีเมลที่ client อ้างเอง
+const SESSION_DURATION_MS_ = 30 * 24 * 60 * 60 * 1000; // 30 วัน
+
+function createSession_(sheet, rowNum) {
+  const tokenCol = ensureColumn_(sheet, "sessionToken");
+  const expiryCol = ensureColumn_(sheet, "sessionExpiry");
+  const token = Utilities.getUuid();
+  sheet.getRange(rowNum, tokenCol).setValue(token);
+  sheet.getRange(rowNum, expiryCol).setValue(new Date(Date.now() + SESSION_DURATION_MS_));
+  return token;
+}
+
+// คืนอีเมลที่ผูกกับ token นี้จริงๆ ตามที่ตรวจสอบฝั่งเซิร์ฟเวอร์ หรือ null ถ้า token ไม่ถูกต้อง/หมดอายุ
+// ต้องใช้แทนการรับอีเมลจาก client ตรงๆ ทุกจุดที่เช็คสิทธิ์ลูกค้า/แอดมิน
+function resolveEmailByToken_(token) {
+  if (!token) return null;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf("email");
+  const tokenCol = headers.indexOf("sessionToken");
+  const expiryCol = headers.indexOf("sessionExpiry");
+  const blockedCol = headers.indexOf("isBlocked");
+  if (tokenCol === -1) return null;
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][tokenCol] === token) {
+      const expiry = expiryCol !== -1 ? data[i][expiryCol] : null;
+      if (expiry && new Date(expiry).getTime() < Date.now()) return null;
+      // สมาชิกที่ถูกบล็อกใช้ token เดิมทำอะไรต่อไม่ได้ทันที แม้ token จะยังไม่หมดอายุ
+      if (blockedCol !== -1 && (data[i][blockedCol] === true || data[i][blockedCol] === 'TRUE')) return null;
+      return data[i][emailCol];
+    }
+  }
+  return null;
+}
+
+// คืนอีเมลแอดมินที่ตรวจสอบแล้วจาก token หรือ null ถ้าไม่ใช่แอดมิน/token ไม่ถูกต้อง
+function requireAdmin_(token) {
+  const email = resolveEmailByToken_(token);
+  if (!email || !isAdmin_(email)) return null;
+  return email;
+}
+
+function getAdminMembers(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
+  if (!sheet) return { success: true, members: [] };
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const members = data.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = row[i]; });
+    return {
+      id: obj.id,
+      name: obj.name,
+      email: obj.email,
+      points: obj.points,
+      createdAt: obj.createdAt instanceof Date ? obj.createdAt.toISOString() : obj.createdAt,
+      isSuperAdmin: ADMIN_EMAILS.indexOf(obj.email) !== -1,
+      adminStatus: obj.adminStatus || "",
+      isBlocked: obj.isBlocked === true || obj.isBlocked === 'TRUE'
+    };
+  }).reverse();
+
+  return { success: true, members: members };
+}
+
+function setMemberAdminStatus(memberId, status, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  if (["approved", "rejected", ""].indexOf(status) === -1) return { success: false, message: "สถานะไม่ถูกต้อง" };
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
+  if (!sheet) return { success: false, message: "ไม่พบสมาชิก" };
+  const statusCol = ensureColumn_(sheet, "adminStatus");
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === memberId) {
+      sheet.getRange(i + 1, statusCol).setValue(status);
+      return { success: true };
+    }
+  }
+  return { success: false, message: "ไม่พบสมาชิกนี้" };
+}
+
+function setMemberBlocked(memberId, blocked, token) {
+  const adminEmail = requireAdmin_(token);
+  if (!adminEmail) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
+  if (!sheet) return { success: false, message: "ไม่พบสมาชิก" };
+  const blockedCol = ensureColumn_(sheet, "isBlocked");
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === memberId) {
+      const targetEmail = data[i][2];
+      if (ADMIN_EMAILS.indexOf(targetEmail) !== -1) {
+        return { success: false, message: "ไม่สามารถบล็อกบัญชีผู้ดูแลระบบหลักได้" };
+      }
+      if (targetEmail === adminEmail) {
+        return { success: false, message: "ไม่สามารถบล็อกบัญชีของตัวเองได้" };
+      }
+      sheet.getRange(i + 1, blockedCol).setValue(!!blocked);
+      return { success: true };
+    }
+  }
+  return { success: false, message: "ไม่พบสมาชิกนี้" };
+}
+
+function logoutMember(token) {
+  if (!token) return { success: true };
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
+  if (!sheet) return { success: true };
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const tokenCol = headers.indexOf("sessionToken");
+  if (tokenCol === -1) return { success: true };
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][tokenCol] === token) {
+      sheet.getRange(i + 1, tokenCol + 1).setValue("");
+      break;
+    }
+  }
+  return { success: true };
 }
 
 function getOrCreateSheet_(name, headers) {
@@ -32,7 +177,18 @@ function ensureColumn_(sheet, columnName) {
   return newCol;
 }
 
-// หมายเหตุ: เก็บรหัสผ่านแบบข้อความล้วน เหมาะสำหรับ demo เท่านั้น ไม่ควรใช้กับระบบจริง
+// รหัสผ่านเก็บเป็น salted SHA-256 hash (คอลัมน์ passwordHash/passwordSalt) ไม่ใช่ข้อความล้วนอีกต่อไป
+// คอลัมน์ "password" เดิมเก็บไว้เฉยๆ เพื่อความเข้ากันได้กับแถวเก่าที่อาจยังมีข้อมูล (ดู loginMember ด้านล่าง
+// ที่ migrate แถวเก่าให้เป็น hash อัตโนมัติตอน login ครั้งถัดไป) แถวใหม่จะไม่เขียนอะไรลงคอลัมน์นี้อีก
+function generateSalt_() {
+  return Utilities.getUuid();
+}
+
+function hashPassword_(password, salt) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + password, Utilities.Charset.UTF_8);
+  return bytes.map(b => (b < 0 ? b + 256 : b).toString(16).padStart(2, "0")).join("");
+}
+
 function registerMember(data) {
   const sheet = getOrCreateSheet_("Members", ["id", "name", "email", "password", "points", "createdAt", "resetCode", "resetExpiry"]);
   const rows = sheet.getDataRange().getValues();
@@ -41,17 +197,68 @@ function registerMember(data) {
     return { success: false, message: "อีเมลนี้ถูกใช้งานแล้ว" };
   }
   const id = "M" + Date.now();
-  sheet.appendRow([id, data.name, data.email, data.password, 0, new Date()]);
-  return { success: true, member: { id: id, name: data.name, email: data.email, points: 0, isAdmin: isAdmin_(data.email) } };
+  sheet.appendRow([id, data.name, data.email, "", 0, new Date()]);
+  const rowNum = sheet.getLastRow();
+
+  const salt = generateSalt_();
+  const hash = hashPassword_(data.password, salt);
+  sheet.getRange(rowNum, ensureColumn_(sheet, "passwordHash")).setValue(hash);
+  sheet.getRange(rowNum, ensureColumn_(sheet, "passwordSalt")).setValue(salt);
+  ensureColumn_(sheet, "isBlocked");
+
+  const adminStatus = data.requestAdmin ? "pending" : "";
+  sheet.getRange(rowNum, ensureColumn_(sheet, "adminStatus")).setValue(adminStatus);
+
+  const token = createSession_(sheet, rowNum);
+  return {
+    success: true,
+    member: { id: id, name: data.name, email: data.email, points: 0, isAdmin: isAdmin_(data.email), adminStatus: adminStatus, token: token }
+  };
 }
 
 function loginMember(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
   if (!sheet) return { success: false, message: "ไม่พบบัญชีผู้ใช้ กรุณาลงทะเบียนก่อน" };
+  const hashCol = ensureColumn_(sheet, "passwordHash");
+  const saltCol = ensureColumn_(sheet, "passwordSalt");
+  const blockedCol = ensureColumn_(sheet, "isBlocked");
+  const statusCol = ensureColumn_(sheet, "adminStatus");
   const rows = sheet.getDataRange().getValues();
-  const match = rows.slice(1).find(r => r[2] === data.email && r[3] === data.password);
-  if (!match) return { success: false, message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
-  return { success: true, member: { id: match[0], name: match[1], email: match[2], points: match[4], isAdmin: isAdmin_(match[2]) } };
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][2] !== data.email) continue;
+
+    const storedHash = rows[i][hashCol - 1];
+    let passwordOk = false;
+
+    if (storedHash) {
+      passwordOk = hashPassword_(data.password, rows[i][saltCol - 1]) === storedHash;
+    } else if (rows[i][3] && rows[i][3] === data.password) {
+      // บัญชีเก่าที่ยังเก็บรหัสผ่านข้อความล้วนในคอลัมน์ "password" — ยืนยันผ่านแล้ว migrate เป็น hash ทันที
+      // แบบเนียนๆ ไม่ต้องให้ผู้ใช้ตั้งรหัสผ่านใหม่เอง
+      passwordOk = true;
+      const newSalt = generateSalt_();
+      sheet.getRange(i + 1, hashCol).setValue(hashPassword_(data.password, newSalt));
+      sheet.getRange(i + 1, saltCol).setValue(newSalt);
+      sheet.getRange(i + 1, 4).setValue("");
+    }
+
+    if (!passwordOk) return { success: false, message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
+
+    if (rows[i][blockedCol - 1] === true || rows[i][blockedCol - 1] === 'TRUE') {
+      return { success: false, message: "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อร้านค้า" };
+    }
+
+    const token = createSession_(sheet, i + 1);
+    return {
+      success: true,
+      member: {
+        id: rows[i][0], name: rows[i][1], email: rows[i][2], points: rows[i][4],
+        isAdmin: isAdmin_(rows[i][2]), adminStatus: rows[i][statusCol - 1] || "", token: token
+      }
+    };
+  }
+  return { success: false, message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" };
 }
 
 function requestPasswordReset(email) {
@@ -94,6 +301,8 @@ function resetPassword(email, code, newPassword) {
   const codeCol = headers.indexOf("resetCode");
   const expiryCol = headers.indexOf("resetExpiry");
   const pwCol = headers.indexOf("password");
+  const hashCol = ensureColumn_(sheet, "passwordHash");
+  const saltCol = ensureColumn_(sheet, "passwordSalt");
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -108,7 +317,10 @@ function resetPassword(email, code, newPassword) {
         return { success: false, message: "รหัสยืนยันหมดอายุแล้ว กรุณาขอรหัสใหม่" };
       }
 
-      sheet.getRange(i + 1, pwCol + 1).setValue(newPassword);
+      const salt = generateSalt_();
+      sheet.getRange(i + 1, hashCol).setValue(hashPassword_(newPassword, salt));
+      sheet.getRange(i + 1, saltCol).setValue(salt);
+      if (pwCol !== -1) sheet.getRange(i + 1, pwCol + 1).setValue("");
       sheet.getRange(i + 1, codeCol + 1).setValue("");
       sheet.getRange(i + 1, expiryCol + 1).setValue("");
       return { success: true };
@@ -134,7 +346,8 @@ function updateMemberPoints_(email, pointsRedeemed, pointsEarned) {
   return null;
 }
 
-function getCart(email) {
+function getCart(token) {
+  const email = resolveEmailByToken_(token);
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
   if (!sheet || !email) return [];
   const data = sheet.getDataRange().getValues();
@@ -154,7 +367,8 @@ function getCart(email) {
   return [];
 }
 
-function saveCart(email, cart) {
+function saveCart(token, cart) {
+  const email = resolveEmailByToken_(token);
   if (!email) return { success: false, message: "ไม่พบสมาชิก" };
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Members");
   if (!sheet) return { success: false, message: "ไม่พบสมาชิก" };
@@ -170,9 +384,10 @@ function saveCart(email, cart) {
   return { success: false, message: "ไม่พบสมาชิก" };
 }
 
+const DEFAULT_STOCK_QTY_ = 20;
+
 function adjustStock_(items, sign) {
   const sheet = getOrCreateSheet_("Stock", ["sku", "qty"]);
-  const DEFAULT_STOCK = 20;
   const data = sheet.getDataRange().getValues();
   const rowBySku = {};
   for (let i = 1; i < data.length; i++) rowBySku[data[i][0]] = i + 1;
@@ -184,9 +399,9 @@ function adjustStock_(items, sign) {
       const currentQty = Number(sheet.getRange(rowNum, 2).getValue());
       sheet.getRange(rowNum, 2).setValue(Math.max(0, currentQty + sign * item.qty));
     } else if (sign < 0) {
-      sheet.appendRow([item.sku, Math.max(0, DEFAULT_STOCK - item.qty)]);
+      sheet.appendRow([item.sku, Math.max(0, DEFAULT_STOCK_QTY_ - item.qty)]);
     } else {
-      sheet.appendRow([item.sku, DEFAULT_STOCK + item.qty]);
+      sheet.appendRow([item.sku, DEFAULT_STOCK_QTY_ + item.qty]);
     }
   });
 }
@@ -197,6 +412,25 @@ function decrementStock_(items) {
 
 function incrementStock_(items) {
   adjustStock_(items, 1);
+}
+
+// คืนรายการ sku ที่สต๊อกไม่พอ (ใช้เช็คก่อนตัดสต๊อกจริง กัน oversell เวลามีคนสั่งพร้อมกัน)
+function checkStockAvailable_(items) {
+  const stockMap = getStockMap_();
+  const needed = {};
+  (items || []).forEach(item => {
+    if (!item.sku) return;
+    needed[item.sku] = (needed[item.sku] || 0) + (Number(item.qty) || 0);
+  });
+
+  const shortages = [];
+  Object.keys(needed).forEach(sku => {
+    const available = stockMap[sku] !== undefined ? stockMap[sku] : DEFAULT_STOCK_QTY_;
+    if (needed[sku] > available) {
+      shortages.push({ sku: sku, requested: needed[sku], available: available });
+    }
+  });
+  return shortages;
 }
 
 const GIFT_HEADERS_ = ["id", "name", "sku", "type", "image"];
@@ -219,14 +453,14 @@ function getAllGifts_() {
   });
 }
 
-function getAdminGifts(adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function getAdminGifts(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const stockMap = getStockMap_();
   return { success: true, gifts: withVariantStock_(getAllGifts_(), stockMap) };
 }
 
-function saveGift(gift, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function saveGift(gift, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = getOrCreateSheet_("Gifts", GIFT_HEADERS_);
   const id = gift.id || ("gift" + Date.now());
@@ -247,8 +481,8 @@ function saveGift(gift, adminEmail) {
   return { success: true, id: id };
 }
 
-function deleteGift(id, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function deleteGift(id, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Gifts");
   if (!sheet) return { success: false, message: "ไม่พบของแถมนี้" };
@@ -295,13 +529,13 @@ function getPromotions() {
   return getAllPromotions_().filter(p => p.enabled);
 }
 
-function getAdminPromotions(adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function getAdminPromotions(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   return { success: true, promotions: getAllPromotions_() };
 }
 
-function savePromotion(promo, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function savePromotion(promo, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = getOrCreateSheet_("Promotions", PROMOTION_HEADERS_);
   const id = promo.id || ("promo" + Date.now());
@@ -331,8 +565,8 @@ function savePromotion(promo, adminEmail) {
   return { success: true, id: id };
 }
 
-function deletePromotion(id, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function deletePromotion(id, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Promotions");
   if (!sheet) return { success: false, message: "ไม่พบโปรโมชั่นนี้" };
@@ -448,49 +682,73 @@ function validateAndRedeemCoupon_(code, customerEmail) {
 }
 
 function placeOrder(data) {
-  if (data.couponCode) {
-    const couponCheck = validateAndRedeemCoupon_(data.couponCode, data.memberEmail || data.guestEmail);
-    if (!couponCheck.valid) return { success: false, message: couponCheck.message };
+  const memberEmail = data.memberToken ? resolveEmailByToken_(data.memberToken) : null;
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return { success: false, message: "ระบบมีผู้สั่งซื้อพร้อมกันจำนวนมาก กรุณาลองใหม่อีกครั้ง" };
   }
 
-  const pointsRedeemed = Number(data.pointsRedeemed) || 0;
-  const pointsEarned = Math.round((Number(data.total) || 0) * 0.01);
-  let pointsBalance = null;
-
-  if (data.memberEmail) {
-    const result = updateMemberPoints_(data.memberEmail, pointsRedeemed, pointsEarned);
-    if (result && result.error) {
-      return { success: false, message: result.error };
+  let orderId, orderFields, pointsBalance = null;
+  try {
+    // เช็คสต๊อกก่อนทำรายการอื่นใดๆ (คูปอง/แต้ม) กัน oversell เวลามีคนสั่งพร้อมกันหลายคน
+    const giftStockItems = resolveGiftStockItems_(data.items);
+    const shortages = checkStockAvailable_((data.items || []).concat(giftStockItems));
+    if (shortages.length) {
+      const s = shortages[0];
+      return { success: false, message: `สินค้า SKU ${s.sku} เหลือไม่พอ (เหลือ ${s.available} ชิ้น, สั่ง ${s.requested} ชิ้น) กรุณาลดจำนวนหรือลองใหม่อีกครั้ง` };
     }
-    if (result) pointsBalance = result.points;
+
+    if (data.couponCode) {
+      const couponCheck = validateAndRedeemCoupon_(data.couponCode, memberEmail || data.guestEmail);
+      if (!couponCheck.valid) return { success: false, message: couponCheck.message };
+    }
+
+    const pointsRedeemed = Number(data.pointsRedeemed) || 0;
+    const pointsEarned = Math.round((Number(data.total) || 0) * 0.01);
+
+    if (memberEmail) {
+      const result = updateMemberPoints_(memberEmail, pointsRedeemed, pointsEarned);
+      if (result && result.error) {
+        return { success: false, message: result.error };
+      }
+      if (result) pointsBalance = result.points;
+    }
+
+    const orderHeaderList = [
+      "orderId", "customerName", "phone", "address", "province", "paymentMethod",
+      "items", "subtotal", "discount", "pointsRedeemed", "total", "couponCode", "promotionIds", "status", "createdAt", "memberEmail", "guestEmail",
+      "needTaxInvoice", "taxId", "taxInvoiceName", "taxInvoiceAddress", "trackingNumber"
+    ];
+    const sheet = getOrCreateSheet_("Orders", orderHeaderList);
+    const orderColIndex = {};
+    orderHeaderList.forEach(h => { orderColIndex[h] = ensureColumn_(sheet, h); });
+
+    orderId = "ORD" + Date.now();
+    const orderRowNum = sheet.getLastRow() + 1;
+    orderFields = {
+      orderId, customerName: data.customerName, phone: data.phone, address: data.address, province: data.province,
+      paymentMethod: data.paymentMethod, items: JSON.stringify(data.items), subtotal: data.subtotal,
+      discount: data.discount || 0, pointsRedeemed: pointsRedeemed, total: data.total, couponCode: data.couponCode || "",
+      promotionIds: (data.promotionIds || []).join(","),
+      status: "รอดำเนินการ", createdAt: new Date(), memberEmail: memberEmail || "", guestEmail: data.guestEmail || "",
+      needTaxInvoice: !!data.needTaxInvoice, taxId: data.taxId || "", taxInvoiceName: data.taxInvoiceName || "",
+      taxInvoiceAddress: data.taxInvoiceAddress || "", trackingNumber: ""
+    };
+    orderHeaderList.forEach(h => {
+      sheet.getRange(orderRowNum, orderColIndex[h]).setValue(orderFields[h]);
+    });
+
+    decrementStock_(data.items);
+    decrementGiftStock_(data.items);
+  } finally {
+    lock.releaseLock();
   }
 
-  const orderHeaderList = [
-    "orderId", "customerName", "phone", "address", "province", "paymentMethod",
-    "items", "subtotal", "discount", "pointsRedeemed", "total", "couponCode", "promotionIds", "status", "createdAt", "memberEmail", "guestEmail"
-  ];
-  const sheet = getOrCreateSheet_("Orders", orderHeaderList);
-  const orderColIndex = {};
-  orderHeaderList.forEach(h => { orderColIndex[h] = ensureColumn_(sheet, h); });
-
-  const orderId = "ORD" + Date.now();
-  const orderRowNum = sheet.getLastRow() + 1;
-  const orderFields = {
-    orderId, customerName: data.customerName, phone: data.phone, address: data.address, province: data.province,
-    paymentMethod: data.paymentMethod, items: JSON.stringify(data.items), subtotal: data.subtotal,
-    discount: data.discount || 0, pointsRedeemed: pointsRedeemed, total: data.total, couponCode: data.couponCode || "",
-    promotionIds: (data.promotionIds || []).join(","),
-    status: "รอดำเนินการ", createdAt: new Date(), memberEmail: data.memberEmail || "", guestEmail: data.guestEmail || ""
-  };
-  orderHeaderList.forEach(h => {
-    sheet.getRange(orderRowNum, orderColIndex[h]).setValue(orderFields[h]);
-  });
-
-  decrementStock_(data.items);
-  decrementGiftStock_(data.items);
   logOrderItems_(orderId, data.items, orderFields.createdAt);
   notifyNewOrder_(orderId, data);
-  notifyCustomer_(orderId, data);
 
   return { success: true, orderId: orderId, pointsBalance: pointsBalance };
 }
@@ -516,27 +774,6 @@ function logOrderItems_(orderId, items, createdAt) {
   }
 }
 
-function notifyCustomer_(orderId, data) {
-  const targetEmail = data.memberEmail || data.guestEmail;
-  if (!targetEmail) return;
-  try {
-    const itemLines = (data.items || [])
-      .map(item => `- ${item.name} (${item.color}, ${item.variant}) x${item.qty} = ฿${(item.price * item.qty).toLocaleString("th-TH")}`)
-      .join("\n");
-    const body =
-      `ขอบคุณที่สั่งซื้อกับ i7 Store!\n\n` +
-      `เลขที่คำสั่งซื้อ: ${orderId}\n\n` +
-      `รายการสินค้า:\n${itemLines}\n\n` +
-      `ยอดชำระทั้งหมด: ฿${Number(data.total).toLocaleString("th-TH")}\n` +
-      `วิธีชำระเงิน: ${data.paymentMethod === "cod" ? "เก็บเงินปลายทาง" : "โอนเงินผ่านธนาคาร"}\n` +
-      `จัดส่งไปที่: ${data.address}, ${data.province}\n\n` +
-      `ทีมงานจะดำเนินการจัดส่งโดยเร็วที่สุด ขอบคุณที่ไว้วางใจ i7 Store ครับ`;
-    MailApp.sendEmail(targetEmail, `ยืนยันคำสั่งซื้อ ${orderId} - i7 Store`, body);
-  } catch (e) {
-    Logger.log("ส่งอีเมลยืนยันคำสั่งซื้อให้ลูกค้าไม่สำเร็จ: " + e);
-  }
-}
-
 function notifyNewOrder_(orderId, data) {
   try {
     const itemLines = (data.items || [])
@@ -556,7 +793,8 @@ function notifyNewOrder_(orderId, data) {
   }
 }
 
-function getMyOrders(email) {
+function getMyOrders(token) {
+  const email = resolveEmailByToken_(token);
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders");
   if (!sheet || !email) return [];
   const data = sheet.getDataRange().getValues();
@@ -573,7 +811,8 @@ function getMyOrders(email) {
       discount: obj.discount,
       total: obj.total,
       status: obj.status,
-      createdAt: obj.createdAt instanceof Date ? obj.createdAt.toISOString() : obj.createdAt
+      createdAt: obj.createdAt instanceof Date ? obj.createdAt.toISOString() : obj.createdAt,
+      trackingNumber: obj.trackingNumber || ""
     };
   }).reverse();
 }
@@ -636,7 +875,8 @@ function hasPurchased_(email, productId) {
 }
 
 function submitReview(data) {
-  if (!data.memberEmail) return { success: false, message: "กรุณาเข้าสู่ระบบก่อนรีวิวสินค้า" };
+  const memberEmail = data.memberToken ? resolveEmailByToken_(data.memberToken) : null;
+  if (!memberEmail) return { success: false, message: "กรุณาเข้าสู่ระบบก่อนรีวิวสินค้า" };
   const rating = Number(data.rating);
   if (!rating || rating < 1 || rating > 5) return { success: false, message: "กรุณาให้คะแนน 1-5 ดาว" };
 
@@ -645,10 +885,10 @@ function submitReview(data) {
   const headers = rows[0];
   const pCol = headers.indexOf("productId");
   const eCol = headers.indexOf("memberEmail");
-  const verified = hasPurchased_(data.memberEmail, data.productId);
+  const verified = hasPurchased_(memberEmail, data.productId);
 
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][pCol] === data.productId && rows[i][eCol] === data.memberEmail) {
+    if (rows[i][pCol] === data.productId && rows[i][eCol] === memberEmail) {
       const rowNum = i + 1;
       sheet.getRange(rowNum, headers.indexOf("rating") + 1).setValue(rating);
       sheet.getRange(rowNum, headers.indexOf("comment") + 1).setValue(data.comment || "");
@@ -659,7 +899,7 @@ function submitReview(data) {
   }
 
   const reviewId = "RV" + Date.now();
-  sheet.appendRow([reviewId, data.productId, data.memberEmail, data.memberName || "", rating, data.comment || "", verified, new Date()]);
+  sheet.appendRow([reviewId, data.productId, memberEmail, data.memberName || "", rating, data.comment || "", verified, new Date()]);
   return { success: true };
 }
 
@@ -691,8 +931,8 @@ function getProductReviews(productId) {
   return { success: true, reviews: reviews, avg: avg, count: count };
 }
 
-function getAdminReviews(adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function getAdminReviews(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Reviews");
   if (!sheet) return { success: true, reviews: [] };
@@ -728,8 +968,8 @@ function getAdminReviews(adminEmail) {
   return { success: true, reviews: reviews };
 }
 
-function deleteReview(reviewId, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function deleteReview(reviewId, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Reviews");
   if (!sheet) return { success: false, message: "ไม่พบข้อมูลรีวิว" };
@@ -837,13 +1077,13 @@ function productToFieldMap_(p) {
   };
 }
 
-function getAdminProducts(adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function getAdminProducts(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   return { success: true, products: JSON.parse(getProductsData()) };
 }
 
-function saveProduct(product, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function saveProduct(product, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const headerList = [
     "id", "brand", "category", "name", "nameEn", "sku", "badge", "preOrder", "tags",
@@ -911,8 +1151,8 @@ function ensureLinkViewable_(file) {
   }
 }
 
-function uploadProductImage(base64Data, filename, mimeType, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function uploadProductImage(base64Data, filename, mimeType, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   try {
     const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, filename);
@@ -925,8 +1165,8 @@ function uploadProductImage(base64Data, filename, mimeType, adminEmail) {
   }
 }
 
-function deleteProduct(id, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function deleteProduct(id, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Products");
   let skus = [];
@@ -960,8 +1200,8 @@ function deleteProduct(id, adminEmail) {
   return { success: true };
 }
 
-function getAdminOrders(adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function getAdminOrders(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders");
   if (!sheet) return { success: true, orders: [] };
@@ -988,16 +1228,20 @@ function getAdminOrders(adminEmail) {
       status: obj.status,
       createdAt: obj.createdAt instanceof Date ? obj.createdAt.toISOString() : obj.createdAt,
       memberEmail: obj.memberEmail,
-      guestEmail: obj.guestEmail
+      guestEmail: obj.guestEmail,
+      needTaxInvoice: obj.needTaxInvoice === true || obj.needTaxInvoice === 'TRUE',
+      taxId: obj.taxId || "",
+      taxInvoiceName: obj.taxInvoiceName || "",
+      taxInvoiceAddress: obj.taxInvoiceAddress || "",
+      trackingNumber: obj.trackingNumber || "",
+      cancelReason: obj.cancelReason || ""
     };
   }).reverse();
 
   return { success: true, orders: orders };
 }
 
-function updateOrderStatus(orderId, status, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
-
+function setOrderStatus_(orderId, status) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders");
   if (!sheet) return { success: false, message: "ไม่พบข้อมูลคำสั่งซื้อ" };
 
@@ -1031,10 +1275,63 @@ function updateOrderStatus(orderId, status, adminEmail) {
   return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
 }
 
-function getAdminDashboardStats(adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function updateOrderStatus(orderId, status, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  return setOrderStatus_(orderId, status);
+}
 
-  const result = getAdminOrders(adminEmail);
+function updateOrderTracking(orderId, trackingNumber, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders");
+  if (!sheet) return { success: false, message: "ไม่พบข้อมูลคำสั่งซื้อ" };
+
+  const trackingCol = ensureColumn_(sheet, "trackingNumber");
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === orderId) {
+      sheet.getRange(i + 1, trackingCol).setValue(trackingNumber || "");
+      return { success: true };
+    }
+  }
+  return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
+}
+
+// ลูกค้ายกเลิกออเดอร์ของตัวเองได้เฉพาะตอนสถานะยัง "รอดำเนินการ" เท่านั้น
+// (กันลูกค้ายกเลิกออเดอร์ที่แอดมินเริ่มจัดส่งไปแล้ว ต้องติดต่อร้านแทน)
+const CANCELLABLE_ORDER_STATUS_ = "รอดำเนินการ";
+
+function requestCancelOrder(orderId, token, reason) {
+  const email = resolveEmailByToken_(token);
+  if (!email) return { success: false, message: "กรุณาเข้าสู่ระบบก่อน" };
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders");
+  if (!sheet) return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailCol = headers.indexOf("memberEmail");
+  const statusCol = headers.indexOf("status");
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] !== orderId) continue;
+    if (emailCol === -1 || data[i][emailCol] !== email) {
+      return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
+    }
+    if (data[i][statusCol] !== CANCELLABLE_ORDER_STATUS_) {
+      return { success: false, message: "ไม่สามารถยกเลิกได้ เนื่องจากคำสั่งซื้อนี้เริ่มดำเนินการแล้ว กรุณาติดต่อร้านค้าโดยตรง" };
+    }
+    const reasonCol = ensureColumn_(sheet, "cancelReason");
+    sheet.getRange(i + 1, reasonCol).setValue(reason || "");
+    return setOrderStatus_(orderId, "ยกเลิก");
+  }
+  return { success: false, message: "ไม่พบคำสั่งซื้อนี้" };
+}
+
+function getAdminDashboardStats(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+
+  const result = getAdminOrders(token);
   if (!result.success) return result;
   const orders = result.orders;
 
@@ -1106,8 +1403,8 @@ function getPromoPopup() {
   };
 }
 
-function savePromoPopup(data, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function savePromoPopup(data, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const headerList = ["enabled", "imageUrl", "title", "description", "buttonText", "linkType", "linkValue", "updatedAt"];
   const sheet = getOrCreateSheet_("PromoPopup", headerList);
@@ -1150,8 +1447,8 @@ function getInstallmentSettings() {
   }
 }
 
-function saveInstallmentSettings(settings, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function saveInstallmentSettings(settings, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const sheet = getOrCreateSheet_("InstallmentSettings", ["settingsJson", "updatedAt"]);
   const data = {
     enabled: !!settings.enabled,
@@ -1180,8 +1477,8 @@ function getHeroBanners() {
   }
 }
 
-function saveHeroBanners(slides, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function saveHeroBanners(slides, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const sheet = getOrCreateSheet_("HeroBanners", ["slidesJson", "updatedAt"]);
   sheet.getRange(2, 1).setValue(JSON.stringify(slides || []));
   sheet.getRange(2, 2).setValue(new Date());
@@ -1220,8 +1517,8 @@ function getCoupons() {
     .map(c => ({ ...c, expired: !!c.expiryDate && new Date(c.expiryDate).getTime() < Date.now() }));
 }
 
-function getAdminCoupons(adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function getAdminCoupons(token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Coupons");
   if (!sheet || sheet.getLastRow() < 2) return { success: true, coupons: [] };
   const data = sheet.getDataRange().getValues();
@@ -1229,8 +1526,8 @@ function getAdminCoupons(adminEmail) {
   return { success: true, coupons: data.slice(1).map(row => couponRowToObj_(headers, row)) };
 }
 
-function saveCoupon(coupon, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function saveCoupon(coupon, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const code = (coupon.code || "").trim().toUpperCase();
   if (!code) return { success: false, message: "กรุณาระบุโค้ดคูปอง" };
@@ -1264,8 +1561,8 @@ function saveCoupon(coupon, adminEmail) {
   return { success: true, code: code };
 }
 
-function deleteCoupon(code, adminEmail) {
-  if (!isAdmin_(adminEmail)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+function deleteCoupon(code, token) {
+  if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Coupons");
   if (!sheet) return { success: false, message: "ไม่พบคูปองนี้" };

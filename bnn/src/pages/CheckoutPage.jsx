@@ -15,7 +15,12 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
     address: "",
     province: PROVINCES[0],
     paymentMethod: "transfer",
-    guestEmail: ""
+    guestEmail: "",
+    needTaxInvoice: false,
+    taxId: "",
+    taxInvoiceName: "",
+    taxInvoiceAddress: "",
+    taxSameAsShipping: true
   });
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -28,11 +33,13 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
   const subtotal = cart.reduce((sum, item) => sum + item.selectedVariant.price * item.qty, 0);
   const couponDiscount = calcCouponDiscount(appliedCoupon, subtotal);
   const { appliedPromotions, totalDiscount: promotionDiscount } = calcApplicablePromotions(cart, promotions);
-  const discount = couponDiscount + promotionDiscount;
+  // คูปองกับโปรโมชั่นต่างคำนวณ/จำกัดวงเงินแยกกันเอง (แต่ละอย่างไม่เกิน subtotal) แต่ถ้าเข้าเงื่อนไขพร้อมกันหลายรายการ
+  // ผลรวมส่วนลดอาจเกิน subtotal ได้ — กันไม่ให้ยอดสุทธิติดลบ
+  const discount = Math.min(couponDiscount + promotionDiscount, subtotal);
   const memberPoints = member?.points || 0;
   const maxPointsRedeemable = Math.min(memberPoints, subtotal - discount);
   const pointsDiscount = usePoints ? maxPointsRedeemable : 0;
-  const total = subtotal - discount - pointsDiscount;
+  const total = Math.max(0, subtotal - discount - pointsDiscount);
 
   const update = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
 
@@ -90,8 +97,12 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
         total,
         couponCode: appliedCoupon?.code || "",
         promotionIds: appliedPromotions.map(p => p.id),
-        memberEmail: member?.email || "",
-        guestEmail: !member ? form.guestEmail.trim() : ""
+        memberToken: member?.token || "",
+        guestEmail: !member ? form.guestEmail.trim() : "",
+        needTaxInvoice: form.needTaxInvoice,
+        taxId: form.needTaxInvoice ? form.taxId.trim() : "",
+        taxInvoiceName: form.needTaxInvoice ? form.taxInvoiceName.trim() : "",
+        taxInvoiceAddress: form.needTaxInvoice ? (form.taxSameAsShipping ? form.address : form.taxInvoiceAddress.trim()) : ""
       };
       const result = await callGas("placeOrder", [orderData], placeOrderLocal);
       if (result.success) {
@@ -168,7 +179,7 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
                     onChange={update("guestEmail")}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700]"
                   />
-                  <p className="text-[11px] text-gray-400 mt-1">กรอกเพื่อรับอีเมลยืนยันคำสั่งซื้อ</p>
+                  <p className="text-[11px] text-gray-400 mt-1">กรอกไว้เผื่อทีมงานต้องติดต่อกลับ</p>
                 </div>
               )}
               <textarea
@@ -187,6 +198,54 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
                 {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <label className="flex items-center gap-2 cursor-pointer mb-3">
+              <input
+                type="checkbox"
+                checked={form.needTaxInvoice}
+                onChange={(e) => setForm(prev => ({ ...prev, needTaxInvoice: e.target.checked }))}
+              />
+              <span className="font-bold text-gray-900">ต้องการใบกำกับภาษี</span>
+            </label>
+            {form.needTaxInvoice && (
+              <div className="space-y-3">
+                <input
+                  required
+                  placeholder="เลขประจำตัวผู้เสียภาษี 13 หลัก"
+                  value={form.taxId}
+                  onChange={update("taxId")}
+                  maxLength={13}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700]"
+                />
+                <input
+                  required
+                  placeholder="ชื่อสำหรับออกใบกำกับภาษี (บุคคล/บริษัท)"
+                  value={form.taxInvoiceName}
+                  onChange={update("taxInvoiceName")}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700]"
+                />
+                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.taxSameAsShipping}
+                    onChange={(e) => setForm(prev => ({ ...prev, taxSameAsShipping: e.target.checked }))}
+                  />
+                  ใช้ที่อยู่จัดส่งเดียวกันสำหรับออกใบกำกับภาษี
+                </label>
+                {!form.taxSameAsShipping && (
+                  <textarea
+                    required
+                    placeholder="ที่อยู่สำหรับออกใบกำกับภาษี"
+                    rows={3}
+                    value={form.taxInvoiceAddress}
+                    onChange={update("taxInvoiceAddress")}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700] resize-none"
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 p-5">

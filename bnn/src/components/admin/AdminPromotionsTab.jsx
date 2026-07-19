@@ -24,8 +24,8 @@ export default function AdminPromotionsTab({ member }) {
   const load = () => {
     setLoading(true);
     Promise.all([
-      callGas("getAdminPromotions", [member.email], getAdminPromotionsLocal),
-      callGas("getAdminProducts", [member.email], getAdminProductsLocal)
+      callGas("getAdminPromotions", [member.token], getAdminPromotionsLocal),
+      callGas("getAdminProducts", [member.token], getAdminProductsLocal)
     ])
       .then(([promoRes, productRes]) => {
         if (promoRes.success) setPromotions(promoRes.promotions);
@@ -38,13 +38,13 @@ export default function AdminPromotionsTab({ member }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [member.email]);
+  useEffect(load, [member.token]);
 
   const openNew = () => { setEditing(null); setShowForm(true); };
   const openEdit = (p) => { setEditing(p); setShowForm(true); };
 
   const handleSave = async (payload) => {
-    const res = await callGas("savePromotion", [payload, member.email], savePromotionLocal);
+    const res = await callGas("savePromotion", [payload, member.token], savePromotionLocal);
     if (res.success) {
       setShowForm(false);
       load();
@@ -55,7 +55,7 @@ export default function AdminPromotionsTab({ member }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm("ยืนยันการลบโปรโมชั่นนี้?")) return;
-    const res = await callGas("deletePromotion", [id, member.email], deletePromotionLocal);
+    const res = await callGas("deletePromotion", [id, member.token], deletePromotionLocal);
     if (res.success) load();
     else alert(res.message || "ลบไม่สำเร็จ");
   };

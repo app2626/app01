@@ -22,10 +22,10 @@ export default function AdminDashboardTab({ member }) {
   const [hoverIdx, setHoverIdx] = useState(null);
 
   useEffect(() => {
-    callGas("getAdminDashboardStats", [member.email], getAdminDashboardStatsLocal)
+    callGas("getAdminDashboardStats", [member.token], getAdminDashboardStatsLocal)
       .then(res => { if (res.success) setStats(res); })
       .finally(() => setLoading(false));
-  }, [member.email]);
+  }, [member.token]);
 
   if (loading) {
     return <div className="text-center text-gray-500 py-12">กำลังโหลด...</div>;

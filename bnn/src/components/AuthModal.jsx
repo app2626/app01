@@ -12,7 +12,7 @@ const inputClass = "w-full border border-gray-300 rounded-md px-3 py-2 text-sm o
 
 export default function AuthModal({ show, onClose, onLoggedIn }) {
   const [mode, setMode] = useState("login"); // "login" | "register" | "forgotRequest" | "forgotCode"
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", requestAdmin: false });
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
@@ -42,7 +42,7 @@ export default function AuthModal({ show, onClose, onLoggedIn }) {
         setError(result.message || "เกิดข้อผิดพลาด");
       } else {
         onLoggedIn(result.member);
-        setForm({ name: "", email: "", password: "" });
+        setForm({ name: "", email: "", password: "", requestAdmin: false });
       }
     } catch {
       setError("เชื่อมต่อระบบไม่สำเร็จ กรุณาลองใหม่");
@@ -158,6 +158,18 @@ export default function AuthModal({ show, onClose, onLoggedIn }) {
               </div>
               <input required type="password" minLength={4} value={form.password} onChange={update("password")} className={inputClass} />
             </div>
+
+            {mode === "register" && (
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.requestAdmin}
+                  onChange={(e) => setForm(prev => ({ ...prev, requestAdmin: e.target.checked }))}
+                  className="mt-0.5"
+                />
+                <span className="text-xs text-gray-600">สมัครเป็นผู้ดูแลระบบ (ต้องรอการอนุมัติจากผู้ดูแลระบบก่อนจึงจะใช้งานได้)</span>
+              </label>
+            )}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
             {info && <p className="text-xs text-green-600">{info}</p>}

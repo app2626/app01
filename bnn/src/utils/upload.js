@@ -14,7 +14,7 @@ function fileToBase64(file) {
   });
 }
 
-export function uploadImageFile(file, adminEmail) {
+export function uploadImageFile(file, token) {
   if (file.size > MAX_FILE_SIZE) {
     return Promise.resolve({ success: false, message: "ไฟล์ใหญ่เกินไป (สูงสุด 5MB)" });
   }
@@ -27,6 +27,6 @@ export function uploadImageFile(file, adminEmail) {
     google.script.run
       .withSuccessHandler(resolve)
       .withFailureHandler(err => reject(err))
-      .uploadProductImage(base64, file.name, file.type, adminEmail);
+      .uploadProductImage(base64, file.name, file.type, token);
   }));
 }

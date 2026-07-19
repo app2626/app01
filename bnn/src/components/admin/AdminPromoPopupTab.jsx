@@ -25,7 +25,7 @@ export default function AdminPromoPopupTab({ member }) {
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
-    const res = await callGas("savePromoPopup", [form, member.email], savePromoPopupLocal);
+    const res = await callGas("savePromoPopup", [form, member.token], savePromoPopupLocal);
     setSaving(false);
     if (res.success) {
       setSaved(true);
@@ -53,7 +53,7 @@ export default function AdminPromoPopupTab({ member }) {
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-sm font-medium text-gray-700">รูปภาพ</label>
-            <UploadButton adminEmail={member?.email} onUploaded={(urls) => setForm(prev => ({ ...prev, imageUrl: urls[0] }))} />
+            <UploadButton token={member?.token} onUploaded={(urls) => setForm(prev => ({ ...prev, imageUrl: urls[0] }))} />
           </div>
           <input value={form.imageUrl} onChange={set("imageUrl")} placeholder="URL รูปภาพ (ไม่บังคับ)" className={inputClass} />
         </div>

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { uploadImageFile } from "../../utils/upload";
 
-export default function UploadButton({ onUploaded, adminEmail }) {
+export default function UploadButton({ onUploaded, token }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
@@ -13,7 +13,7 @@ export default function UploadButton({ onUploaded, adminEmail }) {
     try {
       const urls = [];
       for (const file of files) {
-        const result = await uploadImageFile(file, adminEmail);
+        const result = await uploadImageFile(file, token);
         if (result.success) urls.push(result.url);
         else alert(result.message || "อัปโหลดไม่สำเร็จ");
       }
