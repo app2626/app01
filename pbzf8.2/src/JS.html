@@ -479,7 +479,7 @@ window.app = {
            </div>
            <div style="text-align: right;">
              <strong>ข้อมูลการจอง (Booking)</strong>
-             Order ID: <span style="font-size: 15px; font-weight: bold; color: #0f172a;">${orderId}</span><br>
+             Order ID: <span style="font-size: 15px; font-weight: bold; color: #0f172a;">${esc(orderId)}</span><br>
              วันที่ทำรายการ: ${dateStr}<br>
              สาขา: ${esc(pay.branch)}<br>
              พนักงานผู้รับจอง: ${esc(pay.bkStaffName)}<br>
@@ -1006,7 +1006,48 @@ window.app = {
     let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     return d.getFullYear() + " - W" + String(weekNo).padStart(2, '0');
   },
-  
+
+  // === Dark Mode ===
+  // Boot script ใน Index.html <head> ตั้ง class 'dark' บน <html> ไว้ก่อน paint แรกแล้ว (อ่านจาก localStorage 'tg_theme'
+  // หรือ prefers-color-scheme ถ้ายังไม่เคยตั้ง) กัน flash สีตอนโหลดหน้า — ฟังก์ชันกลุ่มนี้แค่ sync ปุ่ม/Chart.js ให้ตรงกับ class ปัจจุบัน
+  chartTheme: function() {
+    const dark = document.documentElement.classList.contains('dark');
+    return dark
+      ? { text: '#94a3b8', grid: 'rgba(148, 163, 184, 0.15)', datalabel: '#e2e8f0' }
+      : { text: '#64748b', grid: 'rgba(226, 232, 240, 0.4)', datalabel: '#334155' };
+  },
+
+  updateThemeToggleUI: function() {
+    const isDark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('.theme-toggle-icon').forEach(icon => {
+      icon.classList.toggle('fa-moon', !isDark);
+      icon.classList.toggle('fa-sun', isDark);
+    });
+    document.querySelectorAll('.theme-toggle-label').forEach(lbl => {
+      lbl.innerText = isDark ? 'โหมดสว่าง' : 'โหมดมืด';
+    });
+  },
+
+  applyTheme: function(theme) {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    try { localStorage.setItem('tg_theme', theme); } catch(e) {}
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', theme === 'dark' ? '#0f172a' : '#254d71');
+    if (typeof Chart !== 'undefined') {
+      const ct = window.app.chartTheme();
+      Chart.defaults.color = ct.text;
+      Chart.defaults.borderColor = ct.grid;
+    }
+    window.app.updateThemeToggleUI();
+  },
+
+  toggleTheme: function() {
+    const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+    window.app.applyTheme(next);
+    // Chart.js วาดสีลง <canvas> ไม่ใช่ CSS — ต้อง re-render หน้าปัจจุบันใหม่ให้กราฟ/ตารางเปลี่ยนสีตามธีม
+    if (window.app.user) window.app.route();
+  },
+
   toggleMobileMenu: function() {
     const panel = document.getElementById('mobileMenuPanel');
     if(panel) panel.classList.toggle('hidden');
@@ -1041,6 +1082,8 @@ window.app = {
   },
   
   init: function() {
+    window.app.applyTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
     setInterval(() => {
       const d = new Date();
       const clk = document.getElementById('clock');
@@ -1104,6 +1147,7 @@ window.app = {
     const tmpl = document.getElementById('tmpl-login');
     if(el && tmpl) {
         el.innerHTML = tmpl.innerHTML;
+        window.app.updateThemeToggleUI();
         google.script.run.withSuccessHandler(bgUrl => {
             const bgEl = document.getElementById('loginBg');
             if(bgEl && bgUrl) {
@@ -1126,6 +1170,7 @@ window.app = {
     if(document.getElementById('mobileRole')) document.getElementById('mobileRole').innerText = window.app.user.Role;
     
     window.app.buildMenu();
+    window.app.updateThemeToggleUI();
     window.app.showLoading('กำลังเข้าสู่ระบบ...');
     
     try {
@@ -1359,7 +1404,8 @@ window.app = {
             { key: 'Discount Percent', label: 'เปอร์เซ็นต์ส่วนลด (%)', type: 'number' },
             { key: 'Message Suggest', label: 'ข้อความเชียร์ขาย (รองรับ HTML)', type: 'text' },
             { key: 'Message Apply', label: 'ข้อความเมื่อได้รับส่วนลด (รองรับ HTML)', type: 'text' },
-            { key: 'Status', label: 'สถานะ', type: 'select', options: ['Active', 'Inactive'] }
+            { key: 'Status', label: 'สถานะ', type: 'select', options: ['Active', 'Inactive'] },
+            { key: 'Channel', label: 'ช่องทางที่ร่วมรายการ (เว้นว่าง = ทุกช่องทาง)', type: 'multi_select_channel' }
           ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
         case 'giftmappings': 
           window.app.grid.init('GiftMappings', 'Mapping ID', [
@@ -1775,7 +1821,7 @@ window.app = {
       if (typeof ChartDataLabels !== 'undefined') {
           Chart.register(ChartDataLabels);
           Chart.defaults.set('plugins.datalabels', {
-              color: '#334155',
+              color: window.app.chartTheme().datalabel,
               font: { family: 'Sarabun', weight: 'bold', size: 10 },
               align: 'end',
               anchor: 'end',
@@ -1828,7 +1874,7 @@ window.app = {
         this.charts['chartModelAdvanced'] = new Chart(ctxModel.getContext('2d'), {
             type: 'bar',
             data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
         });
         window.app.chartExportButtons('chartModelAdvanced');
       }
@@ -1917,9 +1963,9 @@ window.app = {
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     indexAxis: 'y',
-                    scales: { 
-                        x: { stacked: true, grid: { color: '#f1f5f9' }, grace: '15%' }, 
-                        y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 10 } } } 
+                    scales: {
+                        x: { stacked: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' },
+                        y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 10 } } }
                     },
                     plugins: {
                         legend: { display: true, position: 'top', labels: { font: { family: 'Sarabun' } } },
@@ -2080,9 +2126,9 @@ window.app = {
           },
           scales: {
             y: {
-              grid: { color: 'rgba(226, 232, 240, 0.4)', drawBorder: false },
+              grid: { color: window.app.chartTheme().grid, drawBorder: false },
               ticks: {
-                color: '#64748b',
+                color: window.app.chartTheme().text,
                 font: { family: 'Sarabun', size: 10, weight: '500' }
               },
               grace: '15%'
@@ -2090,7 +2136,7 @@ window.app = {
             x: {
               grid: { display: false, drawBorder: false },
               ticks: {
-                color: '#64748b',
+                color: window.app.chartTheme().text,
                 font: { family: 'Sarabun', size: 10, weight: '500' }
               },
               grace: '15%'
@@ -2343,7 +2389,7 @@ window.app = {
                   }
                }
             },
-            scales: { y: { beginAtZero: true, grid: { borderDash: [2,4], color: '#f1f5f9' } }, x: { grid: { display: false } } },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2,4], color: window.app.chartTheme().grid } }, x: { grid: { display: false } } },
             interaction: { mode: 'index', intersect: false }
          }
       });
@@ -3559,9 +3605,9 @@ window.app = {
       this.openPopover = null;
     },
     renderProducts: function(products) {
-      const row = document.getElementById('productGrid'); 
+      const row = document.getElementById('productGrid');
       if(!row) return;
-      
+
       const searchEl = document.getElementById('searchProduct');
       const resultCountEl = document.getElementById('storeResultCount');
       // ค้นหา/กรอง (6B) แล้วไม่เจอสินค้า — empty state มาตรฐาน (5A.4) พร้อมปุ่มล้างตัวกรอง+คำค้น
@@ -3665,6 +3711,7 @@ window.app = {
       const esc = window.app.esc, escJs = window.app.escAttrJs;
       const stockOf = (v) => parseInt(String(v.Stock || '0').replace(/[^\d.\-]/g, ''), 10) || 0; // Stock จาก getDisplayValues อาจมี comma/format
       const isGift = (p.Category || '').includes('ของแถม');
+      const currentChannelForBadge = (document.getElementById('posChannelSelect') || {}).value || '';
 
       let variant = p, dotsHtml = '', chipsHtml = '';
       if (p.isGroup) {
@@ -3749,6 +3796,10 @@ window.app = {
         bRules.forEach(r => {
           if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
           if ((r['Get Discount Category'] || '').toString().trim() !== myCat) return;
+          const badgeChRaw = (r['Channel'] || '').toString().trim();
+          const badgeChTokens = badgeChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+          const badgeChMatches = badgeChRaw === '' || badgeChRaw === '*' || badgeChRaw.toLowerCase() === 'all' || badgeChTokens.includes(currentChannelForBadge.toString().trim().toLowerCase());
+          if (!badgeChMatches) return;
           const pct = parseFloat(r['Discount Percent']) || 0;
           if (pct > 0 && (!best || pct > best.pct)) best = { pct: pct, buyCat: (r['Buy Category'] || '').toString().trim() };
         });
@@ -4129,8 +4180,16 @@ window.app = {
             }];
         }
         
-        let activeRules = rules.filter(r => (r.Status || '').toString().trim().toLowerCase() === 'active');
-        
+        // เงื่อนไข Channel ร่วมรายการ (เว้นว่าง/'*'/'all' = ทุกช่องทาง) — tokenize เทียบทีละช่องทาง ตามรูปแบบเดียวกับ GiftMappings.Channel (rule 20)
+        const chSelEl = document.getElementById('posChannelSelect');
+        const currentChannel = (chSelEl ? chSelEl.value : '').toString().trim().toLowerCase();
+        let activeRules = rules.filter(r => {
+            if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return false;
+            const ruleChRaw = (r['Channel'] || '').toString().trim();
+            const ruleChTokens = ruleChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            return ruleChRaw === '' || ruleChRaw === '*' || ruleChRaw.toLowerCase() === 'all' || ruleChTokens.includes(currentChannel);
+        });
+
         let totalAutoDiscount = 0;
         let appliedRules = [];
         let suggestRules = [];
@@ -4776,7 +4835,7 @@ window.app = {
             });
             inp += `</div>`;
         }
-        else if(c.type==='select') { inp='<select class="'+inputClass+'" id="field_' + c.key + '" ' + dis + '>' + c.options.map(opt=>'<option value="' + opt + '" ' + (val===opt?'selected':'') + '>' + opt + '</option>').join('') + '</select>'; }
+        else if(c.type==='select') { inp='<select class="'+inputClass+'" id="field_' + c.key + '" ' + dis + '>' + c.options.map(opt=>'<option value="' + window.app.esc(opt) + '" ' + (val===opt?'selected':'') + '>' + window.app.esc(opt) + '</option>').join('') + '</select>'; }
         else if(c.type==='product_select') {
           if (data && data.SKU === 'DISCOUNT') {
             inp = '<input type="text" class="' + inputClass + ' bg-slate-100" id="field_' + c.key + '" value="' + escVal + '" readonly>';
