@@ -16,6 +16,7 @@ window.app = {
       { id: 'target', icon: 'fa-crosshairs', label: 'Target & Forecast', roles: ['Admin', 'Manager'] },
       { id: 'bookingsummary', icon: 'fa-table', label: 'สรุปยอดจองรายวัน', roles: ['Admin', 'Manager'] },
       { id: 'salessummary', icon: 'fa-layer-group', label: 'สรุปยอดรุ่น/แอเรีย/ช่องทาง', roles: ['Admin', 'Manager'] },
+      { id: 'branchbookingsummary', icon: 'fa-store-alt', label: 'สรุปยอดจองตามสาขา', roles: ['Admin', 'Manager'] },
       { id: 'allbookingsummary', icon: 'fa-boxes-stacked', label: 'สรุปข้อมูลจองทั้งหมด', roles: ['Admin', 'Manager'] },
       { label: 'SETTINGS', isCategory: true, roles: ['Admin', 'Manager'] },
       { 
@@ -1358,6 +1359,9 @@ window.app = {
         case 'salessummary':
           window.app.salesSummary.init();
           break;
+        case 'branchbookingsummary':
+          window.app.branchBookingSummary.init();
+          break;
         case 'allbookingsummary':
           window.app.allBookingSummary.init();
           break;
@@ -2668,25 +2672,36 @@ window.app = {
         headRow += '<th class="py-2.5 px-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l border-slate-100">' + window.app.esc(c.label) + '</th>';
       });
       headRow += '<th class="py-2.5 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l-2 border-slate-300 bg-slate-50">ยอดรวม</th>';
+      headRow += '<th class="py-2.5 px-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l border-slate-100 bg-slate-50">%</th>';
+
+      // เดินลูปรอบแรกหา rowTotal ของแต่ละแถวและ grandTotal ก่อน เพื่อคำนวณ % (คอลัมน์หลัง "ยอดรวม") ในลูปที่สอง
+      const colTotals = {}; // colKey -> qty
+      const rowTotals = rowCombos.map(r => {
+        let t = 0;
+        columns.forEach(c => {
+          const colMatrix = matrix[c.key] || {};
+          t += (colMatrix[r.model] && colMatrix[r.model][r.variant]) || 0;
+        });
+        return t;
+      });
+      const grandTotal = rowTotals.reduce((s, v) => s + v, 0);
 
       let bodyRows = '';
-      const colTotals = {}; // colKey -> qty
-      let grandTotal = 0;
-      rowCombos.forEach(r => {
-        let rowTotal = 0;
+      rowCombos.forEach((r, i) => {
         let cells = '';
         columns.forEach(c => {
           const colMatrix = matrix[c.key] || {};
           const qty = (colMatrix[r.model] && colMatrix[r.model][r.variant]) || 0;
-          rowTotal += qty;
           colTotals[c.key] = (colTotals[c.key] || 0) + qty;
           cells += '<td class="py-2.5 px-3 text-center text-slate-600 border-l border-slate-100">' + (qty > 0 ? qty.toLocaleString() : '<span class="text-slate-300">-</span>') + '</td>';
         });
-        grandTotal += rowTotal;
+        const rowTotal = rowTotals[i];
+        const pct = grandTotal > 0 ? ((rowTotal / grandTotal) * 100).toFixed(1) : '0.0';
         bodyRows += '<tr class="hover:bg-slate-50 transition-colors">'
           + '<td class="py-2.5 px-4 text-slate-700 font-medium sticky left-0 bg-white z-10">' + window.app.esc(r.label) + '</td>'
           + cells
           + '<td class="py-2.5 px-4 text-right text-indigo-600 font-black border-l-2 border-slate-300 bg-slate-50/60">' + rowTotal.toLocaleString() + '</td>'
+          + '<td class="py-2.5 px-3 text-right text-slate-500 border-l border-slate-100">' + pct + '%</td>'
           + '</tr>';
       });
 
@@ -2698,6 +2713,7 @@ window.app = {
         + '<td class="py-3 px-4 text-slate-800 sticky left-0 bg-slate-100 z-10">Grand Total</td>'
         + footCells
         + '<td class="py-3 px-4 text-right text-indigo-700 border-l-2 border-slate-300">' + grandTotal.toLocaleString() + '</td>'
+        + '<td class="py-3 px-3 text-right text-slate-600 border-l border-slate-100">' + (grandTotal > 0 ? '100.0%' : '0.0%') + '</td>'
         + '</tr>';
 
       const tableHtml = '<table class="w-full text-sm text-left whitespace-nowrap">'
@@ -2711,6 +2727,41 @@ window.app = {
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
         + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
+        + '</div>';
+    },
+    // ตารางที่ 3: เปรียบเทียบ % ยอดจองระหว่างกลุ่มรุ่นที่กำหนดไว้ตายตัว (owner request 2026-07-24) — groups: [{label, qty}] ตามลำดับที่ต้องการแสดง
+    buildGroupCompareTable: function(title, groups) {
+      const total = groups.reduce((s, g) => s + g.qty, 0);
+      const colors = ['indigo', 'pink', 'emerald', 'amber'];
+      let bodyRows = '';
+      groups.forEach((g, i) => {
+        const pct = total > 0 ? ((g.qty / total) * 100).toFixed(1) : '0.0';
+        const color = colors[i % colors.length];
+        bodyRows += '<tr class="hover:bg-slate-50 transition-colors">'
+          + '<td class="py-3 px-4 text-slate-700 font-medium">' + window.app.esc(g.label) + '</td>'
+          + '<td class="py-3 px-4 text-center font-black text-slate-700">' + g.qty.toLocaleString() + '</td>'
+          + '<td class="py-3 px-4"><div class="flex items-center gap-2"><span class="text-xs text-slate-500 w-12 text-right">' + pct + '%</span><div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div class="bg-' + color + '-500 h-full rounded-full" style="width:' + pct + '%"></div></div></div></td>'
+          + '</tr>';
+      });
+      const footRow = '<tr class="bg-slate-100 font-black border-t-2 border-slate-300">'
+        + '<td class="py-3 px-4 text-slate-800">รวม</td>'
+        + '<td class="py-3 px-4 text-center text-indigo-700">' + total.toLocaleString() + '</td>'
+        + '<td class="py-3 px-4 text-right text-slate-500 pr-8">100%</td>'
+        + '</tr>';
+      const tableHtml = '<table class="w-full text-sm text-left">'
+        + '<thead><tr class="bg-slate-50/95 border-b border-slate-200">'
+        + '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">กลุ่มรุ่น</th>'
+        + '<th class="py-2.5 px-4 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">ยอดจอง</th>'
+        + '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">สัดส่วน</th>'
+        + '</tr></thead>'
+        + '<tbody class="divide-y divide-slate-100">' + bodyRows + '</tbody>'
+        + '<tfoot>' + footRow + '</tfoot>'
+        + '</table>';
+      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
+        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+        + '<h6 class="!mb-0"><i class="fas fa-chart-pie text-pink-500"></i>' + window.app.esc(title) + '</h6>'
+        + '</div>'
+        + '<div class="p-2">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -2793,15 +2844,34 @@ window.app = {
         return;
       }
 
-      // จัดลำดับแถว Model/Capacity ตามยอดรวมมาก->น้อย — ใช้ร่วมกันทั้ง 2 ตาราง
+      // จัดลำดับแถว Model/Capacity (owner request 2026-07-24):
+      // - โมเดล: เรียงตามลำดับตายตัว FOLD 8 -> FOLD 8 ULTRA -> FLIP 8 ก่อนเสมอ (ไม่สนยอดขาย) ส่วนโมเดลอื่นที่ไม่อยู่ในลิสต์ต่อท้ายเรียงตามยอดรวมมาก->น้อยเหมือนเดิม
+      // - ความจุในแต่ละโมเดล: เรียงจากน้อย->มากตามขนาดจริง (256, 512, 1TB) ไม่ใช่ตามยอดขาย
+      // capVal ต้องบังคับให้มีหน่วย (TB/GB/MB) ต่อท้ายตัวเลขเสมอ ไม่งั้นรูปแบบ "12/256GB" (RAM/ความจุ) จะจับเลข RAM "12" ก่อนความจุจริงผิดพลาด — ต้องคนละกับ capVal ใน pos module (~บรรทัด 3900) ที่ไม่มี RAM prefix ปนอยู่
+      const capVal = (c) => {
+        const m = String(c).match(/([\d.]+)\s*(TB|GB|MB)\b/i);
+        if (!m) return Number.MAX_VALUE;
+        let v = parseFloat(m[1]);
+        const u = m[2].toUpperCase();
+        if (u === 'TB') v *= 1024; else if (u === 'MB') v /= 1024;
+        return v;
+      };
+      const modelPriority = ['GALAXY Z FLIP 8', 'GALAXY Z FOLD 8', 'GALAXY Z FOLD 8 ULTRA'];
+      const priorityIndexOf = (model) => modelPriority.findIndex(p => p.toUpperCase() === model.toString().trim().toUpperCase());
       const rowCombos = [];
       const modelTotals = {};
       Object.keys(modelVariantTotals).forEach(m => {
         modelTotals[m] = Object.values(modelVariantTotals[m]).reduce((s, v) => s + v, 0);
       });
-      const modelNames = Object.keys(modelVariantTotals).sort((a, b) => modelTotals[b] - modelTotals[a]);
+      const modelNames = Object.keys(modelVariantTotals).sort((a, b) => {
+        const ai = priorityIndexOf(a), bi = priorityIndexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return modelTotals[b] - modelTotals[a];
+      });
       modelNames.forEach(m => {
-        const variants = Object.keys(modelVariantTotals[m]).sort((a, b) => modelVariantTotals[m][b] - modelVariantTotals[m][a]);
+        const variants = Object.keys(modelVariantTotals[m]).sort((a, b) => capVal(a) - capVal(b));
         variants.forEach(v => rowCombos.push({ model: m, variant: v, label: (v && v !== '-') ? (m + ' (' + v + ')') : m }));
       });
 
@@ -2811,12 +2881,59 @@ window.app = {
       if (dateKeys.length > 0) {
         const columns = dateKeys.map(dk => ({ key: dk, label: dateDisplay[dk] }));
         html += this.buildTransposedPivotTable('สรุปยอดจองรายวัน (' + category + ')', columns, dateMatrix, rowCombos, 'รุ่น (ความจุ)');
+
+        // เทียบ % ยอดจองรายวัน (owner request 2026-07-24) — รวมทุกรุ่นเข้าด้วยกันต่อวัน แล้วเทียบสัดส่วนวันต่อวัน แบบเดียวกับตาราง "เทียบ % ตามกลุ่มรุ่น"
+        const dateGroups = dateKeys.map(dk => {
+          let qty = 0;
+          const dayModels = dateMatrix[dk] || {};
+          Object.keys(dayModels).forEach(m => { Object.keys(dayModels[m]).forEach(v => { qty += dayModels[m][v]; }); });
+          return { label: dateDisplay[dk], qty: qty };
+        });
+        html += this.buildGroupCompareTable('ยอดจองเทียบ % รายวัน (' + category + ')', dateGroups);
       }
 
       // ตารางที่ 2 — แถว = Model (Capacity), คอลัมน์ = สถานะจอง (T/F)
       if (hasResData) {
         const columns = [{ key: 'T', label: 'T' }, { key: 'F', label: 'F' }];
         html += this.buildTransposedPivotTable('สรุปยอดจองตามสถานะการจอง (' + category + ')', columns, resMatrix, rowCombos, 'รุ่น (ความจุ)');
+
+        // เทียบ % สถานะจอง T vs F (owner request 2026-07-24) — รวมทุกรุ่นเข้าด้วยกันต่อสถานะ แล้วเทียบสัดส่วน T vs F
+        const sumStatus = (sKey) => {
+          let qty = 0;
+          const models = resMatrix[sKey] || {};
+          Object.keys(models).forEach(m => { Object.keys(models[m]).forEach(v => { qty += models[m][v]; }); });
+          return qty;
+        };
+        const statusGroups = [
+          { label: 'จอง T (มีการจอง)', qty: sumStatus('T') },
+          { label: 'จอง F (สวมสิทธิ์การจอง)', qty: sumStatus('F') }
+        ];
+        html += this.buildGroupCompareTable('ยอดจองเทียบ % ตามสถานะการจอง (' + category + ')', statusGroups);
+      }
+
+      // ตารางที่ 3 — เทียบ % ยอดจองตามกลุ่มรุ่น (owner request 2026-07-24, ปรับหลักการจัดกลุ่ม 2026-07-24)
+      // กลุ่ม = ข้อความ Model โดยตัดส่วนความจุ (Capacity) ออก — หาตำแหน่งที่ค่า Capacity ของแต่ละแถวปรากฏอยู่ใน Model แล้วตัดทุกอย่างตั้งแต่จุดนั้นทิ้ง
+      // เช่น Model "GALAXY Z FOLD 8 ULTRA 1TB" + Capacity "1TB" -> กลุ่ม "GALAXY Z FOLD 8 ULTRA"; ถ้าไม่พบ Capacity ในข้อความ Model ให้ใช้ Model เต็มเป็นกลุ่ม
+      // ไม่ใช้รายชื่อกลุ่มตายตัวอีกต่อไป (เดิม hardcode 3 ชื่อ + เช็ค ULTRA ก่อนกัน substring ทับกัน) — วิธีนี้รองรับรุ่น/กลุ่มใหม่ในอนาคตอัตโนมัติ
+      const stripCapacity = (modelText, cap) => {
+        const mt = modelText.toString().trim();
+        const c = (cap || '').toString().trim();
+        if (!c || c === '-') return mt;
+        const idx = mt.toUpperCase().indexOf(c.toUpperCase());
+        return idx === -1 ? mt : (mt.substring(0, idx).trim() || mt);
+      };
+      const groupTotals = {};
+      Object.keys(modelVariantTotals).forEach(m => {
+        Object.keys(modelVariantTotals[m]).forEach(v => {
+          const g = stripCapacity(m, v);
+          groupTotals[g] = (groupTotals[g] || 0) + modelVariantTotals[m][v];
+        });
+      });
+      const groups = Object.keys(groupTotals)
+        .sort((a, b) => groupTotals[b] - groupTotals[a])
+        .map(g => ({ label: g, qty: groupTotals[g] }));
+      if (groups.length > 0) {
+        html += this.buildGroupCompareTable('ยอดจองเทียบ % ตามกลุ่มรุ่น (' + category + ')', groups);
       }
 
       wrap.innerHTML = html;
@@ -2827,6 +2944,7 @@ window.app = {
   // สรุปยอดตามรุ่น/แอเรีย/ช่องทางขาย: 3 ตาราง กรองด้วยหมวดหมู่สินค้า (ค่าเริ่มต้น "โมบาย")
   salesSummary: {
     rawOrders: [],
+    rawTarget: [],
     currentCategory: '',
     init: async function() {
       const content = document.getElementById('page-content');
@@ -2835,10 +2953,15 @@ window.app = {
 
       window.app.showLoading('กำลังโหลดข้อมูลสรุปยอด...');
       try {
-        const res = await window.app.api('GET_ADVANCED_DASHBOARD', {});
+        // ดึงชีต Target คู่กันไว้จำกัดรายชื่อแอเรียในตาราง "ยอดจองตามแอเรีย × รุ่น" (owner request 2026-07-24)
+        const [res, resTarget] = await Promise.all([
+          window.app.api('GET_ADVANCED_DASHBOARD', {}),
+          window.app.api('GET_TABLE', { tableName: 'Target' })
+        ]);
         Swal.close();
         if (res && res.status === 'success') {
           this.rawOrders = res.data.orders || [];
+          this.rawTarget = (resTarget && resTarget.status === 'success') ? (resTarget.data || []) : [];
           this.setupCategoryFilter();
           this.render();
         } else {
@@ -2990,19 +3113,35 @@ window.app = {
       const branches = window.app.globalData.branches || [];
       const areaKey = branches.length > 0 ? (Object.keys(branches[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area') : 'Area';
       const branchAreaMap = {}; // Branch Code (upper) -> Area
-      const areaRowsSeen = {};
-      const areaRows = [];
+      const areaByUpper = {}; // AREA NAME (upper) -> {key,label} ทุกแอเรียที่มีจริงในชีต Branches
       branches.forEach(b => {
         const code = (b['Branch Code'] || '').toString().trim().toUpperCase();
         const area = (b[areaKey] || '').toString().trim();
         if (code && area) branchAreaMap[code] = area;
-        if (area && !areaRowsSeen[area]) { areaRowsSeen[area] = true; areaRows.push({ key: area, label: area }); }
+        if (area && !areaByUpper[area.toUpperCase()]) areaByUpper[area.toUpperCase()] = { key: area, label: area };
       });
+
+      // รายชื่อแอเรียที่จะแสดงในตาราง "ยอดจองตามแอเรีย × รุ่น" — จำกัด+เรียงตามรายชื่อในชีต Target คอลัมน์แรกเท่านั้น (owner request 2026-07-24)
+      // ข้ามแถว ALL/ALL BRANCHES เพราะเป็นยอดรวมทุกสาขา ไม่ใช่ชื่อแอเรียจริง (ปฏิบัติแบบเดียวกับ target module)
+      const targetRows = this.rawTarget || [];
+      const targetAreaRows = [];
+      if (targetRows.length > 0) {
+        const targetKeys = Object.keys(targetRows[0]).filter(k => k !== '_rowIndex');
+        const targetNameKey = targetKeys.find(k => k.toLowerCase() === 'area' || k.includes('Area') || k.includes('สาขา') || k.includes('พนักงาน') || k.includes('ชื่อ') || k.includes('รับเป้า')) || targetKeys[0];
+        const targetAreaSeen = {};
+        targetRows.forEach(t => {
+          const name = (t[targetNameKey] || '').toString().trim();
+          if (!name) return;
+          const upper = name.toUpperCase();
+          if (upper === 'ALL' || upper === 'ALL BRANCHES') return;
+          const match = areaByUpper[upper];
+          if (match && !targetAreaSeen[match.key]) { targetAreaSeen[match.key] = true; targetAreaRows.push(match); }
+        });
+      }
 
       // สะสมยอด: matrix1[modelCap][channel] / matrix2[area][modelCap] / matrix3[SKU][channel]
       const matrix1 = {}, matrix2 = {}, matrix3 = {};
       const UNMAPPED_AREA = 'ไม่ระบุแอเรีย';
-      let hasUnmappedArea = false;
 
       this.rawOrders.forEach(o => {
         if (o['Order Status'] === 'Cancelled') return;
@@ -3015,7 +3154,6 @@ window.app = {
         const channel = resolveChannel(o.Channel);
         const branchCode = (o['Branch Code'] || '').toString().trim().toUpperCase();
         const area = branchAreaMap[branchCode] || UNMAPPED_AREA;
-        if (area === UNMAPPED_AREA) hasUnmappedArea = true;
 
         if (!matrix1[info.modelCap]) matrix1[info.modelCap] = {};
         matrix1[info.modelCap][channel] = (matrix1[info.modelCap][channel] || 0) + qty;
@@ -3027,13 +3165,272 @@ window.app = {
         matrix3[o.SKU][channel] = (matrix3[o.SKU][channel] || 0) + qty;
       });
 
-      // ออเดอร์ที่หาสาขา/แอเรียไม่เจอ — เพิ่มแถว "ไม่ระบุแอเรีย" ท้ายตารางที่ 3
-      if (hasUnmappedArea && !areaRowsSeen[UNMAPPED_AREA]) areaRows.push({ key: UNMAPPED_AREA, label: UNMAPPED_AREA });
-
       let html = '';
       html += this.buildFlatPivotTable('ยอดจองตามรุ่น × ช่องทางขาย', channelColumns, matrix1, modelCapRows, 'Model');
       html += this.buildFlatPivotTable('ยอดจองตามสินค้า (รวมสี) × ช่องทางขาย', channelColumns, matrix3, productNameRows, 'Product Name');
-      html += this.buildFlatPivotTable('ยอดจองตามแอเรีย × รุ่น', modelCapRows, matrix2, areaRows, 'แอเรีย');
+      if (targetAreaRows.length > 0) {
+        html += this.buildFlatPivotTable('ยอดจองตามแอเรีย × รุ่น', modelCapRows, matrix2, targetAreaRows, 'แอเรีย');
+      } else {
+        html += '<div class="chart-card mb-6">' + window.app.emptyState({
+          icon: 'fa-list-check',
+          title: 'ไม่มีรายชื่อแอเรียในชีต Target',
+          subtitle: 'ตาราง "ยอดจองตามแอเรีย × รุ่น" แสดงเฉพาะแอเรียตามรายชื่อในชีต Target — กรุณาเพิ่มรายชื่อแอเรียในชีต Target ก่อน'
+        }) + '</div>';
+      }
+
+      wrap.innerHTML = html;
+      wrap.querySelectorAll('.chart-card').forEach(c => window.app.tableExportButtons(c));
+    }
+  },
+
+  // สรุปยอดจองตามสาขา × รุ่น แยกสถานะ จอง T / จอง F / ผลรวม (owner request 2026-07-24) — 3 ตารางแยกสถานะ (แบบเดียวกับ 3 ตารางของ salesSummary)
+  branchBookingSummary: {
+    rawOrders: [],
+    currentCategory: '',
+    currentArea: '',
+    currentBranchQuery: '',
+    init: async function() {
+      const content = document.getElementById('page-content');
+      const tmpl = document.getElementById('tmpl-branchbookingsummary');
+      if (content && tmpl) content.innerHTML = tmpl.innerHTML;
+
+      window.app.showLoading('กำลังโหลดข้อมูลสรุปยอดจองตามสาขา...');
+      try {
+        const res = await window.app.api('GET_ADVANCED_DASHBOARD', {});
+        Swal.close();
+        if (res && res.status === 'success') {
+          this.rawOrders = res.data.orders || [];
+          this.setupCategoryFilter();
+          this.setupBranchAreaFilters();
+          this.render();
+        } else {
+          this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลได้');
+        }
+      } catch (e) {
+        Swal.close(); this.renderLoadError(e.message);
+      }
+    },
+    renderLoadError: function(msg) {
+      const wrap = document.getElementById('branchBookingSummaryTablesWrap');
+      if (!wrap) { Swal.fire('Error', msg, 'error'); return; }
+      wrap.innerHTML = window.app.emptyState({
+        icon: 'fa-exclamation-triangle',
+        title: 'โหลดข้อมูลไม่สำเร็จ',
+        subtitle: msg,
+        actionLabel: 'ลองใหม่',
+        onclick: 'window.app.branchBookingSummary.init()'
+      });
+    },
+    setupCategoryFilter: function() {
+      const sel = document.getElementById('bbCategoryFilter');
+      if (!sel) return;
+      const products = window.app.globalData.products || [];
+      const seen = {}; const cats = [];
+      products.forEach(p => {
+        const c = (p['Category'] || '').toString().trim();
+        if (c && !seen[c]) { seen[c] = true; cats.push(c); }
+      });
+      cats.sort((a, b) => (a === 'โมบาย' ? -1 : b === 'โมบาย' ? 1 : 0));
+      sel.innerHTML = cats.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      this.currentCategory = cats.includes('โมบาย') ? 'โมบาย' : (cats[0] || '');
+      sel.value = this.currentCategory;
+    },
+    onCategoryChange: function() {
+      const sel = document.getElementById('bbCategoryFilter');
+      this.currentCategory = sel ? sel.value : '';
+      this.render();
+    },
+    // ตัวกรอง Area/สาขา แบบพิมพ์ค้นหา (owner request 2026-07-24) — input + datalist (เหมือน Customer Name ในหน้า Orders grid)
+    // กรองแบบ substring ระหว่างพิมพ์ (oninput) ไม่บังคับต้องเลือกค่าจาก datalist ให้ตรงเป๊ะ
+    setupBranchAreaFilters: function() {
+      const branches = window.app.globalData.branches || [];
+      const areaKey = branches.length > 0 ? (Object.keys(branches[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area') : 'Area';
+
+      const areaInput = document.getElementById('bbAreaFilter');
+      const areaList = document.getElementById('bbAreaListOptions');
+      if (areaList) {
+        const seenArea = {}; let opts = '';
+        branches.forEach(b => {
+          const area = (b[areaKey] || '').toString().trim();
+          if (area && !seenArea[area]) { seenArea[area] = true; opts += '<option value="' + window.app.esc(area) + '">'; }
+        });
+        areaList.innerHTML = opts;
+      }
+      if (areaInput) areaInput.value = this.currentArea;
+
+      const branchInput = document.getElementById('bbBranchFilter');
+      const branchList = document.getElementById('bbBranchListOptions');
+      if (branchList) {
+        const seenCode = {}; let opts = '';
+        branches.forEach(b => {
+          const code = (b['Branch Code'] || '').toString().trim();
+          if (!code || seenCode[code]) return;
+          seenCode[code] = true;
+          const name = (b['Branch Name'] || '').toString().trim() || code;
+          opts += '<option value="' + window.app.esc(name) + ' (' + window.app.esc(code) + ')">';
+        });
+        branchList.innerHTML = opts;
+      }
+      if (branchInput) branchInput.value = this.currentBranchQuery;
+    },
+    onFilterChange: function() {
+      const areaInput = document.getElementById('bbAreaFilter');
+      const branchInput = document.getElementById('bbBranchFilter');
+      this.currentArea = areaInput ? areaInput.value.trim() : '';
+      this.currentBranchQuery = branchInput ? branchInput.value.trim() : '';
+      this.render();
+    },
+    // ตัวช่วยสร้างตาราง pivot 2 มิติแบบเรียบ (เหมือน salesSummary.buildFlatPivotTable) พร้อม Grand Total ทั้งแถวและคอลัมน์
+    buildFlatPivotTable: function(title, columns, matrix, rows, rowHeaderLabel) {
+      let headRow = '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-20">' + window.app.esc(rowHeaderLabel) + '</th>';
+      columns.forEach(c => {
+        headRow += '<th class="py-2.5 px-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l border-slate-200">' + window.app.esc(c.label) + '</th>';
+      });
+      headRow += '<th class="py-2.5 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l-2 border-slate-300">Grand Total</th>';
+
+      let bodyRows = '';
+      const colTotals = {};
+      let grandTotal = 0;
+      rows.forEach(r => {
+        const rowMatrix = matrix[r.key] || {};
+        let rowTotal = 0;
+        let cells = '';
+        columns.forEach(c => {
+          const qty = rowMatrix[c.key] || 0;
+          rowTotal += qty;
+          colTotals[c.key] = (colTotals[c.key] || 0) + qty;
+          cells += '<td class="py-2.5 px-3 text-center text-slate-600 border-l border-slate-100">' + (qty > 0 ? qty.toLocaleString() : '') + '</td>';
+        });
+        grandTotal += rowTotal;
+        bodyRows += '<tr class="hover:bg-slate-50 transition-colors">'
+          + '<td class="py-2.5 px-4 text-slate-700 font-medium sticky left-0 bg-white z-10">' + window.app.esc(r.label) + '</td>'
+          + cells
+          + '<td class="py-2.5 px-4 text-right text-slate-700 font-bold border-l-2 border-slate-300 bg-slate-50/60">' + (rowTotal > 0 ? rowTotal.toLocaleString() : '') + '</td>'
+          + '</tr>';
+      });
+
+      let footCells = '';
+      columns.forEach(c => {
+        footCells += '<td class="py-3 px-3 text-center text-slate-800 border-l border-slate-100">' + (colTotals[c.key] || 0).toLocaleString() + '</td>';
+      });
+      const footRow = '<tr class="bg-slate-100 font-black border-t-2 border-slate-300">'
+        + '<td class="py-3 px-4 text-slate-800 sticky left-0 bg-slate-100 z-10">Grand Total</td>'
+        + footCells
+        + '<td class="py-3 px-4 text-right text-amber-700 border-l-2 border-slate-300">' + grandTotal.toLocaleString() + '</td>'
+        + '</tr>';
+
+      const tableHtml = '<table class="w-full text-sm text-left whitespace-nowrap">'
+        + '<thead class="sticky top-0 z-10"><tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">' + headRow + '</tr></thead>'
+        + '<tbody class="divide-y divide-slate-100">' + bodyRows + '</tbody>'
+        + '<tfoot>' + footRow + '</tfoot>'
+        + '</table>';
+
+      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
+        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+        + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
+        + '</div>'
+        + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
+        + '</div>';
+    },
+    render: function() {
+      const wrap = document.getElementById('branchBookingSummaryTablesWrap');
+      if (!wrap) return;
+
+      const category = this.currentCategory;
+      if (!category) {
+        wrap.innerHTML = window.app.emptyState({ icon: 'fa-boxes-stacked', title: 'ไม่มีข้อมูลหมวดหมู่สินค้า', subtitle: '' });
+        return;
+      }
+
+      const products = (window.app.globalData.products || []).filter(p => (p['Category'] || '').toString().trim() === category);
+      if (products.length === 0) {
+        wrap.innerHTML = window.app.emptyState({ icon: 'fa-boxes-stacked', title: 'ไม่มีสินค้าในหมวดหมู่นี้', subtitle: '' });
+        return;
+      }
+
+      // SKU -> modelCap (Model + Capacity, ไม่รวมสี) — ใช้เป็นคอลัมน์
+      const skuInfo = {};
+      const modelCapRowsSeen = {};
+      const modelCapRows = [];
+      products.forEach(p => {
+        if (!p.SKU) return;
+        const model = (p['Model'] || '').toString().trim() || (p['Product Name'] || '').toString().trim() || 'ไม่ระบุรุ่น';
+        const cap = (p['Capacity'] || '').toString().trim();
+        const modelCap = (cap && cap !== '-') ? (model + ' ' + cap) : model;
+        skuInfo[p.SKU] = modelCap;
+        if (!modelCapRowsSeen[modelCap]) { modelCapRowsSeen[modelCap] = true; modelCapRows.push({ key: modelCap, label: modelCap }); }
+      });
+
+      // แถวสาขา — ใช้ทุกสาขาจากชีต Branches (แสดงแม้ยอดจอง 0) เรียงตามลำดับที่บันทึกในชีต — key = Branch Code (join key), label = Branch Name
+      // กรองด้วย Area/สาขา ที่พิมพ์ค้นหา (owner request 2026-07-24) — substring แบบไม่สนตัวพิมพ์เล็กใหญ่, เลือกได้อิสระ ใช้เงื่อนไข AND ร่วมกัน
+      const branches = window.app.globalData.branches || [];
+      const areaKey = branches.length > 0 ? (Object.keys(branches[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area') : 'Area';
+      const filterArea = (this.currentArea || '').toLowerCase();
+      const filterBranchQuery = (this.currentBranchQuery || '').toLowerCase();
+      const branchRows = [];
+      const branchByUpperCode = {}; // BRANCH CODE (upper, trim) -> {key,label} — ใช้ join ยอดจากออเดอร์ ไม่ผ่านตัวกรอง
+      branches.forEach(b => {
+        const code = (b['Branch Code'] || '').toString().trim();
+        if (!code) return;
+        const upper = code.toUpperCase();
+        if (branchByUpperCode[upper]) return;
+        const name = (b['Branch Name'] || '').toString().trim() || code;
+        const area = (b[areaKey] || '').toString().trim();
+        const row = { key: code, label: name };
+        branchByUpperCode[upper] = row;
+        if (filterArea && !area.toLowerCase().includes(filterArea)) return;
+        if (filterBranchQuery && !code.toLowerCase().includes(filterBranchQuery) && !name.toLowerCase().includes(filterBranchQuery)) return;
+        branchRows.push(row);
+      });
+
+      // แถว Reservation Status มีแค่แถวแรกของแต่ละ OrderID — ต้อง join กลับด้วย OrderID (เหมือน bookingSummary)
+      const orderResStatusMap = {};
+      this.rawOrders.forEach(o => { if (o['Reservation Status'] && o['Reservation Status'].toString().trim() !== '') orderResStatusMap[o.OrderID] = o['Reservation Status']; });
+
+      const UNKNOWN_BRANCH = 'ไม่ระบุสาขา';
+      let hasUnknownBranch = false;
+
+      // matrixT/matrixF: กรองเฉพาะแถวที่ Reservation Status เป็นจอง T / จอง F ตามลำดับ, matrixAll: ทุกแถวไม่สนสถานะ (ผลรวมทั้งหมด)
+      const matrixT = {}, matrixF = {}, matrixAll = {};
+
+      this.rawOrders.forEach(o => {
+        if (o['Order Status'] === 'Cancelled') return;
+        if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า
+        let qty = parseInt((o.Qty || '0').toString().replace(/,/g, ''));
+        if (isNaN(qty) || qty <= 0) return;
+        const modelCap = skuInfo[o.SKU];
+        if (!modelCap) return; // สินค้าไม่ได้อยู่ในหมวดหมู่ที่กำลังกรอง — ข้าม
+
+        const branchCodeRaw = (o['Branch Code'] || '').toString().trim();
+        const bRow = branchByUpperCode[branchCodeRaw.toUpperCase()];
+        const branchKey = bRow ? bRow.key : UNKNOWN_BRANCH;
+        if (!bRow) hasUnknownBranch = true;
+
+        if (!matrixAll[branchKey]) matrixAll[branchKey] = {};
+        matrixAll[branchKey][modelCap] = (matrixAll[branchKey][modelCap] || 0) + qty;
+
+        const rStatus = (o['Reservation Status'] || orderResStatusMap[o.OrderID] || '').toString();
+        if (rStatus.includes('จอง T')) {
+          if (!matrixT[branchKey]) matrixT[branchKey] = {};
+          matrixT[branchKey][modelCap] = (matrixT[branchKey][modelCap] || 0) + qty;
+        } else if (rStatus.includes('จอง F')) {
+          if (!matrixF[branchKey]) matrixF[branchKey] = {};
+          matrixF[branchKey][modelCap] = (matrixF[branchKey][modelCap] || 0) + qty;
+        }
+      });
+
+      // ออเดอร์ที่หาสาขาไม่เจอ — เพิ่มแถว "ไม่ระบุสาขา" ท้ายทุกตาราง เฉพาะตอนไม่มีตัวกรอง Area/สาขาใช้งานอยู่ (ไม่มี Area/Branch Code จริงให้จับคู่กับตัวกรอง)
+      if (hasUnknownBranch && !filterArea && !filterBranchQuery) branchRows.push({ key: UNKNOWN_BRANCH, label: UNKNOWN_BRANCH });
+
+      if (branchRows.length === 0) {
+        wrap.innerHTML = window.app.emptyState({ icon: 'fa-store-slash', title: 'ไม่พบสาขาตามตัวกรองที่เลือก', subtitle: 'ลองเปลี่ยนตัวกรอง Area หรือ สาขา' });
+        return;
+      }
+
+      let html = '';
+      html += this.buildFlatPivotTable('ยอดจองตามสาขา × รุ่น (จอง T)', modelCapRows, matrixT, branchRows, 'สาขา');
+      html += this.buildFlatPivotTable('ยอดจองตามสาขา × รุ่น (จอง F)', modelCapRows, matrixF, branchRows, 'สาขา');
+      html += this.buildFlatPivotTable('ยอดจองตามสาขา × รุ่น (ผลรวมทั้งหมด)', modelCapRows, matrixAll, branchRows, 'สาขา');
 
       wrap.innerHTML = html;
       wrap.querySelectorAll('.chart-card').forEach(c => window.app.tableExportButtons(c));

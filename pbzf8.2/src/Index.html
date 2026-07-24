@@ -886,6 +886,34 @@
     </div>
   </template>
 
+  <template id="tmpl-branchbookingsummary">
+    <div id="branchbookingsummary-content" class="space-y-6">
+       <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-4 pb-2 justify-between">
+         <div class="flex items-center gap-3">
+           <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+             <i class="fas fa-store-alt text-lg"></i>
+           </div>
+           <div>
+             <h2 class="text-xl font-black text-slate-800 tracking-tight leading-tight">สรุปยอดจองตามสาขา</h2>
+             <p class="text-xs text-slate-500 font-medium">ยอดจองรวม (ไม่รวมแถวส่วนลดและออเดอร์ที่ยกเลิก) แยกตามสาขา × รุ่นสินค้า และสถานะการจอง (จอง T / จอง F / ผลรวม)</p>
+           </div>
+         </div>
+         <div class="flex flex-wrap items-center gap-2">
+           <label for="bbCategoryFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">หมวดหมู่:</label>
+           <select id="bbCategoryFilter" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" onchange="window.app.branchBookingSummary.onCategoryChange()"></select>
+           <label for="bbAreaFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">แอเรีย:</label>
+           <input type="text" id="bbAreaFilter" list="bbAreaListOptions" placeholder="พิมพ์ค้นหา Area..." autocomplete="off" class="w-36 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()">
+           <datalist id="bbAreaListOptions"></datalist>
+           <label for="bbBranchFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">สาขา:</label>
+           <input type="text" id="bbBranchFilter" list="bbBranchListOptions" placeholder="พิมพ์ค้นหาชื่อ/รหัสสาขา..." autocomplete="off" class="w-52 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()">
+           <datalist id="bbBranchListOptions"></datalist>
+         </div>
+       </div>
+
+       <div id="branchBookingSummaryTablesWrap"></div>
+    </div>
+  </template>
+
   <template id="tmpl-allbookingsummary">
     <div id="allbookingsummary-content" class="space-y-6">
        <div class="flex items-center gap-3 pt-4 pb-2">

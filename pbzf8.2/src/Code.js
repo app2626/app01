@@ -42,11 +42,7 @@ function setupDatabase(userToken) {
     "Interests": ["Interest Name", "Status"],
     "GiftMappings": ["Mapping ID", "Target Mobile (SKU or Group)", "Channel", "Brand Gifts", "Channel Gifts", "Status"],
     // 🌟 จัดเรียงคอลัมน์ Orders ใหม่ตามที่ระบุ
-    "Orders": [
-      "OrderID", "Timestamp", "Channel", "Branch Code", "Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser",
-      "SKU", "Product Name", "Qty", "Unit Price", "Promo", "Reservation Status", "Staff", "Booking Phone",
-      "Customer Interests", "Remark", "Row Total", "Order Status", "Receipt No", "Deposit", "Client Request ID"
-    ],
+    "Orders": ORDERS_HEADERS_,
     "OrderStatus": ["Status ID", "Status Name", "Color Code"],
     "InventoryLog": ["Log ID", "Timestamp", "SKU", "Action", "Qty", "Branch Code", "User"],
     "AuditLog": ["Log ID", "Timestamp", "User", "Action", "Details"],
@@ -296,6 +292,15 @@ let __genIdSeq = 0;
 function generateId(prefix) {
   __genIdSeq++;
   return prefix + '-' + Utilities.formatDate(new Date(), "GMT+7", "yyMMdd") + '-' + Date.now() + '-' + __genIdSeq + '-' + Math.floor(100 + Math.random() * 900);
+}
+
+// กัน formula/CSV injection: ค่าที่ user พิมพ์เอง (ชื่อลูกค้า/หมายเหตุ/ชื่อพนักงานจอง ฯลฯ) เขียนลง Sheets ตรงๆ
+// ถ้าขึ้นต้นด้วย = + - @ ตัว Sheets จะตีความเป็นสูตรทันทีตอน setValues (ไม่เกี่ยวกับ number format ของคอลัมน์)
+// นำหน้าด้วย ' (single quote) บังคับให้เก็บเป็นข้อความเสมอ ตามคำแนะนำมาตรฐานของ Google/OWASP สำหรับ formula injection
+function sanitizeSheetText_(value) {
+  const s = (value === null || value === undefined) ? '' : value.toString();
+  if (/^[=+\-@]/.test(s)) return "'" + s;
+  return s;
 }
 
 function logAudit(user, action, details) {
@@ -575,10 +580,10 @@ function initAutoPromotionsSheet(ss) {
   if (!sheet) {
     try {
       sheet = ss.insertSheet("AutoPromotions");
-      sheet.appendRow(["Rule ID", "Buy Category", "Get Discount Category", "Discount Percent", "Message Suggest", "Message Apply", "Status"]);
-      sheet.appendRow(["AP-001", "โมบาย", "อุปกรณ์เสริม", 10, "ลูกค้าซื้อมือถือแล้ว! เสนอขายอุปกรณ์เสริม (เคส/ฟิล์ม/หัวชาร์จ) ตอนนี้ <strong class='text-rose-900'>รับส่วนลดอุปกรณ์เสริม 10% ทันที</strong>", "ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว", "Active"]);
-      sheet.appendRow(["AP-002", "สมาร์ทวอทช์", "อุปกรณ์เสริม", 5, "ลูกค้าซื้อสมาร์ทวอทช์! เสนอขายสายนาฬิกาเพิ่ม รับส่วนลด 5%", "ได้รับส่วนลดสายนาฬิกา 5% เรียบร้อย", "Inactive"]);
-      sheet.getRange("A1:G1").setFontWeight("bold").setBackground("#d9ead3");
+      sheet.appendRow(["Rule ID", "Buy Category", "Get Discount Category", "Discount Percent", "Message Suggest", "Message Apply", "Status", "Channel"]);
+      sheet.appendRow(["AP-001", "โมบาย", "อุปกรณ์เสริม", 10, "ลูกค้าซื้อมือถือแล้ว! เสนอขายอุปกรณ์เสริม (เคส/ฟิล์ม/หัวชาร์จ) ตอนนี้ <strong class='text-rose-900'>รับส่วนลดอุปกรณ์เสริม 10% ทันที</strong>", "ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว", "Active", ""]);
+      sheet.appendRow(["AP-002", "สมาร์ทวอทช์", "อุปกรณ์เสริม", 5, "ลูกค้าซื้อสมาร์ทวอทช์! เสนอขายสายนาฬิกาเพิ่ม รับส่วนลด 5%", "ได้รับส่วนลดสายนาฬิกา 5% เรียบร้อย", "Inactive", ""]);
+      sheet.getRange("A1:H1").setFontWeight("bold").setBackground("#d9ead3");
       SpreadsheetApp.flush();
     } catch(e) {}
   }
@@ -603,6 +608,14 @@ function initAutoPromotionsSheet(ss) {
         if (!String(vals[i][0] || '').trim()) { maxNum++; vals[i][0] = 'AP-' + String(maxNum).padStart(3, '0'); changed = true; }
       }
       if (changed) rng.setValues(vals);
+    }
+  } catch(e) {}
+  // Retrofit "Channel" ให้ชีตเก่าที่สร้างก่อนคอลัมน์นี้มี — เว้นว่าง = ร่วมทุกช่องทางเหมือนเดิม (backward compatible ไม่ต้องแก้ข้อมูลแถวเก่า)
+  try {
+    const lastCol2 = sheet.getLastColumn();
+    const headers2 = sheet.getRange(1, 1, 1, lastCol2).getValues()[0].map(h => h.toString().trim());
+    if (headers2.indexOf("Channel") === -1) {
+      sheet.getRange(1, lastCol2 + 1).setValue("Channel");
     }
   } catch(e) {}
 }
@@ -757,6 +770,13 @@ function processCheckout(payload, secureUser, ss) {
     const branches = getTableDataAsJson(ss.getSheetByName("Branches"));
     const branchInfo = branches.find(b => b['Branch Code'] === actualBranch && (b.Channel === actualChannel || actualChannel === 'ALL'));
     if (actualBranch !== 'ALL' && !branchInfo) throw new Error("Invalid branch or channel.");
+    // branch === 'ALL' ข้ามการเช็คคู่ branch/channel ด้านบนไปเลย — ต้องเช็ค channel แยกว่ามีอยู่จริงในชีต Channels
+    // ไม่งั้น payload ที่ครอบ branch:'ALL' ส่ง channel เป็นสตริงอะไรก็ได้ ผ่านเข้าไปปลดล็อกของแถม/ส่วนลดที่ผูก channel นั้นได้
+    if (actualBranch === 'ALL' && actualChannel !== 'ALL') {
+      const channels = getTableDataAsJson(ss.getSheetByName("Channels"));
+      const channelExists = channels.some(c => (c['Channel Name'] || '').toString().trim() === (actualChannel || '').toString().trim());
+      if (!channelExists) throw new Error("Invalid branch or channel.");
+    }
 
     let prodData = prodSheet.getDataRange().getValues();
     let headers = prodData[0].map(h => h.toString().trim());
@@ -774,6 +794,13 @@ function processCheckout(payload, secureUser, ss) {
         orderHeaders.push(col);
       }
     });
+    // orderRows.push() ด้านล่างเขียนเป็น array ตำแหน่งตรงตัว 24 ช่อง (ไม่ได้ map ด้วยชื่อ header) — ถ้าคอลัมน์ในชีตจริงสลับตำแหน่งไปจาก
+    // ORDERS_HEADERS_ (เช่น มีคนแทรก/ย้ายคอลัมน์ตรงๆ ใน Sheets UI) ข้อมูลจะเขียนผิดคอลัมน์แบบเงียบๆ — เช็คก่อนเขียนดีกว่าให้ข้อมูลเพี้ยนไม่รู้ตัว
+    for (let i = 0; i < ORDERS_HEADERS_.length; i++) {
+      if (orderHeaders[i] !== ORDERS_HEADERS_[i]) {
+        throw new Error("โครงสร้างชีต Orders ไม่ตรงตามที่ระบบคาดไว้ (คอลัมน์ '" + ORDERS_HEADERS_[i] + "' ควรอยู่ตำแหน่งที่ " + (i + 1) + ") กรุณาติดต่อผู้ดูแลระบบ ห้ามแก้ไข/ย้ายคอลัมน์ในชีต Orders โดยตรง");
+      }
+    }
 
     let isFirstRow = true;
     let orderRows = [];
@@ -843,20 +870,21 @@ function processCheckout(payload, secureUser, ss) {
 
       invRows.push([generateId('INV'), now, item.SKU, "SALE", -qty, actualBranch, secureUser.Username]);
       
-      let fCustName = isFirstRow ? payload.customerName : "";
+      // sanitizeSheetText_ กัน formula injection (=,+,-,@ นำหน้า) — ทุกฟิลด์นี้เป็นข้อความที่ user พิมพ์เองล้วนๆ
+      let fCustName = isFirstRow ? sanitizeSheetText_(payload.customerName) : "";
       // นโยบายเจ้าของระบบ 2026-07-05 (รอบ 7.1): PII เขียน plain text เพื่ออ่านในชีตตรงๆ ได้
       // ฝั่งอ่าน (GET_TABLE/Dashboard) ยังผ่าน deobfuscate ซึ่งมี digit-passthrough — อ่านแถวเก่าที่เข้ารหัสไว้ได้ ห้ามลบ
-      let fContact = isFirstRow ? String(payload.contactPhone || "") : "";
-      let fEmail = isFirstRow ? payload.email : "";
-      let fIdCard = isFirstRow ? String(payload.idCard || "") : "";
-      let fCodeHand = isFirstRow ? payload.codeHandraiser : "";
-      let fPromo = isFirstRow ? (payload.promo || "-") : "";
-      let fResStatus = isFirstRow ? payload.resStatus : "";
-      let fBkStaff = isFirstRow ? payload.bkStaffName : "";
-      let fBkPhone = isFirstRow ? payload.bkPhone : "";
-      let fInterests = isFirstRow ? payload.customerInterests : "";
-      let fRemark = isFirstRow ? payload.remark : "";
-      let fReceiptNo = isFirstRow ? (payload.receiptNo || "") : "";
+      let fContact = isFirstRow ? sanitizeSheetText_(payload.contactPhone) : "";
+      let fEmail = isFirstRow ? sanitizeSheetText_(payload.email) : "";
+      let fIdCard = isFirstRow ? sanitizeSheetText_(payload.idCard) : "";
+      let fCodeHand = isFirstRow ? sanitizeSheetText_(payload.codeHandraiser) : "";
+      let fPromo = isFirstRow ? sanitizeSheetText_(payload.promo || "-") : "";
+      let fResStatus = isFirstRow ? sanitizeSheetText_(payload.resStatus) : "";
+      let fBkStaff = isFirstRow ? sanitizeSheetText_(payload.bkStaffName) : "";
+      let fBkPhone = isFirstRow ? sanitizeSheetText_(payload.bkPhone) : "";
+      let fInterests = isFirstRow ? sanitizeSheetText_(payload.customerInterests) : "";
+      let fRemark = isFirstRow ? sanitizeSheetText_(payload.remark) : "";
+      let fReceiptNo = isFirstRow ? sanitizeSheetText_(payload.receiptNo || "") : "";
       let fDeposit = isFirstRow ? (parseFloat(payload.depositAmount) || 0) : "";
       let fReqId = isFirstRow ? clientRequestId : "";
 
@@ -936,23 +964,33 @@ function processCheckout(payload, secureUser, ss) {
       if (autoRules.length === 0) {
         autoRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'Active' }];
       }
+      // เพดานส่วนลด Auto Bundle คำนวณครั้งเดียวรวมทั้งออเดอร์ (ไม่ใช่ต่อแถว) — client ปกติส่งแถว 'Auto Bundle' แถวเดียวต่อออเดอร์
+      // (ดู JS.html pos.confirmCheckout) แต่ payload เป็น input จาก client ดิบๆ ห้ามเชื่อจำนวนแถว ต้องกันแยกกันส่งหลายแถวแล้วได้ส่วนลดคูณ
+      let maxAutoTotal = 0;
+      autoRules.forEach(r => {
+        if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
+        const buyCat = (r['Buy Category'] || '').toString().trim();
+        const getCat = (r['Get Discount Category'] || '').toString().trim();
+        const pct = parseFloat(r['Discount Percent']) || 0;
+        // เงื่อนไข Channel ร่วมรายการ (เว้นว่าง/'*'/'all' = ทุกช่องทาง) — tokenize เทียบทีละช่องทาง ตามรูปแบบเดียวกับ GiftMappings.Channel
+        const ruleChRaw = (r['Channel'] || '').toString().trim();
+        const ruleChTokens = ruleChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const ruleChMatches = ruleChRaw === '' || ruleChRaw === '*' || ruleChRaw.toLowerCase() === 'all' || ruleChTokens.includes(actualChannel.toString().trim().toLowerCase());
+        if (!ruleChMatches) return;
+        if ((catQtys[buyCat] || 0) > 0 && (catQtys[getCat] || 0) > 0) {
+          maxAutoTotal += ((catTotals[getCat] || 0) * pct) / 100;
+        }
+      });
+      let autoBundleUsed = 0;
+      // สะสมยอดใช้ต่อชื่อโปรโมชั่น — กัน client ส่งชื่อโปรเดิมซ้ำหลายแถวแล้วแต่ละแถวผ่านเพดานแยกกันเป็นเอกเทศ (เพดานจริงต้องนับรวมต่อโปรหนึ่งชื่อ)
+      const promoUsed = {};
       discountsList.forEach(d => {
         let val = parseFloat(d.value || 0);
         if (!(val > 0)) return;
         const dName = (d.name || '').toString().trim();
         if (dName.indexOf('Auto Bundle') > -1) {
-          // คำนวณเพดานส่วนลด Auto ใหม่จากกติกาในชีต + ยอดจริงในตะกร้า (ราคาจากชีต Products)
-          let maxAuto = 0;
-          autoRules.forEach(r => {
-            if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
-            const buyCat = (r['Buy Category'] || '').toString().trim();
-            const getCat = (r['Get Discount Category'] || '').toString().trim();
-            const pct = parseFloat(r['Discount Percent']) || 0;
-            if ((catQtys[buyCat] || 0) > 0 && (catQtys[getCat] || 0) > 0) {
-              maxAuto += ((catTotals[getCat] || 0) * pct) / 100;
-            }
-          });
-          if (val > maxAuto + 0.01) throw new Error("ส่วนลด Auto Bundle ไม่ตรงกับเงื่อนไขโปรโมชั่นของระบบ");
+          autoBundleUsed += val;
+          if (autoBundleUsed > maxAutoTotal + 0.01) throw new Error("ส่วนลด Auto Bundle ไม่ตรงกับเงื่อนไขโปรโมชั่นของระบบ");
         } else {
           const promo = promoList.find(p => (p['Promo Name'] || '').toString().trim() === dName && (p.Status || '').toString().trim() === 'เปิด');
           if (!promo) throw new Error("ไม่พบโปรโมชั่นส่วนลด หรือโปรโมชั่นถูกปิดใช้งาน: " + dName);
@@ -961,7 +999,8 @@ function processCheckout(payload, secureUser, ss) {
           const promoType = (promo['Discount Type'] || 'Fixed').toString().trim();
           const goodsTotal = Object.keys(catTotals).reduce((s, k) => s + catTotals[k], 0);
           const maxVal = promoType === 'Percent' ? (goodsTotal * promoVal) / 100 : promoVal;
-          if (val > maxVal + 0.01) throw new Error("มูลค่าส่วนลดเกินที่โปรโมชั่นกำหนด: " + dName);
+          promoUsed[dName] = (promoUsed[dName] || 0) + val;
+          if (promoUsed[dName] > maxVal + 0.01) throw new Error("มูลค่าส่วนลดเกินที่โปรโมชั่นกำหนด: " + dName);
         }
         orderRows.push([
           orderId, now, actualChannel, actualBranch, "", "",
@@ -1147,9 +1186,12 @@ function updateFullOrder(dataObj, secureUser, ss) {
         }
         dataObj["Row Total"] = newQtyVal * unitPrice;
 
+        // กัน formula injection บนฟิลด์ข้อความอิสระที่ user พิมพ์เอง — ห้ามครอบคอลัมน์ตัวเลข/ควบคุม (Row Total, Qty, Order Status ฯลฯ)
+        // ไม่งั้นค่าตัวเลขจะกลายเป็นสตริงและพังการรวมยอด/สถานะ
+        const FREE_TEXT_COLS_ = ["Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser", "Promo", "Staff", "Booking Phone", "Customer Interests", "Remark"];
         oHeaders.forEach(h => {
           if (dataObj[h] !== undefined && h !== "_rowIndex") {
-            newRowData.push(dataObj[h]);
+            newRowData.push(FREE_TEXT_COLS_.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]);
           } else {
             newRowData.push(rData[oHeaders.indexOf(h)]);
           }
@@ -1441,6 +1483,9 @@ function saveSettingsItem(payload, secureUser, ss) {
     }
     
     if (rowIndex) {
+      // กัน rowIndex เพี้ยน (ค้างจาก UI เก่า/แถวถูกลบไปแล้ว) เขียนทับ header หรือแถวนอกขอบเขตชีตแบบเงียบๆ
+      const ri = parseInt(rowIndex, 10);
+      if (!Number.isInteger(ri) || ri < 2 || ri > bannersSheet.getLastRow()) throw new Error("ตำแหน่งแถวไม่ถูกต้อง กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
       bannersSheet.getRange(rowIndex, 3).setValue(url);
       bannersSheet.getRange(rowIndex, 4).setValue('Active');
       bannersSheet.getRange(rowIndex, 5).setValue(targetLink);
@@ -1532,6 +1577,15 @@ function uploadImage(payload, secureUser, ss) {
 // ===== ใบเสนอราคา/ใบแจ้งหนี้ (Invoices) — เก็บลงชีต + workflow อนุมัติ (2026-07-11) =====
 // หนึ่งเอกสาร = หนึ่งแถว; รายการสินค้าเก็บเป็น JSON ใน "Items JSON" (เอกสารอิสระ ไม่ผูกกับ Orders/Stock)
 // สถานะ: "รออนุมัติ" → "อนุมัติแล้ว" (Admin/Manager กดอนุมัติ; เอกสารที่อนุมัติแล้วแก้ไข/ลบไม่ได้ ยกเว้น Admin ลบได้)
+// ลำดับคอลัมน์ Orders ตามชีวิตจริง (setupDatabase ใช้สร้างชีตใหม่ + processCheckout ใช้ตรวจว่าชีตเดิมไม่ถูกสลับคอลัมน์)
+// orderRows.push() ทั้ง 3 จุดใน processCheckout เป็น array ตำแหน่งตรงตัว (ไม่ได้ map ด้วยชื่อ header) — ถ้าคอลัมน์ในชีตจริงสลับตำแหน่งไปจากนี้
+// (เช่น มีคนแทรก/ย้ายคอลัมน์ใน Sheets UI ตรงๆ) ข้อมูลจะเขียนผิดคอลัมน์แบบเงียบๆ จึงต้องเช็คก่อนเขียนทุกครั้ง ดู rule ที่เกี่ยวข้องใน CLAUDE.md
+var ORDERS_HEADERS_ = [
+  "OrderID", "Timestamp", "Channel", "Branch Code", "Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser",
+  "SKU", "Product Name", "Qty", "Unit Price", "Promo", "Reservation Status", "Staff", "Booking Phone",
+  "Customer Interests", "Remark", "Row Total", "Order Status", "Receipt No", "Deposit", "Client Request ID"
+];
+
 var INVOICES_HEADERS_ = [
   "Invoice ID", "Invoice No", "Type", "Invoice Date",
   "Customer Name", "Customer Address", "Customer Phone", "Customer Email", "Customer TaxID",
@@ -1584,28 +1638,29 @@ function saveInvoice(payload, secureUser, ss) {
     const logoUrl = (d.logoUrl || '').toString();
     const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
 
+    // sanitizeSheetText_ กัน formula injection — setNumberFormat('@') ด้านล่างกันแค่การแปลงชนิดตัวเลข/วันที่ ไม่กัน "=..." ตีความเป็นสูตร
     const values = {
-      "Invoice No": invoiceNo,
-      "Type": (d.type || 'ใบเสนอราคา (Quotation)').toString(),
+      "Invoice No": sanitizeSheetText_(invoiceNo),
+      "Type": sanitizeSheetText_(d.type || 'ใบเสนอราคา (Quotation)'),
       "Invoice Date": (d.invoiceDate || '').toString(),
-      "Customer Name": (d.custName || '').toString(),
-      "Customer Address": (d.custAddress || '').toString(),
-      "Customer Phone": (d.custPhone || '').toString(),
-      "Customer Email": (d.custEmail || '').toString(),
-      "Customer TaxID": (d.custTaxId || '').toString(),
-      "Job Name": (d.jobName || '').toString(),
-      "Payment Terms": (d.payTerms || '').toString(),
+      "Customer Name": sanitizeSheetText_(d.custName || ''),
+      "Customer Address": sanitizeSheetText_(d.custAddress || ''),
+      "Customer Phone": sanitizeSheetText_(d.custPhone || ''),
+      "Customer Email": sanitizeSheetText_(d.custEmail || ''),
+      "Customer TaxID": sanitizeSheetText_(d.custTaxId || ''),
+      "Job Name": sanitizeSheetText_(d.jobName || ''),
+      "Payment Terms": sanitizeSheetText_(d.payTerms || ''),
       "Items JSON": JSON.stringify(items),
-      "Remarks": (d.remarks || '').toString(),
+      "Remarks": sanitizeSheetText_(d.remarks || ''),
       "VAT Enabled": d.vatEnabled ? 'TRUE' : 'FALSE',
       "WHT Percent": parseFloat(d.whtPct) || 0,
       "Sub Total": parseFloat(d.subTotal) || 0,
       "VAT": parseFloat(d.vat) || 0,
       "WHT": parseFloat(d.wht) || 0,
       "Net Total": parseFloat(d.netTotal) || 0,
-      "Company Name": (d.companyName || '').toString(),
-      "Company Address": (d.companyAddress || '').toString(),
-      "Company Email": (d.companyEmail || '').toString(),
+      "Company Name": sanitizeSheetText_(d.companyName || ''),
+      "Company Address": sanitizeSheetText_(d.companyAddress || ''),
+      "Company Email": sanitizeSheetText_(d.companyEmail || ''),
       // เก็บเฉพาะ URL จริง — โลโก้ที่เปลี่ยนเฉพาะใบผ่าน FileReader เป็น data: URL ยาวมาก (เกิน cell limit ได้) จะไม่เก็บ
       "Logo Url": /^https?:\/\//.test(logoUrl) ? logoUrl : '',
       "Status": "รออนุมัติ",
