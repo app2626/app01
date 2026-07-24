@@ -1005,7 +1005,7 @@ function processCheckout(payload, secureUser, ss) {
         orderRows.push([
           orderId, now, actualChannel, actualBranch, "", "",
           "", "", "",
-          "DISCOUNT", dName, 1, -val,
+          "DISCOUNT", sanitizeSheetText_(dName), 1, -val,
           "", "", "", "",
           "", "", -val, "Pending", "", "", ""
         ]);
@@ -1098,6 +1098,18 @@ function updateFullOrder(dataObj, secureUser, ss) {
     if (!orderId) throw new Error("ไม่พบ OrderID");
     
     let newStatus = dataObj["Order Status"] || oldDataRow[oHeaders.indexOf("Order Status")];
+    // Order Status/Reservation Status เป็นค่าจาก <select> ที่ควบคุมชุดค่าตายตัว — ไม่อยู่ใน FREE_TEXT_COLS_ (ห้าม sanitize ทับ ดู comment บรรทัดล่าง)
+    // แต่ก็ต้อง whitelist-validate ฝั่ง server เพราะ API รับ payload ดิบได้โดยไม่ผ่าน <select> ของ UI — ไม่งั้นเขียนสตริงใดๆ (รวมถึง formula) ลงคอลัมน์นี้ได้ตรงๆ
+    if (dataObj["Order Status"] !== undefined) {
+      const statusSheet = ss.getSheetByName("OrderStatus");
+      const validStatuses = statusSheet ? statusSheet.getDataRange().getValues().slice(1).map(r => (r[1] || '').toString().trim()).filter(Boolean) : [];
+      validStatuses.push('Cancelled');
+      if (!validStatuses.includes(newStatus.toString().trim())) throw new Error("สถานะออเดอร์ไม่ถูกต้อง: " + newStatus);
+    }
+    if (dataObj["Reservation Status"] !== undefined) {
+      const validResStatuses = ['', 'จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'];
+      if (!validResStatuses.includes(dataObj["Reservation Status"].toString().trim())) throw new Error("ประเภทการจองไม่ถูกต้อง: " + dataObj["Reservation Status"]);
+    }
       if (secureUser.Role === 'Manager') {
         dataObj = { "_rowIndex": dataObj["_rowIndex"], "Order Status": newStatus };
       }
@@ -1122,10 +1134,12 @@ function updateFullOrder(dataObj, secureUser, ss) {
     
     let invRows = [];
     
-    const adjustStockAndLog = (oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal) => {
+    const adjustStockAndLog = (oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal, oldRemarkVal) => {
       // ไม่มีการเปลี่ยนแปลงที่กระทบสต๊อก — ข้าม ไม่งั้น InventoryLog มีคู่ REVERT/APPLY ขยะทุกแถวทุกครั้งที่แก้ออเดอร์
       if (oldStatusVal !== 'Cancelled' && newStatusVal !== 'Cancelled' && oldSkuVal === newSkuVal && oldQtyVal === newQtyVal) return;
-      if (oldStatusVal !== 'Cancelled' && oldSkuVal && oldSkuVal !== 'DISCOUNT') {
+      // ของแถมที่ตอน checkout สต๊อกไม่พอ (processGift) ไม่เคยตัดสต๊อกจริง — ต้องไม่ REVERT (เติมสต๊อกคืน) ให้แถวที่มี marker "รอสต๊อกของแถม" ใน Remark
+      const oldWasGiftNoStock = (oldRemarkVal || '').toString().trim() === 'รอสต๊อกของแถม';
+      if (oldStatusVal !== 'Cancelled' && oldSkuVal && oldSkuVal !== 'DISCOUNT' && !oldWasGiftNoStock) {
         for (let i = 1; i < prodData.length; i++) {
           if (prodData[i][pSkuIdx] == oldSkuVal) {
             prodData[i][pStockIdx] = parseInt(prodData[i][pStockIdx] || 0) + oldQtyVal;
@@ -1160,6 +1174,7 @@ function updateFullOrder(dataObj, secureUser, ss) {
       let oldQtyVal = parseInt(rData[oHeaders.indexOf("Qty")] || 0);
       let oldStatusVal = rData[oHeaders.indexOf("Order Status")];
       let branchVal = rData[oHeaders.indexOf("Branch Code")];
+      let oldRemarkVal = rData[oHeaders.indexOf("Remark")];
       
       let newSkuVal, newQtyVal, newStatusVal;
       let newRowData = [];
@@ -1185,6 +1200,9 @@ function updateFullOrder(dataObj, secureUser, ss) {
           if (!priceFound) throw new Error("ไม่พบสินค้า SKU สำหรับแก้ไข: " + newSkuVal);
         }
         dataObj["Row Total"] = newQtyVal * unitPrice;
+        // เขียนค่า Qty ที่ validate/parseInt แล้วกลับเข้า sheet เสมอ — ห้ามปล่อย dataObj["Qty"] ดิบ (เช่น "5.5") ผ่านไปตรงๆ
+        // ไม่งั้น Qty ที่เก็บจริงจะไม่ตรงกับ newQtyVal ที่ใช้คำนวณ Row Total ด้านบน ทำให้สองคอลัมน์ไม่สอดคล้องกัน
+        dataObj["Qty"] = newQtyVal;
 
         // กัน formula injection บนฟิลด์ข้อความอิสระที่ user พิมพ์เอง — ห้ามครอบคอลัมน์ตัวเลข/ควบคุม (Row Total, Qty, Order Status ฯลฯ)
         // ไม่งั้นค่าตัวเลขจะกลายเป็นสตริงและพังการรวมยอด/สถานะ
@@ -1210,7 +1228,7 @@ function updateFullOrder(dataObj, secureUser, ss) {
         });
       }
       
-      adjustStockAndLog(oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal);
+      adjustStockAndLog(oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal, oldRemarkVal);
       orderUpdates.push({row: r, data: newRowData});
     });
     
@@ -1251,12 +1269,15 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
     const sheet = ss.getSheetByName(tableName); const data = sheet.getDataRange().getDisplayValues(); const headers = data[0].map(h => h.toString().trim()); let idIndex = headers.indexOf(idField); let rowIndex = -1;
     if (dataObj[idField]) { for (let i = 1; i < data.length; i++) { if (data[i][idIndex] == dataObj[idField]) { rowIndex = i + 1; break; } } }
+    let generatedPassword = null;
     if (tableName === "Members") {
       if (!dataObj.Password || dataObj.Password.trim() === "") {
         if (rowIndex > -1) {
           dataObj.Password = data[rowIndex - 1][headers.indexOf("Password")];
         } else {
-          dataObj.Password = hashPassword("1234");
+          // สมาชิกใหม่เว้นรหัสผ่านว่าง — สุ่มรหัสผ่านแบบเดียวกับ initialAdmin ใน setupDatabase (ห้าม hardcode ค่าเดาง่ายอย่าง "1234")
+          generatedPassword = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
+          dataObj.Password = hashPassword(generatedPassword);
         }
       } else if (!looksLikePasswordHash_(dataObj.Password)) {
         dataObj.Password = hashPassword(dataObj.Password);
@@ -1264,7 +1285,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     }
     let rowData = headers.map(h => dataObj[h] !== undefined ? dataObj[h] : "");
     if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); } const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions"]; if (cacheableTables.includes(tableName)) CacheService.getScriptCache().remove("TABLE_" + tableName);
-    return { status: 'success' };
+    return generatedPassword ? { status: 'success', generatedPassword: generatedPassword } : { status: 'success' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
   } finally {
@@ -1293,12 +1314,12 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
         const prodData = prodSheet.getDataRange().getValues();
         const pSkuIdx = prodData[0].indexOf("SKU");
         const pStockIdx = prodData[0].indexOf("Stock");
-        const pCatIdx = prodData[0].indexOf("Category");
-        
+
         const skuIdx = data[0].indexOf("SKU");
         const qtyIdx = data[0].indexOf("Qty");
         const statusIdx = data[0].indexOf("Order Status");
         const branchIdx = data[0].indexOf("Branch Code");
+        const remarkIdx = data[0].indexOf("Remark");
         
         let deletedCount = 0;
         let invRows = [];
@@ -1310,17 +1331,10 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
             let rowQty = parseInt(data[i][qtyIdx] || 0);
             let rowBranch = data[i][branchIdx];
             
-            let shouldRestore = rowStatus !== 'Cancelled' && rowSku && rowSku !== 'DISCOUNT';
-            if (shouldRestore && pCatIdx > -1) {
-              for (let p = 1; p < prodData.length; p++) {
-                if (prodData[p][pSkuIdx] == rowSku) {
-                  const category = (prodData[p][pCatIdx] || '').toString().toLowerCase();
-                  const currentStock = parseInt(prodData[p][pStockIdx] || 0, 10);
-                  if ((category.includes('gift') || category.includes('ของแถม')) && currentStock < rowQty) shouldRestore = false;
-                  break;
-                }
-              }
-            }
+            // ของแถมที่ตอน checkout สต๊อกไม่พอ (processGift) ไม่เคยตัดสต๊อกจริง — ต้องเช็คจาก marker "รอสต๊อกของแถม" ที่ Remark ของแถวนั้นโดยตรง
+            // ไม่ใช่เดาจากสต๊อกปัจจุบัน (currentStock < rowQty) เพราะสต๊อกอาจถูกเติม/ตัดจากรายการอื่นไปแล้วหลัง checkout ทำให้เดาผิดทั้งสองทาง
+            let shouldRestore = rowStatus !== 'Cancelled' && rowSku && rowSku !== 'DISCOUNT'
+              && !(remarkIdx > -1 && (data[i][remarkIdx] || '').toString().trim() === 'รอสต๊อกของแถม');
             if (shouldRestore) {
               for (let p = 1; p < prodData.length; p++) {
                 if (prodData[p][pSkuIdx] == rowSku) {

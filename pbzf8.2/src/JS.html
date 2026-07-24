@@ -998,16 +998,6 @@ window.app = {
     }
   },
 
-  getWeekString: function(dateStr) {
-    let d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "Unknown Week";
-    d.setHours(0,0,0,0);
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-    let yearStart = new Date(d.getFullYear(), 0, 1);
-    let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    return d.getFullYear() + " - W" + String(weekNo).padStart(2, '0');
-  },
-
   // === Dark Mode ===
   // Boot script ใน Index.html <head> ตั้ง class 'dark' บน <html> ไว้ก่อน paint แรกแล้ว (อ่านจาก localStorage 'tg_theme'
   // หรือ prefers-color-scheme ถ้ายังไม่เคยตั้ง) กัน flash สีตอนโหลดหน้า — ฟังก์ชันกลุ่มนี้แค่ sync ปุ่ม/Chart.js ให้ตรงกับ class ปัจจุบัน
@@ -1849,39 +1839,56 @@ window.app = {
       });
       const sortedDayKeys = Object.keys(trendData).sort();
       this.createChart('chartSalesTrend', 'line', sortedDayKeys.map(k => trendData[k].label), sortedDayKeys.map(k => trendData[k].qty), 'จำนวนเครื่อง', '#254d71');
-      
-      const weeklyTrend = {};
-      this.filteredOrders.forEach(o => {
-        if(o['Order Status'] !== 'Cancelled' && isDevice(o)) {
-          let w = window.app.getWeekString(o.Timestamp);
-          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); weeklyTrend[w] = (weeklyTrend[w] || 0) + (isNaN(qty) ? 0 : qty);
-        }
-      });
-      const sortedWeeks = Object.keys(weeklyTrend).sort();
-      this.createChart('chartWeeklyTrend', 'bar', sortedWeeks, sortedWeeks.map(w => weeklyTrend[w]), 'จำนวนเครื่อง', '#2563eb');
 
-      const modelsData = {}; 
-      let grandTotalQty = 0;
+      // กลุ่มรุ่นสินค้า (ตัดข้อมูลก่อนความจุ) — owner request 2026-07-24, แทนที่ตำแหน่งกราฟ "โมบาย" เดิมที่ย้ายไปอยู่คู่กับกราฟ "สมาร์ทวอทช์ & หูฟัง" แล้ว
+      // ใช้หลักการเดียวกับ bookingSummary.stripCapacity (JS.html บรรทัด ~2899): ตัดข้อความ Model ที่ตำแหน่งซึ่งพบค่า Capacity ของแถวนั้นๆ เพื่อรวมทุกความจุของรุ่นเดียวกันเข้าเป็นกลุ่มเดียว
+      const stripCapacityGroup = (modelText, cap) => {
+        const mt = (modelText || '').toString().trim();
+        const c = (cap || '').toString().trim();
+        if (!c || c === '-') return mt;
+        const idx = mt.toUpperCase().indexOf(c.toUpperCase());
+        return idx === -1 ? mt : (mt.substring(0, idx).trim() || mt);
+      };
+      const groupData = {};
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] === 'Cancelled' || !isDevice(o)) return;
+        if(o['Order Status'] === 'Cancelled' || (o.Category || '').toString().trim() !== 'โมบาย') return;
         let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
-        if (o.Capacity && o.Capacity !== '-' && o.Capacity.trim() !== '') mName += ` (${o.Capacity})`;
+        const g = stripCapacityGroup(mName, o.Capacity);
         let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
-        modelsData[mName] = (modelsData[mName] || 0) + qty;
-        grandTotalQty += qty;
+        groupData[g] = (groupData[g] || 0) + qty;
       });
-      let sortedModels = Object.keys(modelsData).sort((a,b) => modelsData[b] - modelsData[a]).slice(0, 15);
-      
-      if(this.charts['chartModelAdvanced']) this.charts['chartModelAdvanced'].destroy();
-      const ctxModel = document.getElementById('chartModelAdvanced');
-      if(ctxModel) {
-        this.charts['chartModelAdvanced'] = new Chart(ctxModel.getContext('2d'), {
-            type: 'bar',
-            data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
+      let sortedGroups = Object.keys(groupData).sort((a,b) => groupData[b] - groupData[a]);
+      this.createChart('chartModelGroupStripped', 'bar', sortedGroups, sortedGroups.map(g => groupData[g]), 'จำนวนเครื่อง', '#7c3aed');
+
+      // การวิเคราะห์โมเดลสินค้ายอดนิยม (รวมความจุ) — แยกเป็น 2 กราฟตามหมวดหมู่ (owner request 2026-07-24, แทนที่กราฟ "เปรียบเทียบยอดจองรายสัปดาห์" ที่ไม่ได้ใช้แล้ว):
+      // โมบาย แยกกราฟเดี่ยว, ส่วนสมาร์ทวอทช์+หูฟังรวมกันอยู่อีกกราฟหนึ่ง (ไม่รวม "อุปกรณ์เสริม" ทั่วไป)
+      const buildModelAdvancedChart = (canvasId, categories) => {
+        const modelsData = {};
+        let grandTotalQty = 0;
+        this.filteredOrders.forEach(o => {
+          if(o['Order Status'] === 'Cancelled' || !isDevice(o)) return;
+          if(!categories.includes((o.Category || '').toString().trim())) return;
+          let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
+          if (o.Capacity && o.Capacity !== '-' && o.Capacity.trim() !== '') mName += ` (${o.Capacity})`;
+          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
+          modelsData[mName] = (modelsData[mName] || 0) + qty;
+          grandTotalQty += qty;
         });
-        window.app.chartExportButtons('chartModelAdvanced');
-      }
+        let sortedModels = Object.keys(modelsData).sort((a,b) => modelsData[b] - modelsData[a]).slice(0, 15);
+
+        if(this.charts[canvasId]) this.charts[canvasId].destroy();
+        const ctxModel = document.getElementById(canvasId);
+        if(ctxModel) {
+          this.charts[canvasId] = new Chart(ctxModel.getContext('2d'), {
+              type: 'bar',
+              data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
+              options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
+          });
+          window.app.chartExportButtons(canvasId);
+        }
+      };
+      buildModelAdvancedChart('chartModelAdvancedMobile', ['โมบาย']);
+      buildModelAdvancedChart('chartModelAdvancedWatchEarphone', ['สมาร์ทวอทช์', 'หูฟัง']);
 
       // Promotions summary is rendered as a table via renderPromotionsTable()
 
@@ -3379,7 +3386,10 @@ window.app = {
         const row = { key: code, label: name };
         branchByUpperCode[upper] = row;
         if (filterArea && !area.toLowerCase().includes(filterArea)) return;
-        if (filterBranchQuery && !code.toLowerCase().includes(filterBranchQuery) && !name.toLowerCase().includes(filterBranchQuery)) return;
+        // ต้องเทียบกับสตริงรวม "ชื่อ (รหัส)" ด้วย ไม่ใช่แค่ code/name แยกกัน — เพราะ datalist option (บรรทัด ~3277) ใช้ค่านี้เป็น value
+        // ถ้าผู้ใช้คลิกเลือกจาก datalist โดยตรง ค่าที่ได้คือสตริงรวมทั้งก้อน ซึ่งไม่ใช่ substring ของ code หรือ name เดี่ยวๆ เลย
+        const combinedBranchLabel = (name + ' (' + code + ')').toLowerCase();
+        if (filterBranchQuery && !code.toLowerCase().includes(filterBranchQuery) && !name.toLowerCase().includes(filterBranchQuery) && !combinedBranchLabel.includes(filterBranchQuery)) return;
         branchRows.push(row);
       });
 
@@ -5391,7 +5401,16 @@ window.app = {
            let res;
            if(this.tableName==='Orders') res = await window.app.api('UPDATE_FULL_ORDER', { data: pay });
            else res = await window.app.api('SAVE_RECORD', { tableName: this.tableName, idField: this.idField, data: pay });
-           if(res && res.status==='success'){ await window.app.refreshGlobalData(); Swal.fire({ icon: 'success', title: 'อัปเดตข้อมูลเสร็จสิ้น', showConfirmButton: false, timer: 1500 }); this.loadData(); } else Swal.fire('ผิดพลาด',res ? res.message : 'Error', 'error');
+           if(res && res.status==='success'){
+             await window.app.refreshGlobalData();
+             if (res.generatedPassword) {
+               // สมาชิกใหม่เว้นรหัสผ่านว่าง — server สุ่มรหัสผ่านให้ ต้องโชว์ครั้งเดียวตอนนี้เพราะจะไม่ถูกส่งกลับมาอีก (rule 5)
+               Swal.fire({ icon: 'success', title: 'สร้างสมาชิกสำเร็จ', html: 'รหัสผ่านที่สุ่มให้: <b>' + window.app.esc(res.generatedPassword) + '</b><br><span class="text-xs text-slate-500">กรุณาบันทึกไว้และแจ้งพนักงาน — จะไม่แสดงซ้ำอีก</span>' });
+             } else {
+               Swal.fire({ icon: 'success', title: 'อัปเดตข้อมูลเสร็จสิ้น', showConfirmButton: false, timer: 1500 });
+             }
+             this.loadData();
+           } else Swal.fire('ผิดพลาด',res ? res.message : 'Error', 'error');
          } catch(e) { Swal.fire('ผิดพลาด', e.message || 'Error', 'error'); }
          finally { restoreBtn(); }
       }, 350);
