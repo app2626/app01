@@ -305,11 +305,14 @@ function updateStatus(rowId, newStatus) {
   }
 }
 
-function verifyAdminAndExport(pin) {
+function verifyAdminAndExport(pin, rowIds) {
   if(pin === ADMIN_PIN) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
-    const data = sheet.getDataRange().getDisplayValues();
+    const allData = sheet.getRange(1, 1, sheet.getLastRow(), 14).getDisplayValues();
+    const idSet = (rowIds && rowIds.length) ? new Set(rowIds.map(Number)) : null;
+    // แถวที่ 1 (header) เก็บไว้เสมอ, ที่เหลือกรองตามชุดแถวที่ถูกกรองไว้ในตาราง (rowId = เลขแถวจริงในชีต)
+    const data = idSet ? allData.filter((row, idx) => idx === 0 || idSet.has(idx + 1)) : allData;
     let csvString = data.map((row, rIdx) =>
       row.map(field => {
         let text = field.toString();

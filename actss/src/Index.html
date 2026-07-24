@@ -980,7 +980,7 @@
 
                 var btnManage = '<button class="btn btn-sm btn-primary fw-bold" onclick="changeStatus(' + r.rowId + ', \'' + r.status + '\')"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
 
-                tbody += '<tr>' +
+                tbody += '<tr data-rowid="' + r.rowId + '">' +
                     '<td>' + r.desc + '</td>' +                          
                     '<td>' + r.sku + '</td>' +                           
                     '<td>' + r.imei + '</td>' +                          
@@ -1443,10 +1443,16 @@
     function requestExportCsv() {
         Swal.fire({ title: 'รหัส Admin PIN', input: 'password', showCancelButton: true }).then(function(result) {
             if (result.isConfirmed) {
+                var filteredRowIds = [];
+                if (dataTableInstance) {
+                    filteredRowIds = $(dataTableInstance.rows({ search: 'applied' }).nodes()).map(function() {
+                        return $(this).data('rowid');
+                    }).get();
+                }
                 google.script.run.withSuccessHandler(function(res) {
-                    if(res.success) { downloadCSV(res.csvData, "ACT_SAMSUNG_Data_Master.csv"); Swal.fire('สำเร็จ', 'ดาวน์โหลดไฟล์เรียบร้อย', 'success'); } 
+                    if(res.success) { downloadCSV(res.csvData, "ACT_SAMSUNG_Data_Master.csv"); Swal.fire('สำเร็จ', 'ดาวน์โหลดไฟล์เรียบร้อย', 'success'); }
                     else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-                }).verifyAdminAndExport(result.value);
+                }).verifyAdminAndExport(result.value, filteredRowIds);
             }
         });
     }
