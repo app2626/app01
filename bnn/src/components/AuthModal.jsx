@@ -1,27 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, User } from "lucide-react";
 import { callGas } from "../utils/gas";
 import {
   registerMemberLocal,
   loginMemberLocal,
   requestPasswordResetLocal,
-  resetPasswordLocal
+  resetPasswordLocal,
+  getBranchesLocal
 } from "../utils/localMock";
 
 const inputClass = "w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700]";
 
 export default function AuthModal({ show, onClose, onLoggedIn }) {
   const [mode, setMode] = useState("login"); // "login" | "register" | "forgotRequest" | "forgotCode"
-  const [form, setForm] = useState({ name: "", email: "", password: "", requestAdmin: false });
+  const [form, setForm] = useState({ name: "", email: "", password: "", channel: "", branchCode: "", requestAdmin: false });
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [branches, setBranches] = useState([]);
+
+  useEffect(() => {
+    if (mode !== "register" || branches.length > 0) return;
+    callGas("getBranches", [], getBranchesLocal).then(setBranches).catch(() => {});
+  }, [mode, branches.length]);
 
   if (!show) return null;
 
+  const channelOptions = [...new Set(branches.map(b => b.channel))];
+  const branchOptions = branches.filter(b => b.channel === form.channel);
+
   const update = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const updateChannel = (e) => setForm(prev => ({ ...prev, channel: e.target.value, branchCode: "" }));
 
   const switchTab = (tab) => {
     setMode(tab);
@@ -42,7 +53,7 @@ export default function AuthModal({ show, onClose, onLoggedIn }) {
         setError(result.message || "เกิดข้อผิดพลาด");
       } else {
         onLoggedIn(result.member);
-        setForm({ name: "", email: "", password: "", requestAdmin: false });
+        setForm({ name: "", email: "", password: "", channel: "", branchCode: "", requestAdmin: false });
       }
     } catch {
       setError("เชื่อมต่อระบบไม่สำเร็จ กรุณาลองใหม่");
@@ -139,6 +150,32 @@ export default function AuthModal({ show, onClose, onLoggedIn }) {
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">ชื่อ-นามสกุล</label>
                 <input required type="text" value={form.name} onChange={update("name")} className={inputClass} />
+              </div>
+            )}
+
+            {mode === "register" && (
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Channel</label>
+                <select required value={form.channel} onChange={updateChannel} className={inputClass}>
+                  <option value="" disabled>เลือกช่องทาง</option>
+                  {channelOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {mode === "register" && (
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">รหัสสาขา</label>
+                <select required disabled={!form.channel} value={form.branchCode} onChange={update("branchCode")} className={inputClass}>
+                  <option value="" disabled>{form.channel ? "เลือกสาขา" : "เลือก Channel ก่อน"}</option>
+                  {branchOptions.map(b => (
+                    <option key={b.branchCode} value={b.branchCode}>
+                      {b.branchCode}{b.branchName ? ` - ${b.branchName}` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

@@ -85,6 +85,8 @@ export default function AdminMembersTab({ member }) {
             <tr className="border-b border-gray-100 text-left text-gray-500">
               <th className="p-3 font-medium">ชื่อ</th>
               <th className="p-3 font-medium">อีเมล</th>
+              <th className="p-3 font-medium">Channel</th>
+              <th className="p-3 font-medium">รหัสสาขา</th>
               <th className="p-3 font-medium">แต้มสะสม</th>
               <th className="p-3 font-medium">สิทธิ์แอดมิน</th>
               <th className="p-3 font-medium">สถานะบัญชี</th>
@@ -99,6 +101,10 @@ export default function AdminMembersTab({ member }) {
                 <tr key={m.id} className="border-b border-gray-50 last:border-0">
                   <td className="p-3">{m.name}</td>
                   <td className="p-3 text-gray-500">{m.email}</td>
+                  <td className="p-3 text-gray-500">{m.channel || "-"}</td>
+                  <td className="p-3 text-gray-500">
+                    {m.branchCode ? `${m.branchCode}${m.branchName ? ` - ${m.branchName}` : ""}` : "-"}
+                  </td>
                   <td className="p-3">{Number(m.points || 0).toLocaleString("th-TH")}</td>
                   <td className="p-3">
                     {status && <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.className}`}>{status.text}</span>}

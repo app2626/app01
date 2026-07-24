@@ -3,6 +3,11 @@ var SPREADSHEET_ID = '1g6NZTD4zlaH9LZFc00Od_X3pYYwvE05QrkPIPFy5zzw';
 var SHEET_META = {
   Cost: { headerRow: 1, dataStartRow: 2 },
   PriceSet: { headerRow: 2, dataStartRow: 3 },
+  // Entirely fed by one IMPORTRANGE formula anchored in row 1 that spills across
+  // all 12 columns (A:L) and every data row — no cell here can be edited without
+  // breaking the import, so this sheet is view/search only (see getRecords/
+  // saveRecord/deleteRecord's meta.readOnly checks).
+  'Code ส่วนลด': { headerRow: 2, dataStartRow: 3, readOnly: true },
 };
 
 // Curated for compact table display only — describeSheet() still returns every
@@ -11,6 +16,26 @@ var SHEET_META = {
 var PRIMARY_LABELS = {
   Cost: ['Brand', 'Model / SKU', 'FullDescription', 'Price RRP', 'Margin %', 'Cost (InVat) ฿', 'Stock onhand', 'Status'],
   PriceSet: ['Location', 'Brand', 'Model / SKU', 'FullDescription', 'Price RRP', 'ราคาขายสุทธิ', 'Cost B', 'MG%', 'Stock'],
+  'Code ส่วนลด': ['CHANEL', 'BRAND', 'NEW SKU', 'PROMOTION NAME', 'เงื่อนไข', 'การวางบิล'],
+};
+
+// Per-sheet filter bar config. 'select' = dropdown of distinct values (getFilterOptions
+// scans the column for these); 'text' = free contains-match input, no options needed.
+var FILTER_FIELDS = {
+  Cost: [
+    { key: 'Brand', mode: 'select' },
+    { key: 'FullDescription', mode: 'text' },
+  ],
+  PriceSet: [
+    { key: 'Location', mode: 'select' },
+    { key: 'Brand', mode: 'select' },
+    { key: 'FullDescription', mode: 'text' },
+  ],
+  'Code ส่วนลด': [
+    { key: 'CAT', mode: 'select' },
+    { key: 'CHANEL', mode: 'select' },
+    { key: 'BRAND', mode: 'select' },
+  ],
 };
 
 function doGet() {
@@ -144,6 +169,19 @@ function ensureRowUidColumn(sheet, meta) {
   return { headers: headers, uidCol: uidCol };
 }
 
+// Cheap header lookup for read paths (GET_RECORDS/GET_FILTER_OPTIONS), which run
+// on every keystroke/page/sort — this skips ensureRowUidColumn's full-column
+// backfill scan, since backfilling only ever needs to happen once (it already
+// runs on every saveRecord/deleteRecord, so new/blank UIDs get caught there).
+function getReadHeaders(sheet, meta) {
+  var headers = getHeaders(sheet, meta.headerRow);
+  if (headers.indexOf('RowUID') === -1) {
+    // First-ever touch of this sheet — fall back to the full one-time setup.
+    return ensureRowUidColumn(sheet, meta).headers;
+  }
+  return headers;
+}
+
 function normalizeCell(value) {
   if (Object.prototype.toString.call(value) === '[object Date]') {
     return Utilities.formatDate(value, 'GMT+7', 'dd/MM/yyyy');
@@ -207,8 +245,18 @@ function describeSheet(sheetName, ss) {
   if (!meta) throw new Error('Unknown sheet: ' + sheetName);
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('Sheet not found: ' + sheetName);
-  var uidInfo = ensureRowUidColumn(sheet, meta);
-  var columns = getColumnMeta(sheet, meta, uidInfo.headers).filter(function (c) { return !c.internal; });
+
+  var columns;
+  if (meta.readOnly) {
+    var headers = getHeaders(sheet, meta.headerRow);
+    columns = getColumnMeta(sheet, meta, headers).map(function (c) {
+      c.editable = false;
+      return c;
+    });
+  } else {
+    var uidInfo = ensureRowUidColumn(sheet, meta);
+    columns = getColumnMeta(sheet, meta, uidInfo.headers).filter(function (c) { return !c.internal; });
+  }
 
   var primaryLabels = PRIMARY_LABELS[sheetName] || [];
   columns.forEach(function (c) { c.primary = primaryLabels.indexOf(c.label) !== -1; });
@@ -225,8 +273,7 @@ function getRecords(sheetName, opts, ss) {
   if (!meta) throw new Error('Unknown sheet: ' + sheetName);
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('Sheet not found: ' + sheetName);
-  var uidInfo = ensureRowUidColumn(sheet, meta);
-  var headers = uidInfo.headers;
+  var headers = meta.readOnly ? getHeaders(sheet, meta.headerRow) : getReadHeaders(sheet, meta);
 
   var lastRow = sheet.getLastRow();
   var rows = [];
@@ -238,6 +285,23 @@ function getRecords(sheetName, opts, ss) {
       return obj;
     });
   }
+
+  var filterFields = FILTER_FIELDS[sheetName] || [];
+  var filters = opts.filters || {};
+  filterFields.forEach(function (field) {
+    var raw = filters[field.key];
+    if (raw === undefined || raw === null || raw === '') return;
+    if (field.mode === 'select') {
+      rows = rows.filter(function (row) {
+        return String(row[field.key] == null ? '' : row[field.key]).trim() === String(raw).trim();
+      });
+    } else {
+      var needle = String(raw).trim().toLowerCase();
+      rows = rows.filter(function (row) {
+        return String(row[field.key] == null ? '' : row[field.key]).toLowerCase().indexOf(needle) !== -1;
+      });
+    }
+  });
 
   var search = (opts.search || '').toString().trim().toLowerCase();
   if (search) {
@@ -265,6 +329,41 @@ function getRecords(sheetName, opts, ss) {
   return { rows: rows.slice(start, start + pageSize), total: total };
 }
 
+// Distinct values for each 'select'-mode filter field, for populating dropdowns.
+// 'text'-mode fields (free contains-match) don't need an options list.
+function getFilterOptions(sheetName, ss) {
+  var meta = SHEET_META[sheetName];
+  if (!meta) throw new Error('Unknown sheet: ' + sheetName);
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Sheet not found: ' + sheetName);
+  var fields = (FILTER_FIELDS[sheetName] || []).filter(function (f) { return f.mode === 'select'; });
+
+  var result = {};
+  if (!fields.length) return result;
+
+  var headers = meta.readOnly ? getHeaders(sheet, meta.headerRow) : getReadHeaders(sheet, meta);
+  var lastRow = sheet.getLastRow();
+  var rowCount = lastRow - meta.dataStartRow + 1;
+
+  fields.forEach(function (field) {
+    var idx = headers.indexOf(field.key);
+    if (idx === -1 || rowCount <= 0) { result[field.key] = []; return; }
+    var values = sheet.getRange(meta.dataStartRow, idx + 1, rowCount, 1).getValues();
+    var seen = {};
+    var distinct = [];
+    values.forEach(function (row) {
+      var v = normalizeCell(row[0]);
+      var key = String(v == null ? '' : v).trim();
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      distinct.push(key);
+    });
+    distinct.sort(function (a, b) { return a.localeCompare(b); });
+    result[field.key] = distinct;
+  });
+  return result;
+}
+
 function canWrite(secureUser) {
   return !!secureUser && secureUser.Role === 'Admin';
 }
@@ -288,6 +387,7 @@ function saveRecord(sheetName, record, secureUser, ss) {
   if (!canWrite(secureUser)) throw new Error('Permission denied: view-only account');
   var meta = SHEET_META[sheetName];
   if (!meta) throw new Error('Unknown sheet: ' + sheetName);
+  if (meta.readOnly) throw new Error('ชีตนี้ดึงข้อมูลมาจากระบบอื่นอัตโนมัติ (IMPORTRANGE) ไม่สามารถแก้ไขได้');
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('Sheet not found: ' + sheetName);
 
@@ -348,6 +448,7 @@ function deleteRecord(sheetName, rowUid, secureUser, ss) {
   if (!canWrite(secureUser)) throw new Error('Permission denied: view-only account');
   var meta = SHEET_META[sheetName];
   if (!meta) throw new Error('Unknown sheet: ' + sheetName);
+  if (meta.readOnly) throw new Error('ชีตนี้ดึงข้อมูลมาจากระบบอื่นอัตโนมัติ (IMPORTRANGE) ไม่สามารถลบได้');
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('Sheet not found: ' + sheetName);
 
@@ -387,6 +488,32 @@ function doLogin(username, password, ss) {
   };
 }
 
+function changePassword(username, oldPassword, newPassword, ss) {
+  var sheet = ss.getSheetByName('Users');
+  var data = sheet.getDataRange().getValues();
+  var oldHashed = hashPassword(oldPassword);
+  
+  var rowIndex = -1;
+  for (var i = 1; i < data.length; i++) { // Skip header
+    if (data[i][0] === username) {
+      if (data[i][1] !== oldHashed) {
+        return { status: 'error', message: 'รหัสผ่านเดิมไม่ถูกต้อง' };
+      }
+      rowIndex = i + 1; // 1-based index for getRange
+      break;
+    }
+  }
+  
+  if (rowIndex === -1) {
+    return { status: 'error', message: 'ไม่พบชื่อผู้ใช้' };
+  }
+  
+  sheet.getRange(rowIndex, 2).setValue(hashPassword(newPassword));
+  logAudit(ss, username, 'CHANGE_PASSWORD', 'User changed password');
+  
+  return { status: 'success' };
+}
+
 // ---------- router ----------
 
 function apiHandler(action, payload, userToken) {
@@ -409,7 +536,13 @@ function apiHandler(action, payload, userToken) {
       case 'LOGIN':
         return doLogin(payload.username, payload.password, ss);
       case 'DESCRIBE_SHEET':
-        return { status: 'success', columns: describeSheet(payload.sheetName, ss) };
+        return {
+          status: 'success',
+          columns: describeSheet(payload.sheetName, ss),
+          filters: FILTER_FIELDS[payload.sheetName] || [],
+        };
+      case 'GET_FILTER_OPTIONS':
+        return { status: 'success', options: getFilterOptions(payload.sheetName, ss) };
       case 'GET_RECORDS': {
         var result = getRecords(payload.sheetName, payload, ss);
         return { status: 'success', rows: result.rows, total: result.total };
@@ -418,6 +551,8 @@ function apiHandler(action, payload, userToken) {
         return saveRecord(payload.sheetName, payload.record, secureUser, ss);
       case 'DELETE_RECORD':
         return deleteRecord(payload.sheetName, payload.rowUid, secureUser, ss);
+      case 'CHANGE_PASSWORD':
+        return changePassword(secureUser.Username, payload.oldPassword, payload.newPassword, ss);
       default:
         throw new Error('Invalid API action: ' + action);
     }
@@ -433,4 +568,57 @@ function printSeedAdminPassword() {
   ensureSupportSheets(getSpreadsheet());
   var pw = PropertiesService.getScriptProperties().getProperty('IPUR_SEED_ADMIN_PASSWORD');
   Logger.log('admin password: ' + (pw || '(already set on a previous run — check the Users sheet or reset it manually)'));
+}
+
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('🛠️ จัดการระบบ (Admin)')
+    .addItem('รีเซ็ตรหัสผ่านผู้ใช้', 'resetPasswordFromMenu')
+    .addToUi();
+}
+
+function resetPasswordFromMenu() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  var usernameResponse = ui.prompt('รีเซ็ตรหัสผ่าน', 'กรุณากรอก Username ของผู้ใช้ที่ต้องการรีเซ็ตรหัส:', ui.ButtonSet.OK_CANCEL);
+  if (usernameResponse.getSelectedButton() !== ui.Button.OK) return;
+  var username = usernameResponse.getResponseText().trim();
+  if (!username) {
+    ui.alert('ข้อผิดพลาด', 'ต้องกรอก Username', ui.ButtonSet.OK);
+    return;
+  }
+  
+  var passwordResponse = ui.prompt('รีเซ็ตรหัสผ่าน', 'กรุณากรอกรหัสผ่านใหม่ (เช่น 1234):', ui.ButtonSet.OK_CANCEL);
+  if (passwordResponse.getSelectedButton() !== ui.Button.OK) return;
+  var newPassword = passwordResponse.getResponseText().trim();
+  if (!newPassword) {
+    ui.alert('ข้อผิดพลาด', 'ต้องกรอกรหัสผ่านใหม่', ui.ButtonSet.OK);
+    return;
+  }
+  
+  var sheet = ss.getSheetByName('Users');
+  if (!sheet) {
+    ui.alert('ข้อผิดพลาด', 'ไม่พบชีต Users', ui.ButtonSet.OK);
+    return;
+  }
+  
+  var data = sheet.getDataRange().getValues();
+  var rowIndex = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === username) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  
+  if (rowIndex === -1) {
+    ui.alert('ข้อผิดพลาด', 'ไม่พบผู้ใช้: ' + username, ui.ButtonSet.OK);
+    return;
+  }
+  
+  sheet.getRange(rowIndex, 2).setValue(hashPassword(newPassword));
+  logAudit(ss, 'AdminMenu', 'RESET_PASSWORD', 'Admin reset password for ' + username);
+  
+  ui.alert('สำเร็จ', 'รีเซ็ตรหัสผ่านสำหรับ ' + username + ' เป็นที่เรียบร้อยแล้ว!', ui.ButtonSet.OK);
 }

@@ -1,6 +1,7 @@
 import { MOCK_PRODUCTS, GIFTS, PROMOTIONS } from "../data/products";
 import { COUPONS } from "../data/coupons";
 import { DEFAULT_INSTALLMENT_SETTINGS } from "../data/installments";
+import { BRANCHES } from "../data/branches";
 
 const ADMIN_EMAILS = ["mahalala123@gmail.com"];
 
@@ -81,13 +82,22 @@ export function logoutMemberLocal(token) {
   return { success: true };
 }
 
-export function registerMemberLocal({ name, email, password, requestAdmin }) {
+export function getBranchesLocal() {
+  return BRANCHES.slice();
+}
+
+export function registerMemberLocal({ name, email, password, branchCode, requestAdmin }) {
   if (members.some(m => m.email === email)) {
     return { success: false, message: "อีเมลนี้ถูกใช้งานแล้ว" };
   }
   const token = generateSessionTokenLocal_();
   const adminStatus = requestAdmin ? "pending" : "";
-  const member = { id: "M" + Date.now(), name, email, points: 0, adminStatus, isBlocked: false };
+  const branch = BRANCHES.find(b => b.branchCode === branchCode);
+  const member = {
+    id: "M" + Date.now(), name, email, points: 0, adminStatus,
+    channel: branch ? branch.channel : "", branchCode: branchCode || "", branchName: branch ? branch.branchName : "",
+    isBlocked: false
+  };
   members.push({ ...member, password, sessionToken: token });
   return { success: true, member: { ...member, isAdmin: isAdminLocal_(email), token } };
 }
@@ -103,7 +113,10 @@ export function getAdminMembersLocal(token) {
       points: m.points,
       isSuperAdmin: ADMIN_EMAILS.includes(m.email),
       adminStatus: m.adminStatus || "",
-      isBlocked: !!m.isBlocked
+      isBlocked: !!m.isBlocked,
+      channel: m.channel || "",
+      branchCode: m.branchCode || "",
+      branchName: m.branchName || ""
     }))
   };
 }

@@ -1,11 +1,22 @@
 import { useState } from 'react';
-import { api, setToken } from '../lib/api.js';
+import { api, setToken, setStoredUser } from '../lib/api.js';
+import Swal from 'sweetalert2';
 
-export default function LoginScreen({ onLogin }) {
+export default function LoginScreen({ onLogin, message }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  function handleForgotPassword() {
+    Swal.fire({
+      icon: 'info',
+      title: 'ลืมรหัสผ่าน',
+      text: 'กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อทำการรีเซ็ตรหัสผ่านของคุณ',
+      confirmButtonText: 'ตกลง',
+      confirmButtonColor: '#4f46e5'
+    });
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -14,6 +25,7 @@ export default function LoginScreen({ onLogin }) {
     try {
       const res = await api.login(username, password);
       setToken(res.user.Token);
+      setStoredUser(res.user);
       onLogin(res.user);
     } catch (err) {
       setError(err.message || 'เข้าสู่ระบบไม่สำเร็จ');
@@ -29,6 +41,9 @@ export default function LoginScreen({ onLogin }) {
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Cost / PriceSet Manager</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">เข้าสู่ระบบเพื่อจัดการข้อมูลต้นทุนและราคา</p>
         </div>
+        {message && !error && (
+          <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{message}</div>
+        )}
         {error && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</div>
         )}
@@ -44,7 +59,16 @@ export default function LoginScreen({ onLogin }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">รหัสผ่าน</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">รหัสผ่าน</label>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 font-medium focus:outline-none"
+              >
+                ลืมรหัสผ่าน?
+              </button>
+            </div>
             <input
               type="password"
               className="w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"

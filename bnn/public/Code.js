@@ -90,7 +90,10 @@ function getAdminMembers(token) {
       createdAt: obj.createdAt instanceof Date ? obj.createdAt.toISOString() : obj.createdAt,
       isSuperAdmin: ADMIN_EMAILS.indexOf(obj.email) !== -1,
       adminStatus: obj.adminStatus || "",
-      isBlocked: obj.isBlocked === true || obj.isBlocked === 'TRUE'
+      isBlocked: obj.isBlocked === true || obj.isBlocked === 'TRUE',
+      channel: obj.channel || "",
+      branchCode: obj.branchCode || "",
+      branchName: obj.branchName || ""
     };
   }).reverse();
 
@@ -189,6 +192,26 @@ function hashPassword_(password, salt) {
   return bytes.map(b => (b < 0 ? b + 256 : b).toString(16).padStart(2, "0")).join("");
 }
 
+// ชีต Branches (ดูแลแยกจากโค้ด ไม่มี setup อัตโนมัติ) ใช้เป็นแหล่งข้อมูล Channel/รหัสสาขา
+// ตอนลงทะเบียนสมาชิก คอลัมน์: "Channel", "Branch Code", "Branch Name"
+function getBranches() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Branches");
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const channelCol = headers.indexOf("Channel");
+  const codeCol = headers.indexOf("Branch Code");
+  const nameCol = headers.indexOf("Branch Name");
+  if (channelCol === -1 || codeCol === -1) return [];
+  return data.slice(1)
+    .filter(row => row[codeCol])
+    .map(row => ({
+      channel: row[channelCol],
+      branchCode: row[codeCol],
+      branchName: nameCol !== -1 ? row[nameCol] : ""
+    }));
+}
+
 function registerMember(data) {
   const sheet = getOrCreateSheet_("Members", ["id", "name", "email", "password", "points", "createdAt", "resetCode", "resetExpiry"]);
   const rows = sheet.getDataRange().getValues();
@@ -209,10 +232,20 @@ function registerMember(data) {
   const adminStatus = data.requestAdmin ? "pending" : "";
   sheet.getRange(rowNum, ensureColumn_(sheet, "adminStatus")).setValue(adminStatus);
 
+  const branch = getBranches().find(b => b.branchCode === data.branchCode) || null;
+  const channel = branch ? branch.channel : "";
+  const branchName = branch ? branch.branchName : "";
+  sheet.getRange(rowNum, ensureColumn_(sheet, "channel")).setValue(channel);
+  sheet.getRange(rowNum, ensureColumn_(sheet, "branchCode")).setValue(data.branchCode || "");
+  sheet.getRange(rowNum, ensureColumn_(sheet, "branchName")).setValue(branchName);
+
   const token = createSession_(sheet, rowNum);
   return {
     success: true,
-    member: { id: id, name: data.name, email: data.email, points: 0, isAdmin: isAdmin_(data.email), adminStatus: adminStatus, token: token }
+    member: {
+      id: id, name: data.name, email: data.email, points: 0, isAdmin: isAdmin_(data.email), adminStatus: adminStatus,
+      channel: channel, branchCode: data.branchCode || "", branchName: branchName, token: token
+    }
   };
 }
 
