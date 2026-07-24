@@ -1,0 +1,109 @@
+import { useState } from "react";
+import { X } from "lucide-react";
+import { RESERVATION_CHANNELS } from "../../data/channels";
+
+function toFormState(gift) {
+  if (!gift) {
+    return { name: "", sku: "", stockQty: "", channels: [] };
+  }
+  return {
+    name: gift.name || "",
+    sku: gift.sku || "",
+    stockQty: gift.stockQty ?? "",
+    channels: gift.channels || []
+  };
+}
+
+export default function GiftFormModal({ gift, type, title, onClose, onSave }) {
+  const [form, setForm] = useState(() => toFormState(gift));
+  const [saving, setSaving] = useState(false);
+  const isEdit = !!gift;
+
+  const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+
+  const toggleChannel = (channel) => {
+    setForm(prev => ({
+      ...prev,
+      channels: prev.channels.includes(channel)
+        ? prev.channels.filter(c => c !== channel)
+        : [...prev.channels, channel]
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSave({
+        id: gift?.id,
+        name: form.name,
+        sku: form.sku,
+        type,
+        stockQty: form.stockQty,
+        channels: form.channels
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto p-6">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700">
+          <X className="w-5 h-5" />
+        </button>
+
+        <h2 className="text-lg font-bold text-gray-900 mb-1">{isEdit ? "แก้ไขของแถม" : "เพิ่มของแถมใหม่"}</h2>
+        <p className="text-xs text-gray-500 mb-6">{title}</p>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">ชื่อของแถม</label>
+            <input required value={form.name} onChange={set("name")} className="input" placeholder="เช่น เคสซิลิโคนกันกระแทก มูลค่า ฿290" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">SKU</label>
+            <input value={form.sku} onChange={set("sku")} className="input" placeholder="เช่น GIFT-CASE-001" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">จำนวนสต๊อก</label>
+            <input type="number" min="0" value={form.stockQty} onChange={set("stockQty")} className="input" placeholder="เว้นว่าง = ไม่เปลี่ยนแปลงสต๊อกเดิม" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">ช่องทางการรับจอง</label>
+            <p className="text-[11px] text-gray-400 mb-1.5">เลือกได้หลายช่องทาง — ไม่เลือกเลย = อนุญาตให้จองได้ทุกช่องทาง</p>
+            <div className="flex flex-wrap gap-2">
+              {RESERVATION_CHANNELS.map(channel => (
+                <label
+                  key={channel}
+                  className="flex items-center gap-1.5 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs cursor-pointer has-[:checked]:border-[#FFD700] has-[:checked]:bg-[#FFFBE6]"
+                >
+                  <input type="checkbox" checked={form.channels.includes(channel)} onChange={() => toggleChannel(channel)} />
+                  {channel}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-3">
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-[#1a1a1a] text-white text-sm font-bold px-5 py-2.5 rounded-md hover:bg-black transition-colors disabled:opacity-50"
+            >
+              {saving ? "กำลังบันทึก..." : "บันทึก"}
+            </button>
+            <button type="button" onClick={onClose} className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              ยกเลิก
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

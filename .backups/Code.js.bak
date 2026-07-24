@@ -275,23 +275,11 @@ function getPublicConfig() {
     // Fallback to old Settings sheet just in case it hasn't been migrated
     const oldSheet = ss.getSheetByName("Settings");
     if(oldSheet) {
-       const rows = oldSheet.getDataRange().getValues();
-       for (let i = 1; i < rows.length; i++) {
-         const key = (rows[i][0] || '').toString().trim().toLowerCase();
-         if (['loginbg', 'login bg', 'loginbackground', 'login background'].includes(key)) {
-           const val = rows[i][1];
-           return val ? val.toString() : null;
-         }
-       }
        const val = oldSheet.getRange("D2").getValue();
        return val ? val.toString() : null;
     }
   } catch(e) { return null; }
   return null;
-}
-
-function looksLikePasswordHash_(value) {
-  return /^[a-f0-9]{64}$/i.test((value || '').toString().trim());
 }
 
 function apiHandler(action, payload, userToken) {
@@ -614,7 +602,6 @@ function getAllInitialData(ss) {
     interests: getTableDataAsJson(ss.getSheetByName("Interests")),
     giftMappings: getTableDataAsJson(ss.getSheetByName("GiftMappings")),
     autoPromotions: getTableDataAsJson(ss.getSheetByName("AutoPromotions")),
-    members: getTableDataAsJson(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
     // ใช้วาด order status timeline (5A.3) — ชีตอาจไม่มีในระบบเก่า จึงต้องกัน null
     orderStatuses: ss.getSheetByName("OrderStatus") ? getTableDataAsJson(ss.getSheetByName("OrderStatus")) : [],
     heroBanners: heroBanners,
@@ -1110,17 +1097,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
     const sheet = ss.getSheetByName(tableName); const data = sheet.getDataRange().getDisplayValues(); const headers = data[0].map(h => h.toString().trim()); let idIndex = headers.indexOf(idField); let rowIndex = -1;
     if (dataObj[idField]) { for (let i = 1; i < data.length; i++) { if (data[i][idIndex] == dataObj[idField]) { rowIndex = i + 1; break; } } }
-    if (tableName === "Members") {
-      if (!dataObj.Password || dataObj.Password.trim() === "") {
-        if (rowIndex > -1) {
-          dataObj.Password = data[rowIndex - 1][headers.indexOf("Password")];
-        } else {
-          dataObj.Password = hashPassword("1234");
-        }
-      } else if (!looksLikePasswordHash_(dataObj.Password)) {
-        dataObj.Password = hashPassword(dataObj.Password);
-      }
-    }
+    if(tableName === "Members") { if (!dataObj.Password || dataObj.Password.trim() === "") { if (rowIndex > -1) { dataObj.Password = data[rowIndex - 1][headers.indexOf("Password")]; } else { dataObj.Password = hashPassword("1234"); } } else { if (dataObj.Password.length < 50) dataObj.Password = hashPassword(dataObj.Password); } }
     let rowData = headers.map(h => dataObj[h] !== undefined ? dataObj[h] : "");
     if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); } const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions"]; if (cacheableTables.includes(tableName)) CacheService.getScriptCache().remove("TABLE_" + tableName);
     return { status: 'success' };
@@ -1650,6 +1627,7 @@ function deleteSettingsItem(payload, secureUser, ss) {
     lock.releaseLock();
   }
 }
+
 
 
 
