@@ -54,6 +54,22 @@ window.app = {
     return window.app.esc(String(v === null || v === undefined ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
   },
 
+  // ทุกหน้าที่นับ/รวมยอดจองจาก Orders ต้องข้ามแถวที่ถูกยกเลิกด้วยฟังก์ชันนี้ — เดิมแต่ละหน้าเช็คเอง ('Cancelled' บ้าง, 'Cancelled'+'ยกเลิก' บ้าง)
+  // ไม่สม่ำเสมอกัน ทำให้ถ้าแถวไหนถูกตั้ง Order Status เป็น 'ยกเลิก' (เช่น แก้ตรงชีตเอง) บางหน้าจะยังนับรวมอยู่ — รวมเป็นจุดเดียวกันแทน
+  isOrderCancelled: function(o) {
+    const s = (o && o['Order Status'] !== undefined && o['Order Status'] !== null ? o['Order Status'] : '').toString().trim();
+    return s === 'Cancelled' || s === 'ยกเลิก';
+  },
+
+  // flow สถานะออเดอร์ปัจจุบัน (ไม่รวม Cancelled) — อ่านจากชีต OrderStatus ตามลำดับแถวถ้ามี ≥2 แถว ไม่งั้น fallback มาตรฐาน
+  // เดิมมี 3 จุดคัดลอกลอจิกนี้ซ้ำกัน (Orders grid select, grid filter, orderTimelineHtml) เสี่ยงแก้จุดเดียวแล้วหลุดไม่ตรงกัน — รวมมาไว้ที่เดียว
+  getOrderStatusFlow: function() {
+    const stList = (window.app.globalData.orderStatuses || []).filter(s => s && (s['Status Name'] || '').toString().trim() !== '');
+    return stList.length >= 2
+      ? stList.map(s => s['Status Name'].toString().trim()).filter(n => n.toLowerCase() !== 'cancelled')
+      : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
+  },
+
   // 5B.1 — esc ข้อความแล้ว highlight คำค้น: หา match บน raw text, esc ทีละ segment แล้วครอบ <mark>
   // (ปลอดภัยกว่า replace หลัง esc ทั้งก้อน เพราะคำค้นจะไม่มีวัน match เข้าไปใน entity เช่น &amp;)
   highlightEsc: function(raw, term) {
@@ -920,7 +936,9 @@ window.app = {
            Swal.close();
            if(res && res.status === 'success') {
               window.app.toast('ลบเอกสารแล้ว');
-              if(this.currentId === invoiceId) { this.currentId = null; this.currentStatus = null; this.updateSaveBtn(); }
+              // เดิมไม่เรียก applyLockState() — ถ้าเอกสารที่ลบ (ตัวที่เปิดอยู่) สถานะ "อนุมัติแล้ว" อยู่ก่อน ฟอร์ม #invoice-paper ทุก input/select/textarea/button
+              // จะค้าง disabled ต่อไปทั้งที่ currentStatus ถูกล้างเป็น null แล้ว (updateSaveBtn() อย่างเดียวไม่ปลดล็อกฟอร์ม) จนกว่าจะกด "สร้างใหม่"
+              if(this.currentId === invoiceId) { this.currentId = null; this.currentStatus = null; this.applyLockState(); }
               this.loadList();
            } else {
               Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
@@ -1456,13 +1474,7 @@ window.app = {
             { key: 'Remark', label: 'Remark', type: 'text' },
             { key: 'Row Total', label: 'ยอดรวม', type: 'readonly' },
             // ตัวเลือกต้องตรงกับ flow ที่ orderTimelineHtml ใช้จริง (ชีต OrderStatus ถ้ามี ≥2 แถว ไม่งั้น fallback Pending/Confirmed/Paid/Delivered) — เดิม hardcode ['Pending','Completed','Cancelled'] ทำให้เลือกสถานะกลางไม่ได้เลย
-            { key: 'Order Status', label: 'สถานะออเดอร์', type: 'select', options: (function() {
-              const stList = (window.app.globalData.orderStatuses || []).filter(s => s && (s['Status Name'] || '').toString().trim() !== '');
-              const flow = stList.length >= 2
-                ? stList.map(s => s['Status Name'].toString().trim()).filter(n => n.toLowerCase() !== 'cancelled')
-                : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
-              return flow.concat(['Cancelled']);
-            })() },
+            { key: 'Order Status', label: 'สถานะออเดอร์', type: 'select', options: window.app.getOrderStatusFlow().concat(['Cancelled']) },
             { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text' },
             { key: 'Deposit', label: 'เงินมัดจำ', type: 'number' }
           ], isSalesRole); break;
@@ -1781,12 +1793,18 @@ window.app = {
       const orderResStatusMap = {};
       this.filteredOrders.forEach(o => { if(o['Reservation Status'] && o['Reservation Status'].trim() !== '') { orderResStatusMap[o.OrderID] = o['Reservation Status']; } });
 
+      // "อัตราปิดการขาย" = สัดส่วนออเดอร์ที่ถึงสถานะสุดท้ายของ flow ปัจจุบัน (getOrderStatusFlow) — เดิม hardcode ตรวจ 'Completed'
+      // ซึ่งไม่ใช่ค่าที่ processCheckout เขียนจริง (เริ่ม 'Pending' เสมอ) และไม่อยู่ใน flow มาตรฐาน Pending→Confirmed→Paid→Delivered เลย
+      // ทำให้ KPI นี้เป็น 0% เสมอในระบบที่ยังไม่ได้ตั้งชื่อสถานะ "Completed" เองในชีต OrderStatus
+      const orderFlow = window.app.getOrderStatusFlow();
+      const terminalStatus = orderFlow[orderFlow.length - 1];
+
       this.filteredOrders.forEach(o => {
-        if (o['Order Status'] !== 'Cancelled') { 
+        if (!window.app.isOrderCancelled(o)) {
             let rTotal = parseFloat((o['Row Total'] || '0').toString().replace(/,/g,''));
             t += isNaN(rTotal) ? 0 : rTotal;
             u.add(o.OrderID);
-            if (o['Order Status'] === 'Completed') completedOrders.add(o.OrderID);
+            if (o['Order Status'] === terminalStatus) completedOrders.add(o.OrderID);
             
             let isMobile = o.Category === 'โมบาย';
             // 6C.3 — "อุปกรณ์เสริม" แยกเป็น 3 หมวดย่อย (อุปกรณ์เสริม/สมาร์ทวอทช์/หูฟัง) แต่ KPI นี้ยังรวมเป็นยอดเดียว
@@ -1830,7 +1848,7 @@ window.app = {
       // (เช่น "10/1/2569" < "2/1/2569" แบบ string แต่ผิดลำดับวันที่จริง) ต้อง sort ด้วย key YYYY-MM-DD ตาม rule 1 แล้วค่อย map กลับเป็น label
       const trendData = {};
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] !== 'Cancelled' && isDevice(o)) {
+        if(!window.app.isOrderCancelled(o) && isDevice(o)) {
           const dt = new Date(o.Timestamp);
           const dKey = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
           if (!trendData[dKey]) trendData[dKey] = { label: dt.toLocaleDateString('th-TH'), qty: 0 };
@@ -1851,7 +1869,7 @@ window.app = {
       };
       const groupData = {};
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] === 'Cancelled' || (o.Category || '').toString().trim() !== 'โมบาย') return;
+        if(window.app.isOrderCancelled(o) || (o.Category || '').toString().trim() !== 'โมบาย') return;
         let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
         const g = stripCapacityGroup(mName, o.Capacity);
         let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
@@ -1866,7 +1884,7 @@ window.app = {
         const modelsData = {};
         let grandTotalQty = 0;
         this.filteredOrders.forEach(o => {
-          if(o['Order Status'] === 'Cancelled' || !isDevice(o)) return;
+          if(window.app.isOrderCancelled(o) || !isDevice(o)) return;
           if(!categories.includes((o.Category || '').toString().trim())) return;
           let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
           if (o.Capacity && o.Capacity !== '-' && o.Capacity.trim() !== '') mName += ` (${o.Capacity})`;
@@ -1895,7 +1913,7 @@ window.app = {
       const buildCountChart = (field, canvasId, colorHex) => {
           const counts = {};
           this.filteredOrders.forEach(o => {
-            if (o['Order Status'] !== 'Cancelled' && isDevice(o) && o[field] && o[field] !== '-') {
+            if (!window.app.isOrderCancelled(o) && isDevice(o) && o[field] && o[field] !== '-') {
               let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); counts[o[field]] = (counts[o[field]] || 0) + (isNaN(qty) ? 0 : qty);
             }
           });
@@ -1908,12 +1926,12 @@ window.app = {
       buildCountChart('Province', 'chartProvince', '#f59e0b'); buildCountChart('Type Name', 'chartType', '#8b5cf6');
 
       const branchCounts = {};
-      this.filteredOrders.forEach(o => { if(o['Order Status'] !== 'Cancelled' && isDevice(o)) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); branchCounts[o['Branch Code']] = (branchCounts[o['Branch Code']] || 0) + (isNaN(qty) ? 0 : qty); } });
+      this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o)) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); branchCounts[o['Branch Code']] = (branchCounts[o['Branch Code']] || 0) + (isNaN(qty) ? 0 : qty); } });
       let sortedBranches = Object.keys(branchCounts).sort((a,b)=>branchCounts[b]-branchCounts[a]).slice(0, 10);
       this.createChart('chartTopBranches', 'bar', sortedBranches, sortedBranches.map(b=>branchCounts[b]), 'จำนวนเครื่องรวม', '#254d71');
 
       const salesCounts = {};
-      this.filteredOrders.forEach(o => { if(o['Order Status'] !== 'Cancelled' && isDevice(o) && o['Staff']) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); salesCounts[o['Staff']] = (salesCounts[o['Staff']] || 0) + (isNaN(qty) ? 0 : qty); } });
+      this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o) && o['Staff']) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); salesCounts[o['Staff']] = (salesCounts[o['Staff']] || 0) + (isNaN(qty) ? 0 : qty); } });
       let sortedSales = Object.keys(salesCounts).sort((a,b)=>salesCounts[b]-salesCounts[a]).slice(0, 10);
       this.createChart('chartSalesRank', 'bar', sortedSales, sortedSales.map(s=>salesCounts[s]), 'จำนวนเครื่อง', '#2563eb', true);
 
@@ -1926,7 +1944,7 @@ window.app = {
       const allChannelsAcc = new Set();
       
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] === 'Cancelled' || !isDevice(o)) return;
+        if(window.app.isOrderCancelled(o) || !isDevice(o)) return;
         let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
         if (o.Capacity && o.Capacity !== '-' && o.Capacity.trim() !== '') mName += ` (${o.Capacity})`;
         
@@ -2002,7 +2020,7 @@ window.app = {
       const promoData = {}; const promoProcessed = new Set(); let totalPromos = 0;
       const isDevice = (o) => { const validCat = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง']; return o.Category && validCat.includes(o.Category.toString().trim()); };
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] !== 'Cancelled' && !promoProcessed.has(o.OrderID)) {
+        if(!window.app.isOrderCancelled(o) && !promoProcessed.has(o.OrderID)) {
            let orderItems = this.filteredOrders.filter(x => x.OrderID === o.OrderID);
            if(orderItems.some(x => isDevice(x))) {
                let firstRow = orderItems[0];
@@ -2026,7 +2044,7 @@ window.app = {
       const giftCounts = {}; let totalGifts = 0;
       const isGift = (o) => o.Category && o.Category.toString().trim().includes('ของแถม');
       this.filteredOrders.forEach(o => {
-         if(o['Order Status'] !== 'Cancelled' && isGift(o)) {
+         if(!window.app.isOrderCancelled(o) && isGift(o)) {
             let name = o['Product Name'] || '';
             let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
             giftCounts[name] = (giftCounts[name] || 0) + qty; totalGifts += qty;
@@ -2046,7 +2064,7 @@ window.app = {
       const tbody = document.getElementById('tableInterestsBody'); if(!tbody) return;
       let tbodyHtml = ''; let counts = {}; let totalInterests = 0; const ordersById = {};
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] !== 'Cancelled') {
+        if(!window.app.isOrderCancelled(o)) {
            if(!ordersById[o.OrderID]) ordersById[o.OrderID] = [];
            ordersById[o.OrderID].push(o);
         }
@@ -2161,8 +2179,9 @@ window.app = {
       if(window.app.dashboard.filteredOrders.length===0) return Swal.fire('ไม่มีข้อมูล', '', 'warning');
       const headers = Object.keys(window.app.dashboard.filteredOrders[0]); 
       let csvContent = "\uFEFF" + headers.join(",") + "\r\n";
-      window.app.dashboard.filteredOrders.forEach(row => { 
-        csvContent += headers.map(h => '"' + (row[h]?row[h].toString().replace(/"/g, '""'):"") + '"').join(",") + "\r\n"; 
+      window.app.dashboard.filteredOrders.forEach(row => {
+        // เดิมเช็ค truthy (row[h] ? ... : "") ทำให้ค่า 0 ที่ถูกต้อง (เช่น Unit Price ของแถม, Deposit ของจอง F) กลายเป็นช่องว่างในไฟล์ export
+        csvContent += headers.map(h => '"' + ((row[h] !== undefined && row[h] !== null) ? row[h].toString().replace(/"/g, '""') : "") + '"').join(",") + "\r\n";
       });
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -2243,7 +2262,7 @@ window.app = {
       let currentDays = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
       if (now > endDate) currentDays = totalDays;
       
-      const validOrders = orders.filter(o => o['Order Status'] !== 'Cancelled' && o['Order Status'] !== 'ยกเลิก' && o.Timestamp);
+      const validOrders = orders.filter(o => !window.app.isOrderCancelled(o) && o.Timestamp);
       let totalMobile = 0;
       let totalAcc = 0;
       
@@ -2479,7 +2498,7 @@ window.app = {
       const endKey = toDateKey(endDate);
 
       const validOrders = orders.filter(o => {
-          if (o['Order Status'] === 'Cancelled' || o['Order Status'] === 'ยกเลิก' || !o.Timestamp) return false;
+          if (window.app.isOrderCancelled(o) || !o.Timestamp) return false;
           // นอกช่วงเวลาการจอง (ReserveStart/ReserveEnd) — ตัดออก ไม่งั้นยอดจองรวมออเดอร์เก่าข้ามแคมเปญทั้งหมด (Orders sheet ไม่เคยถูกล้าง)
           const tsObj = new Date(o.Timestamp);
           if (isNaN(tsObj)) return false;
@@ -2768,7 +2787,7 @@ window.app = {
         + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-chart-pie text-pink-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="p-2">' + tableHtml + '</div>'
+        + '<div class="p-2 overflow-x-auto custom-scrollbar">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -2810,7 +2829,7 @@ window.app = {
       const resMatrix = { 'T': {}, 'F': {} };
 
       this.rawOrders.forEach(o => {
-        if (o['Order Status'] === 'Cancelled') return;
+        if (window.app.isOrderCancelled(o)) return;
         if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า
         let qty = parseInt((o.Qty || '0').toString().replace(/,/g, ''));
         if (isNaN(qty) || qty <= 0) return;
@@ -3151,7 +3170,7 @@ window.app = {
       const UNMAPPED_AREA = 'ไม่ระบุแอเรีย';
 
       this.rawOrders.forEach(o => {
-        if (o['Order Status'] === 'Cancelled') return;
+        if (window.app.isOrderCancelled(o)) return;
         if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า
         let qty = parseInt((o.Qty || '0').toString().replace(/,/g, ''));
         if (isNaN(qty) || qty <= 0) return;
@@ -3404,7 +3423,7 @@ window.app = {
       const matrixT = {}, matrixF = {}, matrixAll = {};
 
       this.rawOrders.forEach(o => {
-        if (o['Order Status'] === 'Cancelled') return;
+        if (window.app.isOrderCancelled(o)) return;
         if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า
         let qty = parseInt((o.Qty || '0').toString().replace(/,/g, ''));
         if (isNaN(qty) || qty <= 0) return;
@@ -3503,7 +3522,7 @@ window.app = {
       const orderResStatusMap = {};
       this.rawOrders.forEach(o => { if (o['Reservation Status'] && o['Reservation Status'].trim() !== '') { orderResStatusMap[o.OrderID] = o['Reservation Status']; } });
       this.rawOrders.forEach(o => {
-        if (o['Order Status'] === 'Cancelled') return;
+        if (window.app.isOrderCancelled(o)) return;
         if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า — Product Name ของมันคือชื่อโปรโมชั่น
         const name = (o['Product Name'] || '').toString().trim();
         if (!name) return;
@@ -4461,7 +4480,8 @@ window.app = {
 
       window.app.globalData.products.forEach((p, idx)=>{ 
         if(p.Status==='เปิด'){ 
-          let pNameLower = p['Product Name'].toLowerCase();
+          // ต้องกัน Product Name ว่าง/undefined เหมือนจุดอื่นในฟังก์ชันนี้ (แถวชีตที่แก้ตรงๆ อาจว่างได้) ไม่งั้น .toLowerCase() throw ทำให้เปิด modal "จอง" ไม่ได้เลยทั้งหน้า
+          let pNameLower = (p['Product Name'] || '').toLowerCase();
           
           if(p.Category==='ของแถมแบรนด์' && hasMapping && allowedBrandGifts.some(g => g === '*' || pNameLower.includes(g))) {
             bGiftsHTML += `<div class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:bg-slate-50 transition-colors"><input class="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-500 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="bgift${idx}" onchange="document.getElementById('bgiftQty${idx}').disabled = !this.checked"><label class="flex-1 text-[9px] md:text-[10px] font-normal text-slate-700 break-words whitespace-normal cursor-pointer select-none" for="bgift${idx}">${window.app.esc(p['Product Name'])} <span class="text-emerald-600 font-bold ml-1">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="bgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
@@ -4951,7 +4971,13 @@ window.app = {
         if (table === 'Orders') { exBtn.classList.remove('hidden'); exBtn.classList.add('flex'); }
         else { exBtn.classList.add('hidden'); exBtn.classList.remove('flex'); }
       }
-      
+      // ตัวกรอง ประเภทการจอง/สถานะออเดอร์/Category — เฉพาะหน้า Orders
+      const filterBar = document.getElementById('gridFilterBar');
+      if (filterBar) {
+        if (table === 'Orders') { filterBar.classList.remove('hidden'); filterBar.classList.add('flex'); this.setupOrdersFilters(); }
+        else { filterBar.classList.add('hidden'); filterBar.classList.remove('flex'); }
+      }
+
       let h = '<tr>'; 
       this.columns.forEach(c => { 
         if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-left text-[11px] font-bold text-indigo-900 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-indigo-100 transition-colors">${c.label} <i class="fas fa-sort text-indigo-300 ml-1"></i></th>`; 
@@ -4962,6 +4988,37 @@ window.app = {
       if(head) head.innerHTML = h; 
       this.loadData();
     },
+    // ตัวกรองหน้า Orders — ประเภทการจอง (Reservation Status), สถานะออเดอร์ (Order Status), Category (จาก SKU ผ่านชีต Products)
+    setupOrdersFilters: function() {
+      // ตัวเลือกต้องตรงกับค่าที่เก็บจริงในชีต (เหมือน options ของฟอร์มแก้ไข 'Reservation Status' ด้านบน)
+      const resEl = document.getElementById('gridFilterResStatus');
+      if (resEl) {
+        resEl.innerHTML = '<option value="">ประเภทการจอง: ทั้งหมด</option>'
+          + '<option value="จอง T (มีการจอง)">จอง T (มีการจอง)</option>'
+          + '<option value="จอง F (สวมสิทธิ์การจอง)">จอง F (สวมสิทธิ์การจอง)</option>';
+      }
+      // สถานะออเดอร์ — flow เดียวกับที่ orderTimelineHtml/ฟอร์มแก้ไขใช้ (ชีต OrderStatus ถ้ามี ≥2 แถว ไม่งั้น fallback)
+      const stEl = document.getElementById('gridFilterOrderStatus');
+      if (stEl) {
+        const options = window.app.getOrderStatusFlow().concat(['Cancelled']);
+        stEl.innerHTML = '<option value="">สถานะออเดอร์: ทั้งหมด</option>'
+          + options.map(o => '<option value="' + window.app.esc(o) + '">' + window.app.esc(o) + '</option>').join('');
+      }
+      // Category — จากชีต Products ผูกกับ SKU ของแต่ละแถว Order (แถว DISCOUNT ไม่มี SKU สินค้าจริง จึงไม่เข้าเงื่อนไขนี้)
+      const products = window.app.globalData.products || [];
+      this.skuCategoryMap = {};
+      const seenCat = {}; const cats = [];
+      products.forEach(p => {
+        if (p.SKU) this.skuCategoryMap[p.SKU] = (p['Category'] || '').toString().trim();
+        const c = (p['Category'] || '').toString().trim();
+        if (c && !seenCat[c]) { seenCat[c] = true; cats.push(c); }
+      });
+      const catEl = document.getElementById('gridFilterCategory');
+      if (catEl) {
+        catEl.innerHTML = '<option value="">Category: ทั้งหมด</option>'
+          + cats.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      }
+    },
     loadData: async function() {
       window.app.showLoading(); 
       try {
@@ -4969,9 +5026,9 @@ window.app = {
         Swal.close();
         if(res && res.status === 'success') {
           this.dataList = res.data;
-          this.filteredDataList = this.dataList;
-          this.currentPage = 1;
-          this.renderPage(1);
+          // เดิมตั้ง filteredDataList = dataList ตรงๆ ไม่ผ่าน filter() — เรียก loadData() ซ้ำหลัง save/delete สำเร็จ (ยังอยู่หน้าเดิม)
+          // จะล้างคำค้น/ตัวกรอง Orders (gridFilterResStatus ฯลฯ) ที่ผู้ใช้ตั้งไว้เงียบๆ ทั้งที่ UI ยังโชว์ค่าที่เลือกอยู่
+          this.filter();
         }
         else { this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลได้'); }
       } catch(e) { Swal.close(); this.renderLoadError(e.message); }
@@ -5019,12 +5076,26 @@ window.app = {
       if (data.length === 0) {
         const searchEl = document.getElementById('gridSearch');
         const hasSearch = !!(searchEl && searchEl.value.trim() !== '');
+        let hasFilter = hasSearch;
+        let clearAction = "document.getElementById('gridSearch').value='';window.app.grid.filter()";
+        if (this.tableName === 'Orders') {
+          const resEl = document.getElementById('gridFilterResStatus');
+          const stEl = document.getElementById('gridFilterOrderStatus');
+          const catEl = document.getElementById('gridFilterCategory');
+          const hasSelectFilter = !!((resEl && resEl.value) || (stEl && stEl.value) || (catEl && catEl.value));
+          hasFilter = hasSearch || hasSelectFilter;
+          clearAction = "document.getElementById('gridSearch').value='';"
+            + "var r=document.getElementById('gridFilterResStatus'); if(r) r.value='';"
+            + "var s=document.getElementById('gridFilterOrderStatus'); if(s) s.value='';"
+            + "var c=document.getElementById('gridFilterCategory'); if(c) c.value='';"
+            + "window.app.grid.filter()";
+        }
         tbody.innerHTML = '<tr><td colspan="' + this.visibleColCount() + '">' + window.app.emptyState({
-          icon: hasSearch ? 'fa-search' : 'fa-inbox',
-          title: hasSearch ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีข้อมูลในตารางนี้',
-          subtitle: hasSearch ? 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อแสดงข้อมูลทั้งหมด' : 'เมื่อมีการบันทึกข้อมูลใหม่ รายการจะแสดงที่นี่',
-          actionLabel: hasSearch ? 'ล้างตัวกรอง' : '',
-          onclick: hasSearch ? "document.getElementById('gridSearch').value='';window.app.grid.filter()" : ''
+          icon: hasFilter ? 'fa-search' : 'fa-inbox',
+          title: hasFilter ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีข้อมูลในตารางนี้',
+          subtitle: hasFilter ? 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อแสดงข้อมูลทั้งหมด' : 'เมื่อมีการบันทึกข้อมูลใหม่ รายการจะแสดงที่นี่',
+          actionLabel: hasFilter ? 'ล้างตัวกรอง' : '',
+          onclick: hasFilter ? clearAction : ''
         }) + '</td></tr>';
         return;
       }
@@ -5073,15 +5144,36 @@ window.app = {
       });
       tbody.innerHTML = tbodyHtml;
     },
-    filter: function() { 
+    filter: function() {
       const input = document.getElementById('gridSearch'); if(!input) return;
-      const term = input.value.toLowerCase(); 
-      this.filteredDataList = this.dataList.filter(row => JSON.stringify(Object.values(row)).toLowerCase().includes(term));
-      this.renderPage(1); 
+      const term = input.value.toLowerCase();
+      let list = this.dataList.filter(row => JSON.stringify(Object.values(row)).toLowerCase().includes(term));
+      if (this.tableName === 'Orders') {
+        const resEl = document.getElementById('gridFilterResStatus');
+        const stEl = document.getElementById('gridFilterOrderStatus');
+        const catEl = document.getElementById('gridFilterCategory');
+        const resVal = resEl ? resEl.value : '';
+        const stVal = stEl ? stEl.value : '';
+        const catVal = catEl ? catEl.value : '';
+        if (resVal) {
+          // Reservation Status ถูกเขียนแค่แถวแรกของแต่ละ OrderID เท่านั้น (processCheckout, Code.js) — แถวของแถม/ส่วนลดอื่นในบิลเดียวกันเป็นค่าว่าง
+          // ต้อง join กลับด้วย OrderID เหมือน bookingSummary/branchBookingSummary/allBookingSummary ไม่งั้นกรองแล้วเหลือแค่แถวแรกของบิล ซ่อนแถวที่เหลือไปทั้งตารางและ CSV export
+          const orderResStatusMap = {};
+          this.dataList.forEach(o => { if (o['Reservation Status'] && o['Reservation Status'].toString().trim() !== '') orderResStatusMap[o.OrderID] = o['Reservation Status']; });
+          list = list.filter(row => (row['Reservation Status'] || orderResStatusMap[row.OrderID] || '').toString().trim() === resVal);
+        }
+        if (stVal) list = list.filter(row => (row['Order Status'] || '').toString().trim() === stVal);
+        if (catVal) list = list.filter(row => (this.skuCategoryMap || {})[row.SKU] === catVal);
+      }
+      this.filteredDataList = list;
+      // เดิม filter() ไม่ apply sortCol/sortAsc ที่ผู้ใช้ตั้งไว้ต่อ — เรียง แล้วพิมพ์ค้นหา/เปลี่ยนตัวกรอง ทำให้ลำดับ sort หายเงียบๆ
+      this.applyCurrentSort();
+      this.renderPage(1);
     },
-    sortColumn: function(colKey) {
-      if(this.sortCol === colKey) this.sortAsc = !this.sortAsc;
-      else { this.sortCol = colKey; this.sortAsc = true; }
+    // แยกออกจาก sortColumn เพื่อให้ filter()/loadData() เรียก apply sort เดิมซ้ำได้ ไม่ต้องคัดลอก comparator
+    applyCurrentSort: function() {
+      if (!this.sortCol) return;
+      const colKey = this.sortCol;
       this.filteredDataList.sort((a,b) => {
         let valA = a[colKey] !== undefined && a[colKey] !== null ? a[colKey] : '';
         let valB = b[colKey] !== undefined && b[colKey] !== null ? b[colKey] : '';
@@ -5091,6 +5183,11 @@ window.app = {
         if (valA > valB) return this.sortAsc ? 1 : -1;
         return 0;
       });
+    },
+    sortColumn: function(colKey) {
+      if(this.sortCol === colKey) this.sortAsc = !this.sortAsc;
+      else { this.sortCol = colKey; this.sortAsc = true; }
+      this.applyCurrentSort();
       this.renderPage(1);
     },
     // 5A.3 — Order status timeline (read-only visual) แสดงหัว modal แก้ไข/ดูออเดอร์
@@ -5114,9 +5211,7 @@ window.app = {
           + '</div></div>';
       }
 
-      let flow = stList.length >= 2
-        ? stList.map(s => s['Status Name'].toString().trim()).filter(n => n.toLowerCase() !== 'cancelled')
-        : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
+      let flow = window.app.getOrderStatusFlow();
       // สถานะปัจจุบันไม่อยู่ใน flow (เช่นระบบเก่าใช้ Completed) — ต่อท้ายเป็น step สุดท้ายให้ timeline ยังสะท้อนความจริง
       let curIdx = flow.indexOf(current);
       if (curIdx === -1) { flow = flow.concat([current]); curIdx = flow.length - 1; }

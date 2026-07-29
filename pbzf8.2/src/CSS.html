@@ -484,6 +484,9 @@
       box-shadow: none !important;
     }
     .no-print, .no-print * { display: none !important; }
+    /* invWhtPctPrint คือ % หัก ณ ที่จ่ายแบบข้อความล้วน (คู่กับ input#invWhtPct ที่ถูกซ่อนด้วย .no-print ตอนพิมพ์) — JS.html อัปเดตแค่ innerText ไม่เคยปลด class="hidden" เลย
+       ถ้าไม่บังคับ display ที่นี่ ตอนพิมพ์จะไม่เห็น % หัก ณ ที่จ่ายเลยทั้งที่ยอดเงินหักด้านล่างยังคำนวณ/แสดงอยู่ตามปกติ */
+    #invWhtPctPrint { display: inline !important; }
   }
 
   /* === Cross-device: กัน iOS Safari auto-zoom เมื่อ focus input ที่ font-size < 16px === */
@@ -627,6 +630,11 @@
      ที่สู้กับ cascade order ของ Tailwind CDN) — สโคปไว้ใน @media screen เท่านั้น
      กันไม่ให้ไปยุ่งกับ @media print (ใบเสร็จ/รายงานต้องพิมพ์เป็นกระดาษขาวเสมอ)
   ============================================================ */
+  /* เดิม html.dark{...} + component overrides ด้านล่างนี้ไม่ได้อยู่ใน @media screen ทั้งที่คอมเมนต์ด้านบนบอกว่าต้องสโคปไว้แค่ screen —
+     ทำให้เปิด dark mode แล้วสั่งพิมพ์ (Dashboard, ใบเสนอราคา ฯลฯ) ตัวแปรสี var(--color-*) ยังคงเป็นชุดสีมืดอยู่ (เช่น --color-text-primary
+     เกือบขาว) ทุก component ที่อ้างอิงตัวแปรนี้ตรงๆ (.chart-card, .kpi-gradient-*, .swal2-popup, .login-card, .btn-enterprise-*)
+     จึงพิมพ์ออกมาตัวหนังสือ/พื้นหลังเพี้ยนบนกระดาษขาว ขัดกับ invariant "ใบเสร็จ/รายงานต้องพิมพ์เป็นกระดาษขาวเสมอ" ที่โปรเจกต์นี้ตั้งใจไว้ */
+  @media screen {
   html.dark {
     --color-primary: #5485ad;
     --color-primary-dark: #5485ad;
@@ -671,6 +679,7 @@
   html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
   html.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #334155, #475569); }
   html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #475569, #64748b); }
+  }
 
   @media screen {
     /* Surfaces */
@@ -702,12 +711,23 @@
     html.dark .text-indigo-400 { color: #85abc9 !important; }
     html.dark .text-indigo-500, html.dark .text-indigo-600 { color: #85abc9 !important; }
     html.dark .text-indigo-700, html.dark .text-indigo-800, html.dark .text-indigo-900 { color: #b8cee1 !important; }
+    /* จอง T / จอง F การ์ดเลือกประเภทการจอง (Index.html) ใช้สี blue/red ของ Tailwind ตรงๆ (ไม่ใช่ indigo/rose ที่โปรเจกต์ปรับสีไว้แล้ว) — เดิมไม่มี override เลย
+       การ์ดพื้นหลัง bg-white กลายเป็นพื้นมืด (--color-surface) จากกฎด้านบน แต่ตัวหนังสือ blue-700/red-700 เข้มยังคงเดิม ทำให้อ่านยากในโหมดมืด */
+    html.dark .text-blue-700 { color: #93c5fd !important; }
+    html.dark .text-blue-500 { color: #bfdbfe !important; }
+    html.dark .text-red-700 { color: #fca5a5 !important; }
+    html.dark .text-red-500 { color: #fecaca !important; }
 
     /* Borders & dividers */
     html.dark .border-slate-100, html.dark .border-slate-100\/50, html.dark .border-slate-100\/60 { border-color: #263449 !important; }
     html.dark .border-slate-200, html.dark .border-slate-200\/50, html.dark .border-slate-200\/60, html.dark .border-slate-200\/80 { border-color: #334155 !important; }
     html.dark .border-slate-300 { border-color: #475569 !important; }
     html.dark .border-slate-400 { border-color: #64748b !important; }
+    /* border-slate-800 ในโปรเจกต์นี้ถูกกำหนดให้เท่ากับ --color-surface มืด (#1e293b, ดู Index.html tailwind.config) — เดิมไม่มี override
+       ทำให้เส้นแบ่งหัวข้อในหน้าใบเสนอราคา (border-b border-slate-800) กลายเป็นสีเดียวกับพื้นหลังการ์ดตัวเองพอดี มองไม่เห็นเส้นเลยในโหมดมืด */
+    html.dark .border-slate-800 { border-color: var(--color-border) !important; }
+    html.dark .border-blue-200 { border-color: rgba(59, 130, 246, 0.35) !important; }
+    html.dark .border-red-200 { border-color: rgba(248, 113, 113, 0.35) !important; }
     html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #263449 !important; }
     html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
     html.dark .border-indigo-100, html.dark .border-indigo-100\/50, html.dark .border-indigo-100\/80 { border-color: rgba(84, 133, 173, 0.3) !important; }

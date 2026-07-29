@@ -720,6 +720,12 @@ function processCheckout(payload, secureUser, ss) {
         throw new Error("ไม่อยู่ในช่วงเวลาการจองสินค้า");
       }
     }
+    // whitelist ค่าเดียวกับที่ updateFullOrder เช็ค (rule 25 style) — เดิม processCheckout เช็คแค่ .indexOf('จอง T') แล้วปล่อยสตริงอื่นใดผ่าน sanitizeSheetText_ เขียนตรงๆ
+    // ทำให้รายงาน/พีวอตที่ key ด้วยสองสตริงนี้แน่นอน (bookingSummary, salesSummary, ฯลฯ) จัดกลุ่มแถวที่มีค่าอื่นไม่ได้เลย
+    const validResStatuses = ['', 'จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'];
+    if (payload.resStatus && !validResStatuses.includes(payload.resStatus.toString().trim())) {
+      throw new Error("ประเภทการจองไม่ถูกต้อง: " + payload.resStatus);
+    }
     if (payload.resStatus && payload.resStatus.toString().indexOf('จอง T') > -1) {
       if (!payload.receiptNo || payload.receiptNo.toString().trim() === '') throw new Error("จอง T ต้องระบุเลขที่ใบเสร็จรับเงินมัดจำ");
       if (!(parseFloat(payload.depositAmount) > 0)) throw new Error("จอง T ต้องระบุจำนวนเงินมัดจำมากกว่า 0");
@@ -913,6 +919,11 @@ function processCheckout(payload, secureUser, ss) {
           let giftFound = false;
           for(let i=1; i<prodData.length; i++) {
             if(prodData[i][nameIdx] == giftName) {
+              // giftAllowed ด้านบนเช็คแค่ว่าชื่อ "มี" keyword จาก GiftMappings เป็น substring — ไม่ได้จำกัดว่าต้องเป็นสินค้าหมวดของแถมจริง
+              // ถ้าไม่เช็ค Category ตรงนี้ด้วย payload ที่ปลอม giftObj.name เป็นชื่อสินค้าราคาเต็มที่บังเอิญมี keyword ปนอยู่ (เช่น "เคส")
+              // จะได้สินค้านั้นไปฟรีพร้อมตัดสต๊อกจริง — ต้องเป็นสินค้าหมวด "ของแถม..." เท่านั้นถึงจะนับเป็นของแถมได้
+              const giftRowCat = catIdx > -1 ? (prodData[i][catIdx] || '').toString().trim() : '';
+              if (giftRowCat.indexOf('ของแถม') === -1) continue;
               giftFound = true;
               giftSku = prodData[i][skuIdx];
               let currentStock = parseInt(prodData[i][stockIdx] || 0);
@@ -1148,7 +1159,11 @@ function updateFullOrder(dataObj, secureUser, ss) {
           }
         }
       }
-      if (newStatusVal !== 'Cancelled' && newSkuVal && newSkuVal !== 'DISCOUNT') {
+      // แถวของแถมที่เดิมไม่เคยตัดสต๊อกจริง (marker "รอสต๊อกของแถม") แล้ว SKU/Qty ไม่ได้ถูกแก้ไข (แค่สถานะออเดอร์เปลี่ยน เช่น un-cancel)
+      // ต้องไม่ตัดสต๊อกจริงตรงนี้ด้วย (สมมาตรกับฝั่ง REVERT ด้านบนที่ข้ามการคืนสต๊อกด้วย marker เดียวกัน) — ไม่งั้น un-cancel ออเดอร์ที่มีของแถมค้างสต๊อก
+      // จะไปตัดสต๊อกจริงทั้งที่ Remark ยังบอกว่า "รอสต๊อกของแถม" อยู่ กลายเป็นสต๊อกรั่วตอน cancel ครั้งถัดไป (REVERT จะข้ามคืนสต๊อกที่เพิ่งถูกตัดไปจริง)
+      const skipApplyForUnresolvedGift = oldWasGiftNoStock && newSkuVal === oldSkuVal && newQtyVal === oldQtyVal;
+      if (newStatusVal !== 'Cancelled' && newSkuVal && newSkuVal !== 'DISCOUNT' && !skipApplyForUnresolvedGift) {
         let newSkuFound = false;
         for (let i = 1; i < prodData.length; i++) {
           if (prodData[i][pSkuIdx] == newSkuVal) {
@@ -1204,9 +1219,18 @@ function updateFullOrder(dataObj, secureUser, ss) {
         // ไม่งั้น Qty ที่เก็บจริงจะไม่ตรงกับ newQtyVal ที่ใช้คำนวณ Row Total ด้านบน ทำให้สองคอลัมน์ไม่สอดคล้องกัน
         dataObj["Qty"] = newQtyVal;
 
+        // Deposit เป็นคอลัมน์ตัวเลข (ไม่อยู่ใน FREE_TEXT_COLS_ ด้านล่าง จึงไม่ผ่าน sanitizeSheetText_) แต่ก็ไม่เคย validate มาก่อน
+        // เหมือน Qty ด้านบน — payload ดิบส่งสตริง/formula เข้าคอลัมน์ตัวเลขนี้ตรงๆ ได้ ถ้าไม่ parse+เช็คก่อน
+        if (dataObj["Deposit"] !== undefined) {
+          const depositVal = parseFloat(dataObj["Deposit"].toString().replace(/,/g, ''));
+          if (isNaN(depositVal) || depositVal < 0) throw new Error("จำนวนเงินมัดจำไม่ถูกต้อง");
+          dataObj["Deposit"] = depositVal;
+        }
+
         // กัน formula injection บนฟิลด์ข้อความอิสระที่ user พิมพ์เอง — ห้ามครอบคอลัมน์ตัวเลข/ควบคุม (Row Total, Qty, Order Status ฯลฯ)
         // ไม่งั้นค่าตัวเลขจะกลายเป็นสตริงและพังการรวมยอด/สถานะ
-        const FREE_TEXT_COLS_ = ["Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser", "Promo", "Staff", "Booking Phone", "Customer Interests", "Remark"];
+        // Receipt No เป็นข้อความอิสระเหมือนกัน (sanitize แล้วตอนสร้างออเดอร์ใน processCheckout) — เดิมหลุดจากลิสต์นี้ตอนแก้ไขออเดอร์
+        const FREE_TEXT_COLS_ = ["Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser", "Promo", "Staff", "Booking Phone", "Customer Interests", "Remark", "Receipt No"];
         oHeaders.forEach(h => {
           if (dataObj[h] !== undefined && h !== "_rowIndex") {
             newRowData.push(FREE_TEXT_COLS_.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]);
@@ -1283,7 +1307,21 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
         dataObj.Password = hashPassword(dataObj.Password);
       }
     }
-    let rowData = headers.map(h => dataObj[h] !== undefined ? dataObj[h] : "");
+    // กัน formula injection (rule 24) — เดิม saveRecord (CRUD กลางของ Products/Branches/Channels/Promotions/Interests/GiftMappings/AutoPromotions/Members)
+    // ไม่เคยผ่าน sanitizeSheetText_ เลยสักคอลัมน์ ทั้งที่เป็นจุดที่ Admin พิมพ์ข้อความอิสระบ่อยที่สุดในระบบ — ห้ามครอบคอลัมน์ตัวเลข/select/ID
+    // (เช่น Value ที่ตั้งใจติดลบ) จึงต้องระบุเฉพาะคอลัมน์ข้อความอิสระจริงๆ ต่อชีต ไม่ blanket-apply ทั้งแถว
+    const SAVE_RECORD_FREE_TEXT_COLS_ = {
+      "Products": ["Product Name", "Model", "Product Group", "Capacity", "Color", "Image URL", "Unit"],
+      "Branches": ["Channel", "Branch Name", "Area", "Mall", "Region", "Province", "Type Name"],
+      "Channels": ["Channel Name", "Description"],
+      "Promotions": ["Promo Name"],
+      "Interests": ["Interest Name"],
+      "GiftMappings": ["Target Mobile (SKU or Group)", "Brand Gifts", "Channel Gifts"],
+      "AutoPromotions": ["Message Suggest", "Message Apply"],
+      "Members": ["Name"]
+    };
+    const freeTextCols = SAVE_RECORD_FREE_TEXT_COLS_[tableName] || [];
+    let rowData = headers.map(h => dataObj[h] !== undefined ? (freeTextCols.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]) : "");
     if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); } const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions"]; if (cacheableTables.includes(tableName)) CacheService.getScriptCache().remove("TABLE_" + tableName);
     return generatedPassword ? { status: 'success', generatedPassword: generatedPassword } : { status: 'success' };
   } catch(e) {
@@ -1448,6 +1486,9 @@ function saveSettingsItem(payload, secureUser, ss) {
             throw new Error("Drive Folder ID ที่ตั้งค่าไว้ไม่ถูกต้อง หรือบัญชีนี้ไม่มีสิทธิ์เข้าถึงโฟลเดอร์ (ตรวจที่ ตั้งค่าระบบ → ฐานข้อมูล)");
           }
         }
+        // กัน formula injection (rule 24) — path นี้เป็น key-value generic ครอบทั้ง SystemName/InvoiceCompanyName/InvoiceCompanyAddress/
+        // InvoiceCompanyEmail/ApproverName ซึ่งเป็นข้อความอิสระที่ Admin พิมพ์เองและถูกพิมพ์ลงใบเสนอราคา/ใบแจ้งหนี้จริง — เดิมไม่เคย sanitize เลย
+        val = sanitizeSheetText_(val);
         for (let i = 1; i < data.length; i++) {
           if (data[i][0] === key) {
             // บังคับ cell เป็น plain text ก่อนเขียน — ไม่งั้น Sheets แปลง "2026-06-01T00:00" เป็น Date
@@ -1471,9 +1512,10 @@ function saveSettingsItem(payload, secureUser, ss) {
       return { status: 'success' };
     }
     
-    const url = payload.url ? payload.url.toString().trim() : "";
-    const targetLink = payload.targetLink ? payload.targetLink.toString().trim() : "";
-    const details = payload.details ? payload.details.toString().trim() : "";
+    // กัน formula injection (rule 24) — banner url/targetLink/details เป็นข้อความอิสระที่ Admin พิมพ์เอง เดิมไม่เคย sanitize
+    const url = sanitizeSheetText_(payload.url ? payload.url.toString().trim() : "");
+    const targetLink = sanitizeSheetText_(payload.targetLink ? payload.targetLink.toString().trim() : "");
+    const details = sanitizeSheetText_(payload.details ? payload.details.toString().trim() : "");
     const rowIndex = payload.rowIndex;
     const bannersSheet = ss.getSheetByName("UI_Banners");
     if (!bannersSheet) throw new Error("UI_Banners sheet not found. Please click Auto Setup.");
@@ -1805,7 +1847,8 @@ function deleteSettingsItem(payload, secureUser, ss) {
     const type = payload.type;
     let rowIndex = parseInt(payload.rowIndex);
     const bannerId = payload.bannerId ? payload.bannerId.toString().trim() : '';
-    if (!rowIndex || rowIndex < 2) throw new Error("Invalid row index");
+    // เดิมเช็คแค่ขอบล่าง (saveSettingsItem เช็คทั้งขอบบน-ล่างอยู่แล้ว) — rowIndex ที่เกิน lastRow ยังหลุดผ่านมาถึง deleteRow() ได้ถ้าไม่มี bannerId แนบมา
+    if (!rowIndex || rowIndex < 2 || rowIndex > bannersSheet.getLastRow()) throw new Error("Invalid row index");
 
     // กันลบผิดแถวเมื่อชีตขยับ (มีคนลบ/แทรกแถวไปก่อน) — ยืนยันด้วย Banner ID ถ้าไม่ตรงให้ re-scan หาแถวจริง
     if (bannerId) {
