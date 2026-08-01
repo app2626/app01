@@ -4,7 +4,8 @@
  * Author: Enterprise AI Business Commander
  */
 
-const ADMIN_PIN = "9999"; 
+const ADMIN_PIN = "9999";
+const PASSWORD_EXPIRY_DAYS = 40;
 
 function doGet(e) {
   let template = HtmlService.createTemplateFromFile('Index');
@@ -26,8 +27,425 @@ function findSheet(ss, keyword) {
   return null;
 }
 
+// ================= AUTH / SESSION LAYER =================
+function getUsersSheet_(ss) {
+  return findSheet(ss, "users");
+}
+
+function getSessionsSheet_(ss) {
+  return findSheet(ss, "sessions");
+}
+
+function parseDdMmYyyy_(str) {
+  const parts = (str || "").toString().trim().split(/[-/]/);
+  if (parts.length !== 3) return null;
+  const d = new Date(parts[2], parts[1] - 1, parts[0]);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function hashPassword_(password, salt) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password + salt, Utilities.Charset.UTF_8);
+  return bytes.map(function(b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
+}
+
+function getLocNameByCode_(ss, locCode) {
+  const locSheet = findSheet(ss, "location");
+  if (!locSheet || locSheet.getLastRow() <= 1) return "";
+  const locData = locSheet.getRange(2, 1, locSheet.getLastRow() - 1, 5).getDisplayValues();
+  for (let i = 0; i < locData.length; i++) {
+    if ((locData[i][3] || "").toString().trim() === locCode) return locData[i][4];
+  }
+  return "";
+}
+
+function resolveSession_(token) {
+  if (!token) return null;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getSessionsSheet_(ss);
+  if (!sheet || sheet.getLastRow() <= 1) return null;
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][0] === token) return { locCode: (data[i][1] || "").toString().trim() };
+  }
+  return null;
+}
+
+function requireSession_(token) {
+  const session = resolveSession_(token);
+  if (!session) throw new Error("AUTH_REQUIRED");
+  return session;
+}
+
+// ================= ADMIN AUTH (แยกต่างหากจากระบบ login สาขา ใช้เฉพาะ "ตั้งค่าระบบ") =================
+function getAdminsSheet_(ss) {
+  return findSheet(ss, "admins");
+}
+
+function getAdminAuthSheet_(ss) {
+  return findSheet(ss, "adminauth");
+}
+
+function resolveAdminSession_(token) {
+  if (!token) return null;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getAdminAuthSheet_(ss);
+  if (!sheet || sheet.getLastRow() <= 1) return null;
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][0] === token) return { username: (data[i][1] || "").toString().trim() };
+  }
+  return null;
+}
+
+function requireAdminSession_(token) {
+  const session = resolveAdminSession_(token);
+  if (!session) throw new Error("ADMIN_AUTH_REQUIRED");
+  return session;
+}
+
+// รันเองจาก Apps Script editor หรือ `clasp run adminBootstrapAccount --params '["username","password"]'` เท่านั้น
+// ใช้สร้าง/รีเซ็ตรหัสผ่านบัญชี Admin คนแรก (ไม่มีปุ่มเรียกจากหน้าเว็บ)
+function adminBootstrapAccount(username, password) {
+  username = (username || "").toString().trim();
+  password = (password || "").toString();
+  if (!username || password.length < 4) throw new Error("ต้องระบุ username และรหัสผ่านอย่างน้อย 4 ตัวอักษร");
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const adminsSheet = getAdminsSheet_(ss);
+  if (!adminsSheet) throw new Error("ไม่พบชีต Admins — รัน setupAuthSheets() ก่อน");
+
+  const salt = Utilities.getUuid();
+  const hash = hashPassword_(password, salt);
+  const existing = adminsSheet.getLastRow() > 1
+    ? adminsSheet.getRange(2, 1, adminsSheet.getLastRow() - 1, 1).getDisplayValues().map(function(r) { return (r[0] || "").toString().trim(); })
+    : [];
+  const idx = existing.indexOf(username);
+
+  if (idx !== -1) {
+    adminsSheet.getRange(idx + 2, 2, 1, 2).setValues([[hash, salt]]);
+  } else {
+    adminsSheet.appendRow([username, hash, salt]);
+  }
+  return "สร้าง/รีเซ็ตบัญชี Admin: " + username + " สำเร็จ";
+}
+
+// LocCode สงวนไว้แทนบัญชี Admin ที่ login ผ่านหน้าแรกร่วมกับสาขา (ไม่ใช่ LocCode สาขาจริง)
+const ADMIN_SESSION_LOCCODE = "__ADMIN__";
+
+function login(locCode, password) {
+  locCode = (locCode || "").toString().trim();
+  password = (password || "").toString();
+  if (!locCode || !password) return { success: false, message: "กรุณากรอกรหัสสาขาและรหัสผ่าน" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = getUsersSheet_(ss);
+
+  if (usersSheet && usersSheet.getLastRow() > 1) {
+    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 5).getDisplayValues();
+    for (let i = 0; i < data.length; i++) {
+      const rowLocCode = (data[i][0] || "").toString().trim();
+      if (rowLocCode !== locCode) continue;
+
+      const storedHash = data[i][1];
+      const salt = data[i][2];
+      const lastChanged = data[i][3];
+      const active = (data[i][4] || "").toString().trim().toUpperCase();
+
+      if (active !== "TRUE" && active !== "Y") {
+        return { success: false, message: "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ" };
+      }
+      if (hashPassword_(password, salt) !== storedHash) {
+        return { success: false, message: "รหัสสาขาหรือรหัสผ่านไม่ถูกต้อง" };
+      }
+
+      let passwordExpired = false;
+      if (lastChanged) {
+        const changedDate = parseDdMmYyyy_(lastChanged);
+        if (changedDate) {
+          const daysSince = Math.floor((new Date().getTime() - changedDate.getTime()) / (1000 * 60 * 60 * 24));
+          passwordExpired = daysSince >= PASSWORD_EXPIRY_DAYS;
+        }
+      }
+
+      const token = Utilities.getUuid();
+      const sessionsSheet = getSessionsSheet_(ss);
+      if (sessionsSheet) {
+        sessionsSheet.appendRow([token, locCode, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")]);
+      }
+
+      return {
+        success: true,
+        token: token,
+        locCode: locCode,
+        locName: getLocNameByCode_(ss, locCode),
+        passwordExpired: passwordExpired,
+        isAdmin: false
+      };
+    }
+  }
+
+  // ไม่พบ LocCode สาขาที่ตรง → ลองเทียบกับบัญชี Admin (ใช้ช่องเดียวกันเป็น Username)
+  const adminResult = tryAdminLoginAsSession_(locCode, password);
+  if (adminResult) return adminResult;
+
+  return { success: false, message: "รหัสสาขาหรือรหัสผ่านไม่ถูกต้อง" };
+}
+
+// login ด้วยบัญชี Admin ผ่านหน้าแรกเดียวกับสาขา — ออก token เดียวที่ใช้ได้ทั้งฝั่งสาขา (Sessions)
+// และฝั่ง Admin (AdminAuth) เพื่อให้เข้าแท็บตั้งค่าระบบได้ทันทีโดยไม่ต้อง login ซ้อน
+function tryAdminLoginAsSession_(username, password) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const adminsSheet = getAdminsSheet_(ss);
+  if (!adminsSheet || adminsSheet.getLastRow() <= 1) return null;
+
+  const data = adminsSheet.getRange(2, 1, adminsSheet.getLastRow() - 1, 3).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    const rowUsername = (data[i][0] || "").toString().trim();
+    if (rowUsername !== username) continue;
+
+    const storedHash = data[i][1];
+    const salt = data[i][2];
+    if (hashPassword_(password, salt) !== storedHash) return null;
+
+    const token = Utilities.getUuid();
+    const now = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+
+    const sessionsSheet = getSessionsSheet_(ss);
+    if (sessionsSheet) sessionsSheet.appendRow([token, ADMIN_SESSION_LOCCODE, now]);
+
+    const authSheet = getAdminAuthSheet_(ss);
+    if (authSheet) authSheet.appendRow([token, username, now]);
+
+    return {
+      success: true,
+      token: token,
+      locCode: ADMIN_SESSION_LOCCODE,
+      locName: "Admin",
+      passwordExpired: false,
+      isAdmin: true
+    };
+  }
+  return null;
+}
+
+function logout(token) {
+  if (!token) return { success: true };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const sheet = getSessionsSheet_(ss);
+  if (sheet && sheet.getLastRow() > 1) {
+    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues();
+    for (let i = 0; i < data.length; i++) {
+      if (data[i][0] === token) { sheet.deleteRow(i + 2); break; }
+    }
+  }
+
+  // เพิกถอน admin session ที่ผูกกับ token เดียวกันด้วย เผื่อเป็น session ที่ login แบบ admin ผ่านหน้าแรก
+  const authSheet = getAdminAuthSheet_(ss);
+  if (authSheet && authSheet.getLastRow() > 1) {
+    const authData = authSheet.getRange(2, 1, authSheet.getLastRow() - 1, 1).getDisplayValues();
+    for (let i = 0; i < authData.length; i++) {
+      if (authData[i][0] === token) { authSheet.deleteRow(i + 2); break; }
+    }
+  }
+
+  return { success: true };
+}
+
+function validateSessionToken(token) {
+  const session = resolveSession_(token);
+  if (!session) return { valid: false };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const isAdmin = session.locCode === ADMIN_SESSION_LOCCODE;
+  return {
+    valid: true,
+    locCode: session.locCode,
+    locName: isAdmin ? "Admin" : getLocNameByCode_(ss, session.locCode),
+    isAdmin: isAdmin
+  };
+}
+
+function changePassword(token, oldPassword, newPassword) {
+  const session = resolveSession_(token);
+  if (!session) return { success: false, message: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่" };
+  newPassword = (newPassword || "").toString();
+  if (newPassword.length < 4) return { success: false, message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร" };
+
+  if (session.locCode === ADMIN_SESSION_LOCCODE) {
+    return changeAdminPassword_(token, oldPassword, newPassword);
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบฐานข้อมูลผู้ใช้" };
+
+  const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 5).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    const rowLocCode = (data[i][0] || "").toString().trim();
+    if (rowLocCode !== session.locCode) continue;
+
+    const storedHash = data[i][1];
+    const salt = data[i][2];
+    if (hashPassword_((oldPassword || "").toString(), salt) !== storedHash) {
+      return { success: false, message: "รหัสผ่านเดิมไม่ถูกต้อง" };
+    }
+
+    const newSalt = Utilities.getUuid();
+    const newHash = hashPassword_(newPassword, newSalt);
+    usersSheet.getRange(i + 2, 2, 1, 3).setValues([[newHash, newSalt, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy")]]);
+
+    // เปลี่ยนรหัสผ่านแล้วเพิกถอนทุก session เดิมของสาขานี้ บังคับอุปกรณ์อื่นให้ login ใหม่
+    const sessionsSheet = getSessionsSheet_(ss);
+    const newToken = Utilities.getUuid();
+    if (sessionsSheet && sessionsSheet.getLastRow() > 1) {
+      const sessData = sessionsSheet.getRange(2, 1, sessionsSheet.getLastRow() - 1, 2).getDisplayValues();
+      for (let r = sessData.length - 1; r >= 0; r--) {
+        if ((sessData[r][1] || "").toString().trim() === session.locCode) {
+          sessionsSheet.deleteRow(r + 2);
+        }
+      }
+    }
+    if (sessionsSheet) {
+      sessionsSheet.appendRow([newToken, session.locCode, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")]);
+    }
+
+    return { success: true, token: newToken, message: "เปลี่ยนรหัสผ่านสำเร็จ" };
+  }
+
+  return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
+}
+
+// เปลี่ยนรหัสผ่านบัญชี Admin ที่ login ผ่านหน้าแรก — แยกจาก changePassword หลักเพราะ Admin เก็บอยู่คนละชีต (Admins ไม่ใช่ Users)
+function changeAdminPassword_(token, oldPassword, newPassword) {
+  const adminSession = resolveAdminSession_(token);
+  if (!adminSession) return { success: false, message: "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const adminsSheet = getAdminsSheet_(ss);
+  if (!adminsSheet || adminsSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบฐานข้อมูลผู้ใช้" };
+
+  const data = adminsSheet.getRange(2, 1, adminsSheet.getLastRow() - 1, 3).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    const rowUsername = (data[i][0] || "").toString().trim();
+    if (rowUsername !== adminSession.username) continue;
+
+    const storedHash = data[i][1];
+    const salt = data[i][2];
+    if (hashPassword_((oldPassword || "").toString(), salt) !== storedHash) {
+      return { success: false, message: "รหัสผ่านเดิมไม่ถูกต้อง" };
+    }
+
+    const newSalt = Utilities.getUuid();
+    const newHash = hashPassword_(newPassword, newSalt);
+    adminsSheet.getRange(i + 2, 2, 1, 2).setValues([[newHash, newSalt]]);
+
+    // เพิกถอน session เดิมทั้งหมดของ Admin คนนี้ (ทั้งฝั่ง Sessions และ AdminAuth) แล้วออก token ใหม่ให้ session ปัจจุบัน
+    const sessionsSheet = getSessionsSheet_(ss);
+    const authSheet = getAdminAuthSheet_(ss);
+    const oldTokens = [];
+    if (authSheet && authSheet.getLastRow() > 1) {
+      const authData = authSheet.getRange(2, 1, authSheet.getLastRow() - 1, 2).getDisplayValues();
+      for (let r = authData.length - 1; r >= 0; r--) {
+        if ((authData[r][1] || "").toString().trim() === adminSession.username) {
+          oldTokens.push(authData[r][0]);
+          authSheet.deleteRow(r + 2);
+        }
+      }
+    }
+    if (sessionsSheet && sessionsSheet.getLastRow() > 1 && oldTokens.length) {
+      const sessData = sessionsSheet.getRange(2, 1, sessionsSheet.getLastRow() - 1, 1).getDisplayValues();
+      for (let r = sessData.length - 1; r >= 0; r--) {
+        if (oldTokens.indexOf(sessData[r][0]) !== -1) sessionsSheet.deleteRow(r + 2);
+      }
+    }
+
+    const newToken = Utilities.getUuid();
+    const now = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+    if (sessionsSheet) sessionsSheet.appendRow([newToken, ADMIN_SESSION_LOCCODE, now]);
+    if (authSheet) authSheet.appendRow([newToken, adminSession.username, now]);
+
+    return { success: true, token: newToken, message: "เปลี่ยนรหัสผ่านสำเร็จ" };
+  }
+
+  return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
+}
+
+// รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — สร้างชีต Users/Sessions/AccountSetup
+// พร้อม header ให้ครบ ถ้าชีตมีอยู่แล้วจะข้ามไม่แตะของเดิม เรียกได้ซ้ำอย่างปลอดภัย
+function setupAuthSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  if (!getUsersSheet_(ss)) {
+    const sheet = ss.insertSheet("Users");
+    sheet.getRange(1, 1, 1, 5).setValues([["LocCode", "PasswordHash", "Salt", "LastPasswordChangedDate", "Active"]]);
+    sheet.setFrozenRows(1);
+  }
+
+  if (!getSessionsSheet_(ss)) {
+    const sheet = ss.insertSheet("Sessions");
+    sheet.getRange(1, 1, 1, 3).setValues([["Token", "LocCode", "CreatedAt"]]);
+    sheet.setFrozenRows(1);
+  }
+
+  if (!findSheet(ss, "accountsetup")) {
+    const sheet = ss.insertSheet("AccountSetup");
+    sheet.getRange(1, 1, 1, 2).setValues([["LocCode", "PlainPassword"]]);
+    sheet.setFrozenRows(1);
+  }
+
+  // หมายเหตุ: ตั้งชื่อ "Admins"/"AdminAuth" (ไม่ใช่ "AdminUsers"/"AdminSessions") เพราะ findSheet()
+  // จับคู่แบบ substring — ถ้าตั้งชื่อมี "users"/"sessions" อยู่ในนั้น จะไปชนกับ getUsersSheet_/getSessionsSheet_ โดยไม่ตั้งใจ
+  if (!getAdminsSheet_(ss)) {
+    const sheet = ss.insertSheet("Admins");
+    sheet.getRange(1, 1, 1, 3).setValues([["Username", "PasswordHash", "Salt"]]);
+    sheet.setFrozenRows(1);
+  }
+
+  if (!getAdminAuthSheet_(ss)) {
+    const sheet = ss.insertSheet("AdminAuth");
+    sheet.getRange(1, 1, 1, 3).setValues([["Token", "Username", "CreatedAt"]]);
+    sheet.setFrozenRows(1);
+  }
+}
+
+// รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — ใช้สร้าง/รีเซ็ตรหัสผ่านบัญชีสาขา
+// อ่านชีต "AccountSetup" (A: LocCode, B: PlainPassword) แล้ว hash เขียนลงชีต "Users"
+// ทำเสร็จแล้วให้ลบคอลัมน์ B ในชีต AccountSetup ทิ้ง อย่าปล่อยรหัสผ่าน plaintext ค้างไว้
+function adminSetupUsers() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const setupSheet = findSheet(ss, "accountsetup");
+  const usersSheet = getUsersSheet_(ss);
+  if (!setupSheet) throw new Error("ไม่พบชีต AccountSetup");
+  if (!usersSheet) throw new Error("ไม่พบชีต Users");
+  if (setupSheet.getLastRow() <= 1) return;
+
+  const setupData = setupSheet.getRange(2, 1, setupSheet.getLastRow() - 1, 2).getDisplayValues();
+  const existing = usersSheet.getLastRow() > 1
+    ? usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues().map(function(r) { return (r[0] || "").toString().trim(); })
+    : [];
+  const today = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy");
+
+  setupData.forEach(function(row) {
+    const locCode = (row[0] || "").toString().trim();
+    const plainPassword = (row[1] || "").toString();
+    if (!locCode || !plainPassword) return;
+
+    const salt = Utilities.getUuid();
+    const hash = hashPassword_(plainPassword, salt);
+    const existingIdx = existing.indexOf(locCode);
+
+    if (existingIdx !== -1) {
+      usersSheet.getRange(existingIdx + 2, 2, 1, 4).setValues([[hash, salt, today, "TRUE"]]);
+    } else {
+      usersSheet.appendRow([locCode, hash, salt, today, "TRUE"]);
+      existing.push(locCode);
+    }
+  });
+}
+
 // ================= MODEL / DATA ACCESS LAYER =================
-function getAppData() {
+function getAppData(token) {
+  requireSession_(token);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   const annSheet = findSheet(ss, "ประกาศ");
@@ -98,7 +516,8 @@ function getAppData() {
   return { announcement, promotions, locations, timeValid, productMap }; // ส่งข้อมูล Model ออกไป
 }
 
-function getStockByBranch(locCode) {
+function getStockByBranch(token, locCode) {
+  requireSession_(token);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const stockSheet = findSheet(ss, "stock");
   if(!stockSheet) return [];
@@ -172,7 +591,8 @@ function checkIsTimeValid(startStr, endStr) {
 
 // ================= CONTROLLER / BUSINESS LOGIC =================
 
-function getRecords() {
+function getRecords(token) {
+  requireSession_(token);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
   if(!sheet || sheet.getLastRow() <= 1) return [];
@@ -220,7 +640,12 @@ function getRecords() {
   return validData;
 }
 
-function saveBatchRecords(payload) {
+function saveBatchRecords(token, payload) {
+  const session = requireSession_(token);
+  if (session.locCode === ADMIN_SESSION_LOCCODE) {
+    return { success: false, message: "บัญชี Admin ไม่มีสาขา ไม่สามารถบันทึกรายการ ACT ได้" };
+  }
+
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000); // รอสูงสุด 15 วินาที
@@ -230,6 +655,19 @@ function saveBatchRecords(payload) {
 
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // บังคับตรวจสอบเวลาทำการฝั่ง server ด้วย (ฝั่ง client แค่ล็อกฟอร์มด้วย CSS ซึ่งเลี่ยงได้ผ่าน console)
+    const timeSheet = findSheet(ss, "time");
+    if (timeSheet && timeSheet.getLastRow() > 1) {
+      const timeData = timeSheet.getRange(2, 1, 1, 2).getDisplayValues()[0];
+      if (!checkIsTimeValid(timeData[0], timeData[1])) {
+        return { success: false, message: "ขณะนี้อยู่นอกเวลาทำการ ไม่สามารถบันทึกข้อมูลได้" };
+      }
+    }
+
+    // บังคับสาขาจาก session ที่ login ไว้เท่านั้น ไม่เชื่อ locCode/locName ที่ client ส่งมา
+    const branchLocCode = session.locCode;
+    const branchLocName = getLocNameByCode_(ss, branchLocCode);
     const stockSheet = findSheet(ss, "stock");
     if(!stockSheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต Stock" };
     const stockData = stockSheet.getDataRange().getDisplayValues();
@@ -261,22 +699,24 @@ function saveBatchRecords(payload) {
     let actD = payload.actDate.split('-');
     let formattedActDate = payload.actDate;
     if(actD.length === 3) { formattedActDate = "'" + actD[2] + "/" + actD[1] + "/" + actD[0]; }
-    const actEmpName = `${payload.locCode}+${payload.empName}`;
-    
+    const actEmpName = `${branchLocCode}+${payload.empName}`;
+    const allowedStatus = ["ยังไม่ขาย", "ขายแล้ว"];
+
     let errors = [];
     let rowsToInsert = [];
 
     payload.items.forEach((item, index) => {
-      let checkKey = `${payload.locCode}|${item.sku}|${item.imei}`;
+      let checkKey = `${branchLocCode}|${item.sku}|${item.imei}`;
       let transferKey = `Warehouse Transfer|${item.sku}|${item.imei}`;
+      let itemStatus = allowedStatus.indexOf(item.status) !== -1 ? item.status : "ยังไม่ขาย";
       if(usedImeis.has(item.imei)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ถูกทำรายการแอคไปแล้ว`);
       } else if(!validStockKeys.has(checkKey) && !validStockKeys.has(transferKey)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ไม่มีในสต๊อกของสาขานี้ (หรือ Warehouse Transfer)`);
       } else {
         rowsToInsert.push([
-          timestamp, formattedActDate, actEmpName, payload.locCode, payload.locName,
-          item.sku, item.desc, item.imei, item.status || "ยังไม่ขาย", "", "", "", "", ""
+          timestamp, formattedActDate, actEmpName, branchLocCode, branchLocName,
+          item.sku, item.desc, item.imei, itemStatus, "", "", "", "", ""
         ]);
       }
     });
@@ -294,10 +734,21 @@ function saveBatchRecords(payload) {
   }
 }
 
-function updateStatus(rowId, newStatus) {
+function updateStatus(token, rowId, newStatus) {
+  requireSession_(token);
+  const allowedStatus = ["ยังไม่ขาย", "ขายแล้ว"];
+  if(allowedStatus.indexOf(newStatus) === -1) {
+    return { success: false, message: "สถานะไม่ถูกต้อง" };
+  }
+  rowId = Number(rowId);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
+    if (!sheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต 'อยู่ระหว่างดำเนินการ'" };
+    // rowId ต้องชี้ไปยังแถวข้อมูลจริงเท่านั้น (แถว 1 คือ header) ป้องกัน rowId ที่ถูกดัดแปลงจาก client ทำให้ header เสียหาย
+    if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
+      return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+    }
     sheet.getRange(rowId, 9).setValue(newStatus);
     return { success: true, message: "อัปเดตสถานะสำเร็จ" };
   } catch(e) {
@@ -305,10 +756,161 @@ function updateStatus(rowId, newStatus) {
   }
 }
 
+// ================= ADMIN SETTINGS (gate ด้วยระบบ login Admin แยกต่างหาก) =================
+function adminGetSettings(adminToken) {
+  requireAdminSession_(adminToken);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const usersSheet = getUsersSheet_(ss);
+  let users = [];
+  if (usersSheet && usersSheet.getLastRow() > 1) {
+    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 5).getDisplayValues();
+    users = data
+      .map(function(r) {
+        return {
+          locCode: (r[0] || "").toString().trim(),
+          lastPasswordChangedDate: r[3] || "",
+          active: (r[4] || "").toString().trim().toUpperCase() === "TRUE"
+        };
+      })
+      .filter(function(u) { return u.locCode !== ""; });
+  }
+
+  const annSheet = findSheet(ss, "ประกาศ");
+  let announcement = { title: "", detail: "" };
+  if (annSheet && annSheet.getLastRow() > 1) {
+    const a = annSheet.getRange(2, 1, 1, 2).getDisplayValues()[0];
+    announcement = { title: a[0] || "", detail: a[1] || "" };
+  }
+
+  const promoSheet = findSheet(ss, "ข่าวสารโปรโมชั่น");
+  let promotions = [];
+  if (promoSheet && promoSheet.getLastRow() > 1) {
+    promotions = promoSheet.getRange(2, 1, promoSheet.getLastRow() - 1, 3).getDisplayValues()
+      .map(function(r) { return { title: r[0] || "", detail: r[1] || "", link: r[2] || "" }; })
+      .filter(function(p) { return p.title !== ""; });
+  }
+
+  const timeSheet = findSheet(ss, "time");
+  let timeWindow = { start: "", end: "" };
+  if (timeSheet && timeSheet.getLastRow() > 1) {
+    const t = timeSheet.getRange(2, 1, 1, 2).getDisplayValues()[0];
+    timeWindow = { start: t[0] || "", end: t[1] || "" };
+  }
+
+  return { success: true, users: users, announcement: announcement, promotions: promotions, timeWindow: timeWindow };
+}
+
+function adminUpsertUser(adminToken, locCode, newPassword) {
+  requireAdminSession_(adminToken);
+  locCode = (locCode || "").toString().trim();
+  newPassword = (newPassword || "").toString();
+  if (!locCode) return { success: false, message: "กรุณากรอกรหัสสาขา (LocCode)" };
+  if (newPassword.length < 4) return { success: false, message: "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet) return { success: false, message: "ไม่พบชีต Users" };
+
+  const salt = Utilities.getUuid();
+  const hash = hashPassword_(newPassword, salt);
+  const today = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy");
+
+  const existing = usersSheet.getLastRow() > 1
+    ? usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues().map(function(r) { return (r[0] || "").toString().trim(); })
+    : [];
+  const idx = existing.indexOf(locCode);
+
+  if (idx !== -1) {
+    usersSheet.getRange(idx + 2, 2, 1, 4).setValues([[hash, salt, today, "TRUE"]]);
+  } else {
+    usersSheet.appendRow([locCode, hash, salt, today, "TRUE"]);
+  }
+
+  // เปลี่ยนรหัสผ่านแล้วเพิกถอน session เดิมของสาขานี้ทั้งหมด บังคับ login ใหม่
+  const sessionsSheet = getSessionsSheet_(ss);
+  if (sessionsSheet && sessionsSheet.getLastRow() > 1) {
+    const sessData = sessionsSheet.getRange(2, 1, sessionsSheet.getLastRow() - 1, 2).getDisplayValues();
+    for (let r = sessData.length - 1; r >= 0; r--) {
+      if ((sessData[r][1] || "").toString().trim() === locCode) {
+        sessionsSheet.deleteRow(r + 2);
+      }
+    }
+  }
+
+  return { success: true, message: "บันทึกบัญชี " + locCode + " สำเร็จ" };
+}
+
+function adminSetUserActive(adminToken, locCode, active) {
+  requireAdminSession_(adminToken);
+  locCode = (locCode || "").toString().trim();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
+
+  const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if ((data[i][0] || "").toString().trim() === locCode) {
+      usersSheet.getRange(i + 2, 5).setValue(active ? "TRUE" : "FALSE");
+
+      if (!active) {
+        // ปิดใช้งานบัญชีแล้วเพิกถอน session ที่ค้างอยู่ทั้งหมดของสาขานี้
+        const sessionsSheet = getSessionsSheet_(ss);
+        if (sessionsSheet && sessionsSheet.getLastRow() > 1) {
+          const sessData = sessionsSheet.getRange(2, 1, sessionsSheet.getLastRow() - 1, 2).getDisplayValues();
+          for (let r = sessData.length - 1; r >= 0; r--) {
+            if ((sessData[r][1] || "").toString().trim() === locCode) {
+              sessionsSheet.deleteRow(r + 2);
+            }
+          }
+        }
+      }
+      return { success: true, message: "อัปเดตสถานะบัญชี " + locCode + " สำเร็จ" };
+    }
+  }
+  return { success: false, message: "ไม่พบบัญชี " + locCode };
+}
+
+function adminSaveAnnouncement(adminToken, title, detail) {
+  requireAdminSession_(adminToken);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const annSheet = findSheet(ss, "ประกาศ");
+  if (!annSheet) return { success: false, message: "ไม่พบชีตประกาศ" };
+  annSheet.getRange(2, 1, 1, 2).setValues([[(title || "").toString(), (detail || "").toString()]]);
+  return { success: true, message: "บันทึกประกาศสำเร็จ" };
+}
+
+function adminSavePromotions(adminToken, promotions) {
+  requireAdminSession_(adminToken);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const promoSheet = findSheet(ss, "ข่าวสารโปรโมชั่น");
+  if (!promoSheet) return { success: false, message: "ไม่พบชีตข่าวสารโปรโมชั่น" };
+
+  const lastRow = promoSheet.getLastRow();
+  if (lastRow > 1) {
+    promoSheet.getRange(2, 1, lastRow - 1, 3).clearContent();
+  }
+  if (promotions && promotions.length > 0) {
+    const rows = promotions.map(function(p) { return [(p.title || "").toString(), (p.detail || "").toString(), (p.link || "").toString()]; });
+    promoSheet.getRange(2, 1, rows.length, 3).setValues(rows);
+  }
+  return { success: true, message: "บันทึกโปรโมชั่นสำเร็จ" };
+}
+
+function adminSaveTimeWindow(adminToken, startStr, endStr) {
+  requireAdminSession_(adminToken);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const timeSheet = findSheet(ss, "time");
+  if (!timeSheet) return { success: false, message: "ไม่พบชีต time" };
+  timeSheet.getRange(2, 1, 1, 2).setValues([[(startStr || "").toString(), (endStr || "").toString()]]);
+  return { success: true, message: "บันทึกช่วงเวลาทำการสำเร็จ" };
+}
+
 function verifyAdminAndExport(pin, rowIds) {
   if(pin === ADMIN_PIN) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
+    if (!sheet || sheet.getLastRow() < 1) return { success: false, message: "ไม่พบข้อมูลสำหรับส่งออก" };
     const allData = sheet.getRange(1, 1, sheet.getLastRow(), 14).getDisplayValues();
     const idSet = (rowIds && rowIds.length) ? new Set(rowIds.map(Number)) : null;
     // แถวที่ 1 (header) เก็บไว้เสมอ, ที่เหลือกรองตามชุดแถวที่ถูกกรองไว้ในตาราง (rowId = เลขแถวจริงในชีต)

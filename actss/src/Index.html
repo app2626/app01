@@ -153,19 +153,19 @@
         #myTab { background: #fff !important; }
         .nav-pills .nav-item .nav-link { border-radius: 4px 4px 0 0; border: none; border-bottom: 3px solid transparent; transition: all 0.2s; color: #5a5c69; background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 10px 16px; }
         .nav-pills .nav-item .nav-link:hover { color: var(--navy); }
-        .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily { border-color: transparent !important; color: #5a5c69 !important; background: transparent !important; }
-        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active { background: transparent !important; color: var(--navy) !important; border-bottom: 3px solid var(--gold) !important; }
+        .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily, .tab-track, .tab-settings { border-color: transparent !important; color: #5a5c69 !important; background: transparent !important; }
+        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-settings.active { background: transparent !important; color: var(--navy) !important; border-bottom: 3px solid var(--gold) !important; }
 
         [data-theme="dark"] .app-header-bar { background: var(--navy) !important; border-bottom: 2px solid var(--gold); }
         [data-theme="dark"] .app-header-badge { background: rgba(255,255,255,0.08) !important; color: var(--gold) !important; border: 1px solid rgba(201,154,46,0.5); }
         [data-theme="dark"] #myTab { background: var(--navy) !important; }
         [data-theme="dark"] .nav-pills .nav-item .nav-link { color: rgba(255,255,255,0.65); }
         [data-theme="dark"] .nav-pills .nav-item .nav-link:hover { color: #fff; }
-        [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily { color: rgba(255,255,255,0.65) !important; }
-        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active { background: var(--navy-dark) !important; color: var(--gold) !important; }
+        [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily, [data-theme="dark"] .tab-track, [data-theme="dark"] .tab-settings { color: rgba(255,255,255,0.65) !important; }
+        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active, [data-theme="dark"] .tab-track.active, [data-theme="dark"] .tab-settings.active { background: var(--navy-dark) !important; color: var(--gold) !important; }
 
         /* กรอบบนของเนื้อหา (Pane) โทนเดียวกันทั้งระบบ */
-        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane { border-top: 3px solid var(--gold) !important; }
+        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #settings-pane { border-top: 3px solid var(--gold) !important; }
 
         /* รีโทนสี Bootstrap utility ให้เป็นโทน Deep Navy + Gold ทั้งระบบ */
         .bg-primary { background-color: var(--navy) !important; }
@@ -236,6 +236,14 @@
         [data-theme="dark"] .swal2-popup { background: #131b2e !important; color: #e7ebf3 !important; border: 1px solid #263252 !important; }
         [data-theme="dark"] .swal2-container { background: rgba(10,15,28,0.85) !important; }
         [data-theme="dark"] .hud-ring { border-color: #263252; border-top-color: var(--gold); }
+
+        /* หน้าจอเข้าสู่ระบบ */
+        #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-page); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        .login-box { background: #fff; border: 1px solid var(--border-gray); border-top: 4px solid var(--gold); border-radius: 10px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 4px 16px rgba(16,35,63,0.12); }
+        [data-theme="dark"] .login-box { background: #131b2e; border-color: #263252; }
+
+        /* SweetAlert2 ต้องอยู่เหนือ #loginScreen (z-index 10000) เสมอ ไม่งั้น modal บังคับเปลี่ยนรหัสผ่านจะโผล่มาแบบมองไม่เห็น */
+        .swal2-container { z-index: 10001 !important; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -246,6 +254,28 @@
     <div class="mt-3 text-secondary fw-bold">กำลังเชื่อมต่อฐานข้อมูล...</div>
 </div>
 
+<div id="loginScreen">
+    <div class="login-box">
+        <div class="text-center mb-3">
+            <i class="fas fa-shield-halved text-gold" style="font-size: 40px;"></i>
+            <h4 class="fw-bold text-primary mt-2 mb-0">ACT SAMSUNG System</h4>
+            <div class="text-muted small">เข้าสู่ระบบด้วยบัญชีสาขา</div>
+        </div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary">รหัสสาขา (Location Code)</label>
+                <input type="text" class="form-control" id="loginLocCode" placeholder="เช่น BKK01" required autocomplete="username">
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold text-secondary">รหัสผ่าน</label>
+                <input type="password" class="form-control" id="loginPassword" placeholder="รหัสผ่าน" required autocomplete="current-password">
+            </div>
+            <div id="loginErrorMsg" class="alert alert-danger py-2 d-none"></div>
+            <button type="submit" class="btn btn-primary w-100 fw-bold py-2"><i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
+        </form>
+    </div>
+</div>
+
 <div class="container-fluid mt-3 px-3">
     <div class="row mb-2">
         <div class="col-12 d-flex justify-content-between align-items-center app-header-bar p-2 rounded shadow-sm">
@@ -253,6 +283,12 @@
             <div class="d-flex align-items-center gap-2">
                 <button type="button" class="theme-toggle-btn" id="themeToggleBtn" title="สลับโหมดมืด/สว่าง">
                     <i class="fas fa-moon"></i>
+                </button>
+                <button type="button" class="theme-toggle-btn" id="changePwBtn" title="เปลี่ยนรหัสผ่าน" style="display:none;">
+                    <i class="fas fa-key"></i>
+                </button>
+                <button type="button" class="theme-toggle-btn" id="logoutBtn" title="ออกจากระบบ" style="display:none;">
+                    <i class="fas fa-right-from-bracket"></i>
                 </button>
                 <div class="badge app-header-badge p-2" id="currentDateDisplay"></div>
             </div>
@@ -280,6 +316,12 @@
         <li class="nav-item ms-2">
             <button class="nav-link tab-daily fw-bold shadow-sm" id="daily-dash-tab" data-bs-toggle="tab" data-bs-target="#daily-dash-pane" type="button"><i class="fas fa-calendar-day"></i> แดชบอร์ดสรุปรายวัน</button>
         </li>
+        <li class="nav-item ms-2">
+            <button class="nav-link tab-track fw-bold shadow-sm" id="track-tab" data-bs-toggle="tab" data-bs-target="#track-pane" type="button"><i class="fas fa-map-marker-alt"></i> ติดตามขายสินค้า(แอเรีย)</button>
+        </li>
+        <li class="nav-item ms-2" id="settingsTabLi" style="display:none;">
+            <button class="nav-link tab-settings fw-bold shadow-sm" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane" type="button"><i class="fas fa-gears"></i> ตั้งค่าระบบ</button>
+        </li>
     </ul>
 
     <div class="tab-content border-0" id="myTabContent">
@@ -299,7 +341,7 @@
                         </div>
                         <div class="col-md-4 mb-2">
                             <label class="form-label text-secondary fw-bold">สาขาที่ปฏิบัติการ(Location)</label>
-                            <select class="form-select" id="locationSelect" required><option></option></select>
+                            <div class="form-control bg-light fw-bold text-primary" id="lockedBranchDisplay">-</div>
                             <input type="hidden" id="locCode"><input type="hidden" id="locName">
                         </div>
                         <div class="col-md-4 mb-2">
@@ -579,6 +621,136 @@
             </div>
         </div>
 
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="track-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="mb-0 text-dark fw-bold"><i class="fas fa-map-marker-alt text-primary"></i> ติดตามขายสินค้า(แอเรีย)</h5>
+            </div>
+
+            <div class="row mb-3 bg-light p-2 rounded mx-0 border">
+                <h6 class="text-primary fw-bold mb-2"><i class="fas fa-filter"></i> กรองข้อมูลติดตามการขาย <button class="btn btn-sm btn-outline-danger float-end py-0 px-2" onclick="clearFilters('track')"><i class="fas fa-times"></i> ล้างตัวกรอง</button></h6>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">กรองแอเรีย (Area)</label>
+                    <select id="trackFilterArea" class="form-select"><option value="">-- ทุกพื้นที่ --</option></select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">กรองสาขา (Location)</label>
+                    <select id="trackFilterLoc" class="form-select"><option value="">-- ทุกสาขา --</option></select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">สถานะ (Status)</label>
+                    <select id="trackFilterStatus" class="form-select">
+                        <option value="">-- ทุกสถานะ --</option>
+                        <option value="ยังไม่ขาย" selected>ยังไม่ขาย</option>
+                        <option value="ขายแล้ว">ขายแล้ว</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">อายุสต๊อก (Aging)</label>
+                    <select id="trackFilterAging" class="form-select">
+                        <option value="">-- ทุกช่วงอายุ --</option>
+                        <option value="30">&lt;=30 วัน</option>
+                        <option value="60">31-60 วัน</option>
+                        <option value="90">61-90 วัน</option>
+                        <option value="120">91-120 วัน</option>
+                        <option value="121">&gt;120 วัน</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <label class="fw-bold text-secondary">หมายเลขเครื่อง (IMEI)</label>
+                    <input type="text" id="trackFilterImei" class="form-control" placeholder="พิมพ์ IMEI...">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="trackTable" class="table table-hover table-bordered w-100 shadow-sm nowrap">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>สถานะปัจจุบัน</th>
+                            <th>อายุสต๊อก</th>
+                            <th>Area</th>
+                            <th>Loc. Code</th>
+                            <th>สถานที่ตั้งสาขา</th>
+                            <th>รายละเอียดสินค้า (Full Desc)</th>
+                            <th>รหัสสินค้า (SKU)</th>
+                            <th>หมายเลข IMEI</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="settings-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="mb-0 text-dark fw-bold"><i class="fas fa-gears text-primary"></i> ตั้งค่าระบบ (เฉพาะ Admin)</h5>
+            </div>
+
+            <div id="settingsLocked" class="text-center py-5">
+                <i class="fas fa-lock text-gold" style="font-size: 36px;"></i>
+                <div class="text-muted mt-2">หน้านี้สำหรับ Admin เท่านั้น กรุณาออกจากระบบแล้วเข้าสู่ระบบด้วยบัญชี Admin จากหน้าแรก</div>
+            </div>
+
+            <div id="settingsContent" class="d-none">
+
+                <div class="card p-3 mb-4 shadow-sm border">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-primary m-0"><i class="fas fa-users-gear"></i> จัดการบัญชีผู้ใช้ (สาขา)</h6>
+                        <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="addNewUser()"><i class="fas fa-user-plus"></i> เพิ่มบัญชีใหม่</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="settingsUsersTable" class="table table-hover table-bordered w-100">
+                            <thead class="table-dark"><tr><th>LocCode</th><th>เปลี่ยนรหัสผ่านล่าสุด</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card p-3 mb-4 shadow-sm border">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fas fa-bullhorn"></i> จัดการประกาศ (แสดงเป็น popup ตอนเข้าระบบ)</h6>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-secondary">หัวข้อประกาศ</label>
+                        <input type="text" class="form-control" id="settingsAnnTitle" placeholder="เว้นว่างถ้าไม่ต้องการแสดงประกาศ">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-secondary">รายละเอียด</label>
+                        <textarea class="form-control" id="settingsAnnDetail" rows="3"></textarea>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary fw-bold" onclick="saveAnnouncement()"><i class="fas fa-save"></i> บันทึกประกาศ</button>
+                    </div>
+                </div>
+
+                <div class="card p-3 mb-4 shadow-sm border">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-primary m-0"><i class="fas fa-tags"></i> จัดการข่าวสารโปรโมชั่น (แถบวิ่งด้านบน)</h6>
+                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="addPromotionRow()"><i class="fas fa-plus"></i> เพิ่มแถว</button>
+                    </div>
+                    <div id="settingsPromoList"></div>
+                    <div class="text-end mt-2">
+                        <button type="button" class="btn btn-primary fw-bold" onclick="savePromotions()"><i class="fas fa-save"></i> บันทึกโปรโมชั่นทั้งหมด</button>
+                    </div>
+                </div>
+
+                <div class="card p-3 mb-4 shadow-sm border">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fas fa-clock"></i> ตั้งค่าช่วงเวลาทำการ (จำกัดเวลาบันทึกฟอร์ม ACT)</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label fw-bold text-secondary">เริ่มต้น <span class="text-muted fw-normal">(เช่น 08:00 หรือ 2026-01-01)</span></label>
+                            <input type="text" class="form-control" id="settingsTimeStart">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label fw-bold text-secondary">สิ้นสุด <span class="text-muted fw-normal">(เช่น 20:00 หรือ 2026-12-31)</span></label>
+                            <input type="text" class="form-control" id="settingsTimeEnd">
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary fw-bold" onclick="saveTimeWindow()"><i class="fas fa-save"></i> บันทึกช่วงเวลา</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -605,6 +777,23 @@
     var modelDetailTableInstance = null;
 
     var dailyModelTableInstance = null;
+    var trackTableInstance = null;
+    var settingsUsersTableInstance = null;
+    var adminToken = null;
+
+    var currentToken = null;
+    var currentLocCode = null;
+    var currentLocName = null;
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return str.toString()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
     // 💡 ฟังก์ชันคำนวณอายุถูกประกาศไว้ด้านนอกสุด เพื่อป้องกันบั๊ก "is not defined"
     function computeAgingDays(dateString) {
@@ -656,11 +845,152 @@
             $('#deepFilterModel').val(null).trigger('change');
         } else if(type === 'daily') {
             $('#dailyFilterStartDate, #dailyFilterEndDate').val('').trigger('change');
+        } else if(type === 'track') {
+            $('#trackFilterArea, #trackFilterLoc, #trackFilterAging').val('').trigger('change');
+            $('#trackFilterStatus').val('ยังไม่ขาย').trigger('change');
+            $('#trackFilterImei').val('').trigger('keyup');
         }
     }
 
     function updateThemeIcon(theme) {
         $('#themeToggleBtn i').attr('class', theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon');
+    }
+
+    // ================= AUTH / SESSION =================
+    function showLoginScreen() {
+        $('#overlay').fadeOut();
+        $('#logoutBtn').hide();
+        $('#changePwBtn').hide();
+        $('#loginScreen').css('display', 'flex');
+    }
+
+    function hideLoginScreen() {
+        $('#loginScreen').css('display', 'none');
+        $('#logoutBtn').show();
+        $('#changePwBtn').show();
+    }
+
+    function handleAuthFailure(err) {
+        Swal.close();
+        try { localStorage.removeItem('actssToken'); } catch(e) {}
+        currentToken = null;
+        currentLocCode = null;
+        currentLocName = null;
+        adminToken = null;
+        $('#settingsTabLi').hide();
+        $('#settingsContent').addClass('d-none');
+        $('#settingsLocked').removeClass('d-none');
+        Swal.fire('เซสชันหมดอายุ', 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง', 'warning').then(function() {
+            showLoginScreen();
+        });
+    }
+
+    function bootstrapApp() {
+        google.script.run
+            .withFailureHandler(handleAuthFailure)
+            .withSuccessHandler(initializeUI)
+            .getAppData(currentToken);
+    }
+
+    function attemptSessionRestore() {
+        var savedToken = null;
+        try { savedToken = localStorage.getItem('actssToken'); } catch(e) {}
+        if (!savedToken) { showLoginScreen(); return; }
+
+        google.script.run
+            .withFailureHandler(function() { showLoginScreen(); })
+            .withSuccessHandler(function(res) {
+                if (res && res.valid) {
+                    currentToken = savedToken;
+                    currentLocCode = res.locCode;
+                    currentLocName = res.locName;
+                    if (res.isAdmin) {
+                        adminToken = savedToken;
+                        $('#settingsTabLi').show();
+                    }
+                    hideLoginScreen();
+                    bootstrapApp();
+                } else {
+                    try { localStorage.removeItem('actssToken'); } catch(e) {}
+                    showLoginScreen();
+                }
+            }).validateSessionToken(savedToken);
+    }
+
+    function promptForcedPasswordChange() {
+        promptChangePassword(true);
+    }
+
+    function promptChangePassword(forced) {
+        Swal.fire({
+            title: forced ? 'ต้องเปลี่ยนรหัสผ่าน' : 'เปลี่ยนรหัสผ่าน',
+            html: (forced ? 'รหัสผ่านของสาขานี้ถูกใช้งานมาเกิน 40 วัน กรุณาตั้งรหัสผ่านใหม่ก่อนใช้งานต่อ<br><br>' : '') +
+                  '<input type="password" id="swalOldPassword" class="swal2-input" placeholder="รหัสผ่านเดิม">' +
+                  '<input type="password" id="swalNewPassword" class="swal2-input" placeholder="รหัสผ่านใหม่">',
+            confirmButtonText: 'เปลี่ยนรหัสผ่าน',
+            allowOutsideClick: !forced,
+            allowEscapeKey: !forced,
+            showCancelButton: !forced,
+            cancelButtonText: 'ยกเลิก',
+            preConfirm: function() {
+                var oldPw = document.getElementById('swalOldPassword').value;
+                var newPw = document.getElementById('swalNewPassword').value;
+                if (!oldPw || !newPw) {
+                    Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน');
+                    return false;
+                }
+                return new Promise(function(resolve) {
+                    google.script.run
+                        .withFailureHandler(function(err) {
+                            Swal.showValidationMessage('เกิดข้อผิดพลาด: ' + err.message);
+                            resolve(false);
+                        })
+                        .withSuccessHandler(function(res) {
+                            if (!res.success) {
+                                Swal.showValidationMessage(res.message);
+                                resolve(false);
+                            } else {
+                                currentToken = res.token;
+                                try { localStorage.setItem('actssToken', res.token); } catch(e) {}
+                                if (currentLocCode === '__ADMIN__') adminToken = res.token;
+                                resolve(true);
+                            }
+                        }).changePassword(currentToken, oldPw, newPw);
+                });
+            }
+        }).then(function(result) {
+            if (result.isConfirmed && result.value) {
+                Swal.fire('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อย', 'success').then(function() {
+                    if (forced) {
+                        hideLoginScreen();
+                        bootstrapApp();
+                    }
+                });
+            }
+        });
+    }
+
+    function applyLoggedBranch() {
+        $('#locCode').val(currentLocCode);
+        $('#locName').val(currentLocName);
+        $('#locPrefix').text(currentLocCode + " +");
+
+        if (currentLocCode === '__ADMIN__') {
+            $('#lockedBranchDisplay').text('Admin (ไม่มีสาขา — บันทึกฟอร์มไม่ได้)');
+            $('#actForm').addClass('form-locked');
+            return;
+        }
+
+        $('#actForm').removeClass('form-locked');
+        $('#lockedBranchDisplay').text(currentLocCode + ' - ' + currentLocName);
+
+        google.script.run
+            .withFailureHandler(handleAuthFailure)
+            .withSuccessHandler(function(stock) {
+                branchStock = stock;
+                $('.select-sku').each(function() { populateSkuDropdown($(this)); });
+                if (stock.length === 0) { Swal.fire('แจ้งคลังสินค้า', 'ไม่พบยอดสต๊อกผลิตภัณฑ์ที่สาขานี้', 'info'); }
+            }).getStockByBranch(currentToken, currentLocCode);
     }
 
     $(document).ready(function() {
@@ -676,9 +1006,101 @@
             updateThemeIcon(newTheme);
         });
 
-        // 💡 1. เข้าเว็บครั้งแรก ให้ดึงข้อมูลเงียบๆ ยังไม่ขึ้น HUD (มีหน้าจอขาวขุ่น Overlay บังไว้บางๆ)
-        google.script.run.withSuccessHandler(initializeUI).getAppData();
-        
+        // 💡 1. เข้าเว็บครั้งแรก เช็ค session ที่ค้างไว้ก่อน ถ้าไม่มี/หมดอายุ ให้โชว์หน้า login
+        attemptSessionRestore();
+
+        $('#loginForm').on('submit', function(e) {
+            e.preventDefault();
+            var locCode = $('#loginLocCode').val();
+            var password = $('#loginPassword').val();
+            $('#loginErrorMsg').addClass('d-none');
+            google.script.run
+                .withFailureHandler(function(err) {
+                    $('#loginErrorMsg').text('เกิดข้อผิดพลาด: ' + err.message).removeClass('d-none');
+                })
+                .withSuccessHandler(function(res) {
+                    if (!res.success) {
+                        $('#loginErrorMsg').text(res.message).removeClass('d-none');
+                        return;
+                    }
+                    currentToken = res.token;
+                    currentLocCode = res.locCode;
+                    currentLocName = res.locName;
+                    try { localStorage.setItem('actssToken', res.token); } catch(e) {}
+
+                    if (res.isAdmin) {
+                        adminToken = res.token;
+                        $('#settingsTabLi').show();
+                    } else {
+                        adminToken = null;
+                        $('#settingsTabLi').hide();
+                        $('#settingsContent').addClass('d-none');
+                        $('#settingsLocked').removeClass('d-none');
+                    }
+
+                    if (res.passwordExpired) {
+                        promptForcedPasswordChange();
+                    } else {
+                        hideLoginScreen();
+                        bootstrapApp();
+                    }
+                }).login(locCode, password);
+        });
+
+        $('#changePwBtn').on('click', function() {
+            promptChangePassword(false);
+        });
+
+        $('#logoutBtn').on('click', function() {
+            Swal.fire({ title: 'ออกจากระบบ?', icon: 'question', showCancelButton: true, confirmButtonText: 'ออกจากระบบ', cancelButtonText: 'ยกเลิก' }).then(function(result) {
+                if (result.isConfirmed) {
+                    var finishLogout = function() {
+                        try { localStorage.removeItem('actssToken'); } catch(e) {}
+                        currentToken = null;
+                        currentLocCode = null;
+                        currentLocName = null;
+                        adminToken = null;
+                        $('#loginLocCode').val('');
+                        $('#loginPassword').val('');
+                        $('#settingsContent').addClass('d-none');
+                        $('#settingsLocked').removeClass('d-none');
+                        $('#settingsTabLi').hide();
+                        showLoginScreen();
+                    };
+                    // ออกจากระบบฝั่ง client เสมอ แม้เรียก server ไม่สำเร็จ (เช่น เน็ตหลุด) เพื่อไม่ให้ผู้ใช้ค้างอยู่ในระบบ
+                    google.script.run.withFailureHandler(finishLogout).withSuccessHandler(finishLogout).logout(currentToken);
+                }
+            });
+        });
+
+        $(document).on('click', '.btn-change-status', function() {
+            changeStatus($(this).data('rowid'), $(this).data('status'));
+        });
+
+        $(document).on('click', '.btn-toggle-user', function() {
+            var locCode = $(this).data('loccode');
+            var newActive = !$(this).data('active');
+            google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                if (res.success) { refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+            }).adminSetUserActive(adminToken, locCode, newActive);
+        });
+
+        $(document).on('click', '.btn-reset-user', function() {
+            var locCode = $(this).data('loccode');
+            Swal.fire({ title: 'รีเซ็ตรหัสผ่าน ' + locCode, input: 'password', inputLabel: 'รหัสผ่านใหม่', showCancelButton: true }).then(function(result) {
+                if (!result.isConfirmed || !result.value) return;
+                google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                    if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                }).adminUpsertUser(adminToken, locCode, result.value);
+            });
+        });
+
+        $(document).on('click', '.btn-remove-promo', function() { $(this).closest('.promo-row').remove(); });
+
+        $('#settings-tab').on('shown.bs.tab', function() {
+            if (adminToken && $('#settingsContent').hasClass('d-none')) loadSettingsContent();
+        });
+
         // ระบบค้นหาแบบช่วงเวลา และรหัส/ชื่อสินค้าของ DataTables
         $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
             if (settings.nTable.id !== 'dataTable') return true; 
@@ -743,6 +1165,14 @@
         $('#dailyFilterStartDate, #dailyFilterEndDate').on('change', function() { generateDailyDashboard(); });
         $('#daily-dash-tab').on('shown.bs.tab', function() { generateDailyDashboard(); });
 
+        $('#trackFilterArea, #trackFilterLoc, #trackFilterStatus, #trackFilterAging').on('change', function() { generateTrackByAreaTable(); });
+        var trackImeiDebounceTimer = null;
+        $('#trackFilterImei').on('keyup', function() {
+            clearTimeout(trackImeiDebounceTimer);
+            trackImeiDebounceTimer = setTimeout(function() { generateTrackByAreaTable(); }, 300);
+        });
+        $('#track-tab').on('shown.bs.tab', function() { generateTrackByAreaTable(); });
+
         $('#btnAddRow').click(function() {
             if(!$('#locCode').val()) { Swal.fire('ข้อกำหนดระบบ', 'โปรดระบุสถานที่ตั้งสาขาก่อนเพิ่มสินค้า', 'warning'); return; }
             $('.select-sku').select2('destroy');
@@ -757,26 +1187,6 @@
 
         $(document).on('click', '.btn-remove-row', function() { $(this).closest('.item-row').fadeOut(200, function() { $(this).remove(); }); });
 
-        $('#locationSelect').on('select2:select', function (e) {
-            var code = e.params.data.id;
-            var text = e.params.data.text;
-            $('#locCode').val(code); 
-            $('#locName').val(text.replace(code + ' - ', '')); 
-            $('#locPrefix').text(code + " +");
-
-            showHUDLoader('กำลังตรวจสอบพิกัดคลังและเช็คยอดสต๊อก...');
-            
-            google.script.run.withSuccessHandler(function(stock) {
-                branchStock = stock;
-                Swal.close();
-                $('.item-row:not(:first)').remove();
-                $('.select-sku').each(function() { populateSkuDropdown($(this)); });
-                $('.select-imei').empty().append('<option></option>');
-
-                if(stock.length === 0) { Swal.fire('แจ้งคลังสินค้า', 'ไม่พบยอดสต๊อกผลิตภัณฑ์ที่สาขานี้', 'info'); }
-            }).getStockByBranch(code);
-        });
-
         $(document).on('select2:select', '.select-sku', function(e) {
             var selectedSku = e.params.data.id;
             var row = $(this).closest('.item-row');
@@ -785,7 +1195,7 @@
             var imeiList = branchStock.filter(function(i) { return i.sku === selectedSku; });
             var imeiDropdown = row.find('.select-imei');
             imeiDropdown.empty().append('<option></option>');
-            imeiList.forEach(function(i) { imeiDropdown.append('<option value="' + i.imei + '">' + i.imei + '</option>'); });
+            imeiList.forEach(function(i) { imeiDropdown.append('<option value="' + escapeHtml(i.imei) + '">' + escapeHtml(i.imei) + '</option>'); });
         });
 
         $(document).on('change', '.select-imei', function() {
@@ -828,7 +1238,13 @@
 
         $('#actForm').on('submit', function(e) {
             e.preventDefault();
-            var payload = { actDate: $('#actDate').val(), empName: $('#empName').val(), locCode: $('#locCode').val(), locName: $('#locName').val(), items: [] };
+
+            if (currentLocCode === '__ADMIN__') {
+                Swal.fire('ไม่สามารถบันทึกได้', 'บัญชี Admin ไม่มีสาขา ไม่สามารถบันทึกรายการ ACT ได้', 'warning');
+                return;
+            }
+
+            var payload = { actDate: $('#actDate').val(), empName: $('#empName').val(), items: [] };
             var validationError = false;
 
             $('.item-row').each(function() {
@@ -843,17 +1259,24 @@
             if(validationError) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุให้ครบถ้วน', 'warning'); return; }
 
             showHUDLoader('กำลังบันทึกโครงสร้างข้อมูลลงฐานระบบหลัก...');
-            google.script.run.withSuccessHandler(function(res) {
-                if(res.success) {
-                    Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
-                    $('.item-row:not(:first)').remove();
-                    $('.select-sku').val(null).trigger('change');
-                    $('.select-imei').empty().append('<option></option>').val(null).trigger('change');
-                    $('#empName').val('');
-                    // โหลดตารางใหม่แบบเงียบๆ ไม่ต้องแสดง HUD อีก
-                    google.script.run.withSuccessHandler(function(records){ processRecords(records); }).getRecords();
-                } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-            }).saveBatchRecords(payload);
+            google.script.run
+                .withFailureHandler(function(err) {
+                    Swal.close();
+                    if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                    Swal.fire('ผิดพลาด', 'บันทึกข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+                })
+                .withSuccessHandler(function(res) {
+                    Swal.close();
+                    if(res.success) {
+                        Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
+                        $('.item-row:not(:first)').remove();
+                        $('.select-sku').val(null).trigger('change');
+                        $('.select-imei').empty().append('<option></option>').val(null).trigger('change');
+                        $('#empName').val('');
+                        // โหลดตารางใหม่แบบเงียบๆ ไม่ต้องแสดง HUD อีก
+                        google.script.run.withFailureHandler(function(err) { console.error(err); }).withSuccessHandler(function(records){ processRecords(records); }).getRecords(currentToken);
+                    } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                }).saveBatchRecords(currentToken, payload);
         });
     });
 
@@ -868,7 +1291,7 @@
         dropdownElement.empty().append('<option></option>');
         skuList.forEach(function(sku) {
             var desc = branchStock.find(function(i) { return i.sku == sku; }).desc;
-            dropdownElement.append('<option value="' + sku + '">' + sku + ' - ' + desc + '</option>');
+            dropdownElement.append('<option value="' + escapeHtml(sku) + '">' + escapeHtml(sku) + ' - ' + escapeHtml(desc) + '</option>');
         });
     }
 
@@ -885,27 +1308,30 @@
         var locDisplayMap = {};
 
         rawLocations.forEach(function(loc) {
-            $('#locationSelect').append('<option value="' + loc.code + '">' + loc.code + ' - ' + loc.name + ' [' + loc.area + ']</option>');
             locDisplayMap[loc.code] = loc.code + ' - ' + loc.name;
             if(areaSet.indexOf(loc.area) === -1) areaSet.push(loc.area);
             if(locSet.indexOf(loc.code) === -1) locSet.push(loc.code);
         });
         
-        areaSet.sort().forEach(function(a) { 
-            $('#filterArea').append('<option value="' + a + '">' + a + '</option>'); 
-            $('#deepFilterArea').append('<option value="' + a + '">' + a + '</option>'); 
-            $('#dashFilterArea').append('<option value="' + a + '">' + a + '</option>'); 
+        areaSet.sort().forEach(function(a) {
+            var opt = '<option value="' + escapeHtml(a) + '">' + escapeHtml(a) + '</option>';
+            $('#filterArea').append(opt);
+            $('#deepFilterArea').append(opt);
+            $('#dashFilterArea').append(opt);
+            $('#trackFilterArea').append(opt);
         });
-        locSet.sort().forEach(function(c) { 
+        locSet.sort().forEach(function(c) {
             var display = locDisplayMap[c] || c;
-            $('#filterLoc').append('<option value="' + c + '">' + display + '</option>'); 
-            $('#deepFilterLoc').append('<option value="' + c + '">' + display + '</option>'); 
+            var opt = '<option value="' + escapeHtml(c) + '">' + escapeHtml(display) + '</option>';
+            $('#filterLoc').append(opt);
+            $('#deepFilterLoc').append(opt);
+            $('#trackFilterLoc').append(opt);
         });
 
-        $('#locationSelect').select2({ theme: 'bootstrap-5', placeholder: "ระบุหรือกรอกคีย์เวิร์ดชื่อสาขา...", allowClear: true, width: '100%' });
-        $('#filterArea, #filterLoc, #filterProduct, #deepFilterArea, #deepFilterLoc, #deepFilterAging, #dashFilterArea, #dashFilterAging').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "แสดงข้อมูลทั้งหมด..." });
+        $('#filterArea, #filterLoc, #filterProduct, #deepFilterArea, #deepFilterLoc, #deepFilterAging, #dashFilterArea, #dashFilterAging, #trackFilterArea, #trackFilterLoc, #trackFilterStatus, #trackFilterAging').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "แสดงข้อมูลทั้งหมด..." });
         $('#filterModel, #dashFilterModel, #deepFilterModel').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, closeOnSelect: false, placeholder: "ติ๊กเลือกรุ่นได้หลายรายการ..." });
         initRowSelect2();
+        applyLoggedBranch();
 
         if(!data.timeValid) {
             $('#actForm').addClass('form-locked');
@@ -943,13 +1369,14 @@
         google.script.run
         .withFailureHandler(function(err) {
             console.error(err);
+            if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
             Swal.fire('ข้อผิดพลาดเครือข่าย', 'ระบบล้มเหลวในการเชื่อมโยงตาราง: ' + err.message, 'error');
         })
         .withSuccessHandler(function(records) {
             processRecords(records);
             // 💡 5. เมื่อโหลดข้อมูลและวาดตารางเสร็จสิ้นทั้งหมด ปิด HUD ทิ้ง
             Swal.close();
-        }).getRecords();
+        }).getRecords(currentToken);
     }
 
     // แยกส่วนการประมวลผลตารางออกมา เพื่อให้เรียกซ้ำตอนบันทึกข้อมูลได้โดยไม่ต้องโชว์ HUD
@@ -978,27 +1405,27 @@
                     unsoldPool.push({ model: mappedModelName, sku: cleanSku, desc: r.desc, area: r.area, locCode: r.locCode, locName: r.locName, imei: r.imei, age: ageDays });
                 }
 
-                var btnManage = '<button class="btn btn-sm btn-primary fw-bold" onclick="changeStatus(' + r.rowId + ', \'' + r.status + '\')"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
+                var btnManage = '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
 
                 tbody += '<tr data-rowid="' + r.rowId + '">' +
-                    '<td>' + r.desc + '</td>' +                          
-                    '<td>' + r.sku + '</td>' +                           
-                    '<td>' + r.imei + '</td>' +                          
-                    '<td>' + r.rrp + '</td>' +                           
-                    '<td>' + r.discount + '</td>' +                      
-                    '<td>' + r.promoPrice + '</td>' +                    
-                    '<td>' + r.locCode + '</td>' +                       
-                    '<td>' + r.locName + '</td>' +                       
-                    '<td class="fw-bold text-dark">' + r.area + '</td>' +
-                    '<td>' + r.cutBarcode + '</td>' +                    
-                    '<td>' + r.suggestPrice + '</td>' +                  
-                    '<td>' + displayTimestamp + '</td>' +                
-                    '<td>' + r.empName + '</td>' +                       
-                    '<td>' + displayActDate + '</td>' +                  
-                    '<td><span class="badge ' + ageBadgeColor + ' rounded-pill">' + ageDays + ' วัน</span></td>' + 
-                    '<td><span class="badge ' + statusStyle + '">' + r.status + '</span></td>' +
+                    '<td>' + escapeHtml(r.desc) + '</td>' +
+                    '<td>' + escapeHtml(r.sku) + '</td>' +
+                    '<td>' + escapeHtml(r.imei) + '</td>' +
+                    '<td>' + escapeHtml(r.rrp) + '</td>' +
+                    '<td>' + escapeHtml(r.discount) + '</td>' +
+                    '<td>' + escapeHtml(r.promoPrice) + '</td>' +
+                    '<td>' + escapeHtml(r.locCode) + '</td>' +
+                    '<td>' + escapeHtml(r.locName) + '</td>' +
+                    '<td class="fw-bold text-dark">' + escapeHtml(r.area) + '</td>' +
+                    '<td>' + escapeHtml(r.cutBarcode) + '</td>' +
+                    '<td>' + escapeHtml(r.suggestPrice) + '</td>' +
+                    '<td>' + escapeHtml(displayTimestamp) + '</td>' +
+                    '<td>' + escapeHtml(r.empName) + '</td>' +
+                    '<td>' + escapeHtml(displayActDate) + '</td>' +
+                    '<td><span class="badge ' + ageBadgeColor + ' rounded-pill">' + ageDays + ' วัน</span></td>' +
+                    '<td><span class="badge ' + statusStyle + '">' + escapeHtml(r.status) + '</span></td>' +
                     '<td>' + btnManage + '</td>' +
-                    '<td>' + mappedModelName + '</td>' +
+                    '<td>' + escapeHtml(mappedModelName) + '</td>' +
                 '</tr>';
             });
         } else {
@@ -1011,14 +1438,14 @@
         $('#filterProduct').empty().append('<option value="">-- ทุกสินค้า --</option>');
         Array.from(productSet).sort().forEach(function(item) {
             var parts = item.split("|||");
-            $('#filterProduct').append('<option value="' + parts[0] + '">' + parts[1] + '</option>');
+            $('#filterProduct').append('<option value="' + escapeHtml(parts[0]) + '">' + escapeHtml(parts[1]) + '</option>');
         });
         if(existingProduct) $('#filterProduct').val(existingProduct);
 
         var existingFilterModel = $('#filterModel').val();
         $('#filterModel').empty();
         Array.from(filterModelSet).sort().forEach(function(m) {
-            $('#filterModel').append('<option value="' + m + '">' + m + '</option>');
+            $('#filterModel').append('<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>');
         });
         if(existingFilterModel && existingFilterModel.length) $('#filterModel').val(existingFilterModel);
 
@@ -1072,13 +1499,64 @@
         var allModels = new Set();
         unsoldPool.forEach(function(item) { allModels.add(item.model); });
         Array.from(allModels).sort().forEach(function(m) {
-            $('#dashFilterModel').append('<option value="' + m + '">' + m + '</option>');
+            $('#dashFilterModel').append('<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>');
         });
         if(existingDashModel && existingDashModel.length) $('#dashFilterModel').val(existingDashModel);
 
         generateExecutiveDashboard(records, unsoldPool);
-        renderDeepDiveTable(); 
+        renderDeepDiveTable();
         generateDailyDashboard();
+        generateTrackByAreaTable();
+    }
+
+    function generateTrackByAreaTable() {
+        var selectedArea = $('#trackFilterArea').val();
+        var selectedLoc = $('#trackFilterLoc').val();
+        var selectedStatus = $('#trackFilterStatus').val();
+        var selectedAging = $('#trackFilterAging').val();
+        var imeiKeyword = ($('#trackFilterImei').val() || '').trim().toLowerCase();
+
+        var filtered = globalAllRecords.filter(function(r) {
+            var matchArea = selectedArea ? r.area === selectedArea : true;
+            var matchLoc = selectedLoc ? r.locCode === selectedLoc : true;
+            var matchStatus = selectedStatus ? r.status === selectedStatus : true;
+            var matchImei = imeiKeyword ? (r.imei && r.imei.toString().toLowerCase().indexOf(imeiKeyword) !== -1) : true;
+            var matchAging = true;
+            if(selectedAging) {
+                var ageDays = computeAgingDays(r.actDate);
+                if(selectedAging === "30") matchAging = ageDays <= 30;
+                else if(selectedAging === "60") matchAging = ageDays > 30 && ageDays <= 60;
+                else if(selectedAging === "90") matchAging = ageDays > 60 && ageDays <= 90;
+                else if(selectedAging === "120") matchAging = ageDays > 90 && ageDays <= 120;
+                else if(selectedAging === "121") matchAging = ageDays > 120;
+            }
+            return matchArea && matchLoc && matchStatus && matchImei && matchAging;
+        });
+
+        if(trackTableInstance) trackTableInstance.destroy();
+        var tbody = '';
+        if(filtered.length > 0) {
+            filtered.forEach(function(r) {
+                var ageDays = computeAgingDays(r.actDate);
+                var ageBadgeColor = ageDays > 15 ? 'bg-danger' : (ageDays > 7 ? 'bg-warning text-dark' : 'bg-success');
+                var statusStyle = r.status === 'ขายแล้ว' ? 'bg-success' : 'bg-danger';
+                tbody += '<tr>' +
+                    '<td><span class="badge ' + statusStyle + '">' + escapeHtml(r.status) + '</span></td>' +
+                    '<td><span class="badge ' + ageBadgeColor + ' rounded-pill">' + ageDays + ' วัน</span></td>' +
+                    '<td class="fw-bold text-dark">' + escapeHtml(r.area) + '</td>' +
+                    '<td>' + escapeHtml(r.locCode) + '</td>' +
+                    '<td>' + escapeHtml(r.locName) + '</td>' +
+                    '<td>' + escapeHtml(r.desc) + '</td>' +
+                    '<td>' + escapeHtml(r.sku) + '</td>' +
+                    '<td>' + escapeHtml(r.imei) + '</td>' +
+                '</tr>';
+            });
+        }
+        $('#trackTable tbody').html(tbody);
+        trackTableInstance = $('#trackTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [[1, "desc"]], "pageLength": 25
+        });
     }
 
     function generateExecutiveDashboard(allRecords, unsoldPool) {
@@ -1152,7 +1630,7 @@
 
         if(modelTableInstance) modelTableInstance.destroy();
         var modelTbody = '';
-        for(var m in modelAggregator) { modelTbody += '<tr><td>' + m + '</td><td class="text-center fw-bold text-primary">' + modelAggregator[m] + '</td></tr>'; }
+        for(var m in modelAggregator) { modelTbody += '<tr><td>' + escapeHtml(m) + '</td><td class="text-center fw-bold text-primary">' + modelAggregator[m] + '</td></tr>'; }
         $('#modelTable tbody').html(modelTbody);
         modelTableInstance = $('#modelTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
@@ -1164,8 +1642,8 @@
         var areaAgingTbody = '';
         for(var a_ag in areaAgingAggregator) { 
             var ag = areaAgingAggregator[a_ag];
-            areaAgingTbody += '<tr>' + 
-                '<td>' + a_ag + '</td>' + 
+            areaAgingTbody += '<tr>' +
+                '<td>' + escapeHtml(a_ag) + '</td>' +
                 '<td class="text-center fw-bold text-primary">' + ag.total + '</td>' + 
                 '<td class="text-center">' + ag.d30 + '</td>' + 
                 '<td class="text-center">' + ag.d60 + '</td>' + 
@@ -1183,7 +1661,7 @@
         var existingModel = $('#deepFilterModel').val();
         $('#deepFilterModel').empty();
         Object.keys(modelAggregator).sort().forEach(function(m) {
-            $('#deepFilterModel').append('<option value="' + m + '">' + m + '</option>');
+            $('#deepFilterModel').append('<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>');
         });
         if(existingModel && existingModel.length) $('#deepFilterModel').val(existingModel);
     }
@@ -1243,8 +1721,8 @@
         var tbodyModel = '';
         Object.values(dailyModelMap).sort((a,b) => b.sortKey.localeCompare(a.sortKey) || a.model.localeCompare(b.model)).forEach(function(obj) {
             var areaJson = JSON.stringify(obj.areaDetails).replace(/'/g, "&#39;");
-            tbodyModel += '<tr><td class="details-control text-center" style="cursor:pointer;" data-details=\'' + areaJson + '\'><i class="fas fa-plus-circle text-primary"></i></td>' + 
-                          '<td>' + obj.date + '</td><td>' + obj.model + '</td><td class="text-center">' + obj.total + '</td><td class="text-center text-success fw-bold">' + obj.sold + '</td></tr>';
+            tbodyModel += '<tr><td class="details-control text-center" style="cursor:pointer;" data-details=\'' + areaJson + '\'><i class="fas fa-plus-circle text-primary"></i></td>' +
+                          '<td>' + escapeHtml(obj.date) + '</td><td>' + escapeHtml(obj.model) + '</td><td class="text-center">' + obj.total + '</td><td class="text-center text-success fw-bold">' + obj.sold + '</td></tr>';
         });
         $('#dailyModelTable tbody').html(tbodyModel);
         dailyModelTableInstance = $('#dailyModelTable').DataTable({
@@ -1266,7 +1744,7 @@
                 var childHtml = '<div class="p-3 bg-light border rounded m-2"><h6 class="fw-bold text-secondary"><i class="fas fa-map-marker-alt text-danger"></i> สรุปรายแอเรีย (Area)</h6><table class="table table-sm table-bordered bg-white w-auto mt-2"><thead><tr class="table-secondary"><th>แอเรีย</th><th class="text-center">ทำรายการทั้งหมด</th><th class="text-center">ขายแล้ว</th></tr></thead><tbody>';
                 
                 Object.keys(areaDetails).sort().forEach(function(areaName) {
-                    childHtml += '<tr><td>' + areaName + '</td><td class="text-center">' + areaDetails[areaName].total + '</td><td class="text-center text-success fw-bold">' + areaDetails[areaName].sold + '</td></tr>';
+                    childHtml += '<tr><td>' + escapeHtml(areaName) + '</td><td class="text-center">' + areaDetails[areaName].total + '</td><td class="text-center text-success fw-bold">' + areaDetails[areaName].sold + '</td></tr>';
                 });
                 childHtml += '</tbody></table></div>';
                 
@@ -1334,7 +1812,7 @@
             data: deepDiveData,
             columns: [
                 { className: 'model-details-control text-center align-middle', orderable: false, data: null, defaultContent: '<button class="btn btn-sm btn-primary rounded-circle shadow-sm" style="width:24px; height:24px; padding:0;"><i class="fas fa-plus" style="font-size:10px;"></i></button>' },
-                { data: 'model', className: 'align-middle fw-bold text-dark' },
+                { data: 'model', className: 'align-middle fw-bold text-dark', render: function(data) { return escapeHtml(data); } },
                 { data: 'count', className: 'text-center align-middle fw-bold text-primary fs-6' }
             ],
             order: [[2, 'desc']], language: { url: "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" }, responsive: false
@@ -1380,7 +1858,7 @@
 
     function formatModelDetails(d) {
         var html = '<div class="p-3 bg-light rounded border border-primary shadow-sm">';
-        html += '<h6 class="fw-bold text-primary mb-3"><i class="fas fa-layer-group"></i> เลือกรหัสสินค้า (SKU) ภายใต้รุ่น: ' + d.model + '</h6>';
+        html += '<h6 class="fw-bold text-primary mb-3"><i class="fas fa-layer-group"></i> เลือกรหัสสินค้า (SKU) ภายใต้รุ่น: ' + escapeHtml(d.model) + '</h6>';
         html += '<table class="table table-sm table-bordered bg-white shadow-sm mb-0">';
         html += '<thead class="table-secondary"><tr><th class="text-center" style="width: 1%; white-space: nowrap;">เจาะลึก</th><th style="width: auto;">[Item No] Full Description</th><th class="text-center" style="width: 1%; white-space: nowrap;">จำนวน (เครื่อง)</th></tr></thead><tbody>';
 
@@ -1390,7 +1868,7 @@
             var uniqueId = 'lvl3-' + Math.random().toString(36).substr(2, 9);
             html += '<tr>';
             html += '<td class="text-center align-middle"><button class="btn btn-sm btn-info text-white rounded-circle shadow-sm btn-toggle-lvl3" data-target="' + uniqueId + '" style="width:24px; height:24px; padding:0;"><i class="fas fa-plus" style="font-size:10px;"></i></button></td>';
-            html += '<td class="fw-bold text-dark align-middle">[' + skuObj.sku + '] ' + skuObj.desc + '</td>';
+            html += '<td class="fw-bold text-dark align-middle">[' + escapeHtml(skuObj.sku) + '] ' + escapeHtml(skuObj.desc) + '</td>';
             html += '<td class="text-center fw-bold text-primary align-middle fs-6">' + skuObj.count + '</td>';
             html += '</tr>';
 
@@ -1407,11 +1885,11 @@
                 
                 var itemDetails = locObj.items.map(function(itm) {
                     var ageBadge = itm.age > 15 ? 'text-danger' : (itm.age > 7 ? 'text-warning' : 'text-success');
-                    return '<div class="small mb-1 border-bottom pb-1"><i class="fas fa-barcode text-secondary"></i> ' + itm.imei + ' <span class="' + ageBadge + ' fw-bold ms-1">(' + itm.age + ' วัน)</span></div>';
+                    return '<div class="small mb-1 border-bottom pb-1"><i class="fas fa-barcode text-secondary"></i> ' + escapeHtml(itm.imei) + ' <span class="' + ageBadge + ' fw-bold ms-1">(' + itm.age + ' วัน)</span></div>';
                 }).join('');
 
                 html += '<tr>';
-                html += '<td class="text-dark fw-bold align-middle">[' + locObj.locCode + '] ' + locObj.locName + '</td>';
+                html += '<td class="text-dark fw-bold align-middle">[' + escapeHtml(locObj.locCode) + '] ' + escapeHtml(locObj.locName) + '</td>';
                 html += '<td class="text-center fw-bold text-success align-middle fs-6">' + locObj.count + '</td>';
                 html += '<td class="align-middle">' + itemDetails + '</td>';
                 html += '</tr>';
@@ -1424,6 +1902,138 @@
         return html;
     }
 
+    // ================= ตั้งค่าระบบ (Admin Settings) =================
+    function handleAdminAuthFailure(err) {
+        Swal.close();
+        adminToken = null;
+        currentToken = null;
+        currentLocCode = null;
+        currentLocName = null;
+        try { localStorage.removeItem('actssToken'); } catch(e) {}
+        $('#settingsContent').addClass('d-none');
+        $('#settingsLocked').removeClass('d-none');
+        $('#settingsTabLi').hide();
+        $('#loginLocCode').val('');
+        $('#loginPassword').val('');
+        showLoginScreen();
+        Swal.fire('เซสชันหมดอายุ', 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง', 'warning');
+    }
+
+    function loadSettingsContent() {
+        showHUDLoader('กำลังโหลดข้อมูลตั้งค่าระบบ...');
+        google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+            Swal.close();
+            renderSettingsUsers(res.users);
+            $('#settingsAnnTitle').val(res.announcement.title);
+            $('#settingsAnnDetail').val(res.announcement.detail);
+            renderSettingsPromotions(res.promotions);
+            $('#settingsTimeStart').val(res.timeWindow.start);
+            $('#settingsTimeEnd').val(res.timeWindow.end);
+            $('#settingsLocked').addClass('d-none');
+            $('#settingsContent').removeClass('d-none');
+        }).adminGetSettings(adminToken);
+    }
+
+    function refreshSettingsUsers() {
+        google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+            if (res.success) renderSettingsUsers(res.users);
+        }).adminGetSettings(adminToken);
+    }
+
+    function renderSettingsUsers(users) {
+        if (settingsUsersTableInstance) settingsUsersTableInstance.destroy();
+        var tbody = '';
+        users.forEach(function(u) {
+            var statusBadge = u.active ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">ปิดใช้งาน</span>';
+            var toggleLabel = u.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน';
+            var toggleClass = u.active ? 'btn-outline-danger' : 'btn-outline-success';
+            tbody += '<tr>' +
+                '<td class="fw-bold">' + escapeHtml(u.locCode) + '</td>' +
+                '<td>' + escapeHtml(u.lastPasswordChangedDate) + '</td>' +
+                '<td>' + statusBadge + '</td>' +
+                '<td>' +
+                    '<button type="button" class="btn btn-sm btn-outline-primary btn-reset-user" data-loccode="' + escapeHtml(u.locCode) + '">รีเซ็ตรหัสผ่าน</button> ' +
+                    '<button type="button" class="btn btn-sm ' + toggleClass + ' btn-toggle-user" data-loccode="' + escapeHtml(u.locCode) + '" data-active="' + u.active + '">' + toggleLabel + '</button>' +
+                '</td>' +
+            '</tr>';
+        });
+        $('#settingsUsersTable tbody').html(tbody);
+        settingsUsersTableInstance = $('#settingsUsersTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [[0, "asc"]], "pageLength": 25
+        });
+    }
+
+    function addNewUser() {
+        Swal.fire({
+            title: 'เพิ่มบัญชีสาขาใหม่',
+            html: '<input id="swalNewLocCode" class="swal2-input" placeholder="LocCode เช่น BKK01">' +
+                  '<input id="swalNewUserPassword" type="password" class="swal2-input" placeholder="รหัสผ่านเริ่มต้น">',
+            confirmButtonText: 'สร้างบัญชี',
+            showCancelButton: true,
+            preConfirm: function() {
+                var loc = document.getElementById('swalNewLocCode').value.trim();
+                var pw = document.getElementById('swalNewUserPassword').value;
+                if (!loc || !pw) { Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน'); return false; }
+                return { loc: loc, pw: pw };
+            }
+        }).then(function(result) {
+            if (!result.isConfirmed) return;
+            google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+            }).adminUpsertUser(adminToken, result.value.loc, result.value.pw);
+        });
+    }
+
+    function saveAnnouncement() {
+        var title = $('#settingsAnnTitle').val();
+        var detail = $('#settingsAnnDetail').val();
+        google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+            if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+        }).adminSaveAnnouncement(adminToken, title, detail);
+    }
+
+    function promoRowHtml(p) {
+        p = p || { title: '', detail: '', link: '' };
+        return '<div class="row g-2 mb-2 align-items-center promo-row">' +
+            '<div class="col-md-3"><input type="text" class="form-control form-control-sm promo-title" value="' + escapeHtml(p.title) + '" placeholder="หัวข้อ"></div>' +
+            '<div class="col-md-4"><input type="text" class="form-control form-control-sm promo-detail" value="' + escapeHtml(p.detail) + '" placeholder="รายละเอียด"></div>' +
+            '<div class="col-md-4"><input type="text" class="form-control form-control-sm promo-link" value="' + escapeHtml(p.link) + '" placeholder="ลิงก์"></div>' +
+            '<div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-promo"><i class="fas fa-trash"></i></button></div>' +
+        '</div>';
+    }
+
+    function renderSettingsPromotions(promotions) {
+        var html = '';
+        (promotions || []).forEach(function(p) { html += promoRowHtml(p); });
+        $('#settingsPromoList').html(html);
+    }
+
+    function addPromotionRow() {
+        $('#settingsPromoList').append(promoRowHtml());
+    }
+
+    function savePromotions() {
+        var promotions = [];
+        $('.promo-row').each(function() {
+            var title = $(this).find('.promo-title').val();
+            var detail = $(this).find('.promo-detail').val();
+            var link = $(this).find('.promo-link').val();
+            if (title) promotions.push({ title: title, detail: detail, link: link });
+        });
+        google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+            if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+        }).adminSavePromotions(adminToken, promotions);
+    }
+
+    function saveTimeWindow() {
+        var start = $('#settingsTimeStart').val();
+        var end = $('#settingsTimeEnd').val();
+        google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+            if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+        }).adminSaveTimeWindow(adminToken, start, end);
+    }
+
     function changeStatus(rowId, currentStatus) {
         Swal.fire({
             title: 'เปลี่ยนสเตตัสการขาย',
@@ -1433,9 +2043,10 @@
         }).then(function(result) {
             if (result.isConfirmed) {
                 showHUDLoader('กำลังบันทึกและซิงค์ข้อมูลสเตตัสใหม่...');
-                google.script.run.withSuccessHandler(function(res) {
+                google.script.run.withFailureHandler(handleAuthFailure).withSuccessHandler(function(res) {
                     if(res.success) { Swal.fire('สำเร็จ', 'เปลี่ยนสเตตัสเรียบร้อย', 'success'); loadDataTable(); }
-                }).updateStatus(rowId, result.value);
+                    else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                }).updateStatus(currentToken, rowId, result.value);
             }
         });
     }
@@ -1449,10 +2060,14 @@
                         return $(this).data('rowid');
                     }).get();
                 }
-                google.script.run.withSuccessHandler(function(res) {
-                    if(res.success) { downloadCSV(res.csvData, "ACT_SAMSUNG_Data_Master.csv"); Swal.fire('สำเร็จ', 'ดาวน์โหลดไฟล์เรียบร้อย', 'success'); }
-                    else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-                }).verifyAdminAndExport(result.value, filteredRowIds);
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.fire('ผิดพลาด', 'ส่งออกข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        if(res.success) { downloadCSV(res.csvData, "ACT_SAMSUNG_Data_Master.csv"); Swal.fire('สำเร็จ', 'ดาวน์โหลดไฟล์เรียบร้อย', 'success'); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).verifyAdminAndExport(result.value, filteredRowIds);
             }
         });
     }
