@@ -330,7 +330,10 @@
             <div id="timeAlert" class="alert alert-danger d-none fw-bold shadow-sm">
                 <i class="fas fa-lock-open"></i> นอกเวลาทำการ ระบบจะไม่บันทึกข้อมูลหลัก แต่สามารถดูรายงานและเปลี่ยนสเตตัสได้
             </div>
-            
+            <div id="viewerAlert" class="alert alert-info d-none fw-bold shadow-sm">
+                <i class="fas fa-eye"></i> บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว (พิเศษ) สามารถดูรายงาน/แดชบอร์ดได้ทุกแท็บ แต่บันทึกฟอร์มหรือเปลี่ยนสถานะไม่ได้
+            </div>
+
             <form id="actForm">
                 <div class="card p-3 bg-light border-0">
                     <h5 class="text-primary fw-bold mb-3 border-bottom pb-2">ข้อมูลหลักผู้ทำรายการ</h5>
@@ -699,7 +702,7 @@
                     </div>
                     <div class="table-responsive">
                         <table id="settingsUsersTable" class="table table-hover table-bordered w-100">
-                            <thead class="table-dark"><tr><th>LocCode</th><th>เปลี่ยนรหัสผ่านล่าสุด</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+                            <thead class="table-dark"><tr><th>LocCode</th><th>เปลี่ยนรหัสผ่านล่าสุด</th><th>สถานะ</th><th>สิทธิ์</th><th>จัดการ</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
@@ -784,6 +787,8 @@
     var currentToken = null;
     var currentLocCode = null;
     var currentLocName = null;
+    var currentRole = 'ทั่วไป';
+    var ROLE_VIEWER = 'พิเศษ';
 
     function escapeHtml(str) {
         if (str === null || str === undefined) return '';
@@ -876,6 +881,7 @@
         currentToken = null;
         currentLocCode = null;
         currentLocName = null;
+        currentRole = 'ทั่วไป';
         adminToken = null;
         $('#settingsTabLi').hide();
         $('#settingsContent').addClass('d-none');
@@ -904,6 +910,7 @@
                     currentToken = savedToken;
                     currentLocCode = res.locCode;
                     currentLocName = res.locName;
+                    currentRole = res.role || 'ทั่วไป';
                     if (res.isAdmin) {
                         adminToken = savedToken;
                         $('#settingsTabLi').show();
@@ -970,6 +977,18 @@
         });
     }
 
+    // บัญชีสิทธิ์ "พิเศษ" ดูข้อมูล/แดชบอร์ดได้ทุกแท็บเหมือน user ทั่วไป แต่คีย์ฟอร์ม ACT และเปลี่ยนสถานะไม่ได้
+    // (บัญชี Admin ถูกล็อกฟอร์มอยู่แล้วจากเงื่อนไข __ADMIN__ ด้านบน ไม่ต้องซ้อนข้อความเตือนอีกชั้น)
+    function applyRoleRestrictions() {
+        if (currentLocCode === '__ADMIN__') return;
+        if (currentRole === ROLE_VIEWER) {
+            $('#actForm').addClass('form-locked');
+            $('#viewerAlert').removeClass('d-none');
+        } else {
+            $('#viewerAlert').addClass('d-none');
+        }
+    }
+
     function applyLoggedBranch() {
         $('#locCode').val(currentLocCode);
         $('#locName').val(currentLocName);
@@ -983,6 +1002,8 @@
 
         $('#actForm').removeClass('form-locked');
         $('#lockedBranchDisplay').text(currentLocCode + ' - ' + currentLocName);
+
+        applyRoleRestrictions();
 
         google.script.run
             .withFailureHandler(handleAuthFailure)
@@ -1026,6 +1047,7 @@
                     currentToken = res.token;
                     currentLocCode = res.locCode;
                     currentLocName = res.locName;
+                    currentRole = res.role || 'ทั่วไป';
                     try { localStorage.setItem('actssToken', res.token); } catch(e) {}
 
                     if (res.isAdmin) {
@@ -1059,6 +1081,7 @@
                         currentToken = null;
                         currentLocCode = null;
                         currentLocName = null;
+                        currentRole = 'ทั่วไป';
                         adminToken = null;
                         $('#loginLocCode').val('');
                         $('#loginPassword').val('');
@@ -1083,6 +1106,15 @@
             google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
                 if (res.success) { refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
             }).adminSetUserActive(adminToken, locCode, newActive);
+        });
+
+        $(document).on('click', '.btn-toggle-role', function() {
+            var locCode = $(this).data('loccode');
+            var currentUserRole = $(this).data('role');
+            var newRole = (currentUserRole === 'พิเศษ') ? 'ทั่วไป' : 'พิเศษ';
+            google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                if (res.success) { refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+            }).adminSetUserRole(adminToken, locCode, newRole);
         });
 
         $(document).on('click', '.btn-reset-user', function() {
@@ -1241,6 +1273,10 @@
 
             if (currentLocCode === '__ADMIN__') {
                 Swal.fire('ไม่สามารถบันทึกได้', 'บัญชี Admin ไม่มีสาขา ไม่สามารถบันทึกรายการ ACT ได้', 'warning');
+                return;
+            }
+            if (currentRole === ROLE_VIEWER) {
+                Swal.fire('ไม่สามารถบันทึกได้', 'บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถบันทึกรายการได้', 'warning');
                 return;
             }
 
@@ -1405,7 +1441,9 @@
                     unsoldPool.push({ model: mappedModelName, sku: cleanSku, desc: r.desc, area: r.area, locCode: r.locCode, locName: r.locName, imei: r.imei, age: ageDays });
                 }
 
-                var btnManage = '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
+                var btnManage = (currentRole === ROLE_VIEWER)
+                    ? '<span class="text-muted small"><i class="fas fa-eye"></i> ดูอย่างเดียว</span>'
+                    : '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
 
                 tbody += '<tr data-rowid="' + r.rowId + '">' +
                     '<td>' + escapeHtml(r.desc) + '</td>' +
@@ -1947,13 +1985,18 @@
             var statusBadge = u.active ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">ปิดใช้งาน</span>';
             var toggleLabel = u.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน';
             var toggleClass = u.active ? 'btn-outline-danger' : 'btn-outline-success';
+            var isViewer = u.role === 'พิเศษ';
+            var roleBadge = isViewer ? '<span class="badge bg-info text-dark">พิเศษ (ดูอย่างเดียว)</span>' : '<span class="badge bg-primary">ทั่วไป (คีย์ข้อมูลได้)</span>';
+            var roleToggleLabel = isViewer ? 'ปรับเป็นทั่วไป' : 'ปรับเป็นพิเศษ';
             tbody += '<tr>' +
                 '<td class="fw-bold">' + escapeHtml(u.locCode) + '</td>' +
                 '<td>' + escapeHtml(u.lastPasswordChangedDate) + '</td>' +
                 '<td>' + statusBadge + '</td>' +
+                '<td>' + roleBadge + '</td>' +
                 '<td>' +
                     '<button type="button" class="btn btn-sm btn-outline-primary btn-reset-user" data-loccode="' + escapeHtml(u.locCode) + '">รีเซ็ตรหัสผ่าน</button> ' +
-                    '<button type="button" class="btn btn-sm ' + toggleClass + ' btn-toggle-user" data-loccode="' + escapeHtml(u.locCode) + '" data-active="' + u.active + '">' + toggleLabel + '</button>' +
+                    '<button type="button" class="btn btn-sm ' + toggleClass + ' btn-toggle-user" data-loccode="' + escapeHtml(u.locCode) + '" data-active="' + u.active + '">' + toggleLabel + '</button> ' +
+                    '<button type="button" class="btn btn-sm btn-outline-info btn-toggle-role" data-loccode="' + escapeHtml(u.locCode) + '" data-role="' + escapeHtml(u.role) + '">' + roleToggleLabel + '</button>' +
                 '</td>' +
             '</tr>';
         });
@@ -1968,20 +2011,25 @@
         Swal.fire({
             title: 'เพิ่มบัญชีสาขาใหม่',
             html: '<input id="swalNewLocCode" class="swal2-input" placeholder="LocCode เช่น BKK01">' +
-                  '<input id="swalNewUserPassword" type="password" class="swal2-input" placeholder="รหัสผ่านเริ่มต้น">',
+                  '<input id="swalNewUserPassword" type="password" class="swal2-input" placeholder="รหัสผ่านเริ่มต้น">' +
+                  '<select id="swalNewUserRole" class="swal2-input">' +
+                      '<option value="ทั่วไป">ทั่วไป (คีย์ข้อมูลได้)</option>' +
+                      '<option value="พิเศษ">พิเศษ (ดูอย่างเดียว)</option>' +
+                  '</select>',
             confirmButtonText: 'สร้างบัญชี',
             showCancelButton: true,
             preConfirm: function() {
                 var loc = document.getElementById('swalNewLocCode').value.trim();
                 var pw = document.getElementById('swalNewUserPassword').value;
+                var role = document.getElementById('swalNewUserRole').value;
                 if (!loc || !pw) { Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน'); return false; }
-                return { loc: loc, pw: pw };
+                return { loc: loc, pw: pw, role: role };
             }
         }).then(function(result) {
             if (!result.isConfirmed) return;
             google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
                 if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-            }).adminUpsertUser(adminToken, result.value.loc, result.value.pw);
+            }).adminUpsertUser(adminToken, result.value.loc, result.value.pw, result.value.role);
         });
     }
 

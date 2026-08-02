@@ -7,6 +7,10 @@
 const ADMIN_PIN = "9999";
 const PASSWORD_EXPIRY_DAYS = 40;
 
+// สิทธิ์บัญชีสาขา: ทั่วไป = คีย์ข้อมูลได้ตามปกติ, พิเศษ = ดูข้อมูล/แดชบอร์ดได้แต่คีย์ฟอร์ม/เปลี่ยนสถานะไม่ได้
+const ROLE_NORMAL = "ทั่วไป";
+const ROLE_VIEWER = "พิเศษ";
+
 function doGet(e) {
   let template = HtmlService.createTemplateFromFile('Index');
   return template.evaluate()
@@ -58,6 +62,21 @@ function getLocNameByCode_(ss, locCode) {
   return "";
 }
 
+// อ่าน Role ของสาขาสดจากชีต Users ทุกครั้ง (ไม่ cache ไว้ใน Sessions) เพื่อให้ admin เปลี่ยนสิทธิ์
+// แล้วมีผลทันทีกับ session ที่ล็อกอินค้างอยู่ โดยไม่ต้องรอให้ผู้ใช้ login ใหม่
+function getUserRole_(ss, locCode) {
+  if (locCode === ADMIN_SESSION_LOCCODE) return "admin";
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet || usersSheet.getLastRow() <= 1) return ROLE_NORMAL;
+  const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 6).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if ((data[i][0] || "").toString().trim() === locCode) {
+      return (data[i][5] || "").toString().trim() || ROLE_NORMAL;
+    }
+  }
+  return ROLE_NORMAL;
+}
+
 function resolveSession_(token) {
   if (!token) return null;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -65,7 +84,10 @@ function resolveSession_(token) {
   if (!sheet || sheet.getLastRow() <= 1) return null;
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues();
   for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === token) return { locCode: (data[i][1] || "").toString().trim() };
+    if (data[i][0] === token) {
+      const locCode = (data[i][1] || "").toString().trim();
+      return { locCode: locCode, role: getUserRole_(ss, locCode) };
+    }
   }
   return null;
 }
@@ -141,7 +163,7 @@ function login(locCode, password) {
   const usersSheet = getUsersSheet_(ss);
 
   if (usersSheet && usersSheet.getLastRow() > 1) {
-    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 5).getDisplayValues();
+    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 6).getDisplayValues();
     for (let i = 0; i < data.length; i++) {
       const rowLocCode = (data[i][0] || "").toString().trim();
       if (rowLocCode !== locCode) continue;
@@ -150,6 +172,7 @@ function login(locCode, password) {
       const salt = data[i][2];
       const lastChanged = data[i][3];
       const active = (data[i][4] || "").toString().trim().toUpperCase();
+      const role = (data[i][5] || "").toString().trim() || ROLE_NORMAL;
 
       if (active !== "TRUE" && active !== "Y") {
         return { success: false, message: "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ" };
@@ -179,7 +202,8 @@ function login(locCode, password) {
         locCode: locCode,
         locName: getLocNameByCode_(ss, locCode),
         passwordExpired: passwordExpired,
-        isAdmin: false
+        isAdmin: false,
+        role: role
       };
     }
   }
@@ -261,7 +285,8 @@ function validateSessionToken(token) {
     valid: true,
     locCode: session.locCode,
     locName: isAdmin ? "Admin" : getLocNameByCode_(ss, session.locCode),
-    isAdmin: isAdmin
+    isAdmin: isAdmin,
+    role: session.role
   };
 }
 
@@ -375,10 +400,15 @@ function changeAdminPassword_(token, oldPassword, newPassword) {
 function setupAuthSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  if (!getUsersSheet_(ss)) {
-    const sheet = ss.insertSheet("Users");
-    sheet.getRange(1, 1, 1, 5).setValues([["LocCode", "PasswordHash", "Salt", "LastPasswordChangedDate", "Active"]]);
-    sheet.setFrozenRows(1);
+  let usersSheet = getUsersSheet_(ss);
+  if (!usersSheet) {
+    usersSheet = ss.insertSheet("Users");
+    usersSheet.getRange(1, 1, 1, 6).setValues([["LocCode", "PasswordHash", "Salt", "LastPasswordChangedDate", "Active", "Role"]]);
+    usersSheet.setFrozenRows(1);
+  }
+  // เผื่อชีต Users เดิมสร้างไว้ก่อนเพิ่มฟีเจอร์สิทธิ์ผู้ใช้ (มีแค่ 5 คอลัมน์) — เติมหัวคอลัมน์ Role ให้โดยไม่กระทบข้อมูลเดิม
+  if (usersSheet.getRange(1, 6).getValue() === "") {
+    usersSheet.getRange(1, 6).setValue("Role");
   }
 
   if (!getSessionsSheet_(ss)) {
@@ -645,6 +675,9 @@ function saveBatchRecords(token, payload) {
   if (session.locCode === ADMIN_SESSION_LOCCODE) {
     return { success: false, message: "บัญชี Admin ไม่มีสาขา ไม่สามารถบันทึกรายการ ACT ได้" };
   }
+  if (session.role === ROLE_VIEWER) {
+    return { success: false, message: "บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถบันทึกรายการได้" };
+  }
 
   const lock = LockService.getScriptLock();
   try {
@@ -735,7 +768,10 @@ function saveBatchRecords(token, payload) {
 }
 
 function updateStatus(token, rowId, newStatus) {
-  requireSession_(token);
+  const session = requireSession_(token);
+  if (session.role === ROLE_VIEWER) {
+    return { success: false, message: "บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถแก้ไขสถานะได้" };
+  }
   const allowedStatus = ["ยังไม่ขาย", "ขายแล้ว"];
   if(allowedStatus.indexOf(newStatus) === -1) {
     return { success: false, message: "สถานะไม่ถูกต้อง" };
@@ -764,13 +800,14 @@ function adminGetSettings(adminToken) {
   const usersSheet = getUsersSheet_(ss);
   let users = [];
   if (usersSheet && usersSheet.getLastRow() > 1) {
-    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 5).getDisplayValues();
+    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 6).getDisplayValues();
     users = data
       .map(function(r) {
         return {
           locCode: (r[0] || "").toString().trim(),
           lastPasswordChangedDate: r[3] || "",
-          active: (r[4] || "").toString().trim().toUpperCase() === "TRUE"
+          active: (r[4] || "").toString().trim().toUpperCase() === "TRUE",
+          role: (r[5] || "").toString().trim() || ROLE_NORMAL
         };
       })
       .filter(function(u) { return u.locCode !== ""; });
@@ -801,7 +838,10 @@ function adminGetSettings(adminToken) {
   return { success: true, users: users, announcement: announcement, promotions: promotions, timeWindow: timeWindow };
 }
 
-function adminUpsertUser(adminToken, locCode, newPassword) {
+// role: ระบุเฉพาะตอนสร้างบัญชีใหม่เท่านั้น (ค่าเริ่มต้น ROLE_NORMAL ถ้าไม่ระบุ) — ตอนรีเซ็ตรหัสผ่านบัญชีเดิม
+// จะไม่แตะคอลัมน์ Role เลย กัน bug ที่รีเซ็ตรหัสผ่านแล้วสิทธิ์ "พิเศษ" ที่ตั้งไว้หลุดกลับเป็นทั่วไปโดยไม่ตั้งใจ
+// เปลี่ยนสิทธิ์ของบัญชีที่มีอยู่แล้วให้ใช้ adminSetUserRole แทน
+function adminUpsertUser(adminToken, locCode, newPassword, role) {
   requireAdminSession_(adminToken);
   locCode = (locCode || "").toString().trim();
   newPassword = (newPassword || "").toString();
@@ -815,6 +855,7 @@ function adminUpsertUser(adminToken, locCode, newPassword) {
   const salt = Utilities.getUuid();
   const hash = hashPassword_(newPassword, salt);
   const today = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy");
+  const newAccountRole = (role === ROLE_VIEWER) ? ROLE_VIEWER : ROLE_NORMAL;
 
   const existing = usersSheet.getLastRow() > 1
     ? usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues().map(function(r) { return (r[0] || "").toString().trim(); })
@@ -824,7 +865,7 @@ function adminUpsertUser(adminToken, locCode, newPassword) {
   if (idx !== -1) {
     usersSheet.getRange(idx + 2, 2, 1, 4).setValues([[hash, salt, today, "TRUE"]]);
   } else {
-    usersSheet.appendRow([locCode, hash, salt, today, "TRUE"]);
+    usersSheet.appendRow([locCode, hash, salt, today, "TRUE", newAccountRole]);
   }
 
   // เปลี่ยนรหัสผ่านแล้วเพิกถอน session เดิมของสาขานี้ทั้งหมด บังคับ login ใหม่
@@ -866,6 +907,27 @@ function adminSetUserActive(adminToken, locCode, active) {
         }
       }
       return { success: true, message: "อัปเดตสถานะบัญชี " + locCode + " สำเร็จ" };
+    }
+  }
+  return { success: false, message: "ไม่พบบัญชี " + locCode };
+}
+
+// เปลี่ยนสิทธิ์บัญชีสาขาที่มีอยู่แล้ว (ทั่วไป <-> พิเศษ) โดยไม่แตะรหัสผ่าน
+// ไม่ต้องเพิกถอน session เดิม เพราะ resolveSession_ อ่าน Role สดจากชีต Users ทุกครั้ง เปลี่ยนแล้วมีผลทันที
+function adminSetUserRole(adminToken, locCode, role) {
+  requireAdminSession_(adminToken);
+  locCode = (locCode || "").toString().trim();
+  const roleValue = (role === ROLE_VIEWER) ? ROLE_VIEWER : ROLE_NORMAL;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
+
+  const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if ((data[i][0] || "").toString().trim() === locCode) {
+      usersSheet.getRange(i + 2, 6).setValue(roleValue);
+      return { success: true, message: "อัปเดตสิทธิ์บัญชี " + locCode + " เป็น " + roleValue + " สำเร็จ" };
     }
   }
   return { success: false, message: "ไม่พบบัญชี " + locCode };
