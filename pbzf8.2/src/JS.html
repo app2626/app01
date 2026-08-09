@@ -336,6 +336,8 @@ window.app = {
     clone.style.position = 'absolute';
     clone.style.top = '-99999px';
     clone.style.left = '0';
+    clone.style.marginLeft = '0';
+    clone.style.marginRight = '0';
     clone.style.width = scrollWrap.scrollWidth + 'px';
     clone.style.background = '#ffffff';
     document.body.appendChild(clone);
@@ -1451,32 +1453,34 @@ window.app = {
             break;
         case 'orders':
           let isSalesRole = (window.app.user.Role === 'Sales');
+          // resp: ซ่อน/แสดงคอลัมน์ตามขนาดจอ (owner request 2026-08-09 — ตาราง Orders 22 คอลัมน์ไม่มีทางพอดีจอเดียวกันหมด
+          // ไม่ใส่ resp = แสดงทุกขนาดจอเสมอ (คอลัมน์หลักที่ต้องเห็นทันที) — ต้อง sync กับ th/td rendering ที่ grid.init/grid.renderTable
           window.app.grid.init('Orders', 'OrderID', [
-            { key: '_rowIndex', type: 'hidden' }, 
+            { key: '_rowIndex', type: 'hidden' },
             { key: 'OrderID', label: 'เลขที่บิล', type: 'readonly' },
-            { key: 'Timestamp', label: 'วันที่', type: 'readonly' },
-            { key: 'Channel', label: 'Channel', type: 'readonly' },
-            { key: 'Branch Code', label: 'Branch Code', type: 'readonly' },
-            { key: 'Customer Name', label: 'ชื่อ-สกุล', type: 'datalist', listId: 'customerList' },
-            { key: 'Contact Number', label: 'เบอร์โทร', type: 'text' },
-            { key: 'Email', label: 'Email', type: 'text' },
-            { key: 'ID Card_Passport', label: 'เลขที่บัตรประชาชน', type: 'text' },
-            { key: 'Code Handraiser', label: 'Code Handraiser', type: 'text' },
-            { key: 'SKU', label: 'SKU', type: 'readonly' },
+            { key: 'Timestamp', label: 'วันที่', type: 'readonly', resp: 'hidden sm:table-cell' },
+            { key: 'Channel', label: 'Channel', type: 'readonly', resp: 'hidden md:table-cell' },
+            { key: 'Branch Code', label: 'Branch Code', type: 'readonly', resp: 'hidden lg:table-cell' },
+            { key: 'Customer Name', label: 'ชื่อ-สกุล', type: 'datalist', listId: 'customerList', resp: 'hidden lg:table-cell' },
+            { key: 'Contact Number', label: 'เบอร์โทร', type: 'text', resp: 'hidden lg:table-cell' },
+            { key: 'Email', label: 'Email', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'ID Card_Passport', label: 'เลขที่บัตรประชาชน', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'Code Handraiser', label: 'Code Handraiser', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'SKU', label: 'SKU', type: 'readonly', resp: 'hidden md:table-cell' },
             { key: 'Product Name', label: 'สินค้า', type: 'product_select' },
             { key: 'Qty', label: 'จำนวน', type: 'number', onchange: 'window.app.grid.calcOrderTotal()' },
-            { key: 'Unit Price', label: 'ราคาต่อหน่วย', type: 'number', onchange: 'window.app.grid.calcOrderTotal()' },
-            { key: 'Promo', label: 'Promo', type: 'text' },
-            { key: 'Reservation Status', label: 'ประเภทการจอง', type: 'select', options: ['จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'] },
-            { key: 'Staff', label: 'Staff', type: 'text' },
-            { key: 'Booking Phone', label: 'Booking Phone', type: 'text' },
-            { key: 'Customer Interests', label: 'Customer Interests', type: 'text' },
-            { key: 'Remark', label: 'Remark', type: 'text' },
-            { key: 'Row Total', label: 'ยอดรวม', type: 'readonly' },
+            { key: 'Unit Price', label: 'ราคาต่อหน่วย', type: 'number', onchange: 'window.app.grid.calcOrderTotal()', resp: 'hidden lg:table-cell' },
+            { key: 'Promo', label: 'Promo', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'Reservation Status', label: 'ประเภทการจอง', type: 'select', options: ['จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'], resp: 'hidden md:table-cell' },
+            { key: 'Staff', label: 'Staff', type: 'text', resp: 'hidden lg:table-cell' },
+            { key: 'Booking Phone', label: 'Booking Phone', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'Customer Interests', label: 'Customer Interests', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'Remark', label: 'Remark', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'Row Total', label: 'ยอดรวม', type: 'readonly', resp: 'hidden sm:table-cell' },
             // ตัวเลือกต้องตรงกับ flow ที่ orderTimelineHtml ใช้จริง (ชีต OrderStatus ถ้ามี ≥2 แถว ไม่งั้น fallback Pending/Confirmed/Paid/Delivered) — เดิม hardcode ['Pending','Completed','Cancelled'] ทำให้เลือกสถานะกลางไม่ได้เลย
             { key: 'Order Status', label: 'สถานะออเดอร์', type: 'select', options: window.app.getOrderStatusFlow().concat(['Cancelled']) },
-            { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text' },
-            { key: 'Deposit', label: 'เงินมัดจำ', type: 'number' }
+            { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'Deposit', label: 'เงินมัดจำ', type: 'number', resp: 'hidden 2xl:table-cell' }
           ], isSalesRole); break;
       }
     } catch(err) {
@@ -2748,11 +2752,11 @@ window.app = {
         + '<tfoot>' + footRow + '</tfoot>'
         + '</table>';
 
-      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
         + '</div>';
     },
     // ตารางที่ 3: เปรียบเทียบ % ยอดจองระหว่างกลุ่มรุ่นที่กำหนดไว้ตายตัว (owner request 2026-07-24) — groups: [{label, qty}] ตามลำดับที่ต้องการแสดง
@@ -2783,11 +2787,11 @@ window.app = {
         + '<tbody class="divide-y divide-slate-100">' + bodyRows + '</tbody>'
         + '<tfoot>' + footRow + '</tfoot>'
         + '</table>';
-      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-chart-pie text-pink-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="p-2 overflow-x-auto custom-scrollbar">' + tableHtml + '</div>'
+        + '<div class="tbleed-body py-2 overflow-x-auto custom-scrollbar">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -3075,11 +3079,11 @@ window.app = {
         + '<tfoot>' + footRow + '</tfoot>'
         + '</table>';
 
-      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -3351,11 +3355,11 @@ window.app = {
         + '<tfoot>' + footRow + '</tfoot>'
         + '</table>';
 
-      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -3568,11 +3572,11 @@ window.app = {
           + '<td class="py-3 px-4 text-right text-blue-700">' + sumF.toLocaleString() + '</td>'
           + '</tr>';
 
-        html += '<div class="chart-card !p-0 overflow-hidden mb-6">'
-          + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+        html += '<div class="chart-card tbleed-outer !p-0 mb-6">'
+          + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
           + '<h6 class="!mb-0"><i class="fas fa-boxes-stacked text-indigo-500"></i>' + window.app.esc(cat) + '</h6>'
           + '</div>'
-          + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[400px]">'
+          + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[400px]">'
           + '<table class="w-full text-sm text-left whitespace-nowrap">'
           + '<thead class="sticky top-0 z-10"><tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">'
           + '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">สินค้า</th>'
@@ -4978,10 +4982,10 @@ window.app = {
         else { filterBar.classList.add('hidden'); filterBar.classList.remove('flex'); }
       }
 
-      let h = '<tr>'; 
-      this.columns.forEach(c => { 
-        if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-left text-[11px] font-bold text-indigo-900 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-indigo-100 transition-colors">${c.label} <i class="fas fa-sort text-indigo-300 ml-1"></i></th>`; 
-      }); 
+      let h = '<tr>';
+      this.columns.forEach(c => {
+        if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-left text-[11px] font-bold text-indigo-900 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-indigo-100 transition-colors ${c.resp || ''}">${c.label} <i class="fas fa-sort text-indigo-300 ml-1"></i></th>`;
+      });
       if(!readonly) h += `<th class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-right text-[11px] font-bold text-indigo-900 uppercase tracking-wider whitespace-nowrap">จัดการ</th>`;
       h += '</tr>'; 
       const head = document.getElementById('dataGridHead');
@@ -5125,7 +5129,7 @@ window.app = {
             if(row.SKU === 'DISCOUNT') val = '<i class="fas fa-tag text-rose-500 mr-1.5" title="ส่วนลด" aria-label="ส่วนลด"></i>' + val;
             else if(num('Unit Price') === 0 && num('Row Total') === 0) val = '<i class="fas fa-gift text-emerald-500 mr-1.5" title="ของแถม" aria-label="ของแถม"></i>' + val;
           }
-          tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-[11px] text-slate-700 whitespace-nowrap">${val}</td>`;
+          tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-[11px] text-slate-700 whitespace-nowrap ${c.resp || ''}">${val}</td>`;
         });
         if(!this.isReadonly) {
             let act = `<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm" onclick="window.app.grid.editForm(${absIndex})" title="แก้ไข" aria-label="แก้ไขรายการ"><i class="fas fa-edit"></i></button>`;

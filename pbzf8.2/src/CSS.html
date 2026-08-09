@@ -336,6 +336,92 @@
     gap: 0.5rem;
   }
 
+  /* === Full-bleed table band (2026-08-09: ตารางต้องขยายชิดขอบจอทุกอุปกรณ์) ===
+     เดิมตารางอยู่ใน .chart-card กรอบเดียว (overflow-hidden + border รวม) ทำให้ negative-margin
+     ที่จะดันตารางออกไปชนขอบจอ #page-content (p-4 md:p-6 lg:p-8) โดนตัดทิ้งเสมอ
+     จึงแยกกรอบเป็น 3 แถบอิสระ: หัว (.tbleed-head) / ตัวตาราง (.tbleed-body, ไม่มีกรอบซ้าย-ขวา + ชน margin ลบ) / ท้าย (.tbleed-foot)
+     ไม่แตะ overflow-x-auto ชั้นในที่ห่อ <table> อยู่แล้ว (ยังเลื่อนแนวนอนได้ตามปกติถ้าตารางกว้างเกินจอ)
+     2026-08-10 fix: หัว/ท้ายเดิมไม่มี negative margin เลย มีแต่ตัวตารางตรงกลางที่ชน margin ลบออกไปถึงขอบจอ
+     ทำให้ตัวตารางกว้างกว่าหัว-ท้าย เกิดเหลี่ยมมุมไม่ตรงกัน (เห็นชัดสุดที่หน้า Orders ซึ่งมี .tbleed-foot ให้เทียบ) —
+     ใส่ negative margin ชุดเดียวกับ .tbleed-body ให้หัว/ท้ายด้วย ทั้ง 3 แถบจะชิดขอบตรงกันเป๊ะ */
+  .tbleed-head {
+    border-left: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    box-shadow: var(--shadow-sm);
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  .tbleed-foot {
+    background: var(--color-surface);
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  @media (min-width: 768px) {
+    .tbleed-head, .tbleed-foot { margin-left: -1.5rem; margin-right: -1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-head, .tbleed-foot { margin-left: -2rem; margin-right: -2rem; }
+  }
+  /* ตัวแปรสำหรับหัวตารางที่อยู่ใน grid หลายคอลัมน์ (เช่น dashboard KPI mini-table ใน lg:grid-cols-3) —
+     ต้องหยุด bleed ทันทีที่ breakpoint ซึ่ง grid เปลี่ยนเป็นหลายคอลัมน์ (จับคู่กับ .tbleed-body-col3) ไม่งั้น
+     margin ลบจะทับคอลัมน์ข้างเคียง — .tbleed-head ปกติห้ามใช้ในบริบท grid หลายคอลัมน์ */
+  .tbleed-head-col3 {
+    border-left: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    box-shadow: var(--shadow-sm);
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  @media (min-width: 768px) {
+    .tbleed-head-col3 { margin-left: -1.5rem; margin-right: -1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-head-col3 { margin-left: 0; margin-right: 0; }
+  }
+  /* หลายจุดหา card ตารางด้วย .closest('.chart-card') / .querySelectorAll('.chart-card') เพื่อแปะปุ่ม export รูปภาพ
+     (window.app.tableExportButtons, ~JS.html บรรทัด 349/2632/2966/3208/3465/3589) — ต้องคง class chart-card ไว้บน
+     กรอบนอกเสมอ ห้ามลบทิ้ง ใช้ตัวปรับแต่งนี้ "ปิด" ลักษณะภาพของ .chart-card แทน (พื้นหลัง/กรอบ/เงา) เพื่อไม่ให้
+     negative margin ของ .tbleed-body โดน overflow ของกรอบเดิมตัดทิ้ง */
+  .chart-card.tbleed-outer {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .tbleed-body {
+    background: var(--color-surface);
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  @media (min-width: 768px) {
+    .tbleed-body { margin-left: -1.5rem; margin-right: -1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-body { margin-left: -2rem; margin-right: -2rem; }
+  }
+  /* ตัวแปรสำหรับตารางที่อยู่ใน grid หลายคอลัมน์ (เช่น dashboard KPI mini-table ใน lg:grid-cols-3) —
+     ต้องหยุด bleed ทันทีที่ breakpoint ซึ่ง grid เปลี่ยนเป็นหลายคอลัมน์ ไม่งั้น margin ลบจะทับคอลัมน์ข้างเคียง */
+  .tbleed-body-col3 {
+    background: var(--color-surface);
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  @media (min-width: 768px) {
+    .tbleed-body-col3 { margin-left: -1.5rem; margin-right: -1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-body-col3 { margin-left: 0; margin-right: 0; }
+  }
+
   /* === Chart export (download/copy) buttons — วางไว้บนกราฟ ในกรอบ .relative ที่ห่อ canvas อยู่แล้ว === */
   .chart-export-btns {
     position: absolute;
