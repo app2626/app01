@@ -397,29 +397,41 @@
     border: none !important;
     box-shadow: none !important;
   }
+  /* 2026-08-12 fix: .tbleed-body มี overflow-x-auto + max-height เสมอ ซึ่งตาม CSS overflow spec
+     ทำให้ overflow-y ถูกบังคับเป็น auto ไปด้วย (แกนหนึ่งไม่ visible อีกแกนต้อง auto ตาม) — พอเนื้อหาสูงเกิน
+     max-h จริง scrollbar แนวตั้ง (กว้าง 0.3cm ตาม .custom-scrollbar) จะแทะพื้นที่จากขอบขวาของกล่องออกไป
+     ทำให้ตัวตาราง (แถบสีหัวตาราง/เซลล์) ขยับเข้ามาไม่ชนขอบเท่า .tbleed-head/.tbleed-foot ที่ไม่มี scrollbar —
+     เห็นชัดว่า "ขอบขวาตารางเยื้องเข้ามา" ทั้งที่ margin ลบเท่ากันแล้ว (ปัญหาคนละสาเหตุกับ fix 2026-08-10 ด้านบน)
+     แก้โดย bleed margin-right เพิ่มอีก 0.3cm (เผื่อที่ให้ scrollbar พอดี ไม่กินพื้นที่ตาราง) — ส่วนที่ล้นออกนอก
+     viewport ถูก <body class="overflow-x-hidden"> ตัดทิ้งอย่างปลอดภัยอยู่แล้ว ไม่ทำให้เกิด scrollbar แนวนอนทั้งหน้า
+     scrollbar-gutter: stable กันไม่ให้ layout กระตุกเวลาข้อมูลเปลี่ยนจนพอดี/ไม่พอดี max-h */
   .tbleed-body {
     background: var(--color-surface);
     margin-left: -1rem;
-    margin-right: -1rem;
+    margin-right: calc(-1rem - 0.3cm);
+    scrollbar-gutter: stable;
   }
   @media (min-width: 768px) {
-    .tbleed-body { margin-left: -1.5rem; margin-right: -1.5rem; }
+    .tbleed-body { margin-left: -1.5rem; margin-right: calc(-1.5rem - 0.3cm); }
   }
   @media (min-width: 1024px) {
-    .tbleed-body { margin-left: -2rem; margin-right: -2rem; }
+    .tbleed-body { margin-left: -2rem; margin-right: calc(-2rem - 0.3cm); }
   }
   /* ตัวแปรสำหรับตารางที่อยู่ใน grid หลายคอลัมน์ (เช่น dashboard KPI mini-table ใน lg:grid-cols-3) —
-     ต้องหยุด bleed ทันทีที่ breakpoint ซึ่ง grid เปลี่ยนเป็นหลายคอลัมน์ ไม่งั้น margin ลบจะทับคอลัมน์ข้างเคียง */
+     ต้องหยุด bleed ทันทีที่ breakpoint ซึ่ง grid เปลี่ยนเป็นหลายคอลัมน์ ไม่งั้น margin ลบจะทับคอลัมน์ข้างเคียง
+     ที่ lg: margin ปกติคือ 0 (ไม่ bleed แล้ว) ยังเผื่อ 0.3cm ให้ scrollbar ได้เพราะ gap ของ grid (1.25-1.5rem)
+     กว้างกว่านี้เยอะ ไม่มีทางชนคอลัมน์ข้างเคียง */
   .tbleed-body-col3 {
     background: var(--color-surface);
     margin-left: -1rem;
-    margin-right: -1rem;
+    margin-right: calc(-1rem - 0.3cm);
+    scrollbar-gutter: stable;
   }
   @media (min-width: 768px) {
-    .tbleed-body-col3 { margin-left: -1.5rem; margin-right: -1.5rem; }
+    .tbleed-body-col3 { margin-left: -1.5rem; margin-right: calc(-1.5rem - 0.3cm); }
   }
   @media (min-width: 1024px) {
-    .tbleed-body-col3 { margin-left: 0; margin-right: 0; }
+    .tbleed-body-col3 { margin-left: 0; margin-right: -0.3cm; }
   }
 
   /* === Chart export (download/copy) buttons — วางไว้บนกราฟ ในกรอบ .relative ที่ห่อ canvas อยู่แล้ว === */

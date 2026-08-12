@@ -2756,7 +2756,7 @@ window.app = {
         + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
         + '</div>';
     },
     // ตารางที่ 3: เปรียบเทียบ % ยอดจองระหว่างกลุ่มรุ่นที่กำหนดไว้ตายตัว (owner request 2026-07-24) — groups: [{label, qty}] ตามลำดับที่ต้องการแสดง
@@ -3083,7 +3083,7 @@ window.app = {
         + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -3359,7 +3359,7 @@ window.app = {
         + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -3576,7 +3576,7 @@ window.app = {
           + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
           + '<h6 class="!mb-0"><i class="fas fa-boxes-stacked text-indigo-500"></i>' + window.app.esc(cat) + '</h6>'
           + '</div>'
-          + '<div class="tbleed-body w-full overflow-x-auto custom-scrollbar max-h-[400px]">'
+          + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[400px]">'
           + '<table class="w-full text-sm text-left whitespace-nowrap">'
           + '<thead class="sticky top-0 z-10"><tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">'
           + '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">สินค้า</th>'
@@ -4055,7 +4055,7 @@ window.app = {
         return;
       }
       if(products.length === 0 && searchEl && searchEl.value === '') {
-         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">';
+         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-4">';
          for(let k=0; k<12; k++) { skel += '<div class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm"><div class="skeleton mb-4" style="height:100px; width:100%;"></div><div class="skeleton mb-3" style="height:12px; width:80%;"></div><div class="skeleton" style="height:14px; width:40%;"></div></div>'; }
          skel += '</div>'; row.innerHTML = skel; return;
       }
@@ -4104,7 +4104,7 @@ window.app = {
       // 6A — POS storefront: สไตล์ scoped ด้วย .pos-storefront เท่านั้น ห้ามรั่วไปหน้าอื่น
       // ถ้าสร้างการ์ดใบใดล้มกลางทาง ห้ามทิ้งกริดว่างเงียบๆ (เคยเจอบน iOS) — โชว์ error state มาตรฐาน + ลองใหม่ (rule 12)
       try {
-        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-6">';
+        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-6">';
         renderedList.forEach(p => { html += this.cardHtml(p, searchTerm); });
         html += '</div>';
         row.innerHTML = html;
