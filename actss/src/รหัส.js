@@ -40,6 +40,25 @@ function getSessionsSheet_(ss) {
   return findSheet(ss, "sessions");
 }
 
+function getAccessLogSheet_(ss) {
+  return findSheet(ss, "accesslog");
+}
+
+// บันทึกประวัติการเข้าใช้งาน (login สำเร็จ / เปลี่ยนสถานะสินค้า) ลงชีต AccessLog
+// ล้มเหลวแบบเงียบถ้าไม่พบชีต เพื่อไม่ให้การ log ไปบล็อก flow หลัก (login/updateStatus)
+function logAccess_(ss, locCode, locName, role, action, detail) {
+  const sheet = getAccessLogSheet_(ss);
+  if (!sheet) return;
+  sheet.appendRow([
+    "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss"),
+    locCode || "",
+    locName || "",
+    role || "",
+    action || "",
+    detail || ""
+  ]);
+}
+
 function parseDdMmYyyy_(str) {
   const parts = (str || "").toString().trim().split(/[-/]/);
   if (parts.length !== 3) return null;
@@ -196,11 +215,14 @@ function login(locCode, password) {
         sessionsSheet.appendRow([token, locCode, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")]);
       }
 
+      const branchLocName = getLocNameByCode_(ss, locCode);
+      logAccess_(ss, locCode, branchLocName, role, "LOGIN", "");
+
       return {
         success: true,
         token: token,
         locCode: locCode,
-        locName: getLocNameByCode_(ss, locCode),
+        locName: branchLocName,
         passwordExpired: passwordExpired,
         isAdmin: false,
         role: role
@@ -239,6 +261,8 @@ function tryAdminLoginAsSession_(username, password) {
 
     const authSheet = getAdminAuthSheet_(ss);
     if (authSheet) authSheet.appendRow([token, username, now]);
+
+    logAccess_(ss, ADMIN_SESSION_LOCCODE, "Admin (" + username + ")", "admin", "LOGIN", "");
 
     return {
       success: true,
@@ -434,6 +458,12 @@ function setupAuthSheets() {
   if (!getAdminAuthSheet_(ss)) {
     const sheet = ss.insertSheet("AdminAuth");
     sheet.getRange(1, 1, 1, 3).setValues([["Token", "Username", "CreatedAt"]]);
+    sheet.setFrozenRows(1);
+  }
+
+  if (!getAccessLogSheet_(ss)) {
+    const sheet = ss.insertSheet("AccessLog");
+    sheet.getRange(1, 1, 1, 6).setValues([["Timestamp", "LocCode", "LocName", "Role", "Action", "Detail"]]);
     sheet.setFrozenRows(1);
   }
 }
@@ -785,7 +815,15 @@ function updateStatus(token, rowId, newStatus) {
     if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
       return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
     }
+
+    const rowVals = sheet.getRange(rowId, 6, 1, 4).getDisplayValues()[0]; // sku, desc, imei, oldStatus
+    const oldStatus = rowVals[3] || "";
     sheet.getRange(rowId, 9).setValue(newStatus);
+
+    const branchLocName = session.locCode === ADMIN_SESSION_LOCCODE ? "Admin" : getLocNameByCode_(ss, session.locCode);
+    logAccess_(ss, session.locCode, branchLocName, session.role, "UPDATE_STATUS",
+      `IMEI ${rowVals[2]} (${rowVals[0]}): ${oldStatus} -> ${newStatus}`);
+
     return { success: true, message: "อัปเดตสถานะสำเร็จ" };
   } catch(e) {
     return { success: false, message: e.message };
