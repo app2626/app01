@@ -16,6 +16,7 @@ window.app = {
       { id: 'target', icon: 'fa-crosshairs', label: 'Target & Forecast', roles: ['Admin', 'Manager'] },
       { id: 'bookingsummary', icon: 'fa-table', label: 'สรุปยอดจองรายวัน', roles: ['Admin', 'Manager'] },
       { id: 'salessummary', icon: 'fa-layer-group', label: 'สรุปยอดรุ่น/แอเรีย/ช่องทาง', roles: ['Admin', 'Manager'] },
+      { id: 'branchbookingsummary', icon: 'fa-store-alt', label: 'สรุปยอดจองตามสาขา', roles: ['Admin', 'Manager'] },
       { id: 'allbookingsummary', icon: 'fa-boxes-stacked', label: 'สรุปข้อมูลจองทั้งหมด', roles: ['Admin', 'Manager'] },
       { label: 'SETTINGS', isCategory: true, roles: ['Admin', 'Manager'] },
       { 
@@ -51,6 +52,22 @@ window.app = {
   // สำหรับค่าที่ฝังเป็น string literal ใน onclick="fn('...')" — escape เป็น JS string ก่อน แล้วค่อย escape HTML
   escAttrJs: function(v) {
     return window.app.esc(String(v === null || v === undefined ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+  },
+
+  // ทุกหน้าที่นับ/รวมยอดจองจาก Orders ต้องข้ามแถวที่ถูกยกเลิกด้วยฟังก์ชันนี้ — เดิมแต่ละหน้าเช็คเอง ('Cancelled' บ้าง, 'Cancelled'+'ยกเลิก' บ้าง)
+  // ไม่สม่ำเสมอกัน ทำให้ถ้าแถวไหนถูกตั้ง Order Status เป็น 'ยกเลิก' (เช่น แก้ตรงชีตเอง) บางหน้าจะยังนับรวมอยู่ — รวมเป็นจุดเดียวกันแทน
+  isOrderCancelled: function(o) {
+    const s = (o && o['Order Status'] !== undefined && o['Order Status'] !== null ? o['Order Status'] : '').toString().trim();
+    return s === 'Cancelled' || s === 'ยกเลิก';
+  },
+
+  // flow สถานะออเดอร์ปัจจุบัน (ไม่รวม Cancelled) — อ่านจากชีต OrderStatus ตามลำดับแถวถ้ามี ≥2 แถว ไม่งั้น fallback มาตรฐาน
+  // เดิมมี 3 จุดคัดลอกลอจิกนี้ซ้ำกัน (Orders grid select, grid filter, orderTimelineHtml) เสี่ยงแก้จุดเดียวแล้วหลุดไม่ตรงกัน — รวมมาไว้ที่เดียว
+  getOrderStatusFlow: function() {
+    const stList = (window.app.globalData.orderStatuses || []).filter(s => s && (s['Status Name'] || '').toString().trim() !== '');
+    return stList.length >= 2
+      ? stList.map(s => s['Status Name'].toString().trim()).filter(n => n.toLowerCase() !== 'cancelled')
+      : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
   },
 
   // 5B.1 — esc ข้อความแล้ว highlight คำค้น: หา match บน raw text, esc ทีละ segment แล้วครอบ <mark>
@@ -121,7 +138,7 @@ window.app = {
     reader.readAsDataURL(file);
   },
 
-  // เก็บไฟล์รูปที่เลือกไว้แต่ยังไม่อัปโหลด คีย์ตามจุดที่ใช้ (gridImage / loginBg / banner-<rowIndex> / swalBanner)
+  // เก็บไฟล์รูปที่เลือกไว้แต่ยังไม่อัปโหลด คีย์ตามจุดที่ใช้ (gridImage / loginBg / banner-<rowIndex> / newBanner)
   // — อัปจริงตอนกด "บันทึกข้อมูล" ครั้งเดียว ไม่ใช่ทันทีที่เลือกไฟล์
   pendingImageUploads: {},
 
@@ -319,6 +336,8 @@ window.app = {
     clone.style.position = 'absolute';
     clone.style.top = '-99999px';
     clone.style.left = '0';
+    clone.style.marginLeft = '0';
+    clone.style.marginRight = '0';
     clone.style.width = scrollWrap.scrollWidth + 'px';
     clone.style.background = '#ffffff';
     document.body.appendChild(clone);
@@ -479,7 +498,7 @@ window.app = {
            </div>
            <div style="text-align: right;">
              <strong>ข้อมูลการจอง (Booking)</strong>
-             Order ID: <span style="font-size: 15px; font-weight: bold; color: #0f172a;">${orderId}</span><br>
+             Order ID: <span style="font-size: 15px; font-weight: bold; color: #0f172a;">${esc(orderId)}</span><br>
              วันที่ทำรายการ: ${dateStr}<br>
              สาขา: ${esc(pay.branch)}<br>
              พนักงานผู้รับจอง: ${esc(pay.bkStaffName)}<br>
@@ -919,7 +938,9 @@ window.app = {
            Swal.close();
            if(res && res.status === 'success') {
               window.app.toast('ลบเอกสารแล้ว');
-              if(this.currentId === invoiceId) { this.currentId = null; this.currentStatus = null; this.updateSaveBtn(); }
+              // เดิมไม่เรียก applyLockState() — ถ้าเอกสารที่ลบ (ตัวที่เปิดอยู่) สถานะ "อนุมัติแล้ว" อยู่ก่อน ฟอร์ม #invoice-paper ทุก input/select/textarea/button
+              // จะค้าง disabled ต่อไปทั้งที่ currentStatus ถูกล้างเป็น null แล้ว (updateSaveBtn() อย่างเดียวไม่ปลดล็อกฟอร์ม) จนกว่าจะกด "สร้างใหม่"
+              if(this.currentId === invoiceId) { this.currentId = null; this.currentStatus = null; this.applyLockState(); }
               this.loadList();
            } else {
               Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
@@ -997,16 +1018,47 @@ window.app = {
     }
   },
 
-  getWeekString: function(dateStr) {
-    let d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "Unknown Week";
-    d.setHours(0,0,0,0);
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-    let yearStart = new Date(d.getFullYear(), 0, 1);
-    let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    return d.getFullYear() + " - W" + String(weekNo).padStart(2, '0');
+  // === Dark Mode ===
+  // Boot script ใน Index.html <head> ตั้ง class 'dark' บน <html> ไว้ก่อน paint แรกแล้ว (อ่านจาก localStorage 'tg_theme'
+  // หรือ prefers-color-scheme ถ้ายังไม่เคยตั้ง) กัน flash สีตอนโหลดหน้า — ฟังก์ชันกลุ่มนี้แค่ sync ปุ่ม/Chart.js ให้ตรงกับ class ปัจจุบัน
+  chartTheme: function() {
+    const dark = document.documentElement.classList.contains('dark');
+    return dark
+      ? { text: '#94a3b8', grid: 'rgba(148, 163, 184, 0.15)', datalabel: '#e2e8f0' }
+      : { text: '#64748b', grid: 'rgba(226, 232, 240, 0.4)', datalabel: '#334155' };
   },
-  
+
+  updateThemeToggleUI: function() {
+    const isDark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('.theme-toggle-icon').forEach(icon => {
+      icon.classList.toggle('fa-moon', !isDark);
+      icon.classList.toggle('fa-sun', isDark);
+    });
+    document.querySelectorAll('.theme-toggle-label').forEach(lbl => {
+      lbl.innerText = isDark ? 'โหมดสว่าง' : 'โหมดมืด';
+    });
+  },
+
+  applyTheme: function(theme) {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    try { localStorage.setItem('tg_theme', theme); } catch(e) {}
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', theme === 'dark' ? '#0f172a' : '#254d71');
+    if (typeof Chart !== 'undefined') {
+      const ct = window.app.chartTheme();
+      Chart.defaults.color = ct.text;
+      Chart.defaults.borderColor = ct.grid;
+    }
+    window.app.updateThemeToggleUI();
+  },
+
+  toggleTheme: function() {
+    const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+    window.app.applyTheme(next);
+    // Chart.js วาดสีลง <canvas> ไม่ใช่ CSS — ต้อง re-render หน้าปัจจุบันใหม่ให้กราฟ/ตารางเปลี่ยนสีตามธีม
+    if (window.app.user) window.app.route();
+  },
+
   toggleMobileMenu: function() {
     const panel = document.getElementById('mobileMenuPanel');
     if(panel) panel.classList.toggle('hidden');
@@ -1041,6 +1093,8 @@ window.app = {
   },
   
   init: function() {
+    window.app.applyTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
     setInterval(() => {
       const d = new Date();
       const clk = document.getElementById('clock');
@@ -1090,7 +1144,10 @@ window.app = {
       const res = await new Promise((resolve, reject) => {
         google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).setupDatabase(window.app.user);
       });
-      Swal.fire({ icon: 'success', title: 'สร้างฐานข้อมูลสำเร็จ!', text: 'กรุณาเข้าสู่ระบบด้วย admin / admin123', confirmButtonColor: '#254d71' });
+       const adminText = res && res.initialAdmin
+         ? 'บัญชีเริ่มต้น: ' + window.app.esc(res.initialAdmin.username) + ' / ' + window.app.esc(res.initialAdmin.password) + ' — กรุณาเปลี่ยนรหัสผ่านทันที'
+         : 'ฐานข้อมูลพร้อมใช้งานแล้ว';
+       Swal.fire({ icon: 'success', title: 'สร้างฐานข้อมูลสำเร็จ!', html: adminText, confirmButtonColor: '#254d71' });
     } catch(e) {
       Swal.fire('ข้อผิดพลาด', e.toString(), 'error');
     }
@@ -1101,6 +1158,7 @@ window.app = {
     const tmpl = document.getElementById('tmpl-login');
     if(el && tmpl) {
         el.innerHTML = tmpl.innerHTML;
+        window.app.updateThemeToggleUI();
         google.script.run.withSuccessHandler(bgUrl => {
             const bgEl = document.getElementById('loginBg');
             if(bgEl && bgUrl) {
@@ -1123,6 +1181,7 @@ window.app = {
     if(document.getElementById('mobileRole')) document.getElementById('mobileRole').innerText = window.app.user.Role;
     
     window.app.buildMenu();
+    window.app.updateThemeToggleUI();
     window.app.showLoading('กำลังเข้าสู่ระบบ...');
     
     try {
@@ -1310,6 +1369,9 @@ window.app = {
         case 'salessummary':
           window.app.salesSummary.init();
           break;
+        case 'branchbookingsummary':
+          window.app.branchBookingSummary.init();
+          break;
         case 'allbookingsummary':
           window.app.allBookingSummary.init();
           break;
@@ -1356,7 +1418,8 @@ window.app = {
             { key: 'Discount Percent', label: 'เปอร์เซ็นต์ส่วนลด (%)', type: 'number' },
             { key: 'Message Suggest', label: 'ข้อความเชียร์ขาย (รองรับ HTML)', type: 'text' },
             { key: 'Message Apply', label: 'ข้อความเมื่อได้รับส่วนลด (รองรับ HTML)', type: 'text' },
-            { key: 'Status', label: 'สถานะ', type: 'select', options: ['Active', 'Inactive'] }
+            { key: 'Status', label: 'สถานะ', type: 'select', options: ['Active', 'Inactive'] },
+            { key: 'Channel', label: 'ช่องทางที่ร่วมรายการ (เว้นว่าง = ทุกช่องทาง)', type: 'multi_select_channel' }
           ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
         case 'giftmappings': 
           window.app.grid.init('GiftMappings', 'Mapping ID', [
@@ -1390,38 +1453,34 @@ window.app = {
             break;
         case 'orders':
           let isSalesRole = (window.app.user.Role === 'Sales');
+          // resp: ซ่อน/แสดงคอลัมน์ตามขนาดจอ (owner request 2026-08-09 — ตาราง Orders 22 คอลัมน์ไม่มีทางพอดีจอเดียวกันหมด
+          // ไม่ใส่ resp = แสดงทุกขนาดจอเสมอ (คอลัมน์หลักที่ต้องเห็นทันที) — ต้อง sync กับ th/td rendering ที่ grid.init/grid.renderTable
           window.app.grid.init('Orders', 'OrderID', [
-            { key: '_rowIndex', type: 'hidden' }, 
+            { key: '_rowIndex', type: 'hidden' },
             { key: 'OrderID', label: 'เลขที่บิล', type: 'readonly' },
-            { key: 'Timestamp', label: 'วันที่', type: 'readonly' },
-            { key: 'Channel', label: 'Channel', type: 'readonly' },
-            { key: 'Branch Code', label: 'Branch Code', type: 'readonly' },
-            { key: 'Customer Name', label: 'ชื่อ-สกุล', type: 'datalist', listId: 'customerList' },
-            { key: 'Contact Number', label: 'เบอร์โทร', type: 'text' },
-            { key: 'Email', label: 'Email', type: 'text' },
-            { key: 'ID Card_Passport', label: 'เลขที่บัตรประชาชน', type: 'text' },
-            { key: 'Code Handraiser', label: 'Code Handraiser', type: 'text' },
-            { key: 'SKU', label: 'SKU', type: 'readonly' },
+            { key: 'Timestamp', label: 'วันที่', type: 'readonly', resp: 'hidden sm:table-cell' },
+            { key: 'Channel', label: 'Channel', type: 'readonly', resp: 'hidden md:table-cell' },
+            { key: 'Branch Code', label: 'Branch Code', type: 'readonly', resp: 'hidden lg:table-cell' },
+            { key: 'Customer Name', label: 'ชื่อ-สกุล', type: 'datalist', listId: 'customerList', resp: 'hidden lg:table-cell' },
+            { key: 'Contact Number', label: 'เบอร์โทร', type: 'text', resp: 'hidden lg:table-cell' },
+            { key: 'Email', label: 'Email', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'ID Card_Passport', label: 'เลขที่บัตรประชาชน', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'Code Handraiser', label: 'Code Handraiser', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'SKU', label: 'SKU', type: 'readonly', resp: 'hidden md:table-cell' },
             { key: 'Product Name', label: 'สินค้า', type: 'product_select' },
             { key: 'Qty', label: 'จำนวน', type: 'number', onchange: 'window.app.grid.calcOrderTotal()' },
-            { key: 'Unit Price', label: 'ราคาต่อหน่วย', type: 'number', onchange: 'window.app.grid.calcOrderTotal()' },
-            { key: 'Promo', label: 'Promo', type: 'text' },
-            { key: 'Reservation Status', label: 'ประเภทการจอง', type: 'select', options: ['จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'] },
-            { key: 'Staff', label: 'Staff', type: 'text' },
-            { key: 'Booking Phone', label: 'Booking Phone', type: 'text' },
-            { key: 'Customer Interests', label: 'Customer Interests', type: 'text' },
-            { key: 'Remark', label: 'Remark', type: 'text' },
-            { key: 'Row Total', label: 'ยอดรวม', type: 'readonly' },
+            { key: 'Unit Price', label: 'ราคาต่อหน่วย', type: 'number', onchange: 'window.app.grid.calcOrderTotal()', resp: 'hidden lg:table-cell' },
+            { key: 'Promo', label: 'Promo', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'Reservation Status', label: 'ประเภทการจอง', type: 'select', options: ['จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'], resp: 'hidden md:table-cell' },
+            { key: 'Staff', label: 'Staff', type: 'text', resp: 'hidden lg:table-cell' },
+            { key: 'Booking Phone', label: 'Booking Phone', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'Customer Interests', label: 'Customer Interests', type: 'text', resp: 'hidden xl:table-cell' },
+            { key: 'Remark', label: 'Remark', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'Row Total', label: 'ยอดรวม', type: 'readonly', resp: 'hidden sm:table-cell' },
             // ตัวเลือกต้องตรงกับ flow ที่ orderTimelineHtml ใช้จริง (ชีต OrderStatus ถ้ามี ≥2 แถว ไม่งั้น fallback Pending/Confirmed/Paid/Delivered) — เดิม hardcode ['Pending','Completed','Cancelled'] ทำให้เลือกสถานะกลางไม่ได้เลย
-            { key: 'Order Status', label: 'สถานะออเดอร์', type: 'select', options: (function() {
-              const stList = (window.app.globalData.orderStatuses || []).filter(s => s && (s['Status Name'] || '').toString().trim() !== '');
-              const flow = stList.length >= 2
-                ? stList.map(s => s['Status Name'].toString().trim()).filter(n => n.toLowerCase() !== 'cancelled')
-                : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
-              return flow.concat(['Cancelled']);
-            })() },
-            { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text' },
-            { key: 'Deposit', label: 'เงินมัดจำ', type: 'number' }
+            { key: 'Order Status', label: 'สถานะออเดอร์', type: 'select', options: window.app.getOrderStatusFlow().concat(['Cancelled']) },
+            { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text', resp: 'hidden 2xl:table-cell' },
+            { key: 'Deposit', label: 'เงินมัดจำ', type: 'number', resp: 'hidden 2xl:table-cell' }
           ], isSalesRole); break;
       }
     } catch(err) {
@@ -1449,13 +1508,19 @@ window.app = {
     e.preventDefault();
     const btn = document.getElementById('btnLogin');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
-    const res = await this.api('LOGIN', { username: document.getElementById('loginUsername').value, password: document.getElementById('loginPassword').value });
-    if(res && res.status === 'success') {
-      window.app.user = res.user; localStorage.setItem('tg_pos_user', JSON.stringify(window.app.user));
-      Swal.fire({icon: 'success', title: 'Welcome', text: res.user.Name, timer: 1500, showConfirmButton: false});
-      window.app.renderLayout();
-    } else {
-      Swal.fire('Error', res ? res.message : 'Unknown Error', 'error'); btn.disabled = false; btn.innerHTML = 'เข้าสู่ระบบ';
+    try {
+      const res = await this.api('LOGIN', { username: document.getElementById('loginUsername').value, password: document.getElementById('loginPassword').value });
+      if(res && res.status === 'success') {
+        window.app.user = res.user; localStorage.setItem('tg_pos_user', JSON.stringify(window.app.user));
+        Swal.fire({icon: 'success', title: 'Welcome', text: res.user.Name, timer: 1500, showConfirmButton: false});
+        window.app.renderLayout();
+      } else {
+        Swal.fire('Error', res ? res.message : 'Unknown Error', 'error');
+        btn.disabled = false; btn.innerHTML = 'เข้าสู่ระบบ';
+      }
+    } catch (err) {
+      Swal.fire('Error', err && err.message ? err.message : 'เชื่อมต่อระบบไม่สำเร็จ', 'error');
+      btn.disabled = false; btn.innerHTML = 'เข้าสู่ระบบ';
     }
   },
 
@@ -1732,12 +1797,18 @@ window.app = {
       const orderResStatusMap = {};
       this.filteredOrders.forEach(o => { if(o['Reservation Status'] && o['Reservation Status'].trim() !== '') { orderResStatusMap[o.OrderID] = o['Reservation Status']; } });
 
+      // "อัตราปิดการขาย" = สัดส่วนออเดอร์ที่ถึงสถานะสุดท้ายของ flow ปัจจุบัน (getOrderStatusFlow) — เดิม hardcode ตรวจ 'Completed'
+      // ซึ่งไม่ใช่ค่าที่ processCheckout เขียนจริง (เริ่ม 'Pending' เสมอ) และไม่อยู่ใน flow มาตรฐาน Pending→Confirmed→Paid→Delivered เลย
+      // ทำให้ KPI นี้เป็น 0% เสมอในระบบที่ยังไม่ได้ตั้งชื่อสถานะ "Completed" เองในชีต OrderStatus
+      const orderFlow = window.app.getOrderStatusFlow();
+      const terminalStatus = orderFlow[orderFlow.length - 1];
+
       this.filteredOrders.forEach(o => {
-        if (o['Order Status'] !== 'Cancelled') { 
+        if (!window.app.isOrderCancelled(o)) {
             let rTotal = parseFloat((o['Row Total'] || '0').toString().replace(/,/g,''));
             t += isNaN(rTotal) ? 0 : rTotal;
             u.add(o.OrderID);
-            if (o['Order Status'] === 'Completed') completedOrders.add(o.OrderID);
+            if (o['Order Status'] === terminalStatus) completedOrders.add(o.OrderID);
             
             let isMobile = o.Category === 'โมบาย';
             // 6C.3 — "อุปกรณ์เสริม" แยกเป็น 3 หมวดย่อย (อุปกรณ์เสริม/สมาร์ทวอทช์/หูฟัง) แต่ KPI นี้ยังรวมเป็นยอดเดียว
@@ -1766,7 +1837,7 @@ window.app = {
       if (typeof ChartDataLabels !== 'undefined') {
           Chart.register(ChartDataLabels);
           Chart.defaults.set('plugins.datalabels', {
-              color: '#334155',
+              color: window.app.chartTheme().datalabel,
               font: { family: 'Sarabun', weight: 'bold', size: 10 },
               align: 'end',
               anchor: 'end',
@@ -1777,54 +1848,76 @@ window.app = {
       const validCategories = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'];
       const isDevice = (o) => o && o.Category && validCategories.includes(o.Category.toString().trim());
 
-      const trendData = {}; 
-      this.filteredOrders.forEach(o => { 
-        if(o['Order Status'] !== 'Cancelled' && isDevice(o)) { 
-          let d = new Date(o.Timestamp).toLocaleDateString('th-TH'); 
-          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); trendData[d] = (trendData[d] || 0) + (isNaN(qty) ? 0 : qty); 
-        }
-      });
-      this.createChart('chartSalesTrend', 'line', Object.keys(trendData), Object.values(trendData), 'จำนวนเครื่อง', '#254d71');
-      
-      const weeklyTrend = {};
+      // เก็บ key แยกจาก label ที่โชว์ — label เป็น th-TH locale string (D/M/YYYY ไม่เติม 0 นำหน้า) เรียงตามตัวอักษรตรงๆ ไม่ได้
+      // (เช่น "10/1/2569" < "2/1/2569" แบบ string แต่ผิดลำดับวันที่จริง) ต้อง sort ด้วย key YYYY-MM-DD ตาม rule 1 แล้วค่อย map กลับเป็น label
+      const trendData = {};
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] !== 'Cancelled' && isDevice(o)) {
-          let w = window.app.getWeekString(o.Timestamp);
-          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); weeklyTrend[w] = (weeklyTrend[w] || 0) + (isNaN(qty) ? 0 : qty);
+        if(!window.app.isOrderCancelled(o) && isDevice(o)) {
+          const dt = new Date(o.Timestamp);
+          const dKey = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+          if (!trendData[dKey]) trendData[dKey] = { label: dt.toLocaleDateString('th-TH'), qty: 0 };
+          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); trendData[dKey].qty += (isNaN(qty) ? 0 : qty);
         }
       });
-      const sortedWeeks = Object.keys(weeklyTrend).sort();
-      this.createChart('chartWeeklyTrend', 'bar', sortedWeeks, sortedWeeks.map(w => weeklyTrend[w]), 'จำนวนเครื่อง', '#2563eb');
+      const sortedDayKeys = Object.keys(trendData).sort();
+      this.createChart('chartSalesTrend', 'line', sortedDayKeys.map(k => trendData[k].label), sortedDayKeys.map(k => trendData[k].qty), 'จำนวนเครื่อง', '#254d71');
 
-      const modelsData = {}; 
-      let grandTotalQty = 0;
+      // กลุ่มรุ่นสินค้า (ตัดข้อมูลก่อนความจุ) — owner request 2026-07-24, แทนที่ตำแหน่งกราฟ "โมบาย" เดิมที่ย้ายไปอยู่คู่กับกราฟ "สมาร์ทวอทช์ & หูฟัง" แล้ว
+      // ใช้หลักการเดียวกับ bookingSummary.stripCapacity (JS.html บรรทัด ~2899): ตัดข้อความ Model ที่ตำแหน่งซึ่งพบค่า Capacity ของแถวนั้นๆ เพื่อรวมทุกความจุของรุ่นเดียวกันเข้าเป็นกลุ่มเดียว
+      const stripCapacityGroup = (modelText, cap) => {
+        const mt = (modelText || '').toString().trim();
+        const c = (cap || '').toString().trim();
+        if (!c || c === '-') return mt;
+        const idx = mt.toUpperCase().indexOf(c.toUpperCase());
+        return idx === -1 ? mt : (mt.substring(0, idx).trim() || mt);
+      };
+      const groupData = {};
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] === 'Cancelled' || !isDevice(o)) return;
+        if(window.app.isOrderCancelled(o) || (o.Category || '').toString().trim() !== 'โมบาย') return;
         let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
-        if (o.Capacity && o.Capacity !== '-' && o.Capacity.trim() !== '') mName += ` (${o.Capacity})`;
+        const g = stripCapacityGroup(mName, o.Capacity);
         let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
-        modelsData[mName] = (modelsData[mName] || 0) + qty;
-        grandTotalQty += qty;
+        groupData[g] = (groupData[g] || 0) + qty;
       });
-      let sortedModels = Object.keys(modelsData).sort((a,b) => modelsData[b] - modelsData[a]).slice(0, 15);
-      
-      if(this.charts['chartModelAdvanced']) this.charts['chartModelAdvanced'].destroy();
-      const ctxModel = document.getElementById('chartModelAdvanced');
-      if(ctxModel) {
-        this.charts['chartModelAdvanced'] = new Chart(ctxModel.getContext('2d'), {
-            type: 'bar',
-            data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
+      let sortedGroups = Object.keys(groupData).sort((a,b) => groupData[b] - groupData[a]);
+      this.createChart('chartModelGroupStripped', 'bar', sortedGroups, sortedGroups.map(g => groupData[g]), 'จำนวนเครื่อง', '#7c3aed');
+
+      // การวิเคราะห์โมเดลสินค้ายอดนิยม (รวมความจุ) — แยกเป็น 2 กราฟตามหมวดหมู่ (owner request 2026-07-24, แทนที่กราฟ "เปรียบเทียบยอดจองรายสัปดาห์" ที่ไม่ได้ใช้แล้ว):
+      // โมบาย แยกกราฟเดี่ยว, ส่วนสมาร์ทวอทช์+หูฟังรวมกันอยู่อีกกราฟหนึ่ง (ไม่รวม "อุปกรณ์เสริม" ทั่วไป)
+      const buildModelAdvancedChart = (canvasId, categories) => {
+        const modelsData = {};
+        let grandTotalQty = 0;
+        this.filteredOrders.forEach(o => {
+          if(window.app.isOrderCancelled(o) || !isDevice(o)) return;
+          if(!categories.includes((o.Category || '').toString().trim())) return;
+          let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
+          if (o.Capacity && o.Capacity !== '-' && o.Capacity.trim() !== '') mName += ` (${o.Capacity})`;
+          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
+          modelsData[mName] = (modelsData[mName] || 0) + qty;
+          grandTotalQty += qty;
         });
-        window.app.chartExportButtons('chartModelAdvanced');
-      }
+        let sortedModels = Object.keys(modelsData).sort((a,b) => modelsData[b] - modelsData[a]).slice(0, 15);
+
+        if(this.charts[canvasId]) this.charts[canvasId].destroy();
+        const ctxModel = document.getElementById(canvasId);
+        if(ctxModel) {
+          this.charts[canvasId] = new Chart(ctxModel.getContext('2d'), {
+              type: 'bar',
+              data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
+              options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
+          });
+          window.app.chartExportButtons(canvasId);
+        }
+      };
+      buildModelAdvancedChart('chartModelAdvancedMobile', ['โมบาย']);
+      buildModelAdvancedChart('chartModelAdvancedWatchEarphone', ['สมาร์ทวอทช์', 'หูฟัง']);
 
       // Promotions summary is rendered as a table via renderPromotionsTable()
 
       const buildCountChart = (field, canvasId, colorHex) => {
           const counts = {};
           this.filteredOrders.forEach(o => {
-            if (o['Order Status'] !== 'Cancelled' && isDevice(o) && o[field] && o[field] !== '-') {
+            if (!window.app.isOrderCancelled(o) && isDevice(o) && o[field] && o[field] !== '-') {
               let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); counts[o[field]] = (counts[o[field]] || 0) + (isNaN(qty) ? 0 : qty);
             }
           });
@@ -1837,12 +1930,12 @@ window.app = {
       buildCountChart('Province', 'chartProvince', '#f59e0b'); buildCountChart('Type Name', 'chartType', '#8b5cf6');
 
       const branchCounts = {};
-      this.filteredOrders.forEach(o => { if(o['Order Status'] !== 'Cancelled' && isDevice(o)) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); branchCounts[o['Branch Code']] = (branchCounts[o['Branch Code']] || 0) + (isNaN(qty) ? 0 : qty); } });
+      this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o)) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); branchCounts[o['Branch Code']] = (branchCounts[o['Branch Code']] || 0) + (isNaN(qty) ? 0 : qty); } });
       let sortedBranches = Object.keys(branchCounts).sort((a,b)=>branchCounts[b]-branchCounts[a]).slice(0, 10);
       this.createChart('chartTopBranches', 'bar', sortedBranches, sortedBranches.map(b=>branchCounts[b]), 'จำนวนเครื่องรวม', '#254d71');
 
       const salesCounts = {};
-      this.filteredOrders.forEach(o => { if(o['Order Status'] !== 'Cancelled' && isDevice(o) && o['Staff']) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); salesCounts[o['Staff']] = (salesCounts[o['Staff']] || 0) + (isNaN(qty) ? 0 : qty); } });
+      this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o) && o['Staff']) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); salesCounts[o['Staff']] = (salesCounts[o['Staff']] || 0) + (isNaN(qty) ? 0 : qty); } });
       let sortedSales = Object.keys(salesCounts).sort((a,b)=>salesCounts[b]-salesCounts[a]).slice(0, 10);
       this.createChart('chartSalesRank', 'bar', sortedSales, sortedSales.map(s=>salesCounts[s]), 'จำนวนเครื่อง', '#2563eb', true);
 
@@ -1855,7 +1948,7 @@ window.app = {
       const allChannelsAcc = new Set();
       
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] === 'Cancelled' || !isDevice(o)) return;
+        if(window.app.isOrderCancelled(o) || !isDevice(o)) return;
         let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
         if (o.Capacity && o.Capacity !== '-' && o.Capacity.trim() !== '') mName += ` (${o.Capacity})`;
         
@@ -1903,9 +1996,9 @@ window.app = {
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     indexAxis: 'y',
-                    scales: { 
-                        x: { stacked: true, grid: { color: '#f1f5f9' }, grace: '15%' }, 
-                        y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 10 } } } 
+                    scales: {
+                        x: { stacked: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' },
+                        y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 10 } } }
                     },
                     plugins: {
                         legend: { display: true, position: 'top', labels: { font: { family: 'Sarabun' } } },
@@ -1931,7 +2024,7 @@ window.app = {
       const promoData = {}; const promoProcessed = new Set(); let totalPromos = 0;
       const isDevice = (o) => { const validCat = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง']; return o.Category && validCat.includes(o.Category.toString().trim()); };
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] !== 'Cancelled' && !promoProcessed.has(o.OrderID)) {
+        if(!window.app.isOrderCancelled(o) && !promoProcessed.has(o.OrderID)) {
            let orderItems = this.filteredOrders.filter(x => x.OrderID === o.OrderID);
            if(orderItems.some(x => isDevice(x))) {
                let firstRow = orderItems[0];
@@ -1955,7 +2048,7 @@ window.app = {
       const giftCounts = {}; let totalGifts = 0;
       const isGift = (o) => o.Category && o.Category.toString().trim().includes('ของแถม');
       this.filteredOrders.forEach(o => {
-         if(o['Order Status'] !== 'Cancelled' && isGift(o)) {
+         if(!window.app.isOrderCancelled(o) && isGift(o)) {
             let name = o['Product Name'] || '';
             let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
             giftCounts[name] = (giftCounts[name] || 0) + qty; totalGifts += qty;
@@ -1975,7 +2068,7 @@ window.app = {
       const tbody = document.getElementById('tableInterestsBody'); if(!tbody) return;
       let tbodyHtml = ''; let counts = {}; let totalInterests = 0; const ordersById = {};
       this.filteredOrders.forEach(o => {
-        if(o['Order Status'] !== 'Cancelled') {
+        if(!window.app.isOrderCancelled(o)) {
            if(!ordersById[o.OrderID]) ordersById[o.OrderID] = [];
            ordersById[o.OrderID].push(o);
         }
@@ -2066,9 +2159,9 @@ window.app = {
           },
           scales: {
             y: {
-              grid: { color: 'rgba(226, 232, 240, 0.4)', drawBorder: false },
+              grid: { color: window.app.chartTheme().grid, drawBorder: false },
               ticks: {
-                color: '#64748b',
+                color: window.app.chartTheme().text,
                 font: { family: 'Sarabun', size: 10, weight: '500' }
               },
               grace: '15%'
@@ -2076,7 +2169,7 @@ window.app = {
             x: {
               grid: { display: false, drawBorder: false },
               ticks: {
-                color: '#64748b',
+                color: window.app.chartTheme().text,
                 font: { family: 'Sarabun', size: 10, weight: '500' }
               },
               grace: '15%'
@@ -2090,8 +2183,9 @@ window.app = {
       if(window.app.dashboard.filteredOrders.length===0) return Swal.fire('ไม่มีข้อมูล', '', 'warning');
       const headers = Object.keys(window.app.dashboard.filteredOrders[0]); 
       let csvContent = "\uFEFF" + headers.join(",") + "\r\n";
-      window.app.dashboard.filteredOrders.forEach(row => { 
-        csvContent += headers.map(h => '"' + (row[h]?row[h].toString().replace(/"/g, '""'):"") + '"').join(",") + "\r\n"; 
+      window.app.dashboard.filteredOrders.forEach(row => {
+        // เดิมเช็ค truthy (row[h] ? ... : "") ทำให้ค่า 0 ที่ถูกต้อง (เช่น Unit Price ของแถม, Deposit ของจอง F) กลายเป็นช่องว่างในไฟล์ export
+        csvContent += headers.map(h => '"' + ((row[h] !== undefined && row[h] !== null) ? row[h].toString().replace(/"/g, '""') : "") + '"').join(",") + "\r\n";
       });
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -2172,7 +2266,7 @@ window.app = {
       let currentDays = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
       if (now > endDate) currentDays = totalDays;
       
-      const validOrders = orders.filter(o => o['Order Status'] !== 'Cancelled' && o['Order Status'] !== 'ยกเลิก' && o.Timestamp);
+      const validOrders = orders.filter(o => !window.app.isOrderCancelled(o) && o.Timestamp);
       let totalMobile = 0;
       let totalAcc = 0;
       
@@ -2329,7 +2423,7 @@ window.app = {
                   }
                }
             },
-            scales: { y: { beginAtZero: true, grid: { borderDash: [2,4], color: '#f1f5f9' } }, x: { grid: { display: false } } },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2,4], color: window.app.chartTheme().grid } }, x: { grid: { display: false } } },
             interaction: { mode: 'index', intersect: false }
          }
       });
@@ -2408,7 +2502,7 @@ window.app = {
       const endKey = toDateKey(endDate);
 
       const validOrders = orders.filter(o => {
-          if (o['Order Status'] === 'Cancelled' || o['Order Status'] === 'ยกเลิก' || !o.Timestamp) return false;
+          if (window.app.isOrderCancelled(o) || !o.Timestamp) return false;
           // นอกช่วงเวลาการจอง (ReserveStart/ReserveEnd) — ตัดออก ไม่งั้นยอดจองรวมออเดอร์เก่าข้ามแคมเปญทั้งหมด (Orders sheet ไม่เคยถูกล้าง)
           const tsObj = new Date(o.Timestamp);
           if (isNaN(tsObj)) return false;
@@ -2608,25 +2702,36 @@ window.app = {
         headRow += '<th class="py-2.5 px-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l border-slate-100">' + window.app.esc(c.label) + '</th>';
       });
       headRow += '<th class="py-2.5 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l-2 border-slate-300 bg-slate-50">ยอดรวม</th>';
+      headRow += '<th class="py-2.5 px-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l border-slate-100 bg-slate-50">%</th>';
+
+      // เดินลูปรอบแรกหา rowTotal ของแต่ละแถวและ grandTotal ก่อน เพื่อคำนวณ % (คอลัมน์หลัง "ยอดรวม") ในลูปที่สอง
+      const colTotals = {}; // colKey -> qty
+      const rowTotals = rowCombos.map(r => {
+        let t = 0;
+        columns.forEach(c => {
+          const colMatrix = matrix[c.key] || {};
+          t += (colMatrix[r.model] && colMatrix[r.model][r.variant]) || 0;
+        });
+        return t;
+      });
+      const grandTotal = rowTotals.reduce((s, v) => s + v, 0);
 
       let bodyRows = '';
-      const colTotals = {}; // colKey -> qty
-      let grandTotal = 0;
-      rowCombos.forEach(r => {
-        let rowTotal = 0;
+      rowCombos.forEach((r, i) => {
         let cells = '';
         columns.forEach(c => {
           const colMatrix = matrix[c.key] || {};
           const qty = (colMatrix[r.model] && colMatrix[r.model][r.variant]) || 0;
-          rowTotal += qty;
           colTotals[c.key] = (colTotals[c.key] || 0) + qty;
           cells += '<td class="py-2.5 px-3 text-center text-slate-600 border-l border-slate-100">' + (qty > 0 ? qty.toLocaleString() : '<span class="text-slate-300">-</span>') + '</td>';
         });
-        grandTotal += rowTotal;
+        const rowTotal = rowTotals[i];
+        const pct = grandTotal > 0 ? ((rowTotal / grandTotal) * 100).toFixed(1) : '0.0';
         bodyRows += '<tr class="hover:bg-slate-50 transition-colors">'
           + '<td class="py-2.5 px-4 text-slate-700 font-medium sticky left-0 bg-white z-10">' + window.app.esc(r.label) + '</td>'
           + cells
           + '<td class="py-2.5 px-4 text-right text-indigo-600 font-black border-l-2 border-slate-300 bg-slate-50/60">' + rowTotal.toLocaleString() + '</td>'
+          + '<td class="py-2.5 px-3 text-right text-slate-500 border-l border-slate-100">' + pct + '%</td>'
           + '</tr>';
       });
 
@@ -2638,6 +2743,7 @@ window.app = {
         + '<td class="py-3 px-4 text-slate-800 sticky left-0 bg-slate-100 z-10">Grand Total</td>'
         + footCells
         + '<td class="py-3 px-4 text-right text-indigo-700 border-l-2 border-slate-300">' + grandTotal.toLocaleString() + '</td>'
+        + '<td class="py-3 px-3 text-right text-slate-600 border-l border-slate-100">' + (grandTotal > 0 ? '100.0%' : '0.0%') + '</td>'
         + '</tr>';
 
       const tableHtml = '<table class="w-full text-sm text-left whitespace-nowrap">'
@@ -2646,11 +2752,46 @@ window.app = {
         + '<tfoot>' + footRow + '</tfoot>'
         + '</table>';
 
-      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
+        + '</div>';
+    },
+    // ตารางที่ 3: เปรียบเทียบ % ยอดจองระหว่างกลุ่มรุ่นที่กำหนดไว้ตายตัว (owner request 2026-07-24) — groups: [{label, qty}] ตามลำดับที่ต้องการแสดง
+    buildGroupCompareTable: function(title, groups) {
+      const total = groups.reduce((s, g) => s + g.qty, 0);
+      const colors = ['indigo', 'pink', 'emerald', 'amber'];
+      let bodyRows = '';
+      groups.forEach((g, i) => {
+        const pct = total > 0 ? ((g.qty / total) * 100).toFixed(1) : '0.0';
+        const color = colors[i % colors.length];
+        bodyRows += '<tr class="hover:bg-slate-50 transition-colors">'
+          + '<td class="py-3 px-4 text-slate-700 font-medium">' + window.app.esc(g.label) + '</td>'
+          + '<td class="py-3 px-4 text-center font-black text-slate-700">' + g.qty.toLocaleString() + '</td>'
+          + '<td class="py-3 px-4"><div class="flex items-center gap-2"><span class="text-xs text-slate-500 w-12 text-right">' + pct + '%</span><div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div class="bg-' + color + '-500 h-full rounded-full" style="width:' + pct + '%"></div></div></div></td>'
+          + '</tr>';
+      });
+      const footRow = '<tr class="bg-slate-100 font-black border-t-2 border-slate-300">'
+        + '<td class="py-3 px-4 text-slate-800">รวม</td>'
+        + '<td class="py-3 px-4 text-center text-indigo-700">' + total.toLocaleString() + '</td>'
+        + '<td class="py-3 px-4 text-right text-slate-500 pr-8">100%</td>'
+        + '</tr>';
+      const tableHtml = '<table class="w-full text-sm text-left">'
+        + '<thead><tr class="bg-slate-50/95 border-b border-slate-200">'
+        + '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">กลุ่มรุ่น</th>'
+        + '<th class="py-2.5 px-4 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">ยอดจอง</th>'
+        + '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">สัดส่วน</th>'
+        + '</tr></thead>'
+        + '<tbody class="divide-y divide-slate-100">' + bodyRows + '</tbody>'
+        + '<tfoot>' + footRow + '</tfoot>'
+        + '</table>';
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
+        + '<h6 class="!mb-0"><i class="fas fa-chart-pie text-pink-500"></i>' + window.app.esc(title) + '</h6>'
+        + '</div>'
+        + '<div class="tbleed-body py-2 overflow-x-auto custom-scrollbar">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -2692,7 +2833,7 @@ window.app = {
       const resMatrix = { 'T': {}, 'F': {} };
 
       this.rawOrders.forEach(o => {
-        if (o['Order Status'] === 'Cancelled') return;
+        if (window.app.isOrderCancelled(o)) return;
         if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า
         let qty = parseInt((o.Qty || '0').toString().replace(/,/g, ''));
         if (isNaN(qty) || qty <= 0) return;
@@ -2733,15 +2874,34 @@ window.app = {
         return;
       }
 
-      // จัดลำดับแถว Model/Capacity ตามยอดรวมมาก->น้อย — ใช้ร่วมกันทั้ง 2 ตาราง
+      // จัดลำดับแถว Model/Capacity (owner request 2026-07-24):
+      // - โมเดล: เรียงตามลำดับตายตัว FOLD 8 -> FOLD 8 ULTRA -> FLIP 8 ก่อนเสมอ (ไม่สนยอดขาย) ส่วนโมเดลอื่นที่ไม่อยู่ในลิสต์ต่อท้ายเรียงตามยอดรวมมาก->น้อยเหมือนเดิม
+      // - ความจุในแต่ละโมเดล: เรียงจากน้อย->มากตามขนาดจริง (256, 512, 1TB) ไม่ใช่ตามยอดขาย
+      // capVal ต้องบังคับให้มีหน่วย (TB/GB/MB) ต่อท้ายตัวเลขเสมอ ไม่งั้นรูปแบบ "12/256GB" (RAM/ความจุ) จะจับเลข RAM "12" ก่อนความจุจริงผิดพลาด — ต้องคนละกับ capVal ใน pos module (~บรรทัด 3900) ที่ไม่มี RAM prefix ปนอยู่
+      const capVal = (c) => {
+        const m = String(c).match(/([\d.]+)\s*(TB|GB|MB)\b/i);
+        if (!m) return Number.MAX_VALUE;
+        let v = parseFloat(m[1]);
+        const u = m[2].toUpperCase();
+        if (u === 'TB') v *= 1024; else if (u === 'MB') v /= 1024;
+        return v;
+      };
+      const modelPriority = ['GALAXY Z FLIP 8', 'GALAXY Z FOLD 8', 'GALAXY Z FOLD 8 ULTRA'];
+      const priorityIndexOf = (model) => modelPriority.findIndex(p => p.toUpperCase() === model.toString().trim().toUpperCase());
       const rowCombos = [];
       const modelTotals = {};
       Object.keys(modelVariantTotals).forEach(m => {
         modelTotals[m] = Object.values(modelVariantTotals[m]).reduce((s, v) => s + v, 0);
       });
-      const modelNames = Object.keys(modelVariantTotals).sort((a, b) => modelTotals[b] - modelTotals[a]);
+      const modelNames = Object.keys(modelVariantTotals).sort((a, b) => {
+        const ai = priorityIndexOf(a), bi = priorityIndexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return modelTotals[b] - modelTotals[a];
+      });
       modelNames.forEach(m => {
-        const variants = Object.keys(modelVariantTotals[m]).sort((a, b) => modelVariantTotals[m][b] - modelVariantTotals[m][a]);
+        const variants = Object.keys(modelVariantTotals[m]).sort((a, b) => capVal(a) - capVal(b));
         variants.forEach(v => rowCombos.push({ model: m, variant: v, label: (v && v !== '-') ? (m + ' (' + v + ')') : m }));
       });
 
@@ -2751,12 +2911,59 @@ window.app = {
       if (dateKeys.length > 0) {
         const columns = dateKeys.map(dk => ({ key: dk, label: dateDisplay[dk] }));
         html += this.buildTransposedPivotTable('สรุปยอดจองรายวัน (' + category + ')', columns, dateMatrix, rowCombos, 'รุ่น (ความจุ)');
+
+        // เทียบ % ยอดจองรายวัน (owner request 2026-07-24) — รวมทุกรุ่นเข้าด้วยกันต่อวัน แล้วเทียบสัดส่วนวันต่อวัน แบบเดียวกับตาราง "เทียบ % ตามกลุ่มรุ่น"
+        const dateGroups = dateKeys.map(dk => {
+          let qty = 0;
+          const dayModels = dateMatrix[dk] || {};
+          Object.keys(dayModels).forEach(m => { Object.keys(dayModels[m]).forEach(v => { qty += dayModels[m][v]; }); });
+          return { label: dateDisplay[dk], qty: qty };
+        });
+        html += this.buildGroupCompareTable('ยอดจองเทียบ % รายวัน (' + category + ')', dateGroups);
       }
 
       // ตารางที่ 2 — แถว = Model (Capacity), คอลัมน์ = สถานะจอง (T/F)
       if (hasResData) {
         const columns = [{ key: 'T', label: 'T' }, { key: 'F', label: 'F' }];
         html += this.buildTransposedPivotTable('สรุปยอดจองตามสถานะการจอง (' + category + ')', columns, resMatrix, rowCombos, 'รุ่น (ความจุ)');
+
+        // เทียบ % สถานะจอง T vs F (owner request 2026-07-24) — รวมทุกรุ่นเข้าด้วยกันต่อสถานะ แล้วเทียบสัดส่วน T vs F
+        const sumStatus = (sKey) => {
+          let qty = 0;
+          const models = resMatrix[sKey] || {};
+          Object.keys(models).forEach(m => { Object.keys(models[m]).forEach(v => { qty += models[m][v]; }); });
+          return qty;
+        };
+        const statusGroups = [
+          { label: 'จอง T (มีการจอง)', qty: sumStatus('T') },
+          { label: 'จอง F (สวมสิทธิ์การจอง)', qty: sumStatus('F') }
+        ];
+        html += this.buildGroupCompareTable('ยอดจองเทียบ % ตามสถานะการจอง (' + category + ')', statusGroups);
+      }
+
+      // ตารางที่ 3 — เทียบ % ยอดจองตามกลุ่มรุ่น (owner request 2026-07-24, ปรับหลักการจัดกลุ่ม 2026-07-24)
+      // กลุ่ม = ข้อความ Model โดยตัดส่วนความจุ (Capacity) ออก — หาตำแหน่งที่ค่า Capacity ของแต่ละแถวปรากฏอยู่ใน Model แล้วตัดทุกอย่างตั้งแต่จุดนั้นทิ้ง
+      // เช่น Model "GALAXY Z FOLD 8 ULTRA 1TB" + Capacity "1TB" -> กลุ่ม "GALAXY Z FOLD 8 ULTRA"; ถ้าไม่พบ Capacity ในข้อความ Model ให้ใช้ Model เต็มเป็นกลุ่ม
+      // ไม่ใช้รายชื่อกลุ่มตายตัวอีกต่อไป (เดิม hardcode 3 ชื่อ + เช็ค ULTRA ก่อนกัน substring ทับกัน) — วิธีนี้รองรับรุ่น/กลุ่มใหม่ในอนาคตอัตโนมัติ
+      const stripCapacity = (modelText, cap) => {
+        const mt = modelText.toString().trim();
+        const c = (cap || '').toString().trim();
+        if (!c || c === '-') return mt;
+        const idx = mt.toUpperCase().indexOf(c.toUpperCase());
+        return idx === -1 ? mt : (mt.substring(0, idx).trim() || mt);
+      };
+      const groupTotals = {};
+      Object.keys(modelVariantTotals).forEach(m => {
+        Object.keys(modelVariantTotals[m]).forEach(v => {
+          const g = stripCapacity(m, v);
+          groupTotals[g] = (groupTotals[g] || 0) + modelVariantTotals[m][v];
+        });
+      });
+      const groups = Object.keys(groupTotals)
+        .sort((a, b) => groupTotals[b] - groupTotals[a])
+        .map(g => ({ label: g, qty: groupTotals[g] }));
+      if (groups.length > 0) {
+        html += this.buildGroupCompareTable('ยอดจองเทียบ % ตามกลุ่มรุ่น (' + category + ')', groups);
       }
 
       wrap.innerHTML = html;
@@ -2767,6 +2974,7 @@ window.app = {
   // สรุปยอดตามรุ่น/แอเรีย/ช่องทางขาย: 3 ตาราง กรองด้วยหมวดหมู่สินค้า (ค่าเริ่มต้น "โมบาย")
   salesSummary: {
     rawOrders: [],
+    rawTarget: [],
     currentCategory: '',
     init: async function() {
       const content = document.getElementById('page-content');
@@ -2775,10 +2983,15 @@ window.app = {
 
       window.app.showLoading('กำลังโหลดข้อมูลสรุปยอด...');
       try {
-        const res = await window.app.api('GET_ADVANCED_DASHBOARD', {});
+        // ดึงชีต Target คู่กันไว้จำกัดรายชื่อแอเรียในตาราง "ยอดจองตามแอเรีย × รุ่น" (owner request 2026-07-24)
+        const [res, resTarget] = await Promise.all([
+          window.app.api('GET_ADVANCED_DASHBOARD', {}),
+          window.app.api('GET_TABLE', { tableName: 'Target' })
+        ]);
         Swal.close();
         if (res && res.status === 'success') {
           this.rawOrders = res.data.orders || [];
+          this.rawTarget = (resTarget && resTarget.status === 'success') ? (resTarget.data || []) : [];
           this.setupCategoryFilter();
           this.render();
         } else {
@@ -2866,11 +3079,11 @@ window.app = {
         + '<tfoot>' + footRow + '</tfoot>'
         + '</table>';
 
-      return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
-        + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
+        + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
         + '</div>';
     },
     render: function() {
@@ -2930,22 +3143,38 @@ window.app = {
       const branches = window.app.globalData.branches || [];
       const areaKey = branches.length > 0 ? (Object.keys(branches[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area') : 'Area';
       const branchAreaMap = {}; // Branch Code (upper) -> Area
-      const areaRowsSeen = {};
-      const areaRows = [];
+      const areaByUpper = {}; // AREA NAME (upper) -> {key,label} ทุกแอเรียที่มีจริงในชีต Branches
       branches.forEach(b => {
         const code = (b['Branch Code'] || '').toString().trim().toUpperCase();
         const area = (b[areaKey] || '').toString().trim();
         if (code && area) branchAreaMap[code] = area;
-        if (area && !areaRowsSeen[area]) { areaRowsSeen[area] = true; areaRows.push({ key: area, label: area }); }
+        if (area && !areaByUpper[area.toUpperCase()]) areaByUpper[area.toUpperCase()] = { key: area, label: area };
       });
+
+      // รายชื่อแอเรียที่จะแสดงในตาราง "ยอดจองตามแอเรีย × รุ่น" — จำกัด+เรียงตามรายชื่อในชีต Target คอลัมน์แรกเท่านั้น (owner request 2026-07-24)
+      // ข้ามแถว ALL/ALL BRANCHES เพราะเป็นยอดรวมทุกสาขา ไม่ใช่ชื่อแอเรียจริง (ปฏิบัติแบบเดียวกับ target module)
+      const targetRows = this.rawTarget || [];
+      const targetAreaRows = [];
+      if (targetRows.length > 0) {
+        const targetKeys = Object.keys(targetRows[0]).filter(k => k !== '_rowIndex');
+        const targetNameKey = targetKeys.find(k => k.toLowerCase() === 'area' || k.includes('Area') || k.includes('สาขา') || k.includes('พนักงาน') || k.includes('ชื่อ') || k.includes('รับเป้า')) || targetKeys[0];
+        const targetAreaSeen = {};
+        targetRows.forEach(t => {
+          const name = (t[targetNameKey] || '').toString().trim();
+          if (!name) return;
+          const upper = name.toUpperCase();
+          if (upper === 'ALL' || upper === 'ALL BRANCHES') return;
+          const match = areaByUpper[upper];
+          if (match && !targetAreaSeen[match.key]) { targetAreaSeen[match.key] = true; targetAreaRows.push(match); }
+        });
+      }
 
       // สะสมยอด: matrix1[modelCap][channel] / matrix2[area][modelCap] / matrix3[SKU][channel]
       const matrix1 = {}, matrix2 = {}, matrix3 = {};
       const UNMAPPED_AREA = 'ไม่ระบุแอเรีย';
-      let hasUnmappedArea = false;
 
       this.rawOrders.forEach(o => {
-        if (o['Order Status'] === 'Cancelled') return;
+        if (window.app.isOrderCancelled(o)) return;
         if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า
         let qty = parseInt((o.Qty || '0').toString().replace(/,/g, ''));
         if (isNaN(qty) || qty <= 0) return;
@@ -2955,7 +3184,6 @@ window.app = {
         const channel = resolveChannel(o.Channel);
         const branchCode = (o['Branch Code'] || '').toString().trim().toUpperCase();
         const area = branchAreaMap[branchCode] || UNMAPPED_AREA;
-        if (area === UNMAPPED_AREA) hasUnmappedArea = true;
 
         if (!matrix1[info.modelCap]) matrix1[info.modelCap] = {};
         matrix1[info.modelCap][channel] = (matrix1[info.modelCap][channel] || 0) + qty;
@@ -2967,13 +3195,275 @@ window.app = {
         matrix3[o.SKU][channel] = (matrix3[o.SKU][channel] || 0) + qty;
       });
 
-      // ออเดอร์ที่หาสาขา/แอเรียไม่เจอ — เพิ่มแถว "ไม่ระบุแอเรีย" ท้ายตารางที่ 3
-      if (hasUnmappedArea && !areaRowsSeen[UNMAPPED_AREA]) areaRows.push({ key: UNMAPPED_AREA, label: UNMAPPED_AREA });
-
       let html = '';
       html += this.buildFlatPivotTable('ยอดจองตามรุ่น × ช่องทางขาย', channelColumns, matrix1, modelCapRows, 'Model');
       html += this.buildFlatPivotTable('ยอดจองตามสินค้า (รวมสี) × ช่องทางขาย', channelColumns, matrix3, productNameRows, 'Product Name');
-      html += this.buildFlatPivotTable('ยอดจองตามแอเรีย × รุ่น', modelCapRows, matrix2, areaRows, 'แอเรีย');
+      if (targetAreaRows.length > 0) {
+        html += this.buildFlatPivotTable('ยอดจองตามแอเรีย × รุ่น', modelCapRows, matrix2, targetAreaRows, 'แอเรีย');
+      } else {
+        html += '<div class="chart-card mb-6">' + window.app.emptyState({
+          icon: 'fa-list-check',
+          title: 'ไม่มีรายชื่อแอเรียในชีต Target',
+          subtitle: 'ตาราง "ยอดจองตามแอเรีย × รุ่น" แสดงเฉพาะแอเรียตามรายชื่อในชีต Target — กรุณาเพิ่มรายชื่อแอเรียในชีต Target ก่อน'
+        }) + '</div>';
+      }
+
+      wrap.innerHTML = html;
+      wrap.querySelectorAll('.chart-card').forEach(c => window.app.tableExportButtons(c));
+    }
+  },
+
+  // สรุปยอดจองตามสาขา × รุ่น แยกสถานะ จอง T / จอง F / ผลรวม (owner request 2026-07-24) — 3 ตารางแยกสถานะ (แบบเดียวกับ 3 ตารางของ salesSummary)
+  branchBookingSummary: {
+    rawOrders: [],
+    currentCategory: '',
+    currentArea: '',
+    currentBranchQuery: '',
+    init: async function() {
+      const content = document.getElementById('page-content');
+      const tmpl = document.getElementById('tmpl-branchbookingsummary');
+      if (content && tmpl) content.innerHTML = tmpl.innerHTML;
+
+      window.app.showLoading('กำลังโหลดข้อมูลสรุปยอดจองตามสาขา...');
+      try {
+        const res = await window.app.api('GET_ADVANCED_DASHBOARD', {});
+        Swal.close();
+        if (res && res.status === 'success') {
+          this.rawOrders = res.data.orders || [];
+          this.setupCategoryFilter();
+          this.setupBranchAreaFilters();
+          this.render();
+        } else {
+          this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลได้');
+        }
+      } catch (e) {
+        Swal.close(); this.renderLoadError(e.message);
+      }
+    },
+    renderLoadError: function(msg) {
+      const wrap = document.getElementById('branchBookingSummaryTablesWrap');
+      if (!wrap) { Swal.fire('Error', msg, 'error'); return; }
+      wrap.innerHTML = window.app.emptyState({
+        icon: 'fa-exclamation-triangle',
+        title: 'โหลดข้อมูลไม่สำเร็จ',
+        subtitle: msg,
+        actionLabel: 'ลองใหม่',
+        onclick: 'window.app.branchBookingSummary.init()'
+      });
+    },
+    setupCategoryFilter: function() {
+      const sel = document.getElementById('bbCategoryFilter');
+      if (!sel) return;
+      const products = window.app.globalData.products || [];
+      const seen = {}; const cats = [];
+      products.forEach(p => {
+        const c = (p['Category'] || '').toString().trim();
+        if (c && !seen[c]) { seen[c] = true; cats.push(c); }
+      });
+      cats.sort((a, b) => (a === 'โมบาย' ? -1 : b === 'โมบาย' ? 1 : 0));
+      sel.innerHTML = cats.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      this.currentCategory = cats.includes('โมบาย') ? 'โมบาย' : (cats[0] || '');
+      sel.value = this.currentCategory;
+    },
+    onCategoryChange: function() {
+      const sel = document.getElementById('bbCategoryFilter');
+      this.currentCategory = sel ? sel.value : '';
+      this.render();
+    },
+    // ตัวกรอง Area/สาขา แบบพิมพ์ค้นหา (owner request 2026-07-24) — input + datalist (เหมือน Customer Name ในหน้า Orders grid)
+    // กรองแบบ substring ระหว่างพิมพ์ (oninput) ไม่บังคับต้องเลือกค่าจาก datalist ให้ตรงเป๊ะ
+    setupBranchAreaFilters: function() {
+      const branches = window.app.globalData.branches || [];
+      const areaKey = branches.length > 0 ? (Object.keys(branches[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area') : 'Area';
+
+      const areaInput = document.getElementById('bbAreaFilter');
+      const areaList = document.getElementById('bbAreaListOptions');
+      if (areaList) {
+        const seenArea = {}; let opts = '';
+        branches.forEach(b => {
+          const area = (b[areaKey] || '').toString().trim();
+          if (area && !seenArea[area]) { seenArea[area] = true; opts += '<option value="' + window.app.esc(area) + '">'; }
+        });
+        areaList.innerHTML = opts;
+      }
+      if (areaInput) areaInput.value = this.currentArea;
+
+      const branchInput = document.getElementById('bbBranchFilter');
+      const branchList = document.getElementById('bbBranchListOptions');
+      if (branchList) {
+        const seenCode = {}; let opts = '';
+        branches.forEach(b => {
+          const code = (b['Branch Code'] || '').toString().trim();
+          if (!code || seenCode[code]) return;
+          seenCode[code] = true;
+          const name = (b['Branch Name'] || '').toString().trim() || code;
+          opts += '<option value="' + window.app.esc(name) + ' (' + window.app.esc(code) + ')">';
+        });
+        branchList.innerHTML = opts;
+      }
+      if (branchInput) branchInput.value = this.currentBranchQuery;
+    },
+    onFilterChange: function() {
+      const areaInput = document.getElementById('bbAreaFilter');
+      const branchInput = document.getElementById('bbBranchFilter');
+      this.currentArea = areaInput ? areaInput.value.trim() : '';
+      this.currentBranchQuery = branchInput ? branchInput.value.trim() : '';
+      this.render();
+    },
+    // ตัวช่วยสร้างตาราง pivot 2 มิติแบบเรียบ (เหมือน salesSummary.buildFlatPivotTable) พร้อม Grand Total ทั้งแถวและคอลัมน์
+    buildFlatPivotTable: function(title, columns, matrix, rows, rowHeaderLabel) {
+      let headRow = '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider sticky left-0 bg-slate-50 z-20">' + window.app.esc(rowHeaderLabel) + '</th>';
+      columns.forEach(c => {
+        headRow += '<th class="py-2.5 px-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l border-slate-200">' + window.app.esc(c.label) + '</th>';
+      });
+      headRow += '<th class="py-2.5 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider border-l-2 border-slate-300">Grand Total</th>';
+
+      let bodyRows = '';
+      const colTotals = {};
+      let grandTotal = 0;
+      rows.forEach(r => {
+        const rowMatrix = matrix[r.key] || {};
+        let rowTotal = 0;
+        let cells = '';
+        columns.forEach(c => {
+          const qty = rowMatrix[c.key] || 0;
+          rowTotal += qty;
+          colTotals[c.key] = (colTotals[c.key] || 0) + qty;
+          cells += '<td class="py-2.5 px-3 text-center text-slate-600 border-l border-slate-100">' + (qty > 0 ? qty.toLocaleString() : '') + '</td>';
+        });
+        grandTotal += rowTotal;
+        bodyRows += '<tr class="hover:bg-slate-50 transition-colors">'
+          + '<td class="py-2.5 px-4 text-slate-700 font-medium sticky left-0 bg-white z-10">' + window.app.esc(r.label) + '</td>'
+          + cells
+          + '<td class="py-2.5 px-4 text-right text-slate-700 font-bold border-l-2 border-slate-300 bg-slate-50/60">' + (rowTotal > 0 ? rowTotal.toLocaleString() : '') + '</td>'
+          + '</tr>';
+      });
+
+      let footCells = '';
+      columns.forEach(c => {
+        footCells += '<td class="py-3 px-3 text-center text-slate-800 border-l border-slate-100">' + (colTotals[c.key] || 0).toLocaleString() + '</td>';
+      });
+      const footRow = '<tr class="bg-slate-100 font-black border-t-2 border-slate-300">'
+        + '<td class="py-3 px-4 text-slate-800 sticky left-0 bg-slate-100 z-10">Grand Total</td>'
+        + footCells
+        + '<td class="py-3 px-4 text-right text-amber-700 border-l-2 border-slate-300">' + grandTotal.toLocaleString() + '</td>'
+        + '</tr>';
+
+      const tableHtml = '<table class="w-full text-sm text-left whitespace-nowrap">'
+        + '<thead class="sticky top-0 z-10"><tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">' + headRow + '</tr></thead>'
+        + '<tbody class="divide-y divide-slate-100">' + bodyRows + '</tbody>'
+        + '<tfoot>' + footRow + '</tfoot>'
+        + '</table>';
+
+      return '<div class="chart-card tbleed-outer !p-0 mb-6">'
+        + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
+        + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
+        + '</div>'
+        + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
+        + '</div>';
+    },
+    render: function() {
+      const wrap = document.getElementById('branchBookingSummaryTablesWrap');
+      if (!wrap) return;
+
+      const category = this.currentCategory;
+      if (!category) {
+        wrap.innerHTML = window.app.emptyState({ icon: 'fa-boxes-stacked', title: 'ไม่มีข้อมูลหมวดหมู่สินค้า', subtitle: '' });
+        return;
+      }
+
+      const products = (window.app.globalData.products || []).filter(p => (p['Category'] || '').toString().trim() === category);
+      if (products.length === 0) {
+        wrap.innerHTML = window.app.emptyState({ icon: 'fa-boxes-stacked', title: 'ไม่มีสินค้าในหมวดหมู่นี้', subtitle: '' });
+        return;
+      }
+
+      // SKU -> modelCap (Model + Capacity, ไม่รวมสี) — ใช้เป็นคอลัมน์
+      const skuInfo = {};
+      const modelCapRowsSeen = {};
+      const modelCapRows = [];
+      products.forEach(p => {
+        if (!p.SKU) return;
+        const model = (p['Model'] || '').toString().trim() || (p['Product Name'] || '').toString().trim() || 'ไม่ระบุรุ่น';
+        const cap = (p['Capacity'] || '').toString().trim();
+        const modelCap = (cap && cap !== '-') ? (model + ' ' + cap) : model;
+        skuInfo[p.SKU] = modelCap;
+        if (!modelCapRowsSeen[modelCap]) { modelCapRowsSeen[modelCap] = true; modelCapRows.push({ key: modelCap, label: modelCap }); }
+      });
+
+      // แถวสาขา — ใช้ทุกสาขาจากชีต Branches (แสดงแม้ยอดจอง 0) เรียงตามลำดับที่บันทึกในชีต — key = Branch Code (join key), label = Branch Name
+      // กรองด้วย Area/สาขา ที่พิมพ์ค้นหา (owner request 2026-07-24) — substring แบบไม่สนตัวพิมพ์เล็กใหญ่, เลือกได้อิสระ ใช้เงื่อนไข AND ร่วมกัน
+      const branches = window.app.globalData.branches || [];
+      const areaKey = branches.length > 0 ? (Object.keys(branches[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area') : 'Area';
+      const filterArea = (this.currentArea || '').toLowerCase();
+      const filterBranchQuery = (this.currentBranchQuery || '').toLowerCase();
+      const branchRows = [];
+      const branchByUpperCode = {}; // BRANCH CODE (upper, trim) -> {key,label} — ใช้ join ยอดจากออเดอร์ ไม่ผ่านตัวกรอง
+      branches.forEach(b => {
+        const code = (b['Branch Code'] || '').toString().trim();
+        if (!code) return;
+        const upper = code.toUpperCase();
+        if (branchByUpperCode[upper]) return;
+        const name = (b['Branch Name'] || '').toString().trim() || code;
+        const area = (b[areaKey] || '').toString().trim();
+        const row = { key: code, label: name };
+        branchByUpperCode[upper] = row;
+        if (filterArea && !area.toLowerCase().includes(filterArea)) return;
+        // ต้องเทียบกับสตริงรวม "ชื่อ (รหัส)" ด้วย ไม่ใช่แค่ code/name แยกกัน — เพราะ datalist option (บรรทัด ~3277) ใช้ค่านี้เป็น value
+        // ถ้าผู้ใช้คลิกเลือกจาก datalist โดยตรง ค่าที่ได้คือสตริงรวมทั้งก้อน ซึ่งไม่ใช่ substring ของ code หรือ name เดี่ยวๆ เลย
+        const combinedBranchLabel = (name + ' (' + code + ')').toLowerCase();
+        if (filterBranchQuery && !code.toLowerCase().includes(filterBranchQuery) && !name.toLowerCase().includes(filterBranchQuery) && !combinedBranchLabel.includes(filterBranchQuery)) return;
+        branchRows.push(row);
+      });
+
+      // แถว Reservation Status มีแค่แถวแรกของแต่ละ OrderID — ต้อง join กลับด้วย OrderID (เหมือน bookingSummary)
+      const orderResStatusMap = {};
+      this.rawOrders.forEach(o => { if (o['Reservation Status'] && o['Reservation Status'].toString().trim() !== '') orderResStatusMap[o.OrderID] = o['Reservation Status']; });
+
+      const UNKNOWN_BRANCH = 'ไม่ระบุสาขา';
+      let hasUnknownBranch = false;
+
+      // matrixT/matrixF: กรองเฉพาะแถวที่ Reservation Status เป็นจอง T / จอง F ตามลำดับ, matrixAll: ทุกแถวไม่สนสถานะ (ผลรวมทั้งหมด)
+      const matrixT = {}, matrixF = {}, matrixAll = {};
+
+      this.rawOrders.forEach(o => {
+        if (window.app.isOrderCancelled(o)) return;
+        if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า
+        let qty = parseInt((o.Qty || '0').toString().replace(/,/g, ''));
+        if (isNaN(qty) || qty <= 0) return;
+        const modelCap = skuInfo[o.SKU];
+        if (!modelCap) return; // สินค้าไม่ได้อยู่ในหมวดหมู่ที่กำลังกรอง — ข้าม
+
+        const branchCodeRaw = (o['Branch Code'] || '').toString().trim();
+        const bRow = branchByUpperCode[branchCodeRaw.toUpperCase()];
+        const branchKey = bRow ? bRow.key : UNKNOWN_BRANCH;
+        if (!bRow) hasUnknownBranch = true;
+
+        if (!matrixAll[branchKey]) matrixAll[branchKey] = {};
+        matrixAll[branchKey][modelCap] = (matrixAll[branchKey][modelCap] || 0) + qty;
+
+        const rStatus = (o['Reservation Status'] || orderResStatusMap[o.OrderID] || '').toString();
+        if (rStatus.includes('จอง T')) {
+          if (!matrixT[branchKey]) matrixT[branchKey] = {};
+          matrixT[branchKey][modelCap] = (matrixT[branchKey][modelCap] || 0) + qty;
+        } else if (rStatus.includes('จอง F')) {
+          if (!matrixF[branchKey]) matrixF[branchKey] = {};
+          matrixF[branchKey][modelCap] = (matrixF[branchKey][modelCap] || 0) + qty;
+        }
+      });
+
+      // ออเดอร์ที่หาสาขาไม่เจอ — เพิ่มแถว "ไม่ระบุสาขา" ท้ายทุกตาราง เฉพาะตอนไม่มีตัวกรอง Area/สาขาใช้งานอยู่ (ไม่มี Area/Branch Code จริงให้จับคู่กับตัวกรอง)
+      if (hasUnknownBranch && !filterArea && !filterBranchQuery) branchRows.push({ key: UNKNOWN_BRANCH, label: UNKNOWN_BRANCH });
+
+      if (branchRows.length === 0) {
+        wrap.innerHTML = window.app.emptyState({ icon: 'fa-store-slash', title: 'ไม่พบสาขาตามตัวกรองที่เลือก', subtitle: 'ลองเปลี่ยนตัวกรอง Area หรือ สาขา' });
+        return;
+      }
+
+      let html = '';
+      html += this.buildFlatPivotTable('ยอดจองตามสาขา × รุ่น (จอง T)', modelCapRows, matrixT, branchRows, 'สาขา');
+      html += this.buildFlatPivotTable('ยอดจองตามสาขา × รุ่น (จอง F)', modelCapRows, matrixF, branchRows, 'สาขา');
+      html += this.buildFlatPivotTable('ยอดจองตามสาขา × รุ่น (ผลรวมทั้งหมด)', modelCapRows, matrixAll, branchRows, 'สาขา');
 
       wrap.innerHTML = html;
       wrap.querySelectorAll('.chart-card').forEach(c => window.app.tableExportButtons(c));
@@ -3036,7 +3526,7 @@ window.app = {
       const orderResStatusMap = {};
       this.rawOrders.forEach(o => { if (o['Reservation Status'] && o['Reservation Status'].trim() !== '') { orderResStatusMap[o.OrderID] = o['Reservation Status']; } });
       this.rawOrders.forEach(o => {
-        if (o['Order Status'] === 'Cancelled') return;
+        if (window.app.isOrderCancelled(o)) return;
         if (o.SKU === 'DISCOUNT') return; // แถวส่วนลดไม่ใช่สินค้า — Product Name ของมันคือชื่อโปรโมชั่น
         const name = (o['Product Name'] || '').toString().trim();
         if (!name) return;
@@ -3082,11 +3572,11 @@ window.app = {
           + '<td class="py-3 px-4 text-right text-blue-700">' + sumF.toLocaleString() + '</td>'
           + '</tr>';
 
-        html += '<div class="chart-card !p-0 overflow-hidden mb-6">'
-          + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
+        html += '<div class="chart-card tbleed-outer !p-0 mb-6">'
+          + '<div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">'
           + '<h6 class="!mb-0"><i class="fas fa-boxes-stacked text-indigo-500"></i>' + window.app.esc(cat) + '</h6>'
           + '</div>'
-          + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[400px]">'
+          + '<div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[400px]">'
           + '<table class="w-full text-sm text-left whitespace-nowrap">'
           + '<thead class="sticky top-0 z-10"><tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">'
           + '<th class="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">สินค้า</th>'
@@ -3545,9 +4035,9 @@ window.app = {
       this.openPopover = null;
     },
     renderProducts: function(products) {
-      const row = document.getElementById('productGrid'); 
+      const row = document.getElementById('productGrid');
       if(!row) return;
-      
+
       const searchEl = document.getElementById('searchProduct');
       const resultCountEl = document.getElementById('storeResultCount');
       // ค้นหา/กรอง (6B) แล้วไม่เจอสินค้า — empty state มาตรฐาน (5A.4) พร้อมปุ่มล้างตัวกรอง+คำค้น
@@ -3565,7 +4055,7 @@ window.app = {
         return;
       }
       if(products.length === 0 && searchEl && searchEl.value === '') {
-         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">';
+         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-4">';
          for(let k=0; k<12; k++) { skel += '<div class="bg-white border border-slate-100 p-3 rounded-2xl shadow-sm"><div class="skeleton mb-4" style="height:100px; width:100%;"></div><div class="skeleton mb-3" style="height:12px; width:80%;"></div><div class="skeleton" style="height:14px; width:40%;"></div></div>'; }
          skel += '</div>'; row.innerHTML = skel; return;
       }
@@ -3614,7 +4104,7 @@ window.app = {
       // 6A — POS storefront: สไตล์ scoped ด้วย .pos-storefront เท่านั้น ห้ามรั่วไปหน้าอื่น
       // ถ้าสร้างการ์ดใบใดล้มกลางทาง ห้ามทิ้งกริดว่างเงียบๆ (เคยเจอบน iOS) — โชว์ error state มาตรฐาน + ลองใหม่ (rule 12)
       try {
-        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-6">';
+        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-6">';
         renderedList.forEach(p => { html += this.cardHtml(p, searchTerm); });
         html += '</div>';
         row.innerHTML = html;
@@ -3651,6 +4141,7 @@ window.app = {
       const esc = window.app.esc, escJs = window.app.escAttrJs;
       const stockOf = (v) => parseInt(String(v.Stock || '0').replace(/[^\d.\-]/g, ''), 10) || 0; // Stock จาก getDisplayValues อาจมี comma/format
       const isGift = (p.Category || '').includes('ของแถม');
+      const currentChannelForBadge = (document.getElementById('posChannelSelect') || {}).value || '';
 
       let variant = p, dotsHtml = '', chipsHtml = '';
       if (p.isGroup) {
@@ -3735,6 +4226,10 @@ window.app = {
         bRules.forEach(r => {
           if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
           if ((r['Get Discount Category'] || '').toString().trim() !== myCat) return;
+          const badgeChRaw = (r['Channel'] || '').toString().trim();
+          const badgeChTokens = badgeChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+          const badgeChMatches = badgeChRaw === '' || badgeChRaw === '*' || badgeChRaw.toLowerCase() === 'all' || badgeChTokens.includes(currentChannelForBadge.toString().trim().toLowerCase());
+          if (!badgeChMatches) return;
           const pct = parseFloat(r['Discount Percent']) || 0;
           if (pct > 0 && (!best || pct > best.pct)) best = { pct: pct, buyCat: (r['Buy Category'] || '').toString().trim() };
         });
@@ -3754,14 +4249,14 @@ window.app = {
       card +=      savePctBadge;
       card +=      stockBadge;
       card += '    <div class="h-[130px] p-[10px] flex items-center justify-center bg-white">';
-      card += '       <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://via.placeholder.com/150?text=No+Image\';" alt="' + pName + '" class="max-h-full max-w-full object-contain transition-transform duration-300">';
+      card += '       <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://via.placeholder.com/150?text=No+Image\';" alt="' + esc(pName) + '" class="max-h-full max-w-full object-contain transition-transform duration-300">';
       card += '    </div>';
       card += '    <div class="p-3 pt-1 flex flex-col flex-1 gap-2">';
       card += '      <div class="font-bold text-[#0f172a] text-[12px] md:text-[15px] line-clamp-2 leading-tight" title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
       card +=      bundleBadge;
       if (dotsHtml) card += '<div class="flex items-center gap-1.5 flex-wrap">' + dotsHtml + '</div>';
       if (chipsHtml) card += '<div class="flex items-center gap-1.5 flex-wrap">' + chipsHtml + '</div>';
-      if (p.isGroup) card += '<div class="text-[10px] text-slate-500 line-clamp-1" title="' + pName + '">' + pName + '</div>';
+      if (p.isGroup) card += '<div class="text-[10px] text-slate-500 line-clamp-1" title="' + esc(pName) + '">' + esc(pName) + '</div>';
       card += '      <div class="mt-auto pt-1">';
       card += '        <div class="text-[#0f172a] font-black text-base' + (hasSave ? '' : ' mb-2') + '">฿' + price + '</div>';
       if (hasSave) {
@@ -3929,7 +4424,7 @@ window.app = {
       
       if (thumbContainer) {
           if (this.currentImages.length > 1) {
-              thumbContainer.innerHTML = this.currentImages.map((u, i) => `<img src="${u}" onclick="window.app.pos.setModalImage(${i})" class="w-12 h-12 md:w-16 md:h-16 object-cover rounded-xl border-2 border-slate-200 hover:border-indigo-500 cursor-pointer shadow-sm transition-all">`).join('');
+              thumbContainer.innerHTML = this.currentImages.map((u, i) => `<img src="${window.app.esc(u)}" onclick="window.app.pos.setModalImage(${i})" class="w-12 h-12 md:w-16 md:h-16 object-cover rounded-xl border-2 border-slate-200 hover:border-indigo-500 cursor-pointer shadow-sm transition-all">`).join('');
               thumbContainer.classList.remove('hidden');
               if(btnPrev) btnPrev.classList.remove('hidden');
               if(btnNext) btnNext.classList.remove('hidden');
@@ -3956,8 +4451,12 @@ window.app = {
 
       const mappings = (window.app.globalData.giftMappings || []).filter(m => {
           if(m.Status !== 'เปิด') return false;
+          // Channel เป็น multi-select ฝั่งแอดมิน ค่าที่เซฟมาเป็น comma list ได้ เช่น "Retail, Online"
+          // ต้องแตก token เทียบเหมือนฝั่ง server (processCheckout) ห้ามใช้ .includes() แบบ substring ทั้งสตริง
+          // ไม่งั้น mapping ที่เลือกหลายช่องทางจะโชว์ให้เลือกได้ที่นี่ แต่ server ปฏิเสธตอน checkout (ไม่ตรงกัน)
           const mCh = (m.Channel || '').trim().toLowerCase();
-          const chMatch = (mCh === 'all' || mCh === '' || mCh.includes(currentChannel.toLowerCase()));
+          const mChTokens = mCh.split(',').map(v => v.trim()).filter(Boolean);
+          const chMatch = (mCh === 'all' || mCh === '' || mChTokens.includes(currentChannel.toLowerCase()));
           if(!chMatch) return false;
 
           const target = (m['Target Mobile (SKU or Group)'] || '').trim();
@@ -3966,31 +4465,13 @@ window.app = {
           const groupLower = (prod['Product Group'] || '').trim().toLowerCase();
           
           if (target === '*' || target.toUpperCase() === 'ALL') return true;
-          
-          const targets = target.split(',').map(t => t.trim().toLowerCase());
-          return targets.some(t => {
-              if (t === skuLower) return true; 
-              if (t === productNameLower && productNameLower !== '') return true;
-              if (t === groupLower && groupLower !== '') return true; 
-              if (t.includes('*')) {
-                  const regexStr = '^' + t.replace(/\*/g, '.*') + '$';
-                  try { 
-                      const regex = new RegExp(regexStr);
-                      if (regex.test(skuLower) || regex.test(productNameLower)) return true; 
-                  } catch(e){}
-              }
-              
-              const subTargets = t.split(' / ').map(st => st.trim());
-              if (subTargets.length > 1) {
-                  return subTargets.some(st => {
-                      if (st === skuLower) return true; 
-                      if (st === productNameLower && productNameLower !== '') return true;
-                      if (st === groupLower && groupLower !== '') return true; 
-                      return false;
-                  });
-              }
-              return false;
-          });
+
+          // ต้องตรงกับ targetMatches ฝั่ง server (processCheckout, Code.js) เป๊ะๆ — ห้ามมี pattern ที่ server ไม่รองรับ
+          // (เช่น "*" ผสมในโทเค็นแบบ regex หรือแยกโทเค็นด้วย " / ") เพราะจะทำให้ที่นี่โชว์ของแถมให้เลือกได้
+          // แต่ server ปฏิเสธตอน checkout — server เทียบชื่อสินค้าแบบ substring (mainName.includes(v)) ไม่ใช่ตรงเป๊ะ
+          const targets = target.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+          return targets.includes(skuLower) || (groupLower !== '' && targets.includes(groupLower)) ||
+              targets.some(t => t !== '*' && productNameLower !== '' && productNameLower.includes(t));
       });
 
       if (mappings.length > 0) {
@@ -4003,13 +4484,14 @@ window.app = {
 
       window.app.globalData.products.forEach((p, idx)=>{ 
         if(p.Status==='เปิด'){ 
-          let pNameLower = p['Product Name'].toLowerCase();
+          // ต้องกัน Product Name ว่าง/undefined เหมือนจุดอื่นในฟังก์ชันนี้ (แถวชีตที่แก้ตรงๆ อาจว่างได้) ไม่งั้น .toLowerCase() throw ทำให้เปิด modal "จอง" ไม่ได้เลยทั้งหน้า
+          let pNameLower = (p['Product Name'] || '').toLowerCase();
           
           if(p.Category==='ของแถมแบรนด์' && hasMapping && allowedBrandGifts.some(g => g === '*' || pNameLower.includes(g))) {
-            bGiftsHTML += `<div class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:bg-slate-50 transition-colors"><input class="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-500 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="bgift${idx}" onchange="document.getElementById('bgiftQty${idx}').disabled = !this.checked"><label class="flex-1 text-[9px] md:text-[10px] font-normal text-slate-700 break-words whitespace-normal cursor-pointer select-none" for="bgift${idx}">${window.app.esc(p['Product Name'])} <span class="text-emerald-600 font-bold ml-1">(คงเหลือ ${p.Stock})</span></label><input type="number" id="bgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
+            bGiftsHTML += `<div class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:bg-slate-50 transition-colors"><input class="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-500 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="bgift${idx}" onchange="document.getElementById('bgiftQty${idx}').disabled = !this.checked"><label class="flex-1 text-[9px] md:text-[10px] font-normal text-slate-700 break-words whitespace-normal cursor-pointer select-none" for="bgift${idx}">${window.app.esc(p['Product Name'])} <span class="text-emerald-600 font-bold ml-1">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="bgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
           } 
           else if(p.Category==='ของแถมช่องทาง' && hasMapping && allowedChannelGifts.some(g => g === '*' || pNameLower.includes(g))) {
-            cGiftsHTML += `<div class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:bg-slate-50 transition-colors"><input class="w-3.5 h-3.5 md:w-4 md:h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${idx}" onchange="document.getElementById('cgiftQty${idx}').disabled = !this.checked"><label class="flex-1 text-[9px] md:text-[10px] font-normal text-slate-700 break-words whitespace-normal cursor-pointer select-none" for="cgift${idx}">${window.app.esc(p['Product Name'])} <span class="text-indigo-600 font-bold ml-1">(คงเหลือ ${p.Stock})</span></label><input type="number" id="cgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
+            cGiftsHTML += `<div class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:bg-slate-50 transition-colors"><input class="w-3.5 h-3.5 md:w-4 md:h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${idx}" onchange="document.getElementById('cgiftQty${idx}').disabled = !this.checked"><label class="flex-1 text-[9px] md:text-[10px] font-normal text-slate-700 break-words whitespace-normal cursor-pointer select-none" for="cgift${idx}">${window.app.esc(p['Product Name'])} <span class="text-indigo-600 font-bold ml-1">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="cgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
           }
         } 
       });
@@ -4076,8 +4558,12 @@ window.app = {
       }
       
       const ex = this.cartData.find(i=>i.SKU==sku && JSON.stringify(i.brandGifts)===JSON.stringify(bGifts) && JSON.stringify(i.channelGifts)===JSON.stringify(cGifts));
-      if(ex){ if(ex.qty+qty>this.stockOf(p)) return Swal.fire('สต๊อกไม่พอ','','warning'); ex.qty+=qty; }
-      else { if(qty>this.stockOf(p)) return Swal.fire('สต๊อกไม่พอ','','warning'); this.cartData.push({...p, qty:qty, brandGifts:bGifts, channelGifts:cGifts}); }
+      // เช็ค stock รวมทุกบรรทัดของ SKU นี้ในตะกร้า ไม่ใช่แค่บรรทัดที่กำลังจะเพิ่ม/รวม — เดิมถ้าหยิบ SKU เดียวกันแต่เลือกของแถมต่างกัน
+      // จะแยกเป็นคนละบรรทัด แล้วแต่ละบรรทัดเช็ค stock อิสระจากกัน ทำให้จองรวมเกิน stock จริงได้ (ไปเจอ error ตอน checkout แทนที่จะเตือนตอนนี้)
+      const totalSkuQtyInCart = this.cartData.filter(i=>i.SKU==sku).reduce((s,i)=>s+i.qty,0);
+      if (totalSkuQtyInCart + qty > this.stockOf(p)) return Swal.fire('สต๊อกไม่พอ','','warning');
+      if(ex){ ex.qty+=qty; }
+      else { this.cartData.push({...p, qty:qty, brandGifts:bGifts, channelGifts:cGifts}); }
       
       window.app.hideModal('addToCartModal'); 
       this.saveAndRender();
@@ -4091,7 +4577,10 @@ window.app = {
           if (otherMobile + itm.qty + c > 1) { return Swal.fire('จำกัดจำนวน', 'สินค้าประเภท โมบาย จำกัดสิทธิ์จองได้ออเดอร์ละ 1 เครื่อง', 'warning'); }
       }
       itm.qty+=c;
-      if(itm.qty>this.stockOf(p)){ itm.qty=this.stockOf(p); Swal.fire('คลังจำกัด','จำนวนสิทธิ์เกินสต๊อกสินค้าหลัก','warning'); }
+      // เช็ค stock รวมทุกบรรทัดของ SKU นี้ในตะกร้า (ไม่นับบรรทัดตัวเอง) — กัน SKU เดียวกันแยกบรรทัดตามของแถมแล้วรวมกันเกิน stock
+      const otherSkuQty = this.cartData.filter((i, i_idx) => i.SKU === itm.SKU && i_idx !== idx).reduce((sum, i) => sum + i.qty, 0);
+      const maxAllowed = Math.max(0, this.stockOf(p) - otherSkuQty);
+      if(itm.qty>maxAllowed){ itm.qty=maxAllowed; Swal.fire('คลังจำกัด','จำนวนสิทธิ์เกินสต๊อกสินค้าหลัก','warning'); }
       if(itm.qty<=0) this.cartData.splice(idx,1);
       this.saveAndRender();
       this.checkAutoPromotions();
@@ -4122,8 +4611,16 @@ window.app = {
             }];
         }
         
-        let activeRules = rules.filter(r => (r.Status || '').toString().trim().toLowerCase() === 'active');
-        
+        // เงื่อนไข Channel ร่วมรายการ (เว้นว่าง/'*'/'all' = ทุกช่องทาง) — tokenize เทียบทีละช่องทาง ตามรูปแบบเดียวกับ GiftMappings.Channel (rule 20)
+        const chSelEl = document.getElementById('posChannelSelect');
+        const currentChannel = (chSelEl ? chSelEl.value : '').toString().trim().toLowerCase();
+        let activeRules = rules.filter(r => {
+            if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return false;
+            const ruleChRaw = (r['Channel'] || '').toString().trim();
+            const ruleChTokens = ruleChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+            return ruleChRaw === '' || ruleChRaw === '*' || ruleChRaw.toLowerCase() === 'all' || ruleChTokens.includes(currentChannel);
+        });
+
         let totalAutoDiscount = 0;
         let appliedRules = [];
         let suggestRules = [];
@@ -4478,16 +4975,53 @@ window.app = {
         if (table === 'Orders') { exBtn.classList.remove('hidden'); exBtn.classList.add('flex'); }
         else { exBtn.classList.add('hidden'); exBtn.classList.remove('flex'); }
       }
-      
-      let h = '<tr>'; 
-      this.columns.forEach(c => { 
-        if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-left text-[11px] font-bold text-indigo-900 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-indigo-100 transition-colors">${c.label} <i class="fas fa-sort text-indigo-300 ml-1"></i></th>`; 
-      }); 
+      // ตัวกรอง ประเภทการจอง/สถานะออเดอร์/Category — เฉพาะหน้า Orders
+      const filterBar = document.getElementById('gridFilterBar');
+      if (filterBar) {
+        if (table === 'Orders') { filterBar.classList.remove('hidden'); filterBar.classList.add('flex'); this.setupOrdersFilters(); }
+        else { filterBar.classList.add('hidden'); filterBar.classList.remove('flex'); }
+      }
+
+      let h = '<tr>';
+      this.columns.forEach(c => {
+        if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-left text-[11px] font-bold text-indigo-900 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-indigo-100 transition-colors ${c.resp || ''}">${c.label} <i class="fas fa-sort text-indigo-300 ml-1"></i></th>`;
+      });
       if(!readonly) h += `<th class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-right text-[11px] font-bold text-indigo-900 uppercase tracking-wider whitespace-nowrap">จัดการ</th>`;
       h += '</tr>'; 
       const head = document.getElementById('dataGridHead');
       if(head) head.innerHTML = h; 
       this.loadData();
+    },
+    // ตัวกรองหน้า Orders — ประเภทการจอง (Reservation Status), สถานะออเดอร์ (Order Status), Category (จาก SKU ผ่านชีต Products)
+    setupOrdersFilters: function() {
+      // ตัวเลือกต้องตรงกับค่าที่เก็บจริงในชีต (เหมือน options ของฟอร์มแก้ไข 'Reservation Status' ด้านบน)
+      const resEl = document.getElementById('gridFilterResStatus');
+      if (resEl) {
+        resEl.innerHTML = '<option value="">ประเภทการจอง: ทั้งหมด</option>'
+          + '<option value="จอง T (มีการจอง)">จอง T (มีการจอง)</option>'
+          + '<option value="จอง F (สวมสิทธิ์การจอง)">จอง F (สวมสิทธิ์การจอง)</option>';
+      }
+      // สถานะออเดอร์ — flow เดียวกับที่ orderTimelineHtml/ฟอร์มแก้ไขใช้ (ชีต OrderStatus ถ้ามี ≥2 แถว ไม่งั้น fallback)
+      const stEl = document.getElementById('gridFilterOrderStatus');
+      if (stEl) {
+        const options = window.app.getOrderStatusFlow().concat(['Cancelled']);
+        stEl.innerHTML = '<option value="">สถานะออเดอร์: ทั้งหมด</option>'
+          + options.map(o => '<option value="' + window.app.esc(o) + '">' + window.app.esc(o) + '</option>').join('');
+      }
+      // Category — จากชีต Products ผูกกับ SKU ของแต่ละแถว Order (แถว DISCOUNT ไม่มี SKU สินค้าจริง จึงไม่เข้าเงื่อนไขนี้)
+      const products = window.app.globalData.products || [];
+      this.skuCategoryMap = {};
+      const seenCat = {}; const cats = [];
+      products.forEach(p => {
+        if (p.SKU) this.skuCategoryMap[p.SKU] = (p['Category'] || '').toString().trim();
+        const c = (p['Category'] || '').toString().trim();
+        if (c && !seenCat[c]) { seenCat[c] = true; cats.push(c); }
+      });
+      const catEl = document.getElementById('gridFilterCategory');
+      if (catEl) {
+        catEl.innerHTML = '<option value="">Category: ทั้งหมด</option>'
+          + cats.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      }
     },
     loadData: async function() {
       window.app.showLoading(); 
@@ -4496,9 +5030,9 @@ window.app = {
         Swal.close();
         if(res && res.status === 'success') {
           this.dataList = res.data;
-          this.filteredDataList = this.dataList;
-          this.currentPage = 1;
-          this.renderPage(1);
+          // เดิมตั้ง filteredDataList = dataList ตรงๆ ไม่ผ่าน filter() — เรียก loadData() ซ้ำหลัง save/delete สำเร็จ (ยังอยู่หน้าเดิม)
+          // จะล้างคำค้น/ตัวกรอง Orders (gridFilterResStatus ฯลฯ) ที่ผู้ใช้ตั้งไว้เงียบๆ ทั้งที่ UI ยังโชว์ค่าที่เลือกอยู่
+          this.filter();
         }
         else { this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลได้'); }
       } catch(e) { Swal.close(); this.renderLoadError(e.message); }
@@ -4546,12 +5080,26 @@ window.app = {
       if (data.length === 0) {
         const searchEl = document.getElementById('gridSearch');
         const hasSearch = !!(searchEl && searchEl.value.trim() !== '');
+        let hasFilter = hasSearch;
+        let clearAction = "document.getElementById('gridSearch').value='';window.app.grid.filter()";
+        if (this.tableName === 'Orders') {
+          const resEl = document.getElementById('gridFilterResStatus');
+          const stEl = document.getElementById('gridFilterOrderStatus');
+          const catEl = document.getElementById('gridFilterCategory');
+          const hasSelectFilter = !!((resEl && resEl.value) || (stEl && stEl.value) || (catEl && catEl.value));
+          hasFilter = hasSearch || hasSelectFilter;
+          clearAction = "document.getElementById('gridSearch').value='';"
+            + "var r=document.getElementById('gridFilterResStatus'); if(r) r.value='';"
+            + "var s=document.getElementById('gridFilterOrderStatus'); if(s) s.value='';"
+            + "var c=document.getElementById('gridFilterCategory'); if(c) c.value='';"
+            + "window.app.grid.filter()";
+        }
         tbody.innerHTML = '<tr><td colspan="' + this.visibleColCount() + '">' + window.app.emptyState({
-          icon: hasSearch ? 'fa-search' : 'fa-inbox',
-          title: hasSearch ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีข้อมูลในตารางนี้',
-          subtitle: hasSearch ? 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อแสดงข้อมูลทั้งหมด' : 'เมื่อมีการบันทึกข้อมูลใหม่ รายการจะแสดงที่นี่',
-          actionLabel: hasSearch ? 'ล้างตัวกรอง' : '',
-          onclick: hasSearch ? "document.getElementById('gridSearch').value='';window.app.grid.filter()" : ''
+          icon: hasFilter ? 'fa-search' : 'fa-inbox',
+          title: hasFilter ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีข้อมูลในตารางนี้',
+          subtitle: hasFilter ? 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อแสดงข้อมูลทั้งหมด' : 'เมื่อมีการบันทึกข้อมูลใหม่ รายการจะแสดงที่นี่',
+          actionLabel: hasFilter ? 'ล้างตัวกรอง' : '',
+          onclick: hasFilter ? clearAction : ''
         }) + '</td></tr>';
         return;
       }
@@ -4581,7 +5129,7 @@ window.app = {
             if(row.SKU === 'DISCOUNT') val = '<i class="fas fa-tag text-rose-500 mr-1.5" title="ส่วนลด" aria-label="ส่วนลด"></i>' + val;
             else if(num('Unit Price') === 0 && num('Row Total') === 0) val = '<i class="fas fa-gift text-emerald-500 mr-1.5" title="ของแถม" aria-label="ของแถม"></i>' + val;
           }
-          tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-[11px] text-slate-700 whitespace-nowrap">${val}</td>`;
+          tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-[11px] text-slate-700 whitespace-nowrap ${c.resp || ''}">${val}</td>`;
         });
         if(!this.isReadonly) {
             let act = `<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm" onclick="window.app.grid.editForm(${absIndex})" title="แก้ไข" aria-label="แก้ไขรายการ"><i class="fas fa-edit"></i></button>`;
@@ -4600,15 +5148,36 @@ window.app = {
       });
       tbody.innerHTML = tbodyHtml;
     },
-    filter: function() { 
+    filter: function() {
       const input = document.getElementById('gridSearch'); if(!input) return;
-      const term = input.value.toLowerCase(); 
-      this.filteredDataList = this.dataList.filter(row => JSON.stringify(Object.values(row)).toLowerCase().includes(term));
-      this.renderPage(1); 
+      const term = input.value.toLowerCase();
+      let list = this.dataList.filter(row => JSON.stringify(Object.values(row)).toLowerCase().includes(term));
+      if (this.tableName === 'Orders') {
+        const resEl = document.getElementById('gridFilterResStatus');
+        const stEl = document.getElementById('gridFilterOrderStatus');
+        const catEl = document.getElementById('gridFilterCategory');
+        const resVal = resEl ? resEl.value : '';
+        const stVal = stEl ? stEl.value : '';
+        const catVal = catEl ? catEl.value : '';
+        if (resVal) {
+          // Reservation Status ถูกเขียนแค่แถวแรกของแต่ละ OrderID เท่านั้น (processCheckout, Code.js) — แถวของแถม/ส่วนลดอื่นในบิลเดียวกันเป็นค่าว่าง
+          // ต้อง join กลับด้วย OrderID เหมือน bookingSummary/branchBookingSummary/allBookingSummary ไม่งั้นกรองแล้วเหลือแค่แถวแรกของบิล ซ่อนแถวที่เหลือไปทั้งตารางและ CSV export
+          const orderResStatusMap = {};
+          this.dataList.forEach(o => { if (o['Reservation Status'] && o['Reservation Status'].toString().trim() !== '') orderResStatusMap[o.OrderID] = o['Reservation Status']; });
+          list = list.filter(row => (row['Reservation Status'] || orderResStatusMap[row.OrderID] || '').toString().trim() === resVal);
+        }
+        if (stVal) list = list.filter(row => (row['Order Status'] || '').toString().trim() === stVal);
+        if (catVal) list = list.filter(row => (this.skuCategoryMap || {})[row.SKU] === catVal);
+      }
+      this.filteredDataList = list;
+      // เดิม filter() ไม่ apply sortCol/sortAsc ที่ผู้ใช้ตั้งไว้ต่อ — เรียง แล้วพิมพ์ค้นหา/เปลี่ยนตัวกรอง ทำให้ลำดับ sort หายเงียบๆ
+      this.applyCurrentSort();
+      this.renderPage(1);
     },
-    sortColumn: function(colKey) {
-      if(this.sortCol === colKey) this.sortAsc = !this.sortAsc;
-      else { this.sortCol = colKey; this.sortAsc = true; }
+    // แยกออกจาก sortColumn เพื่อให้ filter()/loadData() เรียก apply sort เดิมซ้ำได้ ไม่ต้องคัดลอก comparator
+    applyCurrentSort: function() {
+      if (!this.sortCol) return;
+      const colKey = this.sortCol;
       this.filteredDataList.sort((a,b) => {
         let valA = a[colKey] !== undefined && a[colKey] !== null ? a[colKey] : '';
         let valB = b[colKey] !== undefined && b[colKey] !== null ? b[colKey] : '';
@@ -4618,6 +5187,11 @@ window.app = {
         if (valA > valB) return this.sortAsc ? 1 : -1;
         return 0;
       });
+    },
+    sortColumn: function(colKey) {
+      if(this.sortCol === colKey) this.sortAsc = !this.sortAsc;
+      else { this.sortCol = colKey; this.sortAsc = true; }
+      this.applyCurrentSort();
       this.renderPage(1);
     },
     // 5A.3 — Order status timeline (read-only visual) แสดงหัว modal แก้ไข/ดูออเดอร์
@@ -4641,9 +5215,7 @@ window.app = {
           + '</div></div>';
       }
 
-      let flow = stList.length >= 2
-        ? stList.map(s => s['Status Name'].toString().trim()).filter(n => n.toLowerCase() !== 'cancelled')
-        : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
+      let flow = window.app.getOrderStatusFlow();
       // สถานะปัจจุบันไม่อยู่ใน flow (เช่นระบบเก่าใช้ Completed) — ต่อท้ายเป็น step สุดท้ายให้ timeline ยังสะท้อนความจริง
       let curIdx = flow.indexOf(current);
       if (curIdx === -1) { flow = flow.concat([current]); curIdx = flow.length - 1; }
@@ -4769,12 +5341,12 @@ window.app = {
             });
             inp += `</div>`;
         }
-        else if(c.type==='select') { inp='<select class="'+inputClass+'" id="field_' + c.key + '" ' + dis + '>' + c.options.map(opt=>'<option value="' + opt + '" ' + (val===opt?'selected':'') + '>' + opt + '</option>').join('') + '</select>'; }
+        else if(c.type==='select') { inp='<select class="'+inputClass+'" id="field_' + c.key + '" ' + dis + '>' + c.options.map(opt=>'<option value="' + window.app.esc(opt) + '" ' + (val===opt?'selected':'') + '>' + window.app.esc(opt) + '</option>').join('') + '</select>'; }
         else if(c.type==='product_select') {
           if (data && data.SKU === 'DISCOUNT') {
             inp = '<input type="text" class="' + inputClass + ' bg-slate-100" id="field_' + c.key + '" value="' + escVal + '" readonly>';
           } else {
-            inp='<select class="'+inputClass+'" id="field_' + c.key + '" onchange="window.app.grid.onProductChange(this)">'; 
+            inp='<select class="'+inputClass+'" id="field_' + c.key + '" onchange="window.app.grid.onProductChange(this)" ' + dis + '>';
             window.app.globalData.products.forEach(p=>{ 
               if(p.Status==='เปิด'||val===p['Product Name']) inp+='<option value="' + window.app.esc(p['Product Name']) + '" data-sku="' + window.app.esc(p.SKU) + '" data-price="' + parseFloat((p.Price||0).toString().replace(/,/g,'')) + '" ' + (val===p['Product Name']?'selected':'') + '>' + window.app.esc(p['Product Name']) + ' (SKU: ' + window.app.esc(p.SKU) + ')</option>';
             }); 
@@ -4928,7 +5500,16 @@ window.app = {
            let res;
            if(this.tableName==='Orders') res = await window.app.api('UPDATE_FULL_ORDER', { data: pay });
            else res = await window.app.api('SAVE_RECORD', { tableName: this.tableName, idField: this.idField, data: pay });
-           if(res && res.status==='success'){ await window.app.refreshGlobalData(); Swal.fire({ icon: 'success', title: 'อัปเดตข้อมูลเสร็จสิ้น', showConfirmButton: false, timer: 1500 }); this.loadData(); } else Swal.fire('ผิดพลาด',res ? res.message : 'Error', 'error');
+           if(res && res.status==='success'){
+             await window.app.refreshGlobalData();
+             if (res.generatedPassword) {
+               // สมาชิกใหม่เว้นรหัสผ่านว่าง — server สุ่มรหัสผ่านให้ ต้องโชว์ครั้งเดียวตอนนี้เพราะจะไม่ถูกส่งกลับมาอีก (rule 5)
+               Swal.fire({ icon: 'success', title: 'สร้างสมาชิกสำเร็จ', html: 'รหัสผ่านที่สุ่มให้: <b>' + window.app.esc(res.generatedPassword) + '</b><br><span class="text-xs text-slate-500">กรุณาบันทึกไว้และแจ้งพนักงาน — จะไม่แสดงซ้ำอีก</span>' });
+             } else {
+               Swal.fire({ icon: 'success', title: 'อัปเดตข้อมูลเสร็จสิ้น', showConfirmButton: false, timer: 1500 });
+             }
+             this.loadData();
+           } else Swal.fire('ผิดพลาด',res ? res.message : 'Error', 'error');
          } catch(e) { Swal.fire('ผิดพลาด', e.message || 'Error', 'error'); }
          finally { restoreBtn(); }
       }, 350);
@@ -5026,7 +5607,7 @@ window.app = {
     init: async function(type, containerId) {
       this.currentType = type;
       if (containerId) this.containerId = containerId;
-      // เข้า/รีเฟรช tab ใหม่ทุกครั้ง — ล้างไฟล์รูปที่เลือกค้างจากการดูครั้งก่อน (banner-*, loginBg, swalBanner) กัน URL เก่าเผลอทับของใหม่ตอนบันทึก
+      // เข้า/รีเฟรช tab ใหม่ทุกครั้ง — ล้างไฟล์รูปที่เลือกค้างจากการดูครั้งก่อน (banner-*, loginBg, newBanner) กัน URL เก่าเผลอทับของใหม่ตอนบันทึก
       Object.keys(window.app.pendingImageUploads).forEach(k => { if (k !== 'gridImage') delete window.app.pendingImageUploads[k]; });
       const content = document.getElementById(this.containerId);
       if(!content) return;
@@ -5174,8 +5755,8 @@ window.app = {
           </div>
         `;
       } else if (this.currentType === 'bookingsettings') {
-        const start = (this.data.keyValueSettings && this.data.keyValueSettings.ReserveStart) || '';
-        const end = (this.data.keyValueSettings && this.data.keyValueSettings.ReserveEnd) || '';
+        const start = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.ReserveStart) || '');
+        const end = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.ReserveEnd) || '');
         
         html = `
           <div class="max-w-2xl mx-auto bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden animate-fade-in-up">
@@ -5278,6 +5859,30 @@ window.app = {
           typeKey = 'popupbanner';
         }
         
+        // ฟอร์มเพิ่มใหม่: การ์ดแบบเดียวกับฟอร์มแก้ไข (inline, hidden ไว้ก่อน) แทน SweetAlert modal เดิม
+        // — สลับ visibility ด้วย classList.toggle ล้วนๆ เหมือนปุ่ม "แก้ไข" ของแต่ละการ์ด ไม่พึ่ง Swal.fire({html:...})
+        const addFormHtml = `
+          <div id="bannerAddForm" class="hidden col-span-full bg-white border-2 border-indigo-200 rounded-2xl shadow-sm p-4 space-y-2">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase">ลิงก์ภาพ (Image URL) *</label>
+            <div class="flex gap-2">
+              <input type="text" id="newBannerUrl" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="https://...">
+              <button type="button" id="newBannerUpBtn" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('newBannerFile').click()"><i class="fas fa-upload"></i></button>
+              <input type="file" id="newBannerFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'newBanner', function(localUrl){ const pv=document.getElementById('newBannerPreview'); if(pv){ pv.src=localUrl; pv.classList.remove('hidden'); } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
+            </div>
+            <img id="newBannerPreview" class="hidden h-16 w-16 object-cover rounded-lg border border-slate-200 shadow-sm">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mt-2">ลิงก์ปลายทาง (Target Link)</label>
+            <input type="text" id="newTargetLink" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="URL ให้คลิก (ปล่อยว่างได้)">
+            ${typeKey === 'promogrid' ? `
+            <label class="block text-[10px] font-bold text-slate-400 uppercase mt-2">รายละเอียด (Details)</label>
+            <textarea id="newBannerDetails" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none" rows="2" placeholder="รายละเอียดแคมเปญ"></textarea>
+            ` : ''}
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" onclick="window.app.settingsManager.cancelAddItem()" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition-colors">ยกเลิก</button>
+              <button type="button" onclick="window.app.settingsManager.addItem('${typeKey}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors flex items-center" title="เพิ่มแบนเนอร์ใหม่"><i class="fas fa-save mr-1"></i> บันทึก</button>
+            </div>
+          </div>
+        `;
+
         let cardsHtml = '';
         if (list.length === 0) {
           cardsHtml = `
@@ -5331,12 +5936,13 @@ window.app = {
                 <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-images text-indigo-500 mr-2"></i> ${title}</h3>
                 <p class="text-xs text-slate-500 mt-1">${desc}</p>
               </div>
-              <button onclick="window.app.settingsManager.openAddModal('${typeKey}')" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center w-full sm:w-auto justify-center">
+              <button onclick="const f=document.getElementById('bannerAddForm'); if(f){ f.classList.remove('hidden'); f.scrollIntoView({behavior:'smooth', block:'center'}); }" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center w-full sm:w-auto justify-center">
                 <i class="fas fa-plus mr-2"></i> เพิ่มแบนเนอร์ใหม่
               </button>
             </div>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              ${addFormHtml}
               ${cardsHtml}
             </div>
           </div>
@@ -5409,77 +6015,44 @@ window.app = {
       }
     },
     
-    openAddModal: function(type) {
-      const isGrid = type === 'promogrid';
-      delete window.app.pendingImageUploads.swalBanner;
-      Swal.fire({
-        title: 'เพิ่มลิงก์แบนเนอร์ใหม่',
-        html: `
-          <div class="space-y-4 text-left px-2">
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">ลิงก์ภาพ (Image URL) *</label>
-              <div class="flex gap-2">
-                <input type="text" id="swal-url" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="https://...">
-                <button type="button" id="swal-upload-btn" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('swal-file').click()"><i class="fas fa-upload"></i></button>
-                <input type="file" id="swal-file" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'swalBanner', function(localUrl){ const pv=document.getElementById('swal-preview'); if(pv){ pv.src=localUrl; pv.classList.remove('hidden'); } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
-              </div>
-              <img id="swal-preview" class="hidden mt-2 h-16 w-16 object-cover rounded-lg border border-slate-200 shadow-sm">
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">ลิงก์ปลายทาง (Target Link)</label>
-              <input type="text" id="swal-link" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="ลิงก์สำหรับคลิก (ปล่อยว่างได้)">
-            </div>
-            ${isGrid ? `
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-1">รายละเอียด (Details)</label>
-              <textarea id="swal-details" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" rows="2" placeholder="รายละเอียดแคมเปญ"></textarea>
-            </div>
-            ` : ''}
-          </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'บันทึก',
-        cancelButtonText: 'ยกเลิก',
-        confirmButtonColor: '#254d71',
-        preConfirm: async () => {
-          let url = document.getElementById('swal-url').value.trim();
-          const link = document.getElementById('swal-link').value.trim();
-          const detailsEl = document.getElementById('swal-details');
-          const details = detailsEl ? detailsEl.value.trim() : '';
-          const hasPendingImage = !!window.app.pendingImageUploads.swalBanner;
-          if (!url && !hasPendingImage) {
-            Swal.showValidationMessage('กรุณากรอกลิงก์รูปภาพ!');
-            return false;
-          }
-          if (hasPendingImage) {
-            try {
-              url = await window.app.flushImageUpload('swalBanner');
-            } catch (e) {
-              Swal.showValidationMessage(e.message || 'อัปโหลดรูปไม่สำเร็จ');
-              return false;
-            }
-          }
-          return { url: url, targetLink: link, details: details };
-        }
-      }).then(async (result) => {
-        if (result.isConfirmed) {
-          window.app.showLoading('กำลังบันทึกข้อมูล...');
-          try {
-            const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, url: result.value.url, targetLink: result.value.targetLink, details: result.value.details });
-            if(res && res.status==='success') {
-              await window.app.refreshGlobalData();
-              Swal.fire({ icon: 'success', title: 'เพิ่มรูปภาพสำเร็จ', showConfirmButton: false, timer: 1200 });
-              this.init(this.currentType);
-            } else {
-              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
-            }
-          } catch(e) {
-            Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
-          }
-        }
-      });
+    // ยกเลิกฟอร์มเพิ่มใหม่: ซ่อนการ์ด + เคลียร์ค่าที่กรอกไว้กันเผลอเห็นข้อมูลเก่าตอนเปิดใหม่ในเรนเดอร์เดียวกัน
+    cancelAddItem: function() {
+      const f = document.getElementById('bannerAddForm');
+      if (f) f.classList.add('hidden');
+      delete window.app.pendingImageUploads.newBanner;
+      const urlEl = document.getElementById('newBannerUrl'); if (urlEl) urlEl.value = '';
+      const linkEl = document.getElementById('newTargetLink'); if (linkEl) linkEl.value = '';
+      const detailsEl = document.getElementById('newBannerDetails'); if (detailsEl) detailsEl.value = '';
+      const pv = document.getElementById('newBannerPreview'); if (pv) pv.classList.add('hidden');
     },
-    
+
+    addItem: async function(type) {
+      let url = document.getElementById('newBannerUrl').value.trim();
+      const targetLink = document.getElementById('newTargetLink').value.trim();
+      const detailsEl = document.getElementById('newBannerDetails');
+      const details = detailsEl ? detailsEl.value.trim() : '';
+      const hasPendingImage = !!window.app.pendingImageUploads.newBanner;
+      if (!url && !hasPendingImage) return Swal.fire('แจ้งเตือน', 'กรุณากรอกลิงก์รูปภาพ', 'warning');
+
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        if (hasPendingImage) url = await window.app.flushImageUpload('newBanner');
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, url: url, targetLink: targetLink, details: details });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'เพิ่มรูปภาพสำเร็จ', showConfirmButton: false, timer: 1200 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+
     deleteItem: async function(type, rowIndex, bannerId) {
       const confirm = await Swal.fire({
         title: 'ยืนยันการลบรูปภาพ?',
@@ -5658,5 +6231,3 @@ document.addEventListener('click', function(e) {
 document.addEventListener('DOMContentLoaded', () => { if (!window.app.initialized) { window.app.initialized = true; window.app.init(); } });
 window.onload = () => { if (!window.app.initialized) { window.app.initialized = true; window.app.init(); } };
 </script>
-
-

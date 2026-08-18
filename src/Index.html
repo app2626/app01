@@ -1,8 +1,18 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <base target="_top">
   <meta charset="UTF-8">
+  <script>
+    // Dark mode: ตั้ง class ให้ <html> ก่อน paint แรกสุด กัน flash สีตอนโหลดหน้า (อ่านค่าที่ผู้ใช้เลือกไว้ก่อน, ถ้าไม่เคยเลือกค่อย fallback ไปตาม prefers-color-scheme ของเครื่อง)
+    (function() {
+      try {
+        var t = localStorage.getItem('tg_theme');
+        if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        if (t === 'dark') document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+  </script>
+  <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title><?= appName ?> — Enterprise Portal</title>
   <meta name="description" content="ระบบจองสินค้าล่วงหน้าสำหรับองค์กร - Enterprise Pre-Order Management">
@@ -49,6 +59,10 @@
     <div class="relative flex items-center justify-center min-h-screen bg-slate-900 px-4 overflow-hidden">
       <div id="loginBg" class="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000 opacity-30 pointer-events-none"></div>
       <div class="absolute inset-0 bg-slate-900/70 z-0 pointer-events-none"></div>
+
+      <button onclick="window.app.toggleTheme()" aria-label="สลับโหมดมืด/สว่าง" title="สลับโหมดมืด/สว่าง" class="absolute top-5 right-5 z-20 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white flex items-center justify-center transition-all">
+        <i class="fas fa-moon theme-toggle-icon"></i>
+      </button>
 
       <!-- Animated gradient orbs — โทนพรีเมี่ยม (2026-07-10): navy + slate เรียบ + bronze แตะเบาๆ (ใช้ arbitrary hex [#..] แทนการตั้งชื่อสีใหม่ใน Tailwind config — ชื่อสีใหม่ "bronze" ไม่ยอม render ใน Tailwind CDN runtime ของโปรเจกต์นี้ ไม่ทราบสาเหตุแน่ชัด แต่ arbitrary value ใช้ได้ปกติ) แทนสีสดเดิม (indigo/cyan/purple) -->
       <div class="absolute top-1/4 -left-32 w-64 h-64 bg-indigo-500 rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob pointer-events-none"></div>
@@ -113,7 +127,7 @@
               <span class="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] leading-tight truncate">Enterprise</span>
             </div>
           </div>
-          <button onclick="window.app.toggleSidebar()" class="text-slate-400 hover:text-indigo-600 focus:outline-none p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="ซ่อนแถบเมนู">
+          <button onclick="window.app.toggleSidebar()" class="sidebar-toggle-btn" aria-label="ซ่อนแถบเมนู" title="ซ่อนแถบเมนู">
             <i class="fas fa-chevron-left" id="sidebarToggleIcon"></i>
           </button>
         </div>
@@ -137,6 +151,9 @@
               <span><i class="far fa-clock mr-1"></i> <span id="clock"></span></span>
            </div>
            
+           <button onclick="window.app.toggleTheme()" class="w-full py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 font-bold text-xs shadow-sm mb-2">
+              <i class="fas fa-moon theme-toggle-icon"></i> <span class="theme-toggle-label">โหมดมืด</span>
+           </button>
            <button onclick="window.app.openChangePassword()" class="w-full py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 font-bold text-xs shadow-sm mb-2">
               <i class="fas fa-key"></i> เปลี่ยนรหัสผ่าน
            </button>
@@ -150,9 +167,9 @@
       <div class="flex-1 flex flex-col min-h-screen overflow-x-hidden relative w-full lg:w-[calc(100%-260px)] transition-all duration-300" id="mainContentWrapper">
         
         <!-- Desktop Toggle Button (only when sidebar hidden) -->
-        <div class="hidden lg:flex items-center px-6 py-4 absolute top-0 left-0 z-40">
-           <button onclick="window.app.toggleSidebar()" class="text-slate-500 hover:text-indigo-600 focus:outline-none p-2 rounded-lg hover:bg-white/80 transition-colors bg-white/50 backdrop-blur-sm border border-slate-200 shadow-sm" id="desktopShowSidebarBtn" style="display:none;" title="แสดงแถบเมนู">
-             <i class="fas fa-bars text-xl"></i>
+        <div class="hidden lg:flex items-center absolute top-6 left-0 z-40">
+           <button onclick="window.app.toggleSidebar()" class="sidebar-show-handle" id="desktopShowSidebarBtn" style="display:none;" aria-label="แสดงแถบเมนู" title="แสดงแถบเมนู">
+             <i class="fas fa-bars"></i>
            </button>
         </div>
 
@@ -169,7 +186,7 @@
                 </div>
               </div>
               <div class="flex items-center">
-                <button onclick="window.app.toggleMobileMenu()" class="text-slate-500 hover:text-indigo-600 focus:outline-none p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                <button onclick="window.app.toggleMobileMenu()" aria-label="เปิด/ปิดเมนู" class="text-slate-500 hover:text-indigo-600 focus:outline-none p-2 rounded-lg hover:bg-slate-100 transition-colors">
                   <i class="fas fa-bars text-xl"></i>
                 </button>
               </div>
@@ -185,6 +202,9 @@
                  <div class="text-[0.65rem] uppercase tracking-wider text-indigo-600 font-bold" id="mobileRole">Role</div>
                </div>
                <div class="flex items-center gap-2">
+                 <button onclick="window.app.toggleTheme()" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors shadow-sm" aria-label="สลับโหมดมืด/สว่าง" title="สลับโหมดมืด/สว่าง">
+                     <i class="fas fa-moon theme-toggle-icon"></i>
+                 </button>
                  <button onclick="window.app.openChangePassword()" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold transition-colors shadow-sm" aria-label="เปลี่ยนรหัสผ่าน" title="เปลี่ยนรหัสผ่าน">
                      <i class="fas fa-key"></i>
                  </button>
@@ -196,7 +216,7 @@
           </div>
         </nav>
         
-        <main class="flex-1 w-full max-w-[1600px] p-4 md:p-6 lg:p-8" id="page-content"></main>
+        <main class="flex-1 w-full p-4 md:p-6 lg:p-8" id="page-content"></main>
       
         <footer class="mt-auto w-full relative z-0 border-t border-slate-100 bg-white/30 backdrop-blur-sm">
            <div class="w-full py-4 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-3">
@@ -313,19 +333,19 @@
              <div class="relative w-full h-[300px]"><canvas id="chartSalesTrend"></canvas></div>
            </div>
            <div class="chart-card">
-             <h6><i class="fas fa-chart-bar text-indigo-500"></i>เปรียบเทียบยอดจองรายสัปดาห์ (Week vs Week)</h6>
-             <div class="relative w-full h-[300px]"><canvas id="chartWeeklyTrend"></canvas></div>
+             <h6><i class="fas fa-object-ungroup text-indigo-500"></i>กลุ่มรุ่นสินค้า (ตัดข้อมูลก่อนความจุ) - โมบาย</h6>
+             <div class="relative w-full h-[300px]"><canvas id="chartModelGroupStripped"></canvas></div>
            </div>
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6 mb-8">
-           <div class="lg:col-span-2 chart-card admin-filter">
-               <h6><i class="fas fa-store text-indigo-500"></i>10 อันดับสาขาที่มียอดจองดีที่สุด (จำนวนเครื่อง)</h6>
-               <div class="relative w-full h-[300px]"><canvas id="chartTopBranches"></canvas></div>
+           <div class="lg:col-span-2 chart-card">
+               <h6><i class="fas fa-layer-group text-indigo-500"></i>การวิเคราะห์โมเดลสินค้ายอดนิยม (รวมความจุ) - โมบาย</h6>
+               <div class="relative w-full h-[300px]"><canvas id="chartModelAdvancedMobile"></canvas></div>
            </div>
            <div class="chart-card">
-               <h6><i class="fas fa-user-tie text-indigo-500"></i>อันดับพนักงานขาย</h6>
-               <div class="relative w-full h-[300px]"><canvas id="chartSalesRank"></canvas></div>
+               <h6><i class="fas fa-layer-group text-indigo-500"></i>การวิเคราะห์โมเดลสินค้ายอดนิยม (รวมความจุ) - สมาร์ทวอทช์ &amp; หูฟัง</h6>
+               <div class="relative w-full h-[300px]"><canvas id="chartModelAdvancedWatchEarphone"></canvas></div>
            </div>
         </div>
 
@@ -341,19 +361,25 @@
            <div class="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent"></div>
         </div>
 
-        <div class="chart-card mb-6">
-           <h6><i class="fas fa-layer-group text-indigo-500"></i>การวิเคราะห์โมเดลสินค้ายอดนิยม (รวมความจุ)</h6>
-           <div class="relative w-full h-[350px]"><canvas id="chartModelAdvanced"></canvas></div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 mb-6">
+           <div class="chart-card admin-filter">
+             <h6><i class="fas fa-store text-indigo-500"></i>10 อันดับสาขาที่มียอดจองดีที่สุด (จำนวนเครื่อง)</h6>
+             <div class="relative w-full h-[350px]"><canvas id="chartTopBranches"></canvas></div>
+           </div>
+           <div class="chart-card">
+             <h6><i class="fas fa-user-tie text-indigo-500"></i>อันดับพนักงานขาย</h6>
+             <div class="relative w-full h-[350px]"><canvas id="chartSalesRank"></canvas></div>
+           </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 mb-8"><div class="chart-card"><div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4"><h6 class="mb-0"><i class="fas fa-mobile-alt text-indigo-500"></i>ช่องทางที่ขายดี (โมบาย)</h6></div><div class="relative w-full h-[400px]"><canvas id="chartChannelModelMobile"></canvas></div></div><div class="chart-card"><div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4"><h6 class="mb-0"><i class="fas fa-headphones text-pink-500"></i>ช่องทางที่ขายดี (อุปกรณ์เสริม)</h6></div><div class="relative w-full h-[400px]"><canvas id="chartChannelModelAcc"></canvas></div></div></div>
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6 mb-8">
-           <div class="chart-card !p-0 overflow-hidden flex flex-col h-full">
-             <div class="bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
+           <div class="flex flex-col h-full">
+             <div class="tbleed-head-col3 bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
                <h6 class="!mb-0"><i class="fas fa-tags text-pink-500"></i>โปรโมชั่นที่นิยม (บิล)</h6>
              </div>
-             <div class="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
+             <div class="tbleed-body-col3 overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
                  <table class="w-full text-xs text-left whitespace-nowrap">
                     <thead class="sticky top-0 z-10">
                        <tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">
@@ -366,11 +392,11 @@
                  </table>
              </div>
            </div>
-           <div class="chart-card !p-0 overflow-hidden flex flex-col h-full">
-             <div class="bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
+           <div class="flex flex-col h-full">
+             <div class="tbleed-head-col3 bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
                <h6 class="!mb-0"><i class="fas fa-gift text-emerald-500"></i>สรุปของแถมทั้งหมด (ชิ้น)</h6>
              </div>
-             <div class="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
+             <div class="tbleed-body-col3 overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
                  <table class="w-full text-xs text-left whitespace-nowrap">
                     <thead class="sticky top-0 z-10">
                        <tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">
@@ -383,11 +409,11 @@
                  </table>
              </div>
            </div>
-           <div class="chart-card !p-0 overflow-hidden flex flex-col h-full">
-             <div class="bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
+           <div class="flex flex-col h-full">
+             <div class="tbleed-head-col3 bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
                <h6 class="!mb-0"><i class="fas fa-users text-indigo-500"></i>สรุปสัดส่วนความสนใจของลูกค้า</h6>
              </div>
-             <div class="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
+             <div class="tbleed-body-col3 overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
                  <table class="w-full text-xs text-left whitespace-nowrap">
                     <thead class="sticky top-0 z-10">
                        <tr class="bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">
@@ -496,7 +522,7 @@
       </div>
 
       <!-- Off-canvas Cart Drawer -->
-      <div id="cartDrawer" role="dialog" aria-label="ตะกร้าสินค้า" class="fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[400px] lg:w-[450px] max-w-full h-[100dvh] flex flex-col bg-white shadow-xl transform translate-x-full transition-transform duration-300">
+      <div id="cartDrawer" role="dialog" aria-modal="true" aria-label="ตะกร้าสินค้า" class="fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[400px] lg:w-[450px] max-w-full h-[100dvh] flex flex-col bg-white shadow-xl transform translate-x-full transition-transform duration-300">
           <div class="cart-drawer-header bg-indigo-700 text-white px-5 flex justify-between items-center relative overflow-hidden">
               <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImEiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHBhdGggZD0iTTAgMGg0MHY0MEgweiIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjYSkiLz48L3N2Zz4=')] opacity-50"></div>
               <div class="flex items-center relative z-10">
@@ -573,8 +599,8 @@
                   <div class="w-full md:w-4/12 flex flex-col justify-start items-center shrink-0">
                      <div class="w-full max-w-[300px] aspect-square p-4 bg-white border border-slate-100 rounded-3xl shadow-sm flex items-center justify-center sticky top-0 hover:shadow-md transition-shadow relative group overflow-hidden cursor-zoom-in">
                         <img id="modalProdImg" src="" class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-500 hover:scale-[1.5]">
-                        <button id="btnPrevImg" onclick="window.app.pos.prevImage(event)" class="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-left"></i></button>
-                        <button id="btnNextImg" onclick="window.app.pos.nextImage(event)" class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-right"></i></button>
+                        <button id="btnPrevImg" onclick="window.app.pos.prevImage(event)" aria-label="รูปก่อนหน้า" class="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-left"></i></button>
+                        <button id="btnNextImg" onclick="window.app.pos.nextImage(event)" aria-label="รูปถัดไป" class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-right"></i></button>
                      </div>
                      <div id="modalThumbnails" class="flex gap-2 justify-center w-full max-w-[240px] mx-auto overflow-x-auto p-1 mt-3 hidden"></div>
                   </div>
@@ -796,11 +822,11 @@
        </div>
 
        <!-- Table Section -->
-       <div class="chart-card !p-0 overflow-hidden mb-8">
-           <div class="bg-slate-50 border-b border-slate-200/80 p-4">
+       <div class="chart-card tbleed-outer !p-0 mb-8">
+           <div class="tbleed-head bg-slate-50 border-b border-slate-200/80 p-4">
              <h6 class="!mb-0"><i class="fas fa-crosshairs text-indigo-500"></i>Target vs ยอดจองตาม Area</h6>
            </div>
-           <div class="overflow-x-auto">
+           <div class="tbleed-body overflow-x-auto">
                <table class="w-full text-sm text-left">
                    <thead class="bg-slate-50 border-b border-slate-200">
                        <tr>
@@ -866,6 +892,34 @@
     </div>
   </template>
 
+  <template id="tmpl-branchbookingsummary">
+    <div id="branchbookingsummary-content" class="space-y-6">
+       <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-4 pb-2 justify-between">
+         <div class="flex items-center gap-3">
+           <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+             <i class="fas fa-store-alt text-lg"></i>
+           </div>
+           <div>
+             <h2 class="text-xl font-black text-slate-800 tracking-tight leading-tight">สรุปยอดจองตามสาขา</h2>
+             <p class="text-xs text-slate-500 font-medium">ยอดจองรวม (ไม่รวมแถวส่วนลดและออเดอร์ที่ยกเลิก) แยกตามสาขา × รุ่นสินค้า และสถานะการจอง (จอง T / จอง F / ผลรวม)</p>
+           </div>
+         </div>
+         <div class="flex flex-wrap items-center gap-2">
+           <label for="bbCategoryFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">หมวดหมู่:</label>
+           <select id="bbCategoryFilter" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" onchange="window.app.branchBookingSummary.onCategoryChange()"></select>
+           <label for="bbAreaFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">แอเรีย:</label>
+           <input type="text" id="bbAreaFilter" list="bbAreaListOptions" placeholder="พิมพ์ค้นหา Area..." autocomplete="off" class="w-36 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()">
+           <datalist id="bbAreaListOptions"></datalist>
+           <label for="bbBranchFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">สาขา:</label>
+           <input type="text" id="bbBranchFilter" list="bbBranchListOptions" placeholder="พิมพ์ค้นหาชื่อ/รหัสสาขา..." autocomplete="off" class="w-52 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()">
+           <datalist id="bbBranchListOptions"></datalist>
+         </div>
+       </div>
+
+       <div id="branchBookingSummaryTablesWrap"></div>
+    </div>
+  </template>
+
   <template id="tmpl-allbookingsummary">
     <div id="allbookingsummary-content" class="space-y-6">
        <div class="flex items-center gap-3 pt-4 pb-2">
@@ -884,8 +938,9 @@
   </template>
 
   <template id="tmpl-datagrid">
-    <div class="chart-card !p-0 flex flex-col overflow-hidden mb-8">
-      <div class="bg-white border-b border-slate-200/80 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+    <div class="flex flex-col mb-8">
+      <div class="tbleed-head bg-white">
+      <div class="border-b border-slate-200/80 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div class="relative w-full sm:w-1/2 md:w-1/3">
            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
            <input type="text" class="w-full pl-11 pr-10 py-2.5 bg-slate-100/80 border border-slate-200/50 rounded-xl text-sm font-medium focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none" id="gridSearch" placeholder="พิมพ์เพื่อค้นหาข้อมูล..." onkeyup="window.app.grid.filter()">
@@ -901,14 +956,28 @@
           </button>
         </div>
       </div>
-      
-      <div class="w-full overflow-x-auto custom-scrollbar max-h-[75vh]">
-        <table class="w-full min-w-[1000px] text-left border-collapse whitespace-nowrap" id="dataTable">
+
+      <!-- ตัวกรองเพิ่มเติม เฉพาะหน้า Orders (ประเภทการจอง / สถานะออเดอร์ / Category) — ซ่อนไว้เป็นค่าเริ่มต้น, grid.init() สลับ hidden/flex ตามตาราง -->
+      <div id="gridFilterBar" class="hidden w-full flex-wrap items-center gap-3 px-5 pb-4 border-b border-slate-100 bg-white">
+        <select id="gridFilterResStatus" onchange="window.app.grid.filter()" class="px-3 py-2 bg-slate-100/80 border border-slate-200/50 rounded-xl text-xs font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none">
+          <option value="">ประเภทการจอง: ทั้งหมด</option>
+        </select>
+        <select id="gridFilterOrderStatus" onchange="window.app.grid.filter()" class="px-3 py-2 bg-slate-100/80 border border-slate-200/50 rounded-xl text-xs font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none">
+          <option value="">สถานะออเดอร์: ทั้งหมด</option>
+        </select>
+        <select id="gridFilterCategory" onchange="window.app.grid.filter()" class="px-3 py-2 bg-slate-100/80 border border-slate-200/50 rounded-xl text-xs font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none">
+          <option value="">Category: ทั้งหมด</option>
+        </select>
+      </div>
+      </div>
+
+      <div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[75vh]">
+        <table class="w-full text-left border-collapse whitespace-nowrap" id="dataTable">
           <thead id="dataGridHead" class="bg-indigo-600 relative z-20"></thead>
           <tbody id="dataGridBody" class="divide-y divide-slate-100 bg-white relative z-0"></tbody>
         </table>
       </div>
-      <div id="gridPagination"></div>
+      <div id="gridPagination" class="tbleed-foot"></div>
     </div>
 
     <div id="formModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="ฟอร์มจัดการข้อมูล">
@@ -956,15 +1025,15 @@
        </div>
 
        <!-- รายการเอกสารที่บันทึกไว้ + ปุ่มอนุมัติ (Admin/Manager) -->
-       <div class="no-print mb-6 bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
-          <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+       <div class="no-print mb-6">
+          <div class="tbleed-head p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
              <h3 class="font-bold text-slate-800"><i class="fas fa-list-check text-indigo-500 mr-2"></i> รายการเอกสาร</h3>
              <div class="flex items-center gap-2">
                 <input type="text" id="invListSearch" oninput="window.app.invoice.renderList()" placeholder="ค้นหา เลขที่/ลูกค้า/ผู้ขอ..." class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 w-56">
                 <button onclick="window.app.invoice.loadList()" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors" aria-label="รีเฟรชรายการเอกสาร"><i class="fas fa-rotate-right"></i></button>
              </div>
           </div>
-          <div class="overflow-x-auto">
+          <div class="tbleed-body overflow-x-auto">
              <table class="w-full text-sm whitespace-nowrap">
                 <thead>
                    <tr class="bg-slate-100 text-slate-600 text-xs uppercase">
@@ -1121,6 +1190,7 @@
   <script>
     window.tailwind = {
       config: {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {

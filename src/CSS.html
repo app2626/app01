@@ -336,6 +336,104 @@
     gap: 0.5rem;
   }
 
+  /* === Full-bleed table band (2026-08-09: ตารางต้องขยายชิดขอบจอทุกอุปกรณ์) ===
+     เดิมตารางอยู่ใน .chart-card กรอบเดียว (overflow-hidden + border รวม) ทำให้ negative-margin
+     ที่จะดันตารางออกไปชนขอบจอ #page-content (p-4 md:p-6 lg:p-8) โดนตัดทิ้งเสมอ
+     จึงแยกกรอบเป็น 3 แถบอิสระ: หัว (.tbleed-head) / ตัวตาราง (.tbleed-body, ไม่มีกรอบซ้าย-ขวา + ชน margin ลบ) / ท้าย (.tbleed-foot)
+     ไม่แตะ overflow-x-auto ชั้นในที่ห่อ <table> อยู่แล้ว (ยังเลื่อนแนวนอนได้ตามปกติถ้าตารางกว้างเกินจอ)
+     2026-08-10 fix: หัว/ท้ายเดิมไม่มี negative margin เลย มีแต่ตัวตารางตรงกลางที่ชน margin ลบออกไปถึงขอบจอ
+     ทำให้ตัวตารางกว้างกว่าหัว-ท้าย เกิดเหลี่ยมมุมไม่ตรงกัน (เห็นชัดสุดที่หน้า Orders ซึ่งมี .tbleed-foot ให้เทียบ) —
+     ใส่ negative margin ชุดเดียวกับ .tbleed-body ให้หัว/ท้ายด้วย ทั้ง 3 แถบจะชิดขอบตรงกันเป๊ะ */
+  .tbleed-head {
+    border-left: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    box-shadow: var(--shadow-sm);
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  .tbleed-foot {
+    background: var(--color-surface);
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  @media (min-width: 768px) {
+    .tbleed-head, .tbleed-foot { margin-left: -1.5rem; margin-right: -1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-head, .tbleed-foot { margin-left: -2rem; margin-right: -2rem; }
+  }
+  /* ตัวแปรสำหรับหัวตารางที่อยู่ใน grid หลายคอลัมน์ (เช่น dashboard KPI mini-table ใน lg:grid-cols-3) —
+     ต้องหยุด bleed ทันทีที่ breakpoint ซึ่ง grid เปลี่ยนเป็นหลายคอลัมน์ (จับคู่กับ .tbleed-body-col3) ไม่งั้น
+     margin ลบจะทับคอลัมน์ข้างเคียง — .tbleed-head ปกติห้ามใช้ในบริบท grid หลายคอลัมน์ */
+  .tbleed-head-col3 {
+    border-left: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    box-shadow: var(--shadow-sm);
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  @media (min-width: 768px) {
+    .tbleed-head-col3 { margin-left: -1.5rem; margin-right: -1.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-head-col3 { margin-left: 0; margin-right: 0; }
+  }
+  /* หลายจุดหา card ตารางด้วย .closest('.chart-card') / .querySelectorAll('.chart-card') เพื่อแปะปุ่ม export รูปภาพ
+     (window.app.tableExportButtons, ~JS.html บรรทัด 349/2632/2966/3208/3465/3589) — ต้องคง class chart-card ไว้บน
+     กรอบนอกเสมอ ห้ามลบทิ้ง ใช้ตัวปรับแต่งนี้ "ปิด" ลักษณะภาพของ .chart-card แทน (พื้นหลัง/กรอบ/เงา) เพื่อไม่ให้
+     negative margin ของ .tbleed-body โดน overflow ของกรอบเดิมตัดทิ้ง */
+  .chart-card.tbleed-outer {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  /* 2026-08-12 fix: .tbleed-body มี overflow-x-auto + max-height เสมอ ซึ่งตาม CSS overflow spec
+     ทำให้ overflow-y ถูกบังคับเป็น auto ไปด้วย (แกนหนึ่งไม่ visible อีกแกนต้อง auto ตาม) — พอเนื้อหาสูงเกิน
+     max-h จริง scrollbar แนวตั้ง (กว้าง 0.3cm ตาม .custom-scrollbar) จะแทะพื้นที่จากขอบขวาของกล่องออกไป
+     ทำให้ตัวตาราง (แถบสีหัวตาราง/เซลล์) ขยับเข้ามาไม่ชนขอบเท่า .tbleed-head/.tbleed-foot ที่ไม่มี scrollbar —
+     เห็นชัดว่า "ขอบขวาตารางเยื้องเข้ามา" ทั้งที่ margin ลบเท่ากันแล้ว (ปัญหาคนละสาเหตุกับ fix 2026-08-10 ด้านบน)
+     แก้โดย bleed margin-right เพิ่มอีก 0.3cm (เผื่อที่ให้ scrollbar พอดี ไม่กินพื้นที่ตาราง) — ส่วนที่ล้นออกนอก
+     viewport ถูก <body class="overflow-x-hidden"> ตัดทิ้งอย่างปลอดภัยอยู่แล้ว ไม่ทำให้เกิด scrollbar แนวนอนทั้งหน้า
+     scrollbar-gutter: stable กันไม่ให้ layout กระตุกเวลาข้อมูลเปลี่ยนจนพอดี/ไม่พอดี max-h */
+  .tbleed-body {
+    background: var(--color-surface);
+    margin-left: -1rem;
+    margin-right: calc(-1rem - 0.3cm);
+    scrollbar-gutter: stable;
+  }
+  @media (min-width: 768px) {
+    .tbleed-body { margin-left: -1.5rem; margin-right: calc(-1.5rem - 0.3cm); }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-body { margin-left: -2rem; margin-right: calc(-2rem - 0.3cm); }
+  }
+  /* ตัวแปรสำหรับตารางที่อยู่ใน grid หลายคอลัมน์ (เช่น dashboard KPI mini-table ใน lg:grid-cols-3) —
+     ต้องหยุด bleed ทันทีที่ breakpoint ซึ่ง grid เปลี่ยนเป็นหลายคอลัมน์ ไม่งั้น margin ลบจะทับคอลัมน์ข้างเคียง
+     ที่ lg: margin ปกติคือ 0 (ไม่ bleed แล้ว) ยังเผื่อ 0.3cm ให้ scrollbar ได้เพราะ gap ของ grid (1.25-1.5rem)
+     กว้างกว่านี้เยอะ ไม่มีทางชนคอลัมน์ข้างเคียง */
+  .tbleed-body-col3 {
+    background: var(--color-surface);
+    margin-left: -1rem;
+    margin-right: calc(-1rem - 0.3cm);
+    scrollbar-gutter: stable;
+  }
+  @media (min-width: 768px) {
+    .tbleed-body-col3 { margin-left: -1.5rem; margin-right: calc(-1.5rem - 0.3cm); }
+  }
+  @media (min-width: 1024px) {
+    .tbleed-body-col3 { margin-left: 0; margin-right: -0.3cm; }
+  }
+
   /* === Chart export (download/copy) buttons — วางไว้บนกราฟ ในกรอบ .relative ที่ห่อ canvas อยู่แล้ว === */
   .chart-export-btns {
     position: absolute;
@@ -484,6 +582,9 @@
       box-shadow: none !important;
     }
     .no-print, .no-print * { display: none !important; }
+    /* invWhtPctPrint คือ % หัก ณ ที่จ่ายแบบข้อความล้วน (คู่กับ input#invWhtPct ที่ถูกซ่อนด้วย .no-print ตอนพิมพ์) — JS.html อัปเดตแค่ innerText ไม่เคยปลด class="hidden" เลย
+       ถ้าไม่บังคับ display ที่นี่ ตอนพิมพ์จะไม่เห็น % หัก ณ ที่จ่ายเลยทั้งที่ยอดเงินหักด้านล่างยังคำนวณ/แสดงอยู่ตามปกติ */
+    #invWhtPctPrint { display: inline !important; }
   }
 
   /* === Cross-device: กัน iOS Safari auto-zoom เมื่อ focus input ที่ font-size < 16px === */
@@ -540,5 +641,204 @@
     background: #64748b;
     transform: rotate(-45deg);
     pointer-events: none;
+  }
+
+  /* === Sidebar collapse/expand toggle — redesigned (2026-07-21) === */
+  /* ปุ่มในหัว sidebar: ใช้ตอน sidebar เปิดอยู่ กดแล้วยุบ */
+  .sidebar-toggle-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .sidebar-toggle-btn:hover {
+    background: var(--color-primary-bg);
+    color: var(--color-primary-dark);
+    border-color: var(--color-border);
+  }
+  .sidebar-toggle-btn i {
+    transition: transform var(--transition-fast);
+  }
+  .sidebar-toggle-btn:hover i {
+    transform: translateX(-2px);
+  }
+
+  /* ปุ่ม "แสดงแถบเมนู" ตอน sidebar ถูกยุบ — ออกแบบเป็น handle เกาะขอบจอแทนปุ่มลอย
+     ดูเหมือนหูจับที่ยื่นออกมาจาก sidebar ที่ซ่อนอยู่ ไม่ใช่ปุ่มลอยเดี่ยวๆ กลางที่ว่าง */
+  .sidebar-show-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 2.75rem;
+    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-left: none;
+    color: var(--color-text-secondary);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+  }
+  .sidebar-show-handle:hover {
+    width: 2.25rem;
+    color: var(--color-primary-dark);
+    box-shadow: var(--shadow-lg);
+  }
+  .sidebar-show-handle i {
+    font-size: 0.8rem;
+    transition: transform var(--transition-fast);
+  }
+  .sidebar-show-handle:hover i {
+    transform: translateX(1px);
+  }
+
+  /* === Premium micro-interaction polish (flat theme, no structural change) === */
+  .chart-card, .login-card, .swal2-popup, .glass-nav, #cartDrawer, .cart-drawer-footer,
+  .kpi-gradient-total, .kpi-gradient-mob, .kpi-gradient-acc, .kpi-gradient-resT, .kpi-gradient-resF, .kpi-gradient-aov, .kpi-gradient-conv {
+    transition: background-color var(--transition-normal), border-color var(--transition-normal), box-shadow var(--transition-normal), color var(--transition-normal);
+  }
+  .chart-card:hover {
+    transform: translateY(-2px);
+  }
+  .btn-enterprise-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+  .btn-enterprise-primary:active {
+    transform: translateY(0);
+  }
+
+  /* ============================================================
+     Dark Mode
+     Toggle: window.app.toggleTheme() ตั้ง class "dark" บน <html> (ดู JS.html)
+     ทุก component ที่อ้างอิง var(--color-*) อยู่แล้ว (chart-card, kpi-gradient-*,
+     swal2, login-card, btn-enterprise, ปุ่ม export ฯลฯ) เปลี่ยนสีอัตโนมัติแค่
+     override ตัวแปรด้านล่างนี้จุดเดียว — ส่วนที่เหลือคือ utility class ของ Tailwind
+     ที่ฝังสี hardcode ไว้ตรงๆ ใน Index.html/JS.html (bg-white, text-slate-800 ฯลฯ)
+     ต้อง override เป็นรายคลาสด้วย !important (แพทเทิร์นเดียวกับกฎข้อ 18 ของโปรเจกต์
+     ที่สู้กับ cascade order ของ Tailwind CDN) — สโคปไว้ใน @media screen เท่านั้น
+     กันไม่ให้ไปยุ่งกับ @media print (ใบเสร็จ/รายงานต้องพิมพ์เป็นกระดาษขาวเสมอ)
+  ============================================================ */
+  /* เดิม html.dark{...} + component overrides ด้านล่างนี้ไม่ได้อยู่ใน @media screen ทั้งที่คอมเมนต์ด้านบนบอกว่าต้องสโคปไว้แค่ screen —
+     ทำให้เปิด dark mode แล้วสั่งพิมพ์ (Dashboard, ใบเสนอราคา ฯลฯ) ตัวแปรสี var(--color-*) ยังคงเป็นชุดสีมืดอยู่ (เช่น --color-text-primary
+     เกือบขาว) ทุก component ที่อ้างอิงตัวแปรนี้ตรงๆ (.chart-card, .kpi-gradient-*, .swal2-popup, .login-card, .btn-enterprise-*)
+     จึงพิมพ์ออกมาตัวหนังสือ/พื้นหลังเพี้ยนบนกระดาษขาว ขัดกับ invariant "ใบเสร็จ/รายงานต้องพิมพ์เป็นกระดาษขาวเสมอ" ที่โปรเจกต์นี้ตั้งใจไว้ */
+  @media screen {
+  html.dark {
+    --color-primary: #5485ad;
+    --color-primary-dark: #5485ad;
+    --color-primary-darker: #366891;
+    --color-primary-light: #85abc9;
+    --color-primary-bg: rgba(84, 133, 173, 0.12);
+    --color-accent: #22d3ee;
+    --color-accent-dark: #06b6d4;
+    --color-success: #34d399;
+    --color-success-bg: rgba(16, 185, 129, 0.12);
+    --color-warning: #fbbf24;
+    --color-warning-bg: rgba(245, 158, 11, 0.12);
+    --color-danger: #fb7185;
+    --color-danger-bg: rgba(244, 63, 94, 0.12);
+    --color-surface: #1e293b;
+    --color-surface-secondary: #0f172a;
+    --color-border: #334155;
+    --color-border-light: #1e293b;
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #cbd5e1;
+    --color-text-muted: #64748b;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+    --shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 25px -3px rgb(0 0 0 / 0.45);
+    --shadow-xl: 0 20px 40px -8px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+  html.dark body {
+    background: var(--color-surface-secondary);
+  }
+  html.dark #dataTable th {
+    border-bottom-color: #020617;
+  }
+  html.dark .chart-export-btn {
+    background: rgba(30, 41, 59, 0.92);
+  }
+  html.dark .skeleton {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
+    background-size: 400% 100%;
+  }
+  html.dark ::-webkit-scrollbar-thumb { background: #334155; }
+  html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  html.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #334155, #475569); }
+  html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #475569, #64748b); }
+  }
+
+  @media screen {
+    /* Surfaces */
+    html.dark .bg-white { background-color: var(--color-surface) !important; }
+    html.dark .bg-white\/95, html.dark .bg-white\/90, html.dark .bg-white\/80 { background-color: rgba(30, 41, 59, 0.92) !important; }
+    html.dark .bg-slate-50 { background-color: var(--color-surface-secondary) !important; }
+    html.dark .bg-slate-50\/50, html.dark .bg-slate-50\/60 { background-color: rgba(15, 23, 42, 0.6) !important; }
+    html.dark .bg-slate-50\/95 { background-color: rgba(15, 23, 42, 0.95) !important; }
+    html.dark .bg-slate-100, html.dark .bg-slate-100\/80 { background-color: #263449 !important; }
+    html.dark .bg-slate-200 { background-color: #334155 !important; }
+    html.dark .bg-indigo-50, html.dark .bg-indigo-50\/30, html.dark .bg-indigo-50\/50 { background-color: rgba(84, 133, 173, 0.14) !important; }
+    html.dark .bg-indigo-100 { background-color: rgba(84, 133, 173, 0.22) !important; }
+    html.dark .bg-rose-50 { background-color: rgba(244, 63, 94, 0.14) !important; }
+    html.dark .bg-rose-100 { background-color: rgba(244, 63, 94, 0.22) !important; }
+    html.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.14) !important; }
+    html.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.22) !important; }
+    html.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.14) !important; }
+    html.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.22) !important; }
+    html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.14) !important; }
+    html.dark .bg-pink-50 { background-color: rgba(236, 72, 153, 0.14) !important; }
+
+    /* Text */
+    html.dark .text-slate-900 { color: #f8fafc !important; }
+    html.dark .text-slate-800 { color: #f1f5f9 !important; }
+    html.dark .text-slate-700 { color: #e2e8f0 !important; }
+    html.dark .text-slate-600 { color: #cbd5e1 !important; }
+    html.dark .text-slate-500 { color: #94a3b8 !important; }
+    html.dark .text-slate-400 { color: #64748b !important; }
+    html.dark .text-indigo-400 { color: #85abc9 !important; }
+    html.dark .text-indigo-500, html.dark .text-indigo-600 { color: #85abc9 !important; }
+    html.dark .text-indigo-700, html.dark .text-indigo-800, html.dark .text-indigo-900 { color: #b8cee1 !important; }
+    /* จอง T / จอง F การ์ดเลือกประเภทการจอง (Index.html) ใช้สี blue/red ของ Tailwind ตรงๆ (ไม่ใช่ indigo/rose ที่โปรเจกต์ปรับสีไว้แล้ว) — เดิมไม่มี override เลย
+       การ์ดพื้นหลัง bg-white กลายเป็นพื้นมืด (--color-surface) จากกฎด้านบน แต่ตัวหนังสือ blue-700/red-700 เข้มยังคงเดิม ทำให้อ่านยากในโหมดมืด */
+    html.dark .text-blue-700 { color: #93c5fd !important; }
+    html.dark .text-blue-500 { color: #bfdbfe !important; }
+    html.dark .text-red-700 { color: #fca5a5 !important; }
+    html.dark .text-red-500 { color: #fecaca !important; }
+
+    /* Borders & dividers */
+    html.dark .border-slate-100, html.dark .border-slate-100\/50, html.dark .border-slate-100\/60 { border-color: #263449 !important; }
+    html.dark .border-slate-200, html.dark .border-slate-200\/50, html.dark .border-slate-200\/60, html.dark .border-slate-200\/80 { border-color: #334155 !important; }
+    html.dark .border-slate-300 { border-color: #475569 !important; }
+    html.dark .border-slate-400 { border-color: #64748b !important; }
+    /* border-slate-800 ในโปรเจกต์นี้ถูกกำหนดให้เท่ากับ --color-surface มืด (#1e293b, ดู Index.html tailwind.config) — เดิมไม่มี override
+       ทำให้เส้นแบ่งหัวข้อในหน้าใบเสนอราคา (border-b border-slate-800) กลายเป็นสีเดียวกับพื้นหลังการ์ดตัวเองพอดี มองไม่เห็นเส้นเลยในโหมดมืด */
+    html.dark .border-slate-800 { border-color: var(--color-border) !important; }
+    html.dark .border-blue-200 { border-color: rgba(59, 130, 246, 0.35) !important; }
+    html.dark .border-red-200 { border-color: rgba(248, 113, 113, 0.35) !important; }
+    html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #263449 !important; }
+    html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+    html.dark .border-indigo-100, html.dark .border-indigo-100\/50, html.dark .border-indigo-100\/80 { border-color: rgba(84, 133, 173, 0.3) !important; }
+    html.dark .border-indigo-200 { border-color: rgba(84, 133, 173, 0.4) !important; }
+    html.dark .border-indigo-500, html.dark .border-indigo-600 { border-color: #5485ad !important; }
+
+    /* Placeholders */
+    html.dark .placeholder-slate-300::placeholder, html.dark .placeholder-slate-400::placeholder { color: #475569 !important; }
+
+    /* Shadows read as "flat" against a dark surface unless deepened */
+    html.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important; }
+    html.dark .shadow, html.dark .shadow-md { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45) !important; }
+    html.dark .shadow-lg { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important; }
+    html.dark .shadow-xl { box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55) !important; }
   }
 </style>

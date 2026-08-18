@@ -17,9 +17,14 @@ function include(filename) {
 
 function setupDatabase(userToken) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const props = PropertiesService.getScriptProperties();
+  const setupCompleted = props.getProperty('MPOS_SETUP_COMPLETED') === 'true';
   // ถ้าระบบถูกตั้งค่าแล้ว (มีสมาชิกในชีต Members) ต้องเป็น Admin ที่ login แล้วเท่านั้น
   // อนุญาตเรียกแบบไม่มี token เฉพาะการติดตั้งครั้งแรกที่ยังไม่มีข้อมูลผู้ใช้ให้ปกป้อง
   const membersSheetCheck = ss.getSheetByName("Members");
+  if (setupCompleted && (!membersSheetCheck || membersSheetCheck.getLastRow() <= 1)) {
+    throw new Error("Setup ถูกปิดใช้งานแล้ว กรุณาเปิดใช้งานใหม่จาก Script Properties โดยผู้ดูแลระบบ");
+  }
   if (membersSheetCheck && membersSheetCheck.getLastRow() > 1) {
     const tokenPayload = (userToken && userToken.Token) ? verifyToken(userToken.Token) : null;
     if (!tokenPayload) throw new Error("Unauthorized: กรุณาเข้าสู่ระบบก่อนใช้งาน Auto Setup");
@@ -37,11 +42,7 @@ function setupDatabase(userToken) {
     "Interests": ["Interest Name", "Status"],
     "GiftMappings": ["Mapping ID", "Target Mobile (SKU or Group)", "Channel", "Brand Gifts", "Channel Gifts", "Status"],
     // 🌟 จัดเรียงคอลัมน์ Orders ใหม่ตามที่ระบุ
-    "Orders": [
-      "OrderID", "Timestamp", "Channel", "Branch Code", "Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser",
-      "SKU", "Product Name", "Qty", "Unit Price", "Promo", "Reservation Status", "Staff", "Booking Phone",
-      "Customer Interests", "Remark", "Row Total", "Order Status", "Receipt No", "Deposit", "Client Request ID"
-    ],
+    "Orders": ORDERS_HEADERS_,
     "OrderStatus": ["Status ID", "Status Name", "Color Code"],
     "InventoryLog": ["Log ID", "Timestamp", "SKU", "Action", "Qty", "Branch Code", "User"],
     "AuditLog": ["Log ID", "Timestamp", "User", "Action", "Details"],
@@ -51,6 +52,7 @@ function setupDatabase(userToken) {
     "Invoices": INVOICES_HEADERS_
   };
 
+  const initialAdminPassword = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
   const dummyData = {
     "Settings": [
       ["SystemName", "Mobile Pre Order System", "ชื่อระบบ"],
@@ -106,8 +108,7 @@ function setupDatabase(userToken) {
       ["ดีไซน์สวยงาม / น้ำหนักเบา", "เปิด"]
     ],
     "Members": [
-      ["admin", hashPassword("admin123"), "Admin", "ผู้ดูแลระบบ", "ALL", "*"],
-      ["sales", hashPassword("sales123"), "Sales", "สมชาย ใจดี", "B01", "dashboard, pos, orders"]
+      ["admin", hashPassword(initialAdminPassword), "Admin", "ผู้ดูแลระบบ", "ALL", "*"]
     ]
   };
 
@@ -127,7 +128,8 @@ function setupDatabase(userToken) {
       sheet.getRange(2, 1, dataToInsert.length, dataToInsert[0].length).setValues(dataToInsert);
     }
   }
-  return { status: 'success', message: 'Database Ready' };
+  props.setProperty('MPOS_SETUP_COMPLETED', 'true');
+  return { status: 'success', message: 'Database Ready', initialAdmin: { username: 'admin', password: initialAdminPassword } };
 }
 
 function hashPassword(password) {
@@ -247,11 +249,58 @@ function migrateDeobfuscatePII() {
   }
 }
 
+// 12.1 — Migration ครั้งเดียว: จัดเรียง Channel ID ในชีต Channels ใหม่เป็น CH-01, CH-02, ... ตามลำดับแถว
+// สาเหตุ: บางแถวถูกแก้ตรงในชีตให้เป็นค่าเดียวกับ Branch Code (เช่น B01) ทำให้ตัวสร้างรหัสอัตโนมัติฝั่งแอดมิน
+// (ดู JS.html: autoIdFormats['Channel ID'], regex ^CH-(\d+)$) มองไม่เห็นว่ามี ID ตรงรูปแบบอยู่แล้ว
+// ปลอดภัยที่จะรันได้เสมอ — Channel ID ไม่ถูกใช้ join/อ้างอิงที่ไหนในระบบเลย (Branches/GiftMappings/POS/Checkout
+// เชื่อมกันด้วย Channel Name ทั้งหมด ไม่ใช่ Channel ID) การเขียนทับคอลัมน์นี้จึงไม่กระทบข้อมูลอื่น
+// ไม่ผูกกับ apiHandler — Admin รันมือจาก GAS editor เท่านั้น (เลือกฟังก์ชันนี้แล้วกด Run)
+function migrateResequenceChannelIds() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Channels");
+  if (!sheet) throw new Error("ไม่พบชีต Channels");
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return "ไม่มีข้อมูลให้จัดเรียง";
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
+    const idCol = headers.indexOf("Channel ID");
+    if (idCol === -1) throw new Error("ไม่พบคอลัมน์ Channel ID");
+
+    const rng = sheet.getRange(2, idCol + 1, lastRow - 1, 1);
+    const vals = rng.getValues();
+    let changedCount = 0;
+    for (let i = 0; i < vals.length; i++) {
+      const newId = 'CH-' + String(i + 1).padStart(2, '0');
+      if (String(vals[i][0] || '').trim() !== newId) { vals[i][0] = newId; changedCount++; }
+    }
+    if (changedCount > 0) {
+      rng.setNumberFormat('@'); // กัน Sheets ตีความ ID เป็นชนิดอื่น เผื่ออนาคตมีรูปแบบตัวเลขล้วนปนมา
+      rng.setValues(vals);
+      CacheService.getScriptCache().remove("TABLE_Channels");
+    }
+    logAudit((Session.getActiveUser().getEmail() || "ADMIN_MANUAL"), "MIGRATE_CHANNEL_ID", "Resequenced Channel ID in Channels: " + changedCount + " of " + vals.length + " rows changed");
+    return "จัดเรียง Channel ID เรียบร้อย: แก้ไข " + changedCount + " จาก " + vals.length + " แถว (ผลลัพธ์ CH-01 ถึง CH-" + String(vals.length).padStart(2, '0') + ")";
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // running number ภายใน execution เดียว — สุ่ม 4 หลักอย่างเดียวเคยเสี่ยง ID ชนกันใน batch (เช่น invRows หลายแถวในออเดอร์เดียว)
 let __genIdSeq = 0;
 function generateId(prefix) {
   __genIdSeq++;
   return prefix + '-' + Utilities.formatDate(new Date(), "GMT+7", "yyMMdd") + '-' + Date.now() + '-' + __genIdSeq + '-' + Math.floor(100 + Math.random() * 900);
+}
+
+// กัน formula/CSV injection: ค่าที่ user พิมพ์เอง (ชื่อลูกค้า/หมายเหตุ/ชื่อพนักงานจอง ฯลฯ) เขียนลง Sheets ตรงๆ
+// ถ้าขึ้นต้นด้วย = + - @ ตัว Sheets จะตีความเป็นสูตรทันทีตอน setValues (ไม่เกี่ยวกับ number format ของคอลัมน์)
+// นำหน้าด้วย ' (single quote) บังคับให้เก็บเป็นข้อความเสมอ ตามคำแนะนำมาตรฐานของ Google/OWASP สำหรับ formula injection
+function sanitizeSheetText_(value) {
+  const s = (value === null || value === undefined) ? '' : value.toString();
+  if (/^[=+\-@]/.test(s)) return "'" + s;
+  return s;
 }
 
 function logAudit(user, action, details) {
@@ -361,7 +410,7 @@ function apiHandler(action, payload, userToken) {
       case 'DELETE_SETTINGS_ITEM': return deleteSettingsItem(payload, secureUser, ss);
       case 'UPLOAD_IMAGE': return uploadImage(payload, secureUser, ss);
       case 'CHANGE_PASSWORD': return changePassword(payload, secureUser, ss);
-      case 'GET_CUSTOMER_BY_PHONE': return getCustomerByPhone(payload, ss); // ทุก role ที่ login แล้ว — คืนเฉพาะฟิลด์เติมฟอร์ม
+      case 'GET_CUSTOMER_BY_PHONE': return getCustomerByPhone(payload, secureUser, ss); // ทุก role ที่ login แล้ว — คืนเฉพาะฟิลด์เติมฟอร์ม
       case 'GET_INVOICES': return getInvoices(secureUser, ss);       // Admin/Manager เห็นทั้งหมด, role อื่นเห็นเฉพาะที่ตนสร้าง
       case 'SAVE_INVOICE': return saveInvoice(payload, secureUser, ss);
       case 'APPROVE_INVOICE': return approveInvoice(payload, secureUser, ss);
@@ -531,10 +580,10 @@ function initAutoPromotionsSheet(ss) {
   if (!sheet) {
     try {
       sheet = ss.insertSheet("AutoPromotions");
-      sheet.appendRow(["Rule ID", "Buy Category", "Get Discount Category", "Discount Percent", "Message Suggest", "Message Apply", "Status"]);
-      sheet.appendRow(["AP-001", "โมบาย", "อุปกรณ์เสริม", 10, "ลูกค้าซื้อมือถือแล้ว! เสนอขายอุปกรณ์เสริม (เคส/ฟิล์ม/หัวชาร์จ) ตอนนี้ <strong class='text-rose-900'>รับส่วนลดอุปกรณ์เสริม 10% ทันที</strong>", "ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว", "Active"]);
-      sheet.appendRow(["AP-002", "สมาร์ทวอทช์", "อุปกรณ์เสริม", 5, "ลูกค้าซื้อสมาร์ทวอทช์! เสนอขายสายนาฬิกาเพิ่ม รับส่วนลด 5%", "ได้รับส่วนลดสายนาฬิกา 5% เรียบร้อย", "Inactive"]);
-      sheet.getRange("A1:G1").setFontWeight("bold").setBackground("#d9ead3");
+      sheet.appendRow(["Rule ID", "Buy Category", "Get Discount Category", "Discount Percent", "Message Suggest", "Message Apply", "Status", "Channel"]);
+      sheet.appendRow(["AP-001", "โมบาย", "อุปกรณ์เสริม", 10, "ลูกค้าซื้อมือถือแล้ว! เสนอขายอุปกรณ์เสริม (เคส/ฟิล์ม/หัวชาร์จ) ตอนนี้ <strong class='text-rose-900'>รับส่วนลดอุปกรณ์เสริม 10% ทันที</strong>", "ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว", "Active", ""]);
+      sheet.appendRow(["AP-002", "สมาร์ทวอทช์", "อุปกรณ์เสริม", 5, "ลูกค้าซื้อสมาร์ทวอทช์! เสนอขายสายนาฬิกาเพิ่ม รับส่วนลด 5%", "ได้รับส่วนลดสายนาฬิกา 5% เรียบร้อย", "Inactive", ""]);
+      sheet.getRange("A1:H1").setFontWeight("bold").setBackground("#d9ead3");
       SpreadsheetApp.flush();
     } catch(e) {}
   }
@@ -559,6 +608,14 @@ function initAutoPromotionsSheet(ss) {
         if (!String(vals[i][0] || '').trim()) { maxNum++; vals[i][0] = 'AP-' + String(maxNum).padStart(3, '0'); changed = true; }
       }
       if (changed) rng.setValues(vals);
+    }
+  } catch(e) {}
+  // Retrofit "Channel" ให้ชีตเก่าที่สร้างก่อนคอลัมน์นี้มี — เว้นว่าง = ร่วมทุกช่องทางเหมือนเดิม (backward compatible ไม่ต้องแก้ข้อมูลแถวเก่า)
+  try {
+    const lastCol2 = sheet.getLastColumn();
+    const headers2 = sheet.getRange(1, 1, 1, lastCol2).getValues()[0].map(h => h.toString().trim());
+    if (headers2.indexOf("Channel") === -1) {
+      sheet.getRange(1, lastCol2 + 1).setValue("Channel");
     }
   } catch(e) {}
 }
@@ -650,6 +707,7 @@ function processCheckout(payload, secureUser, ss) {
     const orderSheet = ss.getSheetByName("Orders");
     const invSheet = ss.getSheetByName("InventoryLog");
     const prodSheet = ss.getSheetByName("Products");
+    if (!orderSheet || !invSheet || !prodSheet) throw new Error("Database is not ready. Please run Auto Setup first.");
 
     // ==== กติกาการจองต้องบังคับฝั่ง server เสมอ (UI เช็คแล้วแต่เชื่อ client ไม่ได้) ====
     if (!payload.cart || !Array.isArray(payload.cart) || payload.cart.length === 0) throw new Error("ตะกร้าว่างเปล่า");
@@ -661,6 +719,12 @@ function processCheckout(payload, secureUser, ss) {
       if (!isNaN(rStart.getTime()) && !isNaN(rEnd.getTime()) && (nowCheck < rStart || nowCheck > rEnd)) {
         throw new Error("ไม่อยู่ในช่วงเวลาการจองสินค้า");
       }
+    }
+    // whitelist ค่าเดียวกับที่ updateFullOrder เช็ค (rule 25 style) — เดิม processCheckout เช็คแค่ .indexOf('จอง T') แล้วปล่อยสตริงอื่นใดผ่าน sanitizeSheetText_ เขียนตรงๆ
+    // ทำให้รายงาน/พีวอตที่ key ด้วยสองสตริงนี้แน่นอน (bookingSummary, salesSummary, ฯลฯ) จัดกลุ่มแถวที่มีค่าอื่นไม่ได้เลย
+    const validResStatuses = ['', 'จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'];
+    if (payload.resStatus && !validResStatuses.includes(payload.resStatus.toString().trim())) {
+      throw new Error("ประเภทการจองไม่ถูกต้อง: " + payload.resStatus);
     }
     if (payload.resStatus && payload.resStatus.toString().indexOf('จอง T') > -1) {
       if (!payload.receiptNo || payload.receiptNo.toString().trim() === '') throw new Error("จอง T ต้องระบุเลขที่ใบเสร็จรับเงินมัดจำ");
@@ -709,6 +773,17 @@ function processCheckout(payload, secureUser, ss) {
        actualChannel = secureUser.Channel;
     }
 
+    const branches = getTableDataAsJson(ss.getSheetByName("Branches"));
+    const branchInfo = branches.find(b => b['Branch Code'] === actualBranch && (b.Channel === actualChannel || actualChannel === 'ALL'));
+    if (actualBranch !== 'ALL' && !branchInfo) throw new Error("Invalid branch or channel.");
+    // branch === 'ALL' ข้ามการเช็คคู่ branch/channel ด้านบนไปเลย — ต้องเช็ค channel แยกว่ามีอยู่จริงในชีต Channels
+    // ไม่งั้น payload ที่ครอบ branch:'ALL' ส่ง channel เป็นสตริงอะไรก็ได้ ผ่านเข้าไปปลดล็อกของแถม/ส่วนลดที่ผูก channel นั้นได้
+    if (actualBranch === 'ALL' && actualChannel !== 'ALL') {
+      const channels = getTableDataAsJson(ss.getSheetByName("Channels"));
+      const channelExists = channels.some(c => (c['Channel Name'] || '').toString().trim() === (actualChannel || '').toString().trim());
+      if (!channelExists) throw new Error("Invalid branch or channel.");
+    }
+
     let prodData = prodSheet.getDataRange().getValues();
     let headers = prodData[0].map(h => h.toString().trim());
     let skuIdx = headers.indexOf("SKU");
@@ -725,6 +800,13 @@ function processCheckout(payload, secureUser, ss) {
         orderHeaders.push(col);
       }
     });
+    // orderRows.push() ด้านล่างเขียนเป็น array ตำแหน่งตรงตัว 24 ช่อง (ไม่ได้ map ด้วยชื่อ header) — ถ้าคอลัมน์ในชีตจริงสลับตำแหน่งไปจาก
+    // ORDERS_HEADERS_ (เช่น มีคนแทรก/ย้ายคอลัมน์ตรงๆ ใน Sheets UI) ข้อมูลจะเขียนผิดคอลัมน์แบบเงียบๆ — เช็คก่อนเขียนดีกว่าให้ข้อมูลเพี้ยนไม่รู้ตัว
+    for (let i = 0; i < ORDERS_HEADERS_.length; i++) {
+      if (orderHeaders[i] !== ORDERS_HEADERS_[i]) {
+        throw new Error("โครงสร้างชีต Orders ไม่ตรงตามที่ระบบคาดไว้ (คอลัมน์ '" + ORDERS_HEADERS_[i] + "' ควรอยู่ตำแหน่งที่ " + (i + 1) + ") กรุณาติดต่อผู้ดูแลระบบ ห้ามแก้ไข/ย้ายคอลัมน์ในชีต Orders โดยตรง");
+      }
+    }
 
     let isFirstRow = true;
     let orderRows = [];
@@ -733,6 +815,7 @@ function processCheckout(payload, secureUser, ss) {
     let catTotals = {};   // ยอดเงินต่อหมวด (ราคาจากชีต) — ใช้คำนวณ Auto Bundle ซ้ำฝั่ง server
     let catQtys = {};     // จำนวนชิ้นต่อหมวด
 
+    const giftMappings = getTableDataAsJson(ss.getSheetByName("GiftMappings"));
     payload.cart.forEach(item => {
       // จำนวนต้องเป็นจำนวนเต็ม >= 1 — กันค่าติดลบ/ทศนิยมจาก client ทำสต๊อกเพิ่มเอง
       const qty = parseInt(item.qty, 10);
@@ -746,6 +829,7 @@ function processCheckout(payload, secureUser, ss) {
       for(let i=1; i<prodData.length; i++) {
         if(prodData[i][skuIdx] == item.SKU) {
           let currentStock = parseInt(prodData[i][stockIdx] || 0);
+          if (!Number.isInteger(currentStock) || currentStock < 0) throw new Error("Invalid stock value for SKU: " + item.SKU);
           if(currentStock < qty) throw new Error("สินค้า " + prodData[i][nameIdx] + " สต๊อกไม่พอ (เหลือ " + currentStock + ")");
           prodData[i][stockIdx] = currentStock - qty;
           itemPrice = parseFloat((prodData[i][priceIdx] || 0).toString().replace(/,/g, ''));
@@ -756,6 +840,30 @@ function processCheckout(payload, secureUser, ss) {
         }
       }
       if(!foundMain) throw new Error("ไม่พบสินค้า SKU: " + item.SKU);
+
+      const allowedGifts = { brand: [], channel: [] };
+      const mainProductRow = prodData.find(r => r[skuIdx] == item.SKU) || [];
+      const groupIdx = headers.indexOf("Product Group");
+      const addGiftNames = (value, target) => (value || '').toString().split(',').map(v => v.trim().toLowerCase()).filter(Boolean).forEach(v => target.push(v));
+      giftMappings.forEach(mapping => {
+        const target = (mapping['Target Mobile (SKU or Group)'] || '').toString().trim();
+        const mapChannel = (mapping.Channel || '').toString().trim();
+        const targetTokens = target.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+        const mainName = (mainProductRow[nameIdx] || '').toString().trim().toLowerCase();
+        const mainGroup = groupIdx > -1 ? (mainProductRow[groupIdx] || '').toString().trim().toLowerCase() : '';
+        const targetMatches = target === '*' || target.toUpperCase() === 'ALL' ||
+          targetTokens.includes(item.SKU.toString().toLowerCase()) || targetTokens.includes(mainGroup) ||
+          targetTokens.some(v => v !== '*' && mainName.includes(v));
+        // Channel เป็น multi-select ฝั่งแอดมิน (ตั้งค่าระบบ > Set Premium) — ค่าที่เซฟมาเป็น comma list ได้ เช่น "Retail, Online"
+        // ห้ามเทียบ mapChannel === actualChannel ตรงๆ ไม่งั้น mapping ที่เลือกหลายช่องทางจะไม่ match ช่องทางไหนเลยตอน checkout
+        // (ของแถมเลือกได้ในหน้า POS เพราะ frontend match แบบ substring แต่ server เทียบทั้งสตริง ทำให้ processGift โยน error)
+        const channelTokens = mapChannel.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+        const channelMatches = mapChannel === '*' || mapChannel === '' || mapChannel.toLowerCase() === 'all' || channelTokens.includes(actualChannel.toString().trim().toLowerCase());
+        if (targetMatches && channelMatches && (mapping.Status || '').toString().trim().toLowerCase() === 'เปิด') {
+          addGiftNames(mapping['Brand Gifts'], allowedGifts.brand);
+          addGiftNames(mapping['Channel Gifts'], allowedGifts.channel);
+        }
+      });
 
       let rowTotal = itemPrice * qty;
       catTotals[itemCat] = (catTotals[itemCat] || 0) + rowTotal;
@@ -768,20 +876,21 @@ function processCheckout(payload, secureUser, ss) {
 
       invRows.push([generateId('INV'), now, item.SKU, "SALE", -qty, actualBranch, secureUser.Username]);
       
-      let fCustName = isFirstRow ? payload.customerName : "";
+      // sanitizeSheetText_ กัน formula injection (=,+,-,@ นำหน้า) — ทุกฟิลด์นี้เป็นข้อความที่ user พิมพ์เองล้วนๆ
+      let fCustName = isFirstRow ? sanitizeSheetText_(payload.customerName) : "";
       // นโยบายเจ้าของระบบ 2026-07-05 (รอบ 7.1): PII เขียน plain text เพื่ออ่านในชีตตรงๆ ได้
       // ฝั่งอ่าน (GET_TABLE/Dashboard) ยังผ่าน deobfuscate ซึ่งมี digit-passthrough — อ่านแถวเก่าที่เข้ารหัสไว้ได้ ห้ามลบ
-      let fContact = isFirstRow ? String(payload.contactPhone || "") : "";
-      let fEmail = isFirstRow ? payload.email : "";
-      let fIdCard = isFirstRow ? String(payload.idCard || "") : "";
-      let fCodeHand = isFirstRow ? payload.codeHandraiser : "";
-      let fPromo = isFirstRow ? (payload.promo || "-") : "";
-      let fResStatus = isFirstRow ? payload.resStatus : "";
-      let fBkStaff = isFirstRow ? payload.bkStaffName : "";
-      let fBkPhone = isFirstRow ? payload.bkPhone : "";
-      let fInterests = isFirstRow ? payload.customerInterests : "";
-      let fRemark = isFirstRow ? payload.remark : "";
-      let fReceiptNo = isFirstRow ? (payload.receiptNo || "") : "";
+      let fContact = isFirstRow ? sanitizeSheetText_(payload.contactPhone) : "";
+      let fEmail = isFirstRow ? sanitizeSheetText_(payload.email) : "";
+      let fIdCard = isFirstRow ? sanitizeSheetText_(payload.idCard) : "";
+      let fCodeHand = isFirstRow ? sanitizeSheetText_(payload.codeHandraiser) : "";
+      let fPromo = isFirstRow ? sanitizeSheetText_(payload.promo || "-") : "";
+      let fResStatus = isFirstRow ? sanitizeSheetText_(payload.resStatus) : "";
+      let fBkStaff = isFirstRow ? sanitizeSheetText_(payload.bkStaffName) : "";
+      let fBkPhone = isFirstRow ? sanitizeSheetText_(payload.bkPhone) : "";
+      let fInterests = isFirstRow ? sanitizeSheetText_(payload.customerInterests) : "";
+      let fRemark = isFirstRow ? sanitizeSheetText_(payload.remark) : "";
+      let fReceiptNo = isFirstRow ? sanitizeSheetText_(payload.receiptNo || "") : "";
       let fDeposit = isFirstRow ? (parseFloat(payload.depositAmount) || 0) : "";
       let fReqId = isFirstRow ? clientRequestId : "";
 
@@ -797,12 +906,25 @@ function processCheckout(payload, secureUser, ss) {
 
       const processGift = (giftObj) => {
         if(giftObj && giftObj.name) {
+          const giftName = giftObj.name.toString().trim();
+          const giftNameLower = giftName.toLowerCase();
+          const giftAllowed = allowedGifts.brand.includes('*') || allowedGifts.channel.includes('*') ||
+            allowedGifts.brand.some(v => v !== '*' && giftNameLower.includes(v)) ||
+            allowedGifts.channel.some(v => v !== '*' && giftNameLower.includes(v));
+          if (!giftAllowed) throw new Error("Gift is not allowed for this product/channel: " + giftName);
           const gQty = parseInt(giftObj.qty, 10);
-          if (!Number.isInteger(gQty) || gQty < 1) throw new Error("จำนวนของแถมไม่ถูกต้อง: " + giftObj.name);
+          if (!Number.isInteger(gQty) || gQty < 1) throw new Error("จำนวนของแถมไม่ถูกต้อง: " + giftName);
           let giftSku = "GIFT";
           let giftHasStock = false;
+          let giftFound = false;
           for(let i=1; i<prodData.length; i++) {
-            if(prodData[i][nameIdx] == giftObj.name) {
+            if(prodData[i][nameIdx] == giftName) {
+              // giftAllowed ด้านบนเช็คแค่ว่าชื่อ "มี" keyword จาก GiftMappings เป็น substring — ไม่ได้จำกัดว่าต้องเป็นสินค้าหมวดของแถมจริง
+              // ถ้าไม่เช็ค Category ตรงนี้ด้วย payload ที่ปลอม giftObj.name เป็นชื่อสินค้าราคาเต็มที่บังเอิญมี keyword ปนอยู่ (เช่น "เคส")
+              // จะได้สินค้านั้นไปฟรีพร้อมตัดสต๊อกจริง — ต้องเป็นสินค้าหมวด "ของแถม..." เท่านั้นถึงจะนับเป็นของแถมได้
+              const giftRowCat = catIdx > -1 ? (prodData[i][catIdx] || '').toString().trim() : '';
+              if (giftRowCat.indexOf('ของแถม') === -1) continue;
+              giftFound = true;
               giftSku = prodData[i][skuIdx];
               let currentStock = parseInt(prodData[i][stockIdx] || 0);
               if(currentStock >= gQty) {
@@ -812,6 +934,7 @@ function processCheckout(payload, secureUser, ss) {
               break;
             }
           }
+          if (!giftFound) throw new Error("Gift product was not found: " + giftName);
           // นโยบาย: ของแถมหมดต้องไม่ block การขายมือถือ แต่ InventoryLog ต้องตรงความจริง —
           // ตัดสต๊อกจริงเท่านั้นถึง log ติดลบ ถ้าไม่พอให้ log qty 0 และหมายเหตุที่แถวออเดอร์
           if (giftHasStock) {
@@ -823,7 +946,7 @@ function processCheckout(payload, secureUser, ss) {
           orderRows.push([
             orderId, now, actualChannel, actualBranch, "", "",
             "", "", "",
-            giftSku, giftObj.name, gQty, 0,
+            giftSku, giftName, gQty, 0,
             "", "", "", "",
             "", (giftHasStock ? "" : "รอสต๊อกของแถม"), 0, "Pending", "", "", ""
           ]);
@@ -852,23 +975,33 @@ function processCheckout(payload, secureUser, ss) {
       if (autoRules.length === 0) {
         autoRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'Active' }];
       }
+      // เพดานส่วนลด Auto Bundle คำนวณครั้งเดียวรวมทั้งออเดอร์ (ไม่ใช่ต่อแถว) — client ปกติส่งแถว 'Auto Bundle' แถวเดียวต่อออเดอร์
+      // (ดู JS.html pos.confirmCheckout) แต่ payload เป็น input จาก client ดิบๆ ห้ามเชื่อจำนวนแถว ต้องกันแยกกันส่งหลายแถวแล้วได้ส่วนลดคูณ
+      let maxAutoTotal = 0;
+      autoRules.forEach(r => {
+        if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
+        const buyCat = (r['Buy Category'] || '').toString().trim();
+        const getCat = (r['Get Discount Category'] || '').toString().trim();
+        const pct = parseFloat(r['Discount Percent']) || 0;
+        // เงื่อนไข Channel ร่วมรายการ (เว้นว่าง/'*'/'all' = ทุกช่องทาง) — tokenize เทียบทีละช่องทาง ตามรูปแบบเดียวกับ GiftMappings.Channel
+        const ruleChRaw = (r['Channel'] || '').toString().trim();
+        const ruleChTokens = ruleChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const ruleChMatches = ruleChRaw === '' || ruleChRaw === '*' || ruleChRaw.toLowerCase() === 'all' || ruleChTokens.includes(actualChannel.toString().trim().toLowerCase());
+        if (!ruleChMatches) return;
+        if ((catQtys[buyCat] || 0) > 0 && (catQtys[getCat] || 0) > 0) {
+          maxAutoTotal += ((catTotals[getCat] || 0) * pct) / 100;
+        }
+      });
+      let autoBundleUsed = 0;
+      // สะสมยอดใช้ต่อชื่อโปรโมชั่น — กัน client ส่งชื่อโปรเดิมซ้ำหลายแถวแล้วแต่ละแถวผ่านเพดานแยกกันเป็นเอกเทศ (เพดานจริงต้องนับรวมต่อโปรหนึ่งชื่อ)
+      const promoUsed = {};
       discountsList.forEach(d => {
         let val = parseFloat(d.value || 0);
         if (!(val > 0)) return;
         const dName = (d.name || '').toString().trim();
         if (dName.indexOf('Auto Bundle') > -1) {
-          // คำนวณเพดานส่วนลด Auto ใหม่จากกติกาในชีต + ยอดจริงในตะกร้า (ราคาจากชีต Products)
-          let maxAuto = 0;
-          autoRules.forEach(r => {
-            if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
-            const buyCat = (r['Buy Category'] || '').toString().trim();
-            const getCat = (r['Get Discount Category'] || '').toString().trim();
-            const pct = parseFloat(r['Discount Percent']) || 0;
-            if ((catQtys[buyCat] || 0) > 0 && (catQtys[getCat] || 0) > 0) {
-              maxAuto += ((catTotals[getCat] || 0) * pct) / 100;
-            }
-          });
-          if (val > maxAuto + 0.01) throw new Error("ส่วนลด Auto Bundle ไม่ตรงกับเงื่อนไขโปรโมชั่นของระบบ");
+          autoBundleUsed += val;
+          if (autoBundleUsed > maxAutoTotal + 0.01) throw new Error("ส่วนลด Auto Bundle ไม่ตรงกับเงื่อนไขโปรโมชั่นของระบบ");
         } else {
           const promo = promoList.find(p => (p['Promo Name'] || '').toString().trim() === dName && (p.Status || '').toString().trim() === 'เปิด');
           if (!promo) throw new Error("ไม่พบโปรโมชั่นส่วนลด หรือโปรโมชั่นถูกปิดใช้งาน: " + dName);
@@ -877,12 +1010,13 @@ function processCheckout(payload, secureUser, ss) {
           const promoType = (promo['Discount Type'] || 'Fixed').toString().trim();
           const goodsTotal = Object.keys(catTotals).reduce((s, k) => s + catTotals[k], 0);
           const maxVal = promoType === 'Percent' ? (goodsTotal * promoVal) / 100 : promoVal;
-          if (val > maxVal + 0.01) throw new Error("มูลค่าส่วนลดเกินที่โปรโมชั่นกำหนด: " + dName);
+          promoUsed[dName] = (promoUsed[dName] || 0) + val;
+          if (promoUsed[dName] > maxVal + 0.01) throw new Error("มูลค่าส่วนลดเกินที่โปรโมชั่นกำหนด: " + dName);
         }
         orderRows.push([
           orderId, now, actualChannel, actualBranch, "", "",
           "", "", "",
-          "DISCOUNT", dName, 1, -val,
+          "DISCOUNT", sanitizeSheetText_(dName), 1, -val,
           "", "", "", "",
           "", "", -val, "Pending", "", "", ""
         ]);
@@ -923,7 +1057,7 @@ function processCheckout(payload, secureUser, ss) {
 // 8A.2 — จำลูกค้าเก่าจากเบอร์โทร: สแกน Orders จากแถวล่างสุดขึ้นบน (ออเดอร์ล่าสุดก่อน)
 // Contact Number อยู่เฉพาะแถวแรกของออเดอร์ — แถวเก่าอาจเป็น base64 จึงเทียบหลังผ่าน deobfuscate
 // คืนเฉพาะ 4 ฟิลด์ที่ใช้เติมฟอร์ม checkout — ห้ามคืนทั้งแถว (มีข้อมูลออเดอร์อื่นปน)
-function getCustomerByPhone(payload, ss) {
+function getCustomerByPhone(payload, secureUser, ss) {
   const phone = (payload && payload.phone ? payload.phone : '').toString().replace(/\D/g, '');
   if (!/^\d{9,10}$/.test(phone)) throw new Error("เบอร์โทรศัพท์ไม่ถูกต้อง (ต้องเป็นตัวเลข 9-10 หลัก)");
   const sheet = ss.getSheetByName("Orders");
@@ -937,10 +1071,12 @@ function getCustomerByPhone(payload, ss) {
   const emailIdx = headers.indexOf("Email");
   const idCardIdx = headers.indexOf("ID Card_Passport");
   const codeIdx = headers.indexOf("Code Handraiser");
+  const branchIdx = headers.indexOf("Branch Code");
   for (let i = data.length - 1; i >= 1; i--) {
     const raw = (data[i][phoneIdx] || '').toString().trim();
     if (!raw) continue; // แถวของแถม/ส่วนลด/แถวรอง — ข้าม
-    if (deobfuscate(raw).replace(/\D/g, '') === phone) {
+    if (deobfuscate(raw).replace(/\D/g, '') === phone &&
+        (secureUser.Role !== 'Sales' || branchIdx === -1 || data[i][branchIdx] === secureUser['Branch Code'])) {
       return {
         status: 'success', found: true,
         customerName: nameIdx > -1 ? (data[i][nameIdx] || '') : '',
@@ -973,6 +1109,18 @@ function updateFullOrder(dataObj, secureUser, ss) {
     if (!orderId) throw new Error("ไม่พบ OrderID");
     
     let newStatus = dataObj["Order Status"] || oldDataRow[oHeaders.indexOf("Order Status")];
+    // Order Status/Reservation Status เป็นค่าจาก <select> ที่ควบคุมชุดค่าตายตัว — ไม่อยู่ใน FREE_TEXT_COLS_ (ห้าม sanitize ทับ ดู comment บรรทัดล่าง)
+    // แต่ก็ต้อง whitelist-validate ฝั่ง server เพราะ API รับ payload ดิบได้โดยไม่ผ่าน <select> ของ UI — ไม่งั้นเขียนสตริงใดๆ (รวมถึง formula) ลงคอลัมน์นี้ได้ตรงๆ
+    if (dataObj["Order Status"] !== undefined) {
+      const statusSheet = ss.getSheetByName("OrderStatus");
+      const validStatuses = statusSheet ? statusSheet.getDataRange().getValues().slice(1).map(r => (r[1] || '').toString().trim()).filter(Boolean) : [];
+      validStatuses.push('Cancelled');
+      if (!validStatuses.includes(newStatus.toString().trim())) throw new Error("สถานะออเดอร์ไม่ถูกต้อง: " + newStatus);
+    }
+    if (dataObj["Reservation Status"] !== undefined) {
+      const validResStatuses = ['', 'จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'];
+      if (!validResStatuses.includes(dataObj["Reservation Status"].toString().trim())) throw new Error("ประเภทการจองไม่ถูกต้อง: " + dataObj["Reservation Status"]);
+    }
       if (secureUser.Role === 'Manager') {
         dataObj = { "_rowIndex": dataObj["_rowIndex"], "Order Status": newStatus };
       }
@@ -980,7 +1128,8 @@ function updateFullOrder(dataObj, secureUser, ss) {
     // นโยบาย 2026-07-05 (รอบ 7.1): PII เขียน plain text — ไม่ obfuscate อีกต่อไป (ฝั่งอ่านคง deobfuscate ไว้เพื่อแถวเก่า)
 
     const prodData = prodSheet.getDataRange().getValues(); 
-    const pSkuIdx = prodData[0].indexOf("SKU"); 
+    const pHeaders = prodData[0];
+    const pSkuIdx = pHeaders.indexOf("SKU"); 
     const pStockIdx = prodData[0].indexOf("Stock");
     const pNameIdx = prodData[0].indexOf("Product Name");
     
@@ -996,10 +1145,12 @@ function updateFullOrder(dataObj, secureUser, ss) {
     
     let invRows = [];
     
-    const adjustStockAndLog = (oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal) => {
+    const adjustStockAndLog = (oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal, oldRemarkVal) => {
       // ไม่มีการเปลี่ยนแปลงที่กระทบสต๊อก — ข้าม ไม่งั้น InventoryLog มีคู่ REVERT/APPLY ขยะทุกแถวทุกครั้งที่แก้ออเดอร์
       if (oldStatusVal !== 'Cancelled' && newStatusVal !== 'Cancelled' && oldSkuVal === newSkuVal && oldQtyVal === newQtyVal) return;
-      if (oldStatusVal !== 'Cancelled' && oldSkuVal && oldSkuVal !== 'DISCOUNT') {
+      // ของแถมที่ตอน checkout สต๊อกไม่พอ (processGift) ไม่เคยตัดสต๊อกจริง — ต้องไม่ REVERT (เติมสต๊อกคืน) ให้แถวที่มี marker "รอสต๊อกของแถม" ใน Remark
+      const oldWasGiftNoStock = (oldRemarkVal || '').toString().trim() === 'รอสต๊อกของแถม';
+      if (oldStatusVal !== 'Cancelled' && oldSkuVal && oldSkuVal !== 'DISCOUNT' && !oldWasGiftNoStock) {
         for (let i = 1; i < prodData.length; i++) {
           if (prodData[i][pSkuIdx] == oldSkuVal) {
             prodData[i][pStockIdx] = parseInt(prodData[i][pStockIdx] || 0) + oldQtyVal;
@@ -1008,9 +1159,15 @@ function updateFullOrder(dataObj, secureUser, ss) {
           }
         }
       }
-      if (newStatusVal !== 'Cancelled' && newSkuVal && newSkuVal !== 'DISCOUNT') {
+      // แถวของแถมที่เดิมไม่เคยตัดสต๊อกจริง (marker "รอสต๊อกของแถม") แล้ว SKU/Qty ไม่ได้ถูกแก้ไข (แค่สถานะออเดอร์เปลี่ยน เช่น un-cancel)
+      // ต้องไม่ตัดสต๊อกจริงตรงนี้ด้วย (สมมาตรกับฝั่ง REVERT ด้านบนที่ข้ามการคืนสต๊อกด้วย marker เดียวกัน) — ไม่งั้น un-cancel ออเดอร์ที่มีของแถมค้างสต๊อก
+      // จะไปตัดสต๊อกจริงทั้งที่ Remark ยังบอกว่า "รอสต๊อกของแถม" อยู่ กลายเป็นสต๊อกรั่วตอน cancel ครั้งถัดไป (REVERT จะข้ามคืนสต๊อกที่เพิ่งถูกตัดไปจริง)
+      const skipApplyForUnresolvedGift = oldWasGiftNoStock && newSkuVal === oldSkuVal && newQtyVal === oldQtyVal;
+      if (newStatusVal !== 'Cancelled' && newSkuVal && newSkuVal !== 'DISCOUNT' && !skipApplyForUnresolvedGift) {
+        let newSkuFound = false;
         for (let i = 1; i < prodData.length; i++) {
           if (prodData[i][pSkuIdx] == newSkuVal) {
+            newSkuFound = true;
             let currentStock = parseInt(prodData[i][pStockIdx] || 0);
             if (currentStock < newQtyVal) throw new Error("สินค้า " + prodData[i][pNameIdx] + " สต๊อกไม่พอสำหรับการแก้ไข (เหลือ " + currentStock + ")");
             prodData[i][pStockIdx] = currentStock - newQtyVal;
@@ -1018,6 +1175,7 @@ function updateFullOrder(dataObj, secureUser, ss) {
             break;
           }
         }
+        if (!newSkuFound) throw new Error("ไม่พบสินค้า SKU: " + newSkuVal);
       }
     };
     
@@ -1031,6 +1189,7 @@ function updateFullOrder(dataObj, secureUser, ss) {
       let oldQtyVal = parseInt(rData[oHeaders.indexOf("Qty")] || 0);
       let oldStatusVal = rData[oHeaders.indexOf("Order Status")];
       let branchVal = rData[oHeaders.indexOf("Branch Code")];
+      let oldRemarkVal = rData[oHeaders.indexOf("Remark")];
       
       let newSkuVal, newQtyVal, newStatusVal;
       let newRowData = [];
@@ -1043,14 +1202,38 @@ function updateFullOrder(dataObj, secureUser, ss) {
         newStatusVal = newStatus;
 
         // Row Total คำนวณฝั่ง server เสมอ (qty × unit price) — ไม่รับค่าจาก client
-        let unitPriceRaw = dataObj["Unit Price"] !== undefined ? dataObj["Unit Price"] : rData[oHeaders.indexOf("Unit Price")];
-        let unitPrice = parseFloat((unitPriceRaw || 0).toString().replace(/,/g, ''));
-        if (isNaN(unitPrice)) unitPrice = 0;
+        let unitPrice = parseFloat((rData[oHeaders.indexOf("Unit Price")] || 0).toString().replace(/,/g, '')) || 0;
+        if (newSkuVal && newSkuVal !== 'DISCOUNT') {
+          let priceFound = false;
+          for (let p = 1; p < prodData.length; p++) {
+            if (prodData[p][pSkuIdx] == newSkuVal) {
+              unitPrice = parseFloat((prodData[p][pHeaders.indexOf("Price")] || 0).toString().replace(/,/g, '')) || 0;
+              priceFound = true;
+              break;
+            }
+          }
+          if (!priceFound) throw new Error("ไม่พบสินค้า SKU สำหรับแก้ไข: " + newSkuVal);
+        }
         dataObj["Row Total"] = newQtyVal * unitPrice;
+        // เขียนค่า Qty ที่ validate/parseInt แล้วกลับเข้า sheet เสมอ — ห้ามปล่อย dataObj["Qty"] ดิบ (เช่น "5.5") ผ่านไปตรงๆ
+        // ไม่งั้น Qty ที่เก็บจริงจะไม่ตรงกับ newQtyVal ที่ใช้คำนวณ Row Total ด้านบน ทำให้สองคอลัมน์ไม่สอดคล้องกัน
+        dataObj["Qty"] = newQtyVal;
 
+        // Deposit เป็นคอลัมน์ตัวเลข (ไม่อยู่ใน FREE_TEXT_COLS_ ด้านล่าง จึงไม่ผ่าน sanitizeSheetText_) แต่ก็ไม่เคย validate มาก่อน
+        // เหมือน Qty ด้านบน — payload ดิบส่งสตริง/formula เข้าคอลัมน์ตัวเลขนี้ตรงๆ ได้ ถ้าไม่ parse+เช็คก่อน
+        if (dataObj["Deposit"] !== undefined) {
+          const depositVal = parseFloat(dataObj["Deposit"].toString().replace(/,/g, ''));
+          if (isNaN(depositVal) || depositVal < 0) throw new Error("จำนวนเงินมัดจำไม่ถูกต้อง");
+          dataObj["Deposit"] = depositVal;
+        }
+
+        // กัน formula injection บนฟิลด์ข้อความอิสระที่ user พิมพ์เอง — ห้ามครอบคอลัมน์ตัวเลข/ควบคุม (Row Total, Qty, Order Status ฯลฯ)
+        // ไม่งั้นค่าตัวเลขจะกลายเป็นสตริงและพังการรวมยอด/สถานะ
+        // Receipt No เป็นข้อความอิสระเหมือนกัน (sanitize แล้วตอนสร้างออเดอร์ใน processCheckout) — เดิมหลุดจากลิสต์นี้ตอนแก้ไขออเดอร์
+        const FREE_TEXT_COLS_ = ["Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser", "Promo", "Staff", "Booking Phone", "Customer Interests", "Remark", "Receipt No"];
         oHeaders.forEach(h => {
           if (dataObj[h] !== undefined && h !== "_rowIndex") {
-            newRowData.push(dataObj[h]);
+            newRowData.push(FREE_TEXT_COLS_.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]);
           } else {
             newRowData.push(rData[oHeaders.indexOf(h)]);
           }
@@ -1069,7 +1252,7 @@ function updateFullOrder(dataObj, secureUser, ss) {
         });
       }
       
-      adjustStockAndLog(oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal);
+      adjustStockAndLog(oldStatusVal, newStatusVal, oldSkuVal, newSkuVal, oldQtyVal, newQtyVal, branchVal, oldRemarkVal);
       orderUpdates.push({row: r, data: newRowData});
     });
     
@@ -1110,20 +1293,37 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
     const sheet = ss.getSheetByName(tableName); const data = sheet.getDataRange().getDisplayValues(); const headers = data[0].map(h => h.toString().trim()); let idIndex = headers.indexOf(idField); let rowIndex = -1;
     if (dataObj[idField]) { for (let i = 1; i < data.length; i++) { if (data[i][idIndex] == dataObj[idField]) { rowIndex = i + 1; break; } } }
+    let generatedPassword = null;
     if (tableName === "Members") {
       if (!dataObj.Password || dataObj.Password.trim() === "") {
         if (rowIndex > -1) {
           dataObj.Password = data[rowIndex - 1][headers.indexOf("Password")];
         } else {
-          dataObj.Password = hashPassword("1234");
+          // สมาชิกใหม่เว้นรหัสผ่านว่าง — สุ่มรหัสผ่านแบบเดียวกับ initialAdmin ใน setupDatabase (ห้าม hardcode ค่าเดาง่ายอย่าง "1234")
+          generatedPassword = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
+          dataObj.Password = hashPassword(generatedPassword);
         }
       } else if (!looksLikePasswordHash_(dataObj.Password)) {
         dataObj.Password = hashPassword(dataObj.Password);
       }
     }
-    let rowData = headers.map(h => dataObj[h] !== undefined ? dataObj[h] : "");
+    // กัน formula injection (rule 24) — เดิม saveRecord (CRUD กลางของ Products/Branches/Channels/Promotions/Interests/GiftMappings/AutoPromotions/Members)
+    // ไม่เคยผ่าน sanitizeSheetText_ เลยสักคอลัมน์ ทั้งที่เป็นจุดที่ Admin พิมพ์ข้อความอิสระบ่อยที่สุดในระบบ — ห้ามครอบคอลัมน์ตัวเลข/select/ID
+    // (เช่น Value ที่ตั้งใจติดลบ) จึงต้องระบุเฉพาะคอลัมน์ข้อความอิสระจริงๆ ต่อชีต ไม่ blanket-apply ทั้งแถว
+    const SAVE_RECORD_FREE_TEXT_COLS_ = {
+      "Products": ["Product Name", "Model", "Product Group", "Capacity", "Color", "Image URL", "Unit"],
+      "Branches": ["Channel", "Branch Name", "Area", "Mall", "Region", "Province", "Type Name"],
+      "Channels": ["Channel Name", "Description"],
+      "Promotions": ["Promo Name"],
+      "Interests": ["Interest Name"],
+      "GiftMappings": ["Target Mobile (SKU or Group)", "Brand Gifts", "Channel Gifts"],
+      "AutoPromotions": ["Message Suggest", "Message Apply"],
+      "Members": ["Name"]
+    };
+    const freeTextCols = SAVE_RECORD_FREE_TEXT_COLS_[tableName] || [];
+    let rowData = headers.map(h => dataObj[h] !== undefined ? (freeTextCols.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]) : "");
     if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); } const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions"]; if (cacheableTables.includes(tableName)) CacheService.getScriptCache().remove("TABLE_" + tableName);
-    return { status: 'success' };
+    return generatedPassword ? { status: 'success', generatedPassword: generatedPassword } : { status: 'success' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
   } finally {
@@ -1152,11 +1352,12 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
         const prodData = prodSheet.getDataRange().getValues();
         const pSkuIdx = prodData[0].indexOf("SKU");
         const pStockIdx = prodData[0].indexOf("Stock");
-        
+
         const skuIdx = data[0].indexOf("SKU");
         const qtyIdx = data[0].indexOf("Qty");
         const statusIdx = data[0].indexOf("Order Status");
         const branchIdx = data[0].indexOf("Branch Code");
+        const remarkIdx = data[0].indexOf("Remark");
         
         let deletedCount = 0;
         let invRows = [];
@@ -1168,7 +1369,11 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
             let rowQty = parseInt(data[i][qtyIdx] || 0);
             let rowBranch = data[i][branchIdx];
             
-            if (rowStatus !== 'Cancelled' && rowSku && rowSku !== 'DISCOUNT') {
+            // ของแถมที่ตอน checkout สต๊อกไม่พอ (processGift) ไม่เคยตัดสต๊อกจริง — ต้องเช็คจาก marker "รอสต๊อกของแถม" ที่ Remark ของแถวนั้นโดยตรง
+            // ไม่ใช่เดาจากสต๊อกปัจจุบัน (currentStock < rowQty) เพราะสต๊อกอาจถูกเติม/ตัดจากรายการอื่นไปแล้วหลัง checkout ทำให้เดาผิดทั้งสองทาง
+            let shouldRestore = rowStatus !== 'Cancelled' && rowSku && rowSku !== 'DISCOUNT'
+              && !(remarkIdx > -1 && (data[i][remarkIdx] || '').toString().trim() === 'รอสต๊อกของแถม');
+            if (shouldRestore) {
               for (let p = 1; p < prodData.length; p++) {
                 if (prodData[p][pSkuIdx] == rowSku) {
                   prodData[p][pStockIdx] = parseInt(prodData[p][pStockIdx] || 0) + rowQty;
@@ -1281,6 +1486,9 @@ function saveSettingsItem(payload, secureUser, ss) {
             throw new Error("Drive Folder ID ที่ตั้งค่าไว้ไม่ถูกต้อง หรือบัญชีนี้ไม่มีสิทธิ์เข้าถึงโฟลเดอร์ (ตรวจที่ ตั้งค่าระบบ → ฐานข้อมูล)");
           }
         }
+        // กัน formula injection (rule 24) — path นี้เป็น key-value generic ครอบทั้ง SystemName/InvoiceCompanyName/InvoiceCompanyAddress/
+        // InvoiceCompanyEmail/ApproverName ซึ่งเป็นข้อความอิสระที่ Admin พิมพ์เองและถูกพิมพ์ลงใบเสนอราคา/ใบแจ้งหนี้จริง — เดิมไม่เคย sanitize เลย
+        val = sanitizeSheetText_(val);
         for (let i = 1; i < data.length; i++) {
           if (data[i][0] === key) {
             // บังคับ cell เป็น plain text ก่อนเขียน — ไม่งั้น Sheets แปลง "2026-06-01T00:00" เป็น Date
@@ -1304,9 +1512,10 @@ function saveSettingsItem(payload, secureUser, ss) {
       return { status: 'success' };
     }
     
-    const url = payload.url ? payload.url.toString().trim() : "";
-    const targetLink = payload.targetLink ? payload.targetLink.toString().trim() : "";
-    const details = payload.details ? payload.details.toString().trim() : "";
+    // กัน formula injection (rule 24) — banner url/targetLink/details เป็นข้อความอิสระที่ Admin พิมพ์เอง เดิมไม่เคย sanitize
+    const url = sanitizeSheetText_(payload.url ? payload.url.toString().trim() : "");
+    const targetLink = sanitizeSheetText_(payload.targetLink ? payload.targetLink.toString().trim() : "");
+    const details = sanitizeSheetText_(payload.details ? payload.details.toString().trim() : "");
     const rowIndex = payload.rowIndex;
     const bannersSheet = ss.getSheetByName("UI_Banners");
     if (!bannersSheet) throw new Error("UI_Banners sheet not found. Please click Auto Setup.");
@@ -1330,6 +1539,9 @@ function saveSettingsItem(payload, secureUser, ss) {
     }
     
     if (rowIndex) {
+      // กัน rowIndex เพี้ยน (ค้างจาก UI เก่า/แถวถูกลบไปแล้ว) เขียนทับ header หรือแถวนอกขอบเขตชีตแบบเงียบๆ
+      const ri = parseInt(rowIndex, 10);
+      if (!Number.isInteger(ri) || ri < 2 || ri > bannersSheet.getLastRow()) throw new Error("ตำแหน่งแถวไม่ถูกต้อง กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
       bannersSheet.getRange(rowIndex, 3).setValue(url);
       bannersSheet.getRange(rowIndex, 4).setValue('Active');
       bannersSheet.getRange(rowIndex, 5).setValue(targetLink);
@@ -1421,6 +1633,15 @@ function uploadImage(payload, secureUser, ss) {
 // ===== ใบเสนอราคา/ใบแจ้งหนี้ (Invoices) — เก็บลงชีต + workflow อนุมัติ (2026-07-11) =====
 // หนึ่งเอกสาร = หนึ่งแถว; รายการสินค้าเก็บเป็น JSON ใน "Items JSON" (เอกสารอิสระ ไม่ผูกกับ Orders/Stock)
 // สถานะ: "รออนุมัติ" → "อนุมัติแล้ว" (Admin/Manager กดอนุมัติ; เอกสารที่อนุมัติแล้วแก้ไข/ลบไม่ได้ ยกเว้น Admin ลบได้)
+// ลำดับคอลัมน์ Orders ตามชีวิตจริง (setupDatabase ใช้สร้างชีตใหม่ + processCheckout ใช้ตรวจว่าชีตเดิมไม่ถูกสลับคอลัมน์)
+// orderRows.push() ทั้ง 3 จุดใน processCheckout เป็น array ตำแหน่งตรงตัว (ไม่ได้ map ด้วยชื่อ header) — ถ้าคอลัมน์ในชีตจริงสลับตำแหน่งไปจากนี้
+// (เช่น มีคนแทรก/ย้ายคอลัมน์ใน Sheets UI ตรงๆ) ข้อมูลจะเขียนผิดคอลัมน์แบบเงียบๆ จึงต้องเช็คก่อนเขียนทุกครั้ง ดู rule ที่เกี่ยวข้องใน CLAUDE.md
+var ORDERS_HEADERS_ = [
+  "OrderID", "Timestamp", "Channel", "Branch Code", "Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser",
+  "SKU", "Product Name", "Qty", "Unit Price", "Promo", "Reservation Status", "Staff", "Booking Phone",
+  "Customer Interests", "Remark", "Row Total", "Order Status", "Receipt No", "Deposit", "Client Request ID"
+];
+
 var INVOICES_HEADERS_ = [
   "Invoice ID", "Invoice No", "Type", "Invoice Date",
   "Customer Name", "Customer Address", "Customer Phone", "Customer Email", "Customer TaxID",
@@ -1473,28 +1694,29 @@ function saveInvoice(payload, secureUser, ss) {
     const logoUrl = (d.logoUrl || '').toString();
     const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
 
+    // sanitizeSheetText_ กัน formula injection — setNumberFormat('@') ด้านล่างกันแค่การแปลงชนิดตัวเลข/วันที่ ไม่กัน "=..." ตีความเป็นสูตร
     const values = {
-      "Invoice No": invoiceNo,
-      "Type": (d.type || 'ใบเสนอราคา (Quotation)').toString(),
+      "Invoice No": sanitizeSheetText_(invoiceNo),
+      "Type": sanitizeSheetText_(d.type || 'ใบเสนอราคา (Quotation)'),
       "Invoice Date": (d.invoiceDate || '').toString(),
-      "Customer Name": (d.custName || '').toString(),
-      "Customer Address": (d.custAddress || '').toString(),
-      "Customer Phone": (d.custPhone || '').toString(),
-      "Customer Email": (d.custEmail || '').toString(),
-      "Customer TaxID": (d.custTaxId || '').toString(),
-      "Job Name": (d.jobName || '').toString(),
-      "Payment Terms": (d.payTerms || '').toString(),
+      "Customer Name": sanitizeSheetText_(d.custName || ''),
+      "Customer Address": sanitizeSheetText_(d.custAddress || ''),
+      "Customer Phone": sanitizeSheetText_(d.custPhone || ''),
+      "Customer Email": sanitizeSheetText_(d.custEmail || ''),
+      "Customer TaxID": sanitizeSheetText_(d.custTaxId || ''),
+      "Job Name": sanitizeSheetText_(d.jobName || ''),
+      "Payment Terms": sanitizeSheetText_(d.payTerms || ''),
       "Items JSON": JSON.stringify(items),
-      "Remarks": (d.remarks || '').toString(),
+      "Remarks": sanitizeSheetText_(d.remarks || ''),
       "VAT Enabled": d.vatEnabled ? 'TRUE' : 'FALSE',
       "WHT Percent": parseFloat(d.whtPct) || 0,
       "Sub Total": parseFloat(d.subTotal) || 0,
       "VAT": parseFloat(d.vat) || 0,
       "WHT": parseFloat(d.wht) || 0,
       "Net Total": parseFloat(d.netTotal) || 0,
-      "Company Name": (d.companyName || '').toString(),
-      "Company Address": (d.companyAddress || '').toString(),
-      "Company Email": (d.companyEmail || '').toString(),
+      "Company Name": sanitizeSheetText_(d.companyName || ''),
+      "Company Address": sanitizeSheetText_(d.companyAddress || ''),
+      "Company Email": sanitizeSheetText_(d.companyEmail || ''),
       // เก็บเฉพาะ URL จริง — โลโก้ที่เปลี่ยนเฉพาะใบผ่าน FileReader เป็น data: URL ยาวมาก (เกิน cell limit ได้) จะไม่เก็บ
       "Logo Url": /^https?:\/\//.test(logoUrl) ? logoUrl : '',
       "Status": "รออนุมัติ",
@@ -1625,7 +1847,8 @@ function deleteSettingsItem(payload, secureUser, ss) {
     const type = payload.type;
     let rowIndex = parseInt(payload.rowIndex);
     const bannerId = payload.bannerId ? payload.bannerId.toString().trim() : '';
-    if (!rowIndex || rowIndex < 2) throw new Error("Invalid row index");
+    // เดิมเช็คแค่ขอบล่าง (saveSettingsItem เช็คทั้งขอบบน-ล่างอยู่แล้ว) — rowIndex ที่เกิน lastRow ยังหลุดผ่านมาถึง deleteRow() ได้ถ้าไม่มี bannerId แนบมา
+    if (!rowIndex || rowIndex < 2 || rowIndex > bannersSheet.getLastRow()) throw new Error("Invalid row index");
 
     // กันลบผิดแถวเมื่อชีตขยับ (มีคนลบ/แทรกแถวไปก่อน) — ยืนยันด้วย Banner ID ถ้าไม่ตรงให้ re-scan หาแถวจริง
     if (bannerId) {
@@ -1650,6 +1873,3 @@ function deleteSettingsItem(payload, secureUser, ss) {
     lock.releaseLock();
   }
 }
-
-
-
