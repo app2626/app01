@@ -580,8 +580,9 @@ function getAppData(token) {
     const timeData = timeSheet.getRange(2, 1, 1, 2).getDisplayValues()[0];
     timeValid = checkIsTimeValid(timeData[0], timeData[1]);
   }
+  const requireCodeMyOppo = isRequireCodeMyOppo_(ss);
 
-  return { announcement, promotions, locations, timeValid, productMap }; // ส่งข้อมูล Model ออกไป
+  return { announcement, promotions, locations, timeValid, productMap, requireCodeMyOppo }; // ส่งข้อมูล Model ออกไป
 }
 
 function getStockByBranch(token, locCode) {
@@ -618,6 +619,14 @@ function getStockByBranch(token, locCode) {
     }
   }
   return result;
+}
+
+// อ่าน flag "บังคับกรอก Code MyOppo" จากคอลัมน์ C แถว 2 ของชีต "time" (คอลัมน์เดียวกับ A/B ที่เก็บช่วงเวลาทำการ)
+function isRequireCodeMyOppo_(ss) {
+  const timeSheet = findSheet(ss, "time");
+  if (!timeSheet || timeSheet.getLastRow() <= 1) return false;
+  const val = timeSheet.getRange(2, 3).getDisplayValue().toString().trim().toUpperCase();
+  return val === "TRUE";
 }
 
 function checkIsTimeValid(startStr, endStr) {
@@ -737,6 +746,8 @@ function saveBatchRecords(token, payload) {
         return { success: false, message: "ขณะนี้อยู่นอกเวลาทำการ ไม่สามารถบันทึกข้อมูลได้" };
       }
     }
+    // บังคับตรวจสอบ Code MyOppo ฝั่ง server ด้วยเช่นกัน (ฝั่ง client แค่ล็อกฟอร์มด้วย required ซึ่งเลี่ยงได้ผ่าน console)
+    const requireCodeMyOppo = isRequireCodeMyOppo_(ss);
 
     // บังคับสาขาจาก session ที่ login ไว้เท่านั้น ไม่เชื่อ locCode/locName ที่ client ส่งมา
     const branchLocCode = session.locCode;
@@ -787,6 +798,8 @@ function saveBatchRecords(token, payload) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ถูกทำรายการแอคไปแล้ว`);
       } else if(!validStockKeys.has(checkKey) && !validStockKeys.has(transferKey)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ไม่มีในสต๊อกของสาขานี้ (หรือ Warehouse Transfer)`);
+      } else if(requireCodeMyOppo && !(item.codeMyOppo || "").toString().trim()) {
+        errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) กรุณาระบุ Code MyOppo`);
       } else {
         rowsToInsert.push([
           timestamp, formattedActDate, actEmpName, branchLocCode, branchLocName,
@@ -883,8 +896,9 @@ function adminGetSettings(adminToken) {
     const t = timeSheet.getRange(2, 1, 1, 2).getDisplayValues()[0];
     timeWindow = { start: t[0] || "", end: t[1] || "" };
   }
+  const requireCodeMyOppo = isRequireCodeMyOppo_(ss);
 
-  return { success: true, users: users, announcement: announcement, promotions: promotions, timeWindow: timeWindow };
+  return { success: true, users: users, announcement: announcement, promotions: promotions, timeWindow: timeWindow, requireCodeMyOppo: requireCodeMyOppo };
 }
 
 // role: ระบุเฉพาะตอนสร้างบัญชีใหม่เท่านั้น (ค่าเริ่มต้น ROLE_NORMAL ถ้าไม่ระบุ) — ตอนรีเซ็ตรหัสผ่านบัญชีเดิม
@@ -1015,6 +1029,15 @@ function adminSaveTimeWindow(adminToken, startStr, endStr) {
   if (!timeSheet) return { success: false, message: "ไม่พบชีต time" };
   timeSheet.getRange(2, 1, 1, 2).setValues([[(startStr || "").toString(), (endStr || "").toString()]]);
   return { success: true, message: "บันทึกช่วงเวลาทำการสำเร็จ" };
+}
+
+function adminSaveRequireCodeMyOppo(adminToken, required) {
+  requireAdminSession_(adminToken);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const timeSheet = findSheet(ss, "time");
+  if (!timeSheet) return { success: false, message: "ไม่พบชีต time" };
+  timeSheet.getRange(2, 3).setValue(required ? "TRUE" : "FALSE");
+  return { success: true, message: "บันทึกการตั้งค่าบังคับกรอก Code MyOppo สำเร็จ" };
 }
 
 function verifyAdminAndExport(pin, rowIds) {

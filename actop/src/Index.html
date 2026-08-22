@@ -376,7 +376,7 @@
                             <select class="form-select select-imei" required><option></option></select>
                         </div>
                         <div class="col-md-3 mb-2">
-                            <label class="form-label fw-bold text-muted">Code MyOppo</label>
+                            <label class="form-label fw-bold text-muted">Code MyOppo <span class="code-myoppo-req-star text-danger d-none">*</span></label>
                             <input type="text" class="form-control input-code-myoppo" placeholder="ระบุ Code MyOppo">
                         </div>
                         <div class="col-md-3 mb-2">
@@ -750,6 +750,17 @@
                 </div>
 
                 <div class="card p-3 mb-4 shadow-sm border">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fas fa-list-check"></i> ตั้งค่าฟอร์มบันทึกข้อมูล</h6>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="settingsRequireCodeMyOppo">
+                        <label class="form-check-label fw-bold text-secondary" for="settingsRequireCodeMyOppo">บังคับกรอก Code MyOppo</label>
+                    </div>
+                    <div class="text-end mt-2">
+                        <button type="button" class="btn btn-primary fw-bold" onclick="saveRequireCodeMyOppo()"><i class="fas fa-save"></i> บันทึกการตั้งค่า</button>
+                    </div>
+                </div>
+
+                <div class="card p-3 mb-4 shadow-sm border">
                     <h6 class="fw-bold text-primary mb-3"><i class="fas fa-clock"></i> ตั้งค่าช่วงเวลาทำการ (จำกัดเวลาบันทึกฟอร์ม ACT)</h6>
                     <div class="row">
                         <div class="col-md-6 mb-2">
@@ -798,6 +809,12 @@
     var trackTableInstance = null;
     var settingsUsersTableInstance = null;
     var adminToken = null;
+    var requireCodeMyOppoField = false;
+
+    function applyRequireCodeMyOppoUI() {
+        $('.input-code-myoppo').prop('required', requireCodeMyOppoField);
+        $('.code-myoppo-req-star').toggleClass('d-none', !requireCodeMyOppoField);
+    }
 
     var currentToken = null;
     var currentLocCode = null;
@@ -1234,6 +1251,7 @@
             newRow.find('.input-desc').val('');
             newRow.find('.input-code-myoppo').val('');
             newRow.appendTo('#itemsContainer');
+            applyRequireCodeMyOppoUI();
             initRowSelect2();
             populateSkuDropdown(newRow.find('.select-sku'));
             newRow.find('.select-imei').empty().append('<option></option>');
@@ -1312,6 +1330,7 @@
                 var codeMyOppo = $(this).find('.input-code-myoppo').val();
                 var status = $(this).find('.input-status').val();
                 if(!sku || !imei) validationError = true;
+                if(requireCodeMyOppoField && !codeMyOppo) validationError = true;
                 payload.items.push({ sku: sku, desc: desc, imei: imei, codeMyOppo: codeMyOppo, status: status });
             });
 
@@ -1361,7 +1380,9 @@
         $('#overlay').fadeOut();
 
         rawLocations = data.locations;
-        masterProductMap = data.productMap || {}; 
+        masterProductMap = data.productMap || {};
+        requireCodeMyOppoField = !!data.requireCodeMyOppo;
+        applyRequireCodeMyOppoUI();
 
         var areaSet = [];
         var locSet = [];
@@ -2000,6 +2021,7 @@
             renderSettingsPromotions(res.promotions);
             $('#settingsTimeStart').val(res.timeWindow.start);
             $('#settingsTimeEnd').val(res.timeWindow.end);
+            $('#settingsRequireCodeMyOppo').prop('checked', !!res.requireCodeMyOppo);
             $('#settingsLocked').addClass('d-none');
             $('#settingsContent').removeClass('d-none');
         }).adminGetSettings(adminToken);
@@ -2105,6 +2127,13 @@
         google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
             if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
         }).adminSavePromotions(adminToken, promotions);
+    }
+
+    function saveRequireCodeMyOppo() {
+        var required = $('#settingsRequireCodeMyOppo').is(':checked');
+        google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+            if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); requireCodeMyOppoField = required; applyRequireCodeMyOppoUI(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+        }).adminSaveRequireCodeMyOppo(adminToken, required);
     }
 
     function saveTimeWindow() {
