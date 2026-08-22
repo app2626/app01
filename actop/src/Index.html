@@ -2218,7 +2218,11 @@
             confirmButtonText: 'บันทึกการแก้ไข',
             cancelButtonText: 'ยกเลิก',
             showCancelButton: true,
-            focusConfirm: false,
+            didOpen: function() {
+                // iOS Safari: ถ้า input[type=date] ได้ focus ตอนป๊อบอัพเปิด มันจะดีดปฏิทินเด้งขึ้นมาทันทีโดยไม่ได้ตั้งใจ
+                var dateInput = document.getElementById('swalEditActDate');
+                if (dateInput) dateInput.blur();
+            },
             preConfirm: function() {
                 var fields = {
                     actDate: document.getElementById('swalEditActDate').value,
