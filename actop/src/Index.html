@@ -2184,34 +2184,39 @@
         return parts[2] + '-' + parts[1] + '-' + parts[0];
     }
 
+    // สร้าง 1 แถวของฟอร์มแก้ไขใน Swal (label ชิด block + input เต็มความกว้าง)
+    // ต้อง override style ของ .swal2-input เอง (inline style ชนะ class เสมอ) เพราะ default ของมันคือ
+    // width:auto + margin:1em auto ซึ่งทำให้กล่องลอยกลางจอแคบกว่า container และ label (เดิมเป็น inline) ไปเรียงข้างๆ แทนที่จะอยู่คนละบรรทัด
+    function editFieldRow(labelText, inputHtml) {
+        return '<div style="margin-top:14px;text-align:left;">' +
+            '<label style="display:block;font-weight:700;font-size:13px;color:#6c757d;margin-bottom:5px;">' + labelText + '</label>' +
+            inputHtml +
+            '</div>';
+    }
+
     function editActRecord(rowId) {
         var record = globalAllRecords.find(function(r) { return Number(r.rowId) === Number(rowId); });
         if (!record) { Swal.fire('ผิดพลาด', 'ไม่พบรายการนี้ (อาจถูกลบหรือรีเฟรชข้อมูลไปแล้ว)', 'error'); return; }
 
         var displayActDate = record.actDate ? record.actDate.toString().replace(/'/g, '').trim() : '';
         var displayCodeMyOppo = record.codeMyOppo ? record.codeMyOppo.toString().replace(/'/g, '').trim() : '';
+        var inputStyle = 'width:100%;box-sizing:border-box;margin:0;font-size:15px;padding:9px 12px;';
 
         Swal.fire({
             title: 'แก้ไขรายการ ACT (แถว ' + rowId + ')',
+            width: 480,
             html:
-                '<div class="text-start">' +
-                '<label class="fw-bold small">วันที่ ACT</label>' +
-                '<input id="swalEditActDate" type="date" class="swal2-input" value="' + escapeHtml(ddmmyyyyToInputDate(displayActDate)) + '">' +
-                '<label class="fw-bold small">SKU</label>' +
-                '<input id="swalEditSku" class="swal2-input" value="' + escapeHtml(record.sku || '') + '">' +
-                '<label class="fw-bold small">รายละเอียดสินค้า</label>' +
-                '<input id="swalEditDesc" class="swal2-input" value="' + escapeHtml(record.desc || '') + '">' +
-                '<label class="fw-bold small">IMEI</label>' +
-                '<input id="swalEditImei" class="swal2-input" value="' + escapeHtml(record.imei || '') + '">' +
-                '<label class="fw-bold small">Code MyOppo</label>' +
-                '<input id="swalEditCodeMyOppo" class="swal2-input" value="' + escapeHtml(displayCodeMyOppo) + '">' +
-                '<label class="fw-bold small">สถานะ</label>' +
-                '<select id="swalEditStatus" class="swal2-input">' +
+                editFieldRow('วันที่ ACT', '<input id="swalEditActDate" type="date" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(ddmmyyyyToInputDate(displayActDate)) + '">') +
+                editFieldRow('SKU', '<input id="swalEditSku" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(record.sku || '') + '">') +
+                editFieldRow('รายละเอียดสินค้า', '<input id="swalEditDesc" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(record.desc || '') + '">') +
+                editFieldRow('IMEI', '<input id="swalEditImei" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(record.imei || '') + '">') +
+                editFieldRow('Code MyOppo', '<input id="swalEditCodeMyOppo" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(displayCodeMyOppo) + '">') +
+                editFieldRow('สถานะ', '<select id="swalEditStatus" class="swal2-input" style="' + inputStyle + '">' +
                     '<option value="ยังไม่ขาย"' + (record.status === 'ยังไม่ขาย' ? ' selected' : '') + '>ยังไม่ขาย</option>' +
                     '<option value="ขายแล้ว"' + (record.status === 'ขายแล้ว' ? ' selected' : '') + '>ขายแล้ว</option>' +
-                '</select>' +
-                '</div>',
+                '</select>'),
             confirmButtonText: 'บันทึกการแก้ไข',
+            cancelButtonText: 'ยกเลิก',
             showCancelButton: true,
             focusConfirm: false,
             preConfirm: function() {
