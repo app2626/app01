@@ -15,6 +15,22 @@ function productSave(name, adress, celular, all_product_json, total) {
   lock.tryLock(10000)
   if (lock.hasLock()) {
     try {
+      // เช็คแค่ว่า id มีจริงในระบบไหม (กันข้อมูลเพี้ยน/หน้าเก่าค้าง) — ส่วนสต็อกไม่พอ อนุญาตให้เบิกได้
+      // เพราะฝั่ง client เตือนและให้ผู้ใช้ยืนยันก่อนแล้ว (ดู checkStock ด้านล่าง)
+      const { idToCode } = getStockSnapshot();
+
+      let unknownIds = [];
+      all_product_json.forEach(r => {
+        if (!idToCode[r.id]) unknownIds.push(r.id);
+      });
+
+      if (unknownIds.length > 0) {
+        return JSON.stringify({
+          success: false,
+          message: "ไม่พบสินค้าบางรายการในระบบ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง"
+        });
+      }
+
       const ws = ss.getSheetByName("บันทึกรายการเบิก");
       const currentDate = new Date()
 
@@ -30,16 +46,19 @@ function productSave(name, adress, celular, all_product_json, total) {
           r.quantity, //ปริมาณ
         ]);
       });
-      
+
       // บังคับให้ Spreadsheet อัปเดตและคำนวณสูตรทันที
       SpreadsheetApp.flush();
-      
-      return "บันทึกการสั่งเบิกเรียบร้อย";
+
+      return JSON.stringify({ success: true, message: "บันทึกการสั่งเบิกเรียบร้อย" });
     } finally {
       lock.releaseLock();
     }
   } else {
-    return "ไม่สามารถทำรายการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง";
+    return JSON.stringify({
+      success: false,
+      message: "ไม่สามารถทำรายการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง"
+    });
   }
 }
 
@@ -77,47 +96,89 @@ function categoryLoad() {
 }
 
 
-function productLoad() {
+// ชื่อสินค้าทั้งในชีตสินค้าและชีตบันทึกการเบิกอยู่ในรูปแบบ "[รหัสสินค้า] ชื่อสินค้า"
+// ใช้รหัสสินค้า (บาร์โค้ด) เป็น key กลางแทน id เล็กๆ เพราะสต็อกถูกรวมข้ามสาขา
+// และมีสินค้าเดียวกันซ้ำกันคนละ id ในชีตสินค้า
+function extractProductCode(text) {
+  const match = text && text.toString().match(/^\[([^\]]+)\]/);
+  return match ? match[1].trim() : text.toString().trim();
+}
+
+// อ่านสต็อกปัจจุบันของทุกสินค้า (จับคู่ด้วยรหัสสินค้า/บาร์โค้ด รวมยอดเบิกทุกสาขา)
+// ใช้ร่วมกันทั้ง productLoad (แสดงผล), productSave (เช็คว่า id มีจริง) และ checkStock (เตือนก่อนยืนยัน)
+function getStockSnapshot() {
   const productSheet = ss.getSheetByName("รายการสินค้า");
   const logSheet = ss.getSheetByName("บันทึกรายการเบิก");
-  
+
   const pLastRow = productSheet.getLastRow();
   const lLastRow = logSheet.getLastRow();
 
   // ดึงข้อมูลสินค้า (ข้ามหัวตารางแถวที่ 1)
   const productData = pLastRow > 1 ? productSheet.getRange(2, 1, pLastRow - 1, productSheet.getLastColumn()).getValues() : [];
-  
-  // ดึงข้อมูลการเบิก (ข้ามหัวตารางแถวที่ 1, ดึง ID ที่ Col E และ Quantity ที่ Col G)
-  const logData = lLastRow > 1 ? logSheet.getRange(2, 5, lLastRow - 1, 3).getValues() : [];
 
-  // สร้าง Object เพื่อรวมผลรวมการเบิกรายสินค้า
-  let salesSummary = {};
+  // ดึงข้อมูลการเบิก (ข้ามหัวตารางแถวที่ 1, ดึงชื่อสินค้าที่ Col F และ Quantity ที่ Col G)
+  const logData = lLastRow > 1 ? logSheet.getRange(2, 6, lLastRow - 1, 2).getValues() : [];
+
+  // สร้าง Object เพื่อรวมผลรวมการเบิกรายสินค้า (รวมทุกสาขา เพราะสต็อกใช้ร่วมกัน)
+  let totalOutByCode = {};
   logData.forEach(row => {
-    let id = row[0]; // คอลัมน์ E
-    let qty = Number(row[2]) || 0; // คอลัมน์ G
-    salesSummary[id] = (salesSummary[id] || 0) + qty;
+    let code = extractProductCode(row[0]); // คอลัมน์ F
+    let qty = Number(row[1]) || 0; // คอลัมน์ G
+    if (!code) return;
+    totalOutByCode[code] = (totalOutByCode[code] || 0) + qty;
   });
 
-  let jo = {};
-  let dataArray = [];
+  let products = [];
+  let idToCode = {};
+  let stockByCode = {};
 
-  for (let i = 0; i < productData.length; i++) {
-    let dataRow = productData[i];
-    if (dataRow[1] && dataRow[1].toString().trim() !== "") {
-      let id = dataRow[0];
-      let initialStock = Number(dataRow[3]) || 0; // คอลัมน์ D คือสต็อกตั้งต้น
-      let totalOut = salesSummary[id] || 0; 
-      
-      let record = {};
-      record['id'] = id;
-      record['producto'] = dataRow[1];
-      record['categoria'] = dataRow[2];
-      record['stock'] = initialStock - totalOut; 
-      dataArray.push(record);
+  productData.forEach(dataRow => {
+    if (!dataRow[1] || dataRow[1].toString().trim() === "") return;
+
+    const id = dataRow[0];
+    const code = extractProductCode(dataRow[1]);
+    const baselineStock = Number(dataRow[3]) || 0; // คอลัมน์ D คือสต็อกคงเหลือตั้งต้น (XLOOKUP จาก สต๊อกSCG)
+    const stock = baselineStock - (totalOutByCode[code] || 0);
+
+    idToCode[id] = code;
+    if (!(code in stockByCode)) stockByCode[code] = stock; // สินค้าซ้ำ id คนละแถวแต่ code เดียวกัน ใช้ค่าแรกที่เจอ
+
+    products.push({
+      id: id,
+      producto: dataRow[1],
+      categoria: dataRow[2],
+      stock: stock
+    });
+  });
+
+  return { products, idToCode, stockByCode };
+}
+
+function productLoad() {
+  const { products } = getStockSnapshot();
+  return JSON.stringify({ user: products });
+}
+
+// เช็คว่าตะกร้าปัจจุบันมีรายการไหนขอเบิกเกินสต็อกที่มีบ้าง สำหรับให้ client เตือนก่อนกดยืนยัน
+// (แค่แจ้งเตือน ไม่ใช่การล็อกกันชน — ระบบยังอนุญาตให้เบิกเกินสต็อกได้ตามที่ผู้ใช้ยืนยัน)
+function checkStock(all_product_json) {
+  const { idToCode, stockByCode } = getStockSnapshot();
+
+  let requestedByCode = {};
+  all_product_json.forEach(r => {
+    const code = idToCode[r.id];
+    if (!code) return; // id ที่ไม่รู้จักปล่อยให้ productSave() ปฏิเสธตอนบันทึกจริง
+    requestedByCode[code] = (requestedByCode[code] || 0) + (Number(r.quantity) || 0);
+  });
+
+  let insufficient = [];
+  Object.keys(requestedByCode).forEach(code => {
+    const available = stockByCode[code] || 0;
+    if (requestedByCode[code] > available) {
+      insufficient.push({ code: code, requested: requestedByCode[code], available: available });
     }
-  }
+  });
 
-  jo.user = dataArray;
-  return JSON.stringify(jo);
+  return JSON.stringify({ sufficient: insufficient.length === 0, insufficient: insufficient });
 }
 
