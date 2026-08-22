@@ -854,6 +854,75 @@ function updateStatus(token, rowId, newStatus) {
   }
 }
 
+// ================= ADMIN: แก้ไข/ลบข้อมูล ACT (หน้า "ข้อมูลACTทั้งหมด") =================
+function adminUpdateActRecord(adminToken, rowId, fields) {
+  requireAdminSession_(adminToken);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
+  if (!sheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต 'อยู่ระหว่างดำเนินการ'" };
+
+  rowId = Number(rowId);
+  if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
+    return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+  }
+
+  fields = fields || {};
+  const sku = (fields.sku || "").toString().trim();
+  const imei = (fields.imei || "").toString().trim();
+  const desc = (fields.desc || "").toString().trim();
+  const codeMyOppo = (fields.codeMyOppo || "").toString().trim();
+  const allowedStatus = ["ยังไม่ขาย", "ขายแล้ว"];
+  const status = allowedStatus.indexOf(fields.status) !== -1 ? fields.status : "ยังไม่ขาย";
+  if (!sku || !imei) return { success: false, message: "กรุณาระบุ SKU และ IMEI" };
+
+  let formattedActDate = (fields.actDate || "").toString().trim();
+  const actD = formattedActDate.split('-');
+  if (actD.length === 3) formattedActDate = "'" + actD[2] + "/" + actD[1] + "/" + actD[0];
+
+  // กัน IMEI ชนกับแถวอื่นในชีตเดียวกัน (ไม่รวมแถวตัวเอง) เพื่อไม่ให้เกิดข้อมูลซ้ำหลังแก้ไข
+  if (sheet.getLastRow() > 1) {
+    const allImei = sheet.getRange(2, 8, sheet.getLastRow() - 1, 1).getDisplayValues();
+    for (let i = 0; i < allImei.length; i++) {
+      const thisRowId = i + 2;
+      if (thisRowId === rowId) continue;
+      if ((allImei[i][0] || "").toString().trim() === imei) {
+        return { success: false, message: "หมายเลข IMEI นี้มีอยู่แล้วในรายการอื่น" };
+      }
+    }
+  }
+
+  const oldVals = sheet.getRange(rowId, 6, 1, 4).getDisplayValues()[0]; // sku, desc, imei, status เดิม (ไว้ log)
+
+  sheet.getRange(rowId, 2).setValue(formattedActDate);
+  sheet.getRange(rowId, 6, 1, 4).setValues([[sku, desc, imei, status]]);
+  sheet.getRange(rowId, 10).setValue("'" + codeMyOppo);
+
+  logAccess_(ss, ADMIN_SESSION_LOCCODE, "Admin", "admin", "EDIT_ACT_RECORD",
+    `แถว ${rowId}: IMEI ${oldVals[2]} (${oldVals[0]}) -> IMEI ${imei} (${sku})`);
+
+  return { success: true, message: "แก้ไขรายการสำเร็จ" };
+}
+
+function adminDeleteActRecord(adminToken, rowId) {
+  requireAdminSession_(adminToken);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
+  if (!sheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต 'อยู่ระหว่างดำเนินการ'" };
+
+  rowId = Number(rowId);
+  if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
+    return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+  }
+
+  const rowVals = sheet.getRange(rowId, 6, 1, 3).getDisplayValues()[0]; // sku, desc, imei
+  sheet.deleteRow(rowId);
+
+  logAccess_(ss, ADMIN_SESSION_LOCCODE, "Admin", "admin", "DELETE_ACT_RECORD",
+    `แถว ${rowId}: IMEI ${rowVals[2]} (${rowVals[0]})`);
+
+  return { success: true, message: "ลบรายการสำเร็จ" };
+}
+
 // ================= ADMIN SETTINGS (gate ด้วยระบบ login Admin แยกต่างหาก) =================
 function adminGetSettings(adminToken) {
   requireAdminSession_(adminToken);

@@ -1138,6 +1138,14 @@
             changeStatus($(this).data('rowid'), $(this).data('status'));
         });
 
+        $(document).on('click', '.btn-edit-act', function() {
+            editActRecord($(this).data('rowid'));
+        });
+
+        $(document).on('click', '.btn-delete-act', function() {
+            deleteActRecord($(this).data('rowid'));
+        });
+
         $(document).on('click', '.btn-toggle-user', function() {
             var locCode = $(this).data('loccode');
             var newActive = !$(this).data('active');
@@ -1492,9 +1500,18 @@
                     unsoldPool.push({ model: mappedModelName, sku: cleanSku, desc: r.desc, area: r.area, locCode: r.locCode, locName: r.locName, imei: r.imei, age: ageDays });
                 }
 
-                var btnManage = (currentRole === ROLE_VIEWER)
-                    ? '<span class="text-muted small"><i class="fas fa-eye"></i> ดูอย่างเดียว</span>'
-                    : '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
+                var btnManage;
+                if (currentLocCode === '__ADMIN__') {
+                    btnManage = '<div class="btn-group" role="group">' +
+                        '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '" title="เปลี่ยนสถานะ"><i class="fas fa-toggle-on"></i></button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-warning fw-bold btn-edit-act" data-rowid="' + r.rowId + '" title="แก้ไขรายการ"><i class="fas fa-edit"></i></button>' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-delete-act" data-rowid="' + r.rowId + '" title="ลบรายการ"><i class="fas fa-trash"></i></button>' +
+                    '</div>';
+                } else if (currentRole === ROLE_VIEWER) {
+                    btnManage = '<span class="text-muted small"><i class="fas fa-eye"></i> ดูอย่างเดียว</span>';
+                } else {
+                    btnManage = '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
+                }
 
                 tbody += '<tr data-rowid="' + r.rowId + '">' +
                     '<td>' + escapeHtml(r.desc) + '</td>' +
@@ -2158,6 +2175,85 @@
                     else { Swal.fire('ผิดพลาด', res.message, 'error'); }
                 }).updateStatus(currentToken, rowId, result.value);
             }
+        });
+    }
+
+    function ddmmyyyyToInputDate(str) {
+        var parts = (str || '').toString().trim().split('/');
+        if (parts.length !== 3) return '';
+        return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    function editActRecord(rowId) {
+        var record = globalAllRecords.find(function(r) { return Number(r.rowId) === Number(rowId); });
+        if (!record) { Swal.fire('ผิดพลาด', 'ไม่พบรายการนี้ (อาจถูกลบหรือรีเฟรชข้อมูลไปแล้ว)', 'error'); return; }
+
+        var displayActDate = record.actDate ? record.actDate.toString().replace(/'/g, '').trim() : '';
+        var displayCodeMyOppo = record.codeMyOppo ? record.codeMyOppo.toString().replace(/'/g, '').trim() : '';
+
+        Swal.fire({
+            title: 'แก้ไขรายการ ACT (แถว ' + rowId + ')',
+            html:
+                '<div class="text-start">' +
+                '<label class="fw-bold small">วันที่ ACT</label>' +
+                '<input id="swalEditActDate" type="date" class="swal2-input" value="' + escapeHtml(ddmmyyyyToInputDate(displayActDate)) + '">' +
+                '<label class="fw-bold small">SKU</label>' +
+                '<input id="swalEditSku" class="swal2-input" value="' + escapeHtml(record.sku || '') + '">' +
+                '<label class="fw-bold small">รายละเอียดสินค้า</label>' +
+                '<input id="swalEditDesc" class="swal2-input" value="' + escapeHtml(record.desc || '') + '">' +
+                '<label class="fw-bold small">IMEI</label>' +
+                '<input id="swalEditImei" class="swal2-input" value="' + escapeHtml(record.imei || '') + '">' +
+                '<label class="fw-bold small">Code MyOppo</label>' +
+                '<input id="swalEditCodeMyOppo" class="swal2-input" value="' + escapeHtml(displayCodeMyOppo) + '">' +
+                '<label class="fw-bold small">สถานะ</label>' +
+                '<select id="swalEditStatus" class="swal2-input">' +
+                    '<option value="ยังไม่ขาย"' + (record.status === 'ยังไม่ขาย' ? ' selected' : '') + '>ยังไม่ขาย</option>' +
+                    '<option value="ขายแล้ว"' + (record.status === 'ขายแล้ว' ? ' selected' : '') + '>ขายแล้ว</option>' +
+                '</select>' +
+                '</div>',
+            confirmButtonText: 'บันทึกการแก้ไข',
+            showCancelButton: true,
+            focusConfirm: false,
+            preConfirm: function() {
+                var fields = {
+                    actDate: document.getElementById('swalEditActDate').value,
+                    sku: document.getElementById('swalEditSku').value.trim(),
+                    desc: document.getElementById('swalEditDesc').value.trim(),
+                    imei: document.getElementById('swalEditImei').value.trim(),
+                    codeMyOppo: document.getElementById('swalEditCodeMyOppo').value.trim(),
+                    status: document.getElementById('swalEditStatus').value
+                };
+                if (!fields.sku || !fields.imei) { Swal.showValidationMessage('กรุณาระบุ SKU และ IMEI'); return false; }
+                return fields;
+            }
+        }).then(function(result) {
+            if (!result.isConfirmed) return;
+            showHUDLoader('กำลังบันทึกการแก้ไข...');
+            google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                Swal.close();
+                if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadDataTable(); }
+                else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+            }).adminUpdateActRecord(adminToken, rowId, result.value);
+        });
+    }
+
+    function deleteActRecord(rowId) {
+        Swal.fire({
+            title: 'ยืนยันการลบรายการ',
+            text: 'รายการแถว ' + rowId + ' จะถูกลบออกจากฐานข้อมูลถาวร ไม่สามารถกู้คืนได้',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'ลบรายการ',
+            cancelButtonText: 'ยกเลิก'
+        }).then(function(result) {
+            if (!result.isConfirmed) return;
+            showHUDLoader('กำลังลบรายการ...');
+            google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                Swal.close();
+                if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadDataTable(); }
+                else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+            }).adminDeleteActRecord(adminToken, rowId);
         });
     }
 
