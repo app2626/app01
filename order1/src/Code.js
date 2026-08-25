@@ -104,6 +104,16 @@ function extractProductCode(text) {
   return match ? match[1].trim() : text.toString().trim();
 }
 
+// แปลงค่าตัวเลขที่อาจพิมพ์เป็น text มีคอมมาคั่นหลักพัน (เช่น "11,176") ให้เป็นตัวเลขจริง
+// พบว่าแถวสินค้าที่เพิ่มเข้ามาทีหลัง (นอกช่วง ARRAYFORMULA เดิมของคอลัมน์ D) บางแถวถูกพิมพ์สต็อกเป็น text แบบนี้
+// ถ้าใช้ Number() ตรงๆ จะได้ NaN แล้ว fallback เป็น 0 อย่างเงียบๆ ทำให้สต็อกจริงหายไปทั้งก้อน
+function toNumber(v) {
+  if (typeof v === 'number') return v;
+  if (v === null || v === undefined || v === '') return 0;
+  const n = Number(v.toString().replace(/,/g, '').trim());
+  return isNaN(n) ? 0 : n;
+}
+
 // อ่านสต็อกปัจจุบันของทุกสินค้า (จับคู่ด้วยรหัสสินค้า/บาร์โค้ด รวมยอดเบิกทุกสาขา)
 // ใช้ร่วมกันทั้ง productLoad (แสดงผล), productSave (เช็คว่า id มีจริง) และ checkStock (เตือนก่อนยืนยัน)
 function getStockSnapshot() {
@@ -123,7 +133,7 @@ function getStockSnapshot() {
   let totalOutByCode = {};
   logData.forEach(row => {
     let code = extractProductCode(row[0]); // คอลัมน์ F
-    let qty = Number(row[1]) || 0; // คอลัมน์ G
+    let qty = toNumber(row[1]); // คอลัมน์ G
     if (!code) return;
     totalOutByCode[code] = (totalOutByCode[code] || 0) + qty;
   });
@@ -137,7 +147,7 @@ function getStockSnapshot() {
 
     const id = dataRow[0];
     const code = extractProductCode(dataRow[1]);
-    const baselineStock = Number(dataRow[3]) || 0; // คอลัมน์ D คือสต็อกคงเหลือตั้งต้น (XLOOKUP จาก สต๊อกSCG)
+    const baselineStock = toNumber(dataRow[3]); // คอลัมน์ D คือสต็อกคงเหลือตั้งต้น (บางแถวเป็น text มีคอมมา)
     const stock = baselineStock - (totalOutByCode[code] || 0);
 
     idToCode[id] = code;
