@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>ระบบเบิกอุปกรณ์สำนักงาน</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+    
+    body {
+      font-family: 'Outfit', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top right, #1e1b4b, #0f172a, #020617);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: slideUp 0.6s ease-out forwards;
+      position: relative;
+    }
+
+    #login-container { max-width: 400px; }
+    #main-container { display: none; }
+    #admin-container { display: none; max-width: 900px; width: 100%; }
+
+    #history-container { display: none; max-width: 800px; width: 100%; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      text-align: center;
+      font-weight: 600;
+      margin-top: 0;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      margin-top: -20px;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .form-group { margin-bottom: 24px; }
+    label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); }
+
+    input[type="text"], input[type="password"], input[type="number"], select {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(0, 0, 0, 0.4);
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+    
+    input[readonly] { opacity: 0.7; cursor: not-allowed; }
+    select option { background: var(--bg-color); color: var(--text-main); }
+
+    .item-row {
+      display: flex; gap: 12px; margin-bottom: 12px; align-items: center;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .item-row select { flex: 2; }
+    .item-row input { flex: 1; }
+
+    .btn-remove {
+      background: transparent; border: 1px solid var(--danger); color: var(--danger);
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; justify-content: center; align-items: center; cursor: pointer;
+      transition: all 0.2s; font-size: 18px;
+    }
+    .btn-remove:hover { background: var(--danger); color: white; }
+
+    .btn-add {
+      background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--glass-border); color: var(--text-main);
+      width: 100%; padding: 14px; border-radius: 12px; cursor: pointer;
+      font-family: inherit; font-size: 14px; transition: all 0.3s ease; margin-bottom: 24px;
+    }
+    .btn-add:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--text-muted); }
+
+    .btn-submit {
+      background: linear-gradient(135deg, var(--accent), #4f46e5); border: none; color: white;
+      width: 100%; padding: 16px; border-radius: 12px; font-family: inherit; font-size: 18px; font-weight: 600;
+      cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 10px 20px -10px var(--accent);
+    }
+    .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 15px 25px -10px var(--accent); }
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    
+    .btn-logout, .btn-switch {
+      position: absolute; top: 20px; background: transparent; border: 1px solid var(--glass-border);
+      color: var(--text-muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: all 0.3s ease;
+    }
+    .btn-logout { right: 20px; }
+    .btn-switch { right: 110px; display: none; }
+    .btn-logout:hover, .btn-switch:hover { background: rgba(255,255,255,0.1); color: white; }
+
+    .loader {
+      display: none; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .message {
+      margin-top: 20px; padding: 16px; border-radius: 12px; text-align: center;
+      display: none; font-weight: 600; font-size: 14px;
+    }
+    .message.success { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .message.error { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+
+    .loading-overlay {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px);
+      display: flex; justify-content: center; align-items: center; border-radius: 24px; z-index: 10;
+    }
+
+    /* Admin CSS */
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; }
+    .tab { padding: 10px 20px; cursor: pointer; border-radius: 8px; transition: all 0.2s; color: var(--text-muted); font-size: 14px; }
+    .tab:hover { background: rgba(255,255,255,0.05); }
+    .tab.active { background: rgba(59, 130, 246, 0.2); color: var(--accent); font-weight: 600; }
+
+    .admin-table-wrapper { overflow-x: auto; margin-bottom: 20px; }
+    table.admin-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    table.admin-table th, table.admin-table td { border: 1px solid var(--glass-border); padding: 8px; text-align: left; }
+    table.admin-table th { background: rgba(255,255,255,0.05); font-weight: 600; color: var(--text-muted); font-size: 14px; }
+    table.admin-table input { width: 100%; padding: 8px; background: transparent; border: 1px solid transparent; color: var(--text-main); font-family: inherit; font-size: 14px; border-radius: 4px; box-sizing: border-box; }
+    table.admin-table input:focus { border-bottom: 1px solid var(--accent); outline: none; background: rgba(0,0,0,0.2); }
+    
+    .btn-action-small { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 18px; padding: 4px; }
+    .btn-action-small:hover { background: rgba(239, 68, 68, 0.2); border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <!-- Login Container -->
+  <div class="container" id="login-container">
+    <div class="loading-overlay" id="login-loading" style="display: none;">
+      <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
+    </div>
+    
+    <h1>เข้าสู่ระบบ</h1>
+    <div class="subtitle">ระบบเบิกอุปกรณ์สำนักงาน</div>
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">รหัสสาขา (Branch Code)</label>
+        <input type="text" id="username" required>
+      </div>
+      <div class="form-group">
+        <label for="password">รหัสผ่าน (Password)</label>
+        <input type="password" id="password" required>
+      </div>
+      <button type="submit" class="btn-submit" id="btn-login">
+        <span id="btn-login-text">เข้าสู่ระบบ</span>
+        <div class="loader" id="btn-login-loader"></div>
+      </button>
+      <div id="login-message" class="message"></div>
+    </form>
+  </div>
+
+  <!-- Main App Container -->
+  <div class="container" id="main-container">
+    <button class="btn-switch" id="btn-goto-history" style="left: 20px; display: block;" onclick="switchView('history')">ประวัติการเบิก</button>
+    <button class="btn-switch" id="btn-goto-admin" onclick="switchView('admin')">ตั้งค่าระบบ</button>
+    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+    
+    <div class="loading-overlay" id="main-loading">
+      <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
+    </div>
+    
+    <h1>เบิกอุปกรณ์</h1>
+    
+    <form id="requisitionForm">
+      <div class="form-group">
+        <label for="location">สาขาที่เบิก</label>
+        <input type="text" id="location" readonly required>
+      </div>
+      <div class="form-group">
+        <label for="requester">ชื่อผู้เบิก</label>
+        <input type="text" id="requester" placeholder="ระบุชื่อผู้เบิก" required>
+      </div>
+      <div class="form-group">
+        <label>รายการที่ต้องการเบิก</label>
+        <div id="items-container"></div>
+      </div>
+      
+      <button type="button" class="btn-add" id="btn-add-item">+ เพิ่มรายการอุปกรณ์</button>
+      
+      <button type="submit" class="btn-submit" id="btn-submit">
+        <span id="btn-text">ยืนยันการเบิก</span>
+        <div class="loader" id="btn-loader"></div>
+      </button>
+      <div id="main-message" class="message"></div>
+    </form>
+  </div>
+
+  <!-- History Container -->
+  <div class="container" id="history-container" style="display: none; max-width: 800px; width: 100%;">
+    <button class="btn-switch" style="display: block; right: 110px;" onclick="switchView('main')">เบิกอุปกรณ์</button>
+    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+    
+    <div class="loading-overlay" id="history-loading" style="display: none;">
+      <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
+    </div>
+    
+    <h1>ประวัติการเบิกอุปกรณ์</h1>
+    
+    <div class="admin-table-wrapper" id="history-table-wrapper">
+      <!-- Injected table -->
+    </div>
+  </div>
+
+  <!-- Admin Container -->
+  <div class="container" id="admin-container">
+    <button class="btn-switch" style="display: block; right: 110px;" onclick="switchView('main')">เบิกอุปกรณ์</button>
+    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+    
+    <div class="loading-overlay" id="admin-loading">
+      <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
+    </div>
+    
+    <h1>ตั้งค่าระบบ</h1>
+    
+    <div class="tabs">
+      <div class="tab active" onclick="showAdminTab('Users')" id="tab-Users">พนักงาน (Users)</div>
+      <div class="tab" onclick="showAdminTab('Location')" id="tab-Location">สาขา (Location)</div>
+      <div class="tab" onclick="showAdminTab('Product')" id="tab-Product">สินค้า (Product)</div>
+      <div class="tab" onclick="showAdminTab('Order')" id="tab-Order">ประวัติการเบิก (Order)</div>
+    </div>
+    
+    <div class="admin-table-wrapper" id="admin-table-wrapper">
+      <!-- Injected table -->
+    </div>
+    
+    <div style="display: flex; gap: 16px;">
+      <button class="btn-add" onclick="addAdminRow()" style="margin-bottom: 0; flex: 1;">+ เพิ่มรายการ</button>
+      <button class="btn-submit" onclick="saveAdmin()" id="btn-save-admin" style="flex: 2;">
+        <span id="btn-save-admin-text">บันทึกข้อมูล</span>
+        <div class="loader" id="btn-save-admin-loader"></div>
+      </button>
+    </div>
+    
+    <div id="admin-message" class="message"></div>
+  </div>
+
+  <script>
+    let globalProducts = [];
+    let adminDataCache = {};
+    let currentAdminTab = 'Users';
+    
+    // Check login state
+    window.onload = function() {
+      const savedUser = sessionStorage.getItem('req_user');
+      const savedBranchCode = sessionStorage.getItem('req_branchCode');
+      const savedBranchName = sessionStorage.getItem('req_branchName');
+      const savedRole = sessionStorage.getItem('req_role');
+      if (savedUser) {
+        showMainApp(savedUser, savedBranchCode, savedBranchName, savedRole);
+      }
+    };
+
+    // --- Switch View ---
+    function switchView(view) {
+      document.getElementById('login-container').style.display = 'none';
+      document.getElementById('main-container').style.display = 'none';
+      document.getElementById('admin-container').style.display = 'none';
+      document.getElementById('history-container').style.display = 'none';
+      
+      if (view === 'main') {
+        document.getElementById('main-container').style.display = 'block';
+      } else if (view === 'admin') {
+        document.getElementById('admin-container').style.display = 'block';
+        loadAdminData();
+      } else if (view === 'history') {
+        document.getElementById('history-container').style.display = 'block';
+        loadHistoryData();
+      }
+    }
+
+    // ----- Login Logic -----
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const user = document.getElementById('username').value;
+      const pass = document.getElementById('password').value;
+      
+      setLoginLoading(true);
+      google.script.run.withSuccessHandler(function(response) {
+        setLoginLoading(false);
+        if (response.success) {
+          sessionStorage.setItem('req_user', response.name);
+          sessionStorage.setItem('req_branchCode', response.branchCode);
+          sessionStorage.setItem('req_branchName', response.branchName);
+          sessionStorage.setItem('req_role', response.role);
+          
+          if (response.role === 'Admin') {
+            switchView('admin');
+          } else {
+            showMainApp(response.name, response.branchCode, response.branchName, response.role);
+          }
+        } else {
+          showLoginMessage(response.message, 'error');
+        }
+      }).withFailureHandler(function(error) {
+        setLoginLoading(false);
+        showLoginMessage('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + error, 'error');
+      }).login(user, pass);
+    });
+    
+    function setLoginLoading(isLoading) {
+      document.getElementById('btn-login').disabled = isLoading;
+      document.getElementById('btn-login-text').style.display = isLoading ? 'none' : 'block';
+      document.getElementById('btn-login-loader').style.display = isLoading ? 'block' : 'none';
+    }
+    
+    function showLoginMessage(msg, type) {
+      const msgEl = document.getElementById('login-message');
+      msgEl.textContent = msg;
+      msgEl.className = 'message ' + type;
+      msgEl.style.display = 'block';
+    }
+    
+    function logout() {
+      sessionStorage.clear();
+      document.getElementById('main-container').style.display = 'none';
+      document.getElementById('admin-container').style.display = 'none';
+      document.getElementById('history-container').style.display = 'none';
+      document.getElementById('login-container').style.display = 'block';
+      document.getElementById('loginForm').reset();
+      document.getElementById('login-message').style.display = 'none';
+    }
+
+    // ----- Main App Logic -----
+    function showMainApp(userName, userBranchCode, userBranchName, role) {
+      switchView('main');
+      
+      if (role === 'Admin') {
+        document.getElementById('btn-goto-admin').style.display = 'block';
+      } else {
+        document.getElementById('btn-goto-admin').style.display = 'none';
+      }
+      
+      document.getElementById('location').value = (userBranchName || 'ไม่ระบุสาขา') + (userBranchCode ? ` (${userBranchCode})` : '');
+      
+      if (globalProducts.length === 0) {
+        document.getElementById('main-loading').style.display = 'flex';
+        google.script.run.withSuccessHandler(function(data) {
+          document.getElementById('main-loading').style.display = 'none';
+          globalProducts = data.products;
+          if(document.getElementById('items-container').children.length === 0) addItemRow();
+        }).withFailureHandler(function(error) {
+          document.getElementById('main-loading').style.display = 'none';
+          showMainMessage('ไม่สามารถดึงข้อมูลได้: ' + error, 'error');
+        }).getInitialData(userBranchCode);
+      }
+    }
+
+    function addItemRow() {
+      const container = document.getElementById('items-container');
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      
+      const select = document.createElement('select');
+      select.required = true;
+      select.className = 'product-select';
+      select.innerHTML = '<option value="">-- เลือกอุปกรณ์ --</option>';
+      
+      const categories = {};
+      globalProducts.forEach(p => {
+        const cat = p.category || 'อื่นๆ';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(p);
+      });
+      
+      for (const cat in categories) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = cat;
+        categories[cat].forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name + (p.unit ? ` (${p.unit})` : '');
+          opt.setAttribute('data-name', p.name);
+          opt.setAttribute('data-category', p.category || '');
+          optgroup.appendChild(opt);
+        });
+        select.appendChild(optgroup);
+      }
+      
+      const qty = document.createElement('input');
+      qty.type = 'number'; qty.min = '1'; qty.step = '1'; qty.placeholder = 'จำนวน';
+      qty.required = true; qty.className = 'product-qty';
+      
+      select.onchange = function() {
+        const selectedOption = select.options[select.selectedIndex];
+        if (!selectedOption.value) return;
+        
+        const category = selectedOption.getAttribute('data-category') || '';
+        
+        if (category.includes('ถุง')) {
+          qty.min = '100';
+          qty.step = '100';
+          qty.placeholder = 'ทีละ 100';
+          if (qty.value) {
+            let val = parseInt(qty.value);
+            if (val < 100) qty.value = '100';
+            else if (val % 100 !== 0) qty.value = Math.ceil(val / 100) * 100;
+          }
+        } else {
+          qty.min = '1';
+          qty.step = '1';
+          qty.placeholder = 'จำนวน';
+        }
+      };
+      
+      const btnRemove = document.createElement('button');
+      btnRemove.type = 'button'; btnRemove.className = 'btn-remove'; btnRemove.innerHTML = '×';
+      btnRemove.onclick = function() {
+        if (container.children.length > 1) row.remove();
+        else { select.value = ''; qty.value = ''; }
+      };
+      
+      row.appendChild(select); row.appendChild(qty); row.appendChild(btnRemove);
+      container.appendChild(row);
+    }
+
+    document.getElementById('btn-add-item').addEventListener('click', addItemRow);
+
+    document.getElementById('requisitionForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const requester = document.getElementById('requester').value;
+      const selects = document.querySelectorAll('.product-select');
+      const qtys = document.querySelectorAll('.product-qty');
+      
+      const items = [];
+      for(let i=0; i<selects.length; i++) {
+        if(selects[i].value && qtys[i].value) {
+          items.push({
+            id: selects[i].value,
+            name: selects[i].options[selects[i].selectedIndex].getAttribute('data-name'),
+            qty: parseInt(qtys[i].value)
+          });
+        }
+      }
+      
+      if(items.length === 0) return showMainMessage('กรุณาระบุอย่างน้อย 1 รายการ', 'error');
+      
+      const payload = {
+        branchCode: sessionStorage.getItem('req_branchCode'),
+        branchName: sessionStorage.getItem('req_branchName'),
+        requester: requester,
+        items: items
+      };
+      
+      setSubmitLoading(true);
+      google.script.run.withSuccessHandler(function(response) {
+        setSubmitLoading(false);
+        if(response.success) {
+          showMainMessage(response.message, 'success');
+          document.getElementById('requisitionForm').reset();
+          const bc = sessionStorage.getItem('req_branchCode');
+          const bn = sessionStorage.getItem('req_branchName');
+          document.getElementById('location').value = (bn || 'ไม่ระบุสาขา') + (bc ? ` (${bc})` : '');
+          document.getElementById('items-container').innerHTML = '';
+          addItemRow();
+          setTimeout(() => { document.getElementById('main-message').style.display = 'none'; }, 5000);
+        } else {
+          showMainMessage(response.message, 'error');
+        }
+      }).withFailureHandler(function(error) {
+        setSubmitLoading(false);
+        showMainMessage('เกิดข้อผิดพลาด: ' + error, 'error');
+      }).submitOrder(payload);
+    });
+
+    function setSubmitLoading(isLoading) {
+      document.getElementById('btn-submit').disabled = isLoading;
+      document.getElementById('btn-text').style.display = isLoading ? 'none' : 'block';
+      document.getElementById('btn-loader').style.display = isLoading ? 'block' : 'none';
+    }
+
+    function showMainMessage(msg, type) {
+      const msgEl = document.getElementById('main-message');
+      msgEl.textContent = msg; msgEl.className = 'message ' + type; msgEl.style.display = 'block';
+    }
+
+    // ----- Admin Logic -----
+    function loadAdminData() {
+      if (Object.keys(adminDataCache).length > 0) {
+        renderAdminTable();
+        return;
+      }
+      document.getElementById('admin-loading').style.display = 'flex';
+      google.script.run.withSuccessHandler(function(data) {
+        document.getElementById('admin-loading').style.display = 'none';
+        adminDataCache = data;
+        
+        // Ensure default headers exist if sheet was empty
+        if (!adminDataCache.Users || adminDataCache.Users.length === 0) {
+          adminDataCache.Users = [['Branch Code', 'Password', 'Name', 'Role']];
+        }
+        if (!adminDataCache.Location || adminDataCache.Location.length === 0) {
+          adminDataCache.Location = [['รหัสสาขา', 'ชื่อสาขา', 'ช่องทางการมองเห็น']];
+        }
+        if (!adminDataCache.Product || adminDataCache.Product.length === 0) {
+          adminDataCache.Product = [['รหัสสินค้า', 'ชื่อสินค้า', 'หมวดหมู่', 'ช่องทางการมองเห็น', 'หน่วยนับ']];
+        }
+        if (!adminDataCache.Order || adminDataCache.Order.length === 0) {
+          adminDataCache.Order = [['Timestamp', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน']];
+        }
+        
+        renderAdminTable();
+      }).withFailureHandler(function(error) {
+        document.getElementById('admin-loading').style.display = 'none';
+        showAdminMessage('ไม่สามารถโหลดข้อมูลได้: ' + error, 'error');
+      }).getAdminData();
+    }
+
+    function showAdminTab(tabName) {
+      saveCurrentTableToCache();
+      currentAdminTab = tabName;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tabName).classList.add('active');
+      renderAdminTable();
+      document.getElementById('admin-message').style.display = 'none';
+    }
+
+    function renderAdminTable() {
+      const data = adminDataCache[currentAdminTab];
+      const wrapper = document.getElementById('admin-table-wrapper');
+      
+      if (!data || data.length === 0) {
+        wrapper.innerHTML = '<p>ไม่มีข้อมูล</p>';
+        return;
+      }
+      
+      const headers = data[0];
+      const rows = data.slice(1);
+      
+      let html = '<table class="admin-table" id="admin-table">';
+      html += '<thead><tr>';
+      headers.forEach(h => html += `<th>${h}</th>`);
+      html += '<th style="width: 40px; text-align:center;">-</th></tr></thead><tbody>';
+      
+      rows.forEach((row, rIndex) => {
+        html += '<tr>';
+        headers.forEach((h, cIndex) => {
+          html += `<td><input type="text" value="${escapeHtml(row[cIndex] || '')}" /></td>`;
+        });
+        html += `<td style="text-align:center;"><button class="btn-action-small" onclick="removeAdminRow(this)">×</button></td></tr>`;
+      });
+      html += '</tbody></table>';
+      wrapper.innerHTML = html;
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function addAdminRow() {
+      const table = document.getElementById('admin-table');
+      if (!table) return;
+      const headersCount = adminDataCache[currentAdminTab][0].length;
+      
+      const tbody = table.querySelector('tbody');
+      const tr = document.createElement('tr');
+      for (let i = 0; i < headersCount; i++) {
+        tr.innerHTML += `<td><input type="text" value="" /></td>`;
+      }
+      tr.innerHTML += `<td style="text-align:center;"><button class="btn-action-small" onclick="removeAdminRow(this)">×</button></td>`;
+      tbody.appendChild(tr);
+    }
+
+    function removeAdminRow(btn) {
+      if(confirm('คุณต้องการลบรายการนี้ใช่หรือไม่?')) {
+        btn.closest('tr').remove();
+      }
+    }
+
+    function saveCurrentTableToCache() {
+      const table = document.getElementById('admin-table');
+      if (!table) return;
+      
+      const headers = adminDataCache[currentAdminTab][0];
+      const newData = [headers];
+      
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(tr => {
+        const inputs = tr.querySelectorAll('input');
+        const rowData = [];
+        let hasData = false;
+        inputs.forEach(input => {
+          rowData.push(input.value);
+          if (input.value.trim() !== '') hasData = true;
+        });
+        if (hasData) newData.push(rowData);
+      });
+      
+      adminDataCache[currentAdminTab] = newData;
+    }
+
+    function saveAdmin() {
+      if(!confirm('คุณต้องการบันทึกการเปลี่ยนแปลงข้อมูลใช่หรือไม่?')) return;
+      
+      saveCurrentTableToCache();
+      const sheetName = currentAdminTab;
+      const dataToSave = adminDataCache[sheetName];
+      
+      const btn = document.getElementById('btn-save-admin');
+      const text = document.getElementById('btn-save-admin-text');
+      const loader = document.getElementById('btn-save-admin-loader');
+      
+      btn.disabled = true;
+      text.style.display = 'none';
+      loader.style.display = 'block';
+      
+      google.script.run.withSuccessHandler(function(res) {
+        btn.disabled = false;
+        text.style.display = 'block';
+        loader.style.display = 'none';
+        
+        if (res.success) {
+          showAdminMessage(res.message, 'success');
+          // Update globalProducts if product saved
+          if (sheetName === 'Product') {
+            globalProducts = []; // force reload on main view
+          }
+          setTimeout(() => { document.getElementById('admin-message').style.display = 'none'; }, 3000);
+        } else {
+          showAdminMessage(res.message, 'error');
+        }
+      }).withFailureHandler(function(err) {
+        btn.disabled = false;
+        text.style.display = 'block';
+        loader.style.display = 'none';
+        showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
+      }).saveAdminData(sheetName, dataToSave);
+    }
+
+    function showAdminMessage(msg, type) {
+      const msgEl = document.getElementById('admin-message');
+      msgEl.textContent = msg; msgEl.className = 'message ' + type; msgEl.style.display = 'block';
+    }
+
+    // ----- History Logic -----
+    function loadHistoryData() {
+      document.getElementById('history-loading').style.display = 'flex';
+      const branchCode = sessionStorage.getItem('req_branchCode');
+      const role = sessionStorage.getItem('req_role');
+      
+      google.script.run.withSuccessHandler(function(rows) {
+        document.getElementById('history-loading').style.display = 'none';
+        
+        const wrapper = document.getElementById('history-table-wrapper');
+        if (!rows || rows.length === 0) {
+          wrapper.innerHTML = '<p style="text-align:center; color:var(--text-muted);">ยังไม่มีประวัติการเบิก</p>';
+          return;
+        }
+        
+        let html = '<table class="admin-table"><thead><tr>';
+        ['วัน-เวลา', 'ผู้เบิก', 'รายการ', 'จำนวน'].forEach(h => html += `<th>${h}</th>`);
+        html += '</tr></thead><tbody>';
+        
+        rows.forEach(row => {
+          html += '<tr>';
+          row.forEach(cell => {
+            html += `<td>${escapeHtml(String(cell))}</td>`;
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        wrapper.innerHTML = html;
+        
+      }).withFailureHandler(function(error) {
+        document.getElementById('history-loading').style.display = 'none';
+        document.getElementById('history-table-wrapper').innerHTML = '<p style="color:var(--danger);">เกิดข้อผิดพลาด: ' + error + '</p>';
+      }).getBranchOrders(branchCode, role);
+    }
+  </script>
+</body>
+</html>
