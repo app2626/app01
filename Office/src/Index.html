@@ -3,8 +3,10 @@
 <head>
   <base target="_top">
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ระบบเบิกอุปกรณ์สำนักงาน</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -34,7 +36,7 @@
 
     .container {
       width: 100%;
-      max-width: 600px;
+      max-width: 100%;
       background: var(--glass-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -44,13 +46,29 @@
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
       animation: slideUp 0.6s ease-out forwards;
       position: relative;
+      box-sizing: border-box;
     }
 
-    #login-container { max-width: 400px; }
-    #main-container { display: none; }
-    #admin-container { display: none; max-width: 900px; width: 100%; }
+    #login-container { max-width: 500px; margin: 0 auto; }
+    #main-container { display: none; max-width: 1200px; margin: 0 auto; }
+    #admin-container { display: none; max-width: 100%; width: 100%; padding: 40px 20px; }
+    #history-container { display: none; max-width: 100%; width: 100%; padding: 40px 20px; }
 
-    #history-container { display: none; max-width: 800px; width: 100%; }
+    @media (max-width: 768px) {
+      body { padding: 0; align-items: flex-start; }
+      .container { padding: 15px; padding-top: 60px; border-radius: 0; margin-top: 0; border-left: none; border-right: none; }
+      #login-container, #main-container { margin: 10px; border-radius: 16px; border: 1px solid var(--glass-border); padding: 20px; padding-top: 60px; }
+      #login-container { padding-top: 40px; margin-top: 20px; }
+      #history-container, #admin-container { padding-left: 0; padding-right: 0; }
+      table.admin-table { font-size: 12px; }
+      table.admin-table th, table.admin-table td { padding: 6px 4px; }
+      h1 { font-size: 22px; margin-bottom: 20px; }
+      .btn-logout, .btn-switch, .btn-logout-relative, .btn-switch-relative { padding: 6px 10px; font-size: 11px; }
+      .item-row { flex-wrap: wrap; }
+      .item-row select { flex: 100%; margin-bottom: 10px; }
+      .item-row input { flex: 1; }
+      .btn-remove { flex: 0 0 44px; }
+    }
 
     @keyframes slideUp {
       from { opacity: 0; transform: translateY(20px); }
@@ -60,7 +78,7 @@
     h1 {
       text-align: center;
       font-weight: 600;
-      margin-top: 0;
+      margin-top: 40px;
       margin-bottom: 30px;
       background: linear-gradient(135deg, #60a5fa, #a78bfa);
       -webkit-background-clip: text;
@@ -138,13 +156,11 @@
     .btn-submit:active { transform: translateY(0); }
     .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     
-    .btn-logout, .btn-switch {
-      position: absolute; top: 20px; background: transparent; border: 1px solid var(--glass-border);
+    .btn-logout, .btn-switch, .btn-logout-relative, .btn-switch-relative {
+      background: transparent; border: 1px solid var(--glass-border);
       color: var(--text-muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: all 0.3s ease;
     }
-    .btn-logout { right: 20px; }
-    .btn-switch { right: 110px; display: none; }
-    .btn-logout:hover, .btn-switch:hover { background: rgba(255,255,255,0.1); color: white; }
+    .btn-logout:hover, .btn-switch:hover, .btn-logout-relative:hover, .btn-switch-relative:hover { background: rgba(255,255,255,0.1); color: white; }
 
     .loader {
       display: none; width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.3);
@@ -171,12 +187,18 @@
     .tab:hover { background: rgba(255,255,255,0.05); }
     .tab.active { background: rgba(59, 130, 246, 0.2); color: var(--accent); font-weight: 600; }
 
-    .admin-table-wrapper { overflow-x: auto; margin-bottom: 20px; }
-    table.admin-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    .admin-table-wrapper { overflow-x: auto; margin-bottom: 20px; width: 100%; }
+    table.admin-table { width: 100%; border-collapse: collapse; min-width: 100%; table-layout: auto; word-wrap: break-word; }
     table.admin-table th, table.admin-table td { border: 1px solid var(--glass-border); padding: 8px; text-align: left; }
     table.admin-table th { background: rgba(255,255,255,0.05); font-weight: 600; color: var(--text-muted); font-size: 14px; }
     table.admin-table input { width: 100%; padding: 8px; background: transparent; border: 1px solid transparent; color: var(--text-main); font-family: inherit; font-size: 14px; border-radius: 4px; box-sizing: border-box; }
-    table.admin-table input:focus { border-bottom: 1px solid var(--accent); outline: none; background: rgba(0,0,0,0.2); }
+    table.admin-table input:not([readonly]) { border-bottom: 1px solid var(--accent); background: rgba(0,0,0,0.2); }
+    table.admin-table input:not([readonly]):focus { outline: none; background: rgba(0,0,0,0.4); }
+    
+    .btn-status { width: 100%; padding: 8px; border: none; border-radius: 4px; font-family: inherit; font-size: 14px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+    .btn-status-on { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+    .btn-status-off { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .btn-status:disabled { opacity: 0.8; cursor: default; }
     
     .btn-action-small { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 18px; padding: 4px; }
     .btn-action-small:hover { background: rgba(239, 68, 68, 0.2); border-radius: 4px; }
@@ -212,9 +234,13 @@
 
   <!-- Main App Container -->
   <div class="container" id="main-container">
-    <button class="btn-switch" id="btn-goto-history" style="left: 20px; display: block;" onclick="switchView('history')">ประวัติการเบิก</button>
-    <button class="btn-switch" id="btn-goto-admin" onclick="switchView('admin')">ตั้งค่าระบบ</button>
-    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; position: absolute; top: 20px; left: 20px; right: 20px; z-index: 10;">
+      <button class="btn-switch-relative" id="btn-goto-history" onclick="switchView('history')">ประวัติการเบิก</button>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-switch-relative" id="btn-goto-admin" onclick="switchView('admin')" style="display: none;">ตั้งค่าระบบ</button>
+        <button class="btn-logout-relative" onclick="logout()">ออกจากระบบ</button>
+      </div>
+    </div>
     
     <div class="loading-overlay" id="main-loading">
       <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
@@ -246,26 +272,12 @@
     </form>
   </div>
 
-  <!-- History Container -->
-  <div class="container" id="history-container" style="display: none; max-width: 800px; width: 100%;">
-    <button class="btn-switch" style="display: block; right: 110px;" onclick="switchView('main')">เบิกอุปกรณ์</button>
-    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
-    
-    <div class="loading-overlay" id="history-loading" style="display: none;">
-      <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
-    </div>
-    
-    <h1>ประวัติการเบิกอุปกรณ์</h1>
-    
-    <div class="admin-table-wrapper" id="history-table-wrapper">
-      <!-- Injected table -->
-    </div>
-  </div>
 
-  <!-- Admin Container -->
-  <div class="container" id="admin-container">
-    <button class="btn-switch" style="display: block; right: 110px;" onclick="switchView('main')">เบิกอุปกรณ์</button>
-    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+  <div class="container" id="admin-container" style="display: none;">
+    <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; position: absolute; top: 20px; right: 20px; z-index: 10;">
+      <button class="btn-switch-relative" onclick="switchView('main')">เบิกอุปกรณ์</button>
+      <button class="btn-logout-relative" onclick="logout()">ออกจากระบบ</button>
+    </div>
     
     <div class="loading-overlay" id="admin-loading">
       <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
@@ -293,6 +305,34 @@
     </div>
     
     <div id="admin-message" class="message"></div>
+  </div>
+
+  <!-- History Container -->
+  <div class="container" id="history-container" style="display: none;">
+    <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; position: absolute; top: 20px; right: 20px; z-index: 10;">
+      <button class="btn-switch-relative" onclick="switchView('main')">เบิกอุปกรณ์</button>
+      <button class="btn-logout-relative" onclick="logout()">ออกจากระบบ</button>
+    </div>
+    
+    <div class="loading-overlay" id="history-loading" style="display: none;">
+      <div class="loader" style="display: block; width: 40px; height: 40px; border-width: 4px;"></div>
+    </div>
+    
+    <h1>ประวัติการเบิกอุปกรณ์</h1>
+    
+    <div id="history-filters" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+      <input type="text" id="filter-date" placeholder="ค้นหาวัน-เวลา..." oninput="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
+      
+      <input type="text" list="branch-list" id="filter-branch" placeholder="ค้นหาสาขา/ผู้เบิก..." oninput="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
+      <datalist id="branch-list"></datalist>
+      
+      <input type="text" list="item-list" id="filter-item" placeholder="ค้นหารายการ..." oninput="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
+      <datalist id="item-list"></datalist>
+    </div>
+    
+    <div class="admin-table-wrapper" id="history-table-wrapper">
+      <!-- Injected table -->
+    </div>
   </div>
 
   <script>
@@ -365,10 +405,12 @@
     }
     
     function showLoginMessage(msg, type) {
-      const msgEl = document.getElementById('login-message');
-      msgEl.textContent = msg;
-      msgEl.className = 'message ' + type;
-      msgEl.style.display = 'block';
+      Swal.fire({
+        title: type === 'success' ? 'สำเร็จ' : 'ข้อผิดพลาด',
+        text: msg,
+        icon: type,
+        confirmButtonColor: '#3b82f6'
+      });
     }
     
     function logout() {
@@ -530,8 +572,12 @@
     }
 
     function showMainMessage(msg, type) {
-      const msgEl = document.getElementById('main-message');
-      msgEl.textContent = msg; msgEl.className = 'message ' + type; msgEl.style.display = 'block';
+      Swal.fire({
+        title: type === 'success' ? 'สำเร็จ' : 'ข้อผิดพลาด',
+        text: msg,
+        icon: type,
+        confirmButtonColor: '#3b82f6'
+      });
     }
 
     // ----- Admin Logic -----
@@ -556,7 +602,7 @@
           adminDataCache.Product = [['รหัสสินค้า', 'ชื่อสินค้า', 'หมวดหมู่', 'ช่องทางการมองเห็น', 'หน่วยนับ']];
         }
         if (!adminDataCache.Order || adminDataCache.Order.length === 0) {
-          adminDataCache.Order = [['Timestamp', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน']];
+          adminDataCache.Order = [['Timestamp', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน', 'สถานะจ่าย']];
         }
         
         renderAdminTable();
@@ -590,17 +636,39 @@
       let html = '<table class="admin-table" id="admin-table">';
       html += '<thead><tr>';
       headers.forEach(h => html += `<th>${h}</th>`);
-      html += '<th style="width: 40px; text-align:center;">-</th></tr></thead><tbody>';
+      html += '<th style="width: 80px; text-align:center;">จัดการ</th></tr></thead><tbody>';
       
       rows.forEach((row, rIndex) => {
         html += '<tr>';
         headers.forEach((h, cIndex) => {
-          html += `<td><input type="text" value="${escapeHtml(row[cIndex] || '')}" /></td>`;
+          if (h.includes('สถานะ') || h.includes('ช่องทางการมองเห็น')) {
+            let val = (row[cIndex] || '').toString().trim();
+            if (val !== 'ปิด') val = 'เปิด';
+            let btnClass = val === 'เปิด' ? 'btn-status-on' : 'btn-status-off';
+            html += `<td><button type="button" class="btn-status ${btnClass}" value="${val}" onclick="toggleStatus(this)" disabled>${val}</button></td>`;
+          } else {
+            html += `<td><input type="text" value="${escapeHtml(row[cIndex] || '')}" readonly /></td>`;
+          }
         });
-        html += `<td style="text-align:center;"><button class="btn-action-small" onclick="removeAdminRow(this)">×</button></td></tr>`;
+        html += `<td style="text-align:center; white-space:nowrap;">
+                  <button type="button" class="btn-action-small edit-btn" onclick="editRow(this)" title="แก้ไข">✏️</button>
+                  <button type="button" class="btn-action-small delete-btn" onclick="deleteRow(this)" title="ลบ">🗑️</button>
+                 </td></tr>`;
       });
       html += '</tbody></table>';
       wrapper.innerHTML = html;
+    }
+
+    function toggleStatus(btn) {
+      if (btn.value === 'เปิด') {
+        btn.value = 'ปิด';
+        btn.textContent = 'ปิด';
+        btn.className = 'btn-status btn-status-off';
+      } else {
+        btn.value = 'เปิด';
+        btn.textContent = 'เปิด';
+        btn.className = 'btn-status btn-status-on';
+      }
     }
 
     function escapeHtml(text) {
@@ -615,15 +683,66 @@
       const tbody = table.querySelector('tbody');
       const tr = document.createElement('tr');
       for (let i = 0; i < headersCount; i++) {
-        tr.innerHTML += `<td><input type="text" value="" /></td>`;
+        const h = adminDataCache[currentAdminTab][0][i];
+        if (h.includes('สถานะ') || h.includes('ช่องทางการมองเห็น')) {
+          tr.innerHTML += `<td><button type="button" class="btn-status btn-status-on" value="เปิด" onclick="toggleStatus(this)">เปิด</button></td>`;
+        } else {
+          tr.innerHTML += `<td><input type="text" value="" /></td>`;
+        }
       }
-      tr.innerHTML += `<td style="text-align:center;"><button class="btn-action-small" onclick="removeAdminRow(this)">×</button></td>`;
+      tr.innerHTML += `<td style="text-align:center; white-space:nowrap;">
+                  <button type="button" class="btn-action-small edit-btn editing" onclick="editRow(this)" title="บันทึก">💾</button>
+                  <button type="button" class="btn-action-small delete-btn" onclick="deleteRow(this)" title="ลบ">🗑️</button>
+                 </td>`;
       tbody.appendChild(tr);
     }
 
-    function removeAdminRow(btn) {
-      if(confirm('คุณต้องการลบรายการนี้ใช่หรือไม่?')) {
-        btn.closest('tr').remove();
+    function deleteRow(btn) {
+      Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: 'คุณต้องการลบรายการนี้ใช่หรือไม่?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          btn.closest('tr').remove();
+          saveAdmin(true);
+        }
+      });
+    }
+
+    function editRow(btn) {
+      const tr = btn.closest('tr');
+      if (btn.classList.contains('editing')) {
+        Swal.fire({
+          title: 'ยืนยันการแก้ไข',
+          text: 'คุณต้องการยืนยันการแก้ไขข้อมูลใช่หรือไม่?',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonColor: '#10b981',
+          cancelButtonColor: '#94a3b8',
+          confirmButtonText: 'ใช่, บันทึก',
+          cancelButtonText: 'ยกเลิก'
+        }).then((result) => {
+          if (result.isConfirmed) {
+             tr.querySelectorAll('input').forEach(inp => inp.readOnly = true);
+             tr.querySelectorAll('.btn-status').forEach(b => b.disabled = true);
+             btn.classList.remove('editing');
+             btn.innerHTML = '✏️';
+             btn.title = 'แก้ไข';
+             saveAdmin(true);
+          }
+        });
+      } else {
+        tr.querySelectorAll('input').forEach(inp => inp.readOnly = false);
+        tr.querySelectorAll('.btn-status').forEach(b => b.disabled = false);
+        btn.classList.add('editing');
+        btn.innerHTML = '💾';
+        btn.title = 'บันทึก';
       }
     }
 
@@ -636,7 +755,7 @@
       
       const rows = table.querySelectorAll('tbody tr');
       rows.forEach(tr => {
-        const inputs = tr.querySelectorAll('input');
+        const inputs = tr.querySelectorAll('input, .btn-status');
         const rowData = [];
         let hasData = false;
         inputs.forEach(input => {
@@ -649,9 +768,28 @@
       adminDataCache[currentAdminTab] = newData;
     }
 
-    function saveAdmin() {
-      if(!confirm('คุณต้องการบันทึกการเปลี่ยนแปลงข้อมูลใช่หรือไม่?')) return;
-      
+    function saveAdmin(skipConfirm = false) {
+      if(!skipConfirm) {
+        Swal.fire({
+          title: 'ยืนยันการบันทึก',
+          text: 'คุณต้องการบันทึกการเปลี่ยนแปลงข้อมูลใช่หรือไม่?',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonColor: '#3b82f6',
+          cancelButtonColor: '#94a3b8',
+          confirmButtonText: 'ใช่, บันทึก',
+          cancelButtonText: 'ยกเลิก'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            executeSaveAdmin();
+          }
+        });
+        return;
+      }
+      executeSaveAdmin();
+    }
+
+    function executeSaveAdmin() {
       saveCurrentTableToCache();
       const sheetName = currentAdminTab;
       const dataToSave = adminDataCache[sheetName];
@@ -688,8 +826,12 @@
     }
 
     function showAdminMessage(msg, type) {
-      const msgEl = document.getElementById('admin-message');
-      msgEl.textContent = msg; msgEl.className = 'message ' + type; msgEl.style.display = 'block';
+      Swal.fire({
+        title: type === 'success' ? 'สำเร็จ' : 'ข้อผิดพลาด',
+        text: msg,
+        icon: type,
+        confirmButtonColor: '#3b82f6'
+      });
     }
 
     // ----- History Logic -----
@@ -707,24 +849,195 @@
           return;
         }
         
-        let html = '<table class="admin-table"><thead><tr>';
-        ['วัน-เวลา', 'ผู้เบิก', 'รายการ', 'จำนวน'].forEach(h => html += `<th>${h}</th>`);
+        let html = '';
+        if (role === 'Admin') {
+          html += `
+            <div style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center;">
+              <span style="font-size: 14px; color: var(--text-muted);">เปลี่ยนสถานะที่เลือก:</span>
+              <select id="batch-status-select" style="width: auto; padding: 6px; font-family: inherit; font-size: 12px; border-radius: 4px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main);">
+                <option value="รอจ่าย">รอจ่าย</option>
+                <option value="จ่ายแล้ว">จ่ายแล้ว</option>
+                <option value="ยกเลิก">ยกเลิก</option>
+              </select>
+              <button class="btn-submit" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="applyBatchStatus()">อัพเดท</button>
+            </div>
+          `;
+        }
+        
+        html += '<table class="admin-table"><thead><tr>';
+        if (role === 'Admin') {
+           html += `<th style="width: 30px; text-align: center;"><input type="checkbox" onchange="toggleAllHistoryCheckboxes(this)"></th>`;
+        }
+        let headers = ['วัน-เวลา', 'ผู้เบิก', 'รายการ', 'จำนวน', 'สถานะจ่าย'];
+        headers.forEach(h => html += `<th>${h}</th>`);
         html += '</tr></thead><tbody>';
         
         rows.forEach(row => {
           html += '<tr>';
-          row.forEach(cell => {
-            html += `<td>${escapeHtml(String(cell))}</td>`;
-          });
+          let rowIdx = row[5];
+          if (role === 'Admin') {
+            html += `<td style="text-align: center;"><input type="checkbox" class="history-row-checkbox" value="${rowIdx}"></td>`;
+          }
+          
+          html += `<td>${escapeHtml(String(row[0]))}</td>`;
+          html += `<td>${escapeHtml(String(row[1]))}</td>`;
+          html += `<td>${escapeHtml(String(row[2]))}</td>`;
+          html += `<td>${escapeHtml(String(row[3]))}</td>`;
+          
+          let fullStatus = String(row[4] || 'รอจ่าย').trim();
+          let statusBase = fullStatus.split(' ')[0];
+          let statusDate = fullStatus.substring(statusBase.length).trim();
+          
+          if (role === 'Admin') {
+            html += `<td>
+              <select class="status-select" style="width:100%; padding:4px; font-family:inherit; font-size:12px; border-radius:4px; border:1px solid var(--glass-border); background:rgba(0,0,0,0.2); color:var(--text-main);" onchange="updateDispenseStatus(${rowIdx}, this)">
+                <option value="รอจ่าย" ${statusBase==='รอจ่าย'?'selected':''} style="color:var(--text-main);">รอจ่าย</option>
+                <option value="จ่ายแล้ว" ${statusBase==='จ่ายแล้ว'?'selected':''} style="color:var(--text-main);">จ่ายแล้ว</option>
+                <option value="ยกเลิก" ${statusBase==='ยกเลิก'?'selected':''} style="color:var(--text-main);">ยกเลิก</option>
+              </select>
+              ${statusDate ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 4px; text-align: center;">${escapeHtml(statusDate)}</div>` : ''}
+            </td>`;
+          } else {
+            let color = statusBase === 'จ่ายแล้ว' ? 'var(--success)' : (statusBase === 'ยกเลิก' ? 'var(--danger)' : 'var(--text-muted)');
+            html += `<td style="color:${color}; font-weight:600;">
+                       ${escapeHtml(statusBase)}
+                       ${statusDate ? `<br><span style="font-size: 10px; color: var(--text-muted);">${escapeHtml(statusDate)}</span>` : ''}
+                     </td>`;
+          }
+          
           html += '</tr>';
         });
         html += '</tbody></table>';
         wrapper.innerHTML = html;
         
+        let branchSet = new Set();
+        let itemSet = new Set();
+        rows.forEach(row => {
+          branchSet.add(String(row[1]));
+          itemSet.add(String(row[2]));
+        });
+        
+        let branchHtml = '';
+        branchSet.forEach(opt => branchHtml += `<option value="${escapeHtml(opt)}">`);
+        document.getElementById('branch-list').innerHTML = branchHtml;
+        
+        let itemHtml = '';
+        itemSet.forEach(opt => itemHtml += `<option value="${escapeHtml(opt)}">`);
+        document.getElementById('item-list').innerHTML = itemHtml;
+        
       }).withFailureHandler(function(error) {
         document.getElementById('history-loading').style.display = 'none';
         document.getElementById('history-table-wrapper').innerHTML = '<p style="color:var(--danger);">เกิดข้อผิดพลาด: ' + error + '</p>';
       }).getBranchOrders(branchCode, role);
+    }
+    
+    function updateDispenseStatus(rowIdx, selectEl) {
+      const newStatus = selectEl.value;
+      selectEl.disabled = true;
+      google.script.run.withSuccessHandler(function(res) {
+        selectEl.disabled = false;
+        if(res.success) {
+          Swal.fire({
+            title: 'อัพเดทสถานะ',
+            text: 'อัพเดทสถานะจ่ายเรียบร้อยแล้ว',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
+          });
+        } else {
+          Swal.fire('ข้อผิดพลาด', res.message, 'error');
+        }
+      }).withFailureHandler(function(err) {
+        selectEl.disabled = false;
+        Swal.fire('ข้อผิดพลาด', String(err), 'error');
+      }).updateOrderStatus(rowIdx, newStatus);
+    }
+    function toggleAllHistoryCheckboxes(masterCheckbox) {
+      const rows = document.querySelectorAll('#history-table-wrapper table.admin-table tbody tr');
+      rows.forEach(row => {
+        if (row.style.display !== 'none') {
+          const cb = row.querySelector('.history-row-checkbox');
+          if (cb) cb.checked = masterCheckbox.checked;
+        }
+      });
+    }
+
+    function applyBatchStatus() {
+      const checkboxes = document.querySelectorAll('.history-row-checkbox:checked');
+      if (checkboxes.length === 0) {
+        Swal.fire('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการอัพเดทอย่างน้อย 1 รายการ', 'warning');
+        return;
+      }
+      
+      const newStatus = document.getElementById('batch-status-select').value;
+      const updates = [];
+      checkboxes.forEach(cb => {
+        updates.push({ rowIndex: parseInt(cb.value), newStatus: newStatus });
+      });
+      
+      Swal.fire({
+        title: 'ยืนยันการทำรายการ',
+        text: `คุณต้องการเปลี่ยนสถานะของ ${updates.length} รายการเป็น "${newStatus}" ใช่หรือไม่?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#3b82f6',
+        confirmButtonText: 'ใช่, ทำเลย',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          document.getElementById('history-loading').style.display = 'flex';
+          google.script.run.withSuccessHandler(function(res) {
+            document.getElementById('history-loading').style.display = 'none';
+            if (res.success) {
+              Swal.fire('สำเร็จ', res.message, 'success').then(() => {
+                loadHistoryData(); // refresh the table
+              });
+            } else {
+              Swal.fire('ข้อผิดพลาด', res.message, 'error');
+            }
+          }).withFailureHandler(function(err) {
+            document.getElementById('history-loading').style.display = 'none';
+            Swal.fire('ข้อผิดพลาด', String(err), 'error');
+          }).updateMultipleOrderStatuses(updates);
+        }
+      });
+    }
+    function filterHistoryTable() {
+      const dateFilter = document.getElementById('filter-date').value.toLowerCase();
+      const branchFilter = document.getElementById('filter-branch').value.toLowerCase();
+      const itemFilter = document.getElementById('filter-item').value.toLowerCase();
+      
+      const table = document.querySelector('#history-table-wrapper table.admin-table');
+      if (!table) return;
+      
+      const rows = table.querySelectorAll('tbody tr');
+      const role = sessionStorage.getItem('req_role');
+      
+      rows.forEach(row => {
+        let dateCell, branchCell, itemCell;
+        
+        if (role === 'Admin') {
+          dateCell = row.cells[1];
+          branchCell = row.cells[2];
+          itemCell = row.cells[3];
+        } else {
+          dateCell = row.cells[0];
+          branchCell = row.cells[1];
+          itemCell = row.cells[2];
+        }
+        
+        if (!dateCell || !branchCell || !itemCell) return;
+        
+        const dateText = dateCell.textContent.toLowerCase();
+        const branchText = branchCell.textContent.toLowerCase();
+        const itemText = itemCell.textContent.toLowerCase();
+        
+        if (dateText.includes(dateFilter) && branchText.includes(branchFilter) && itemText.includes(itemFilter)) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
     }
   </script>
 </body>

@@ -103,8 +103,8 @@ function submitOrder(orderData) {
   let orderSheet = ss.getSheetByName('Order');
   if (!orderSheet) {
     orderSheet = ss.insertSheet('Order');
-    orderSheet.appendRow(['Timestamp', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน']);
-    orderSheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#f3f4f6');
+    orderSheet.appendRow(['Timestamp', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน', 'สถานะจ่าย']);
+    orderSheet.getRange(1, 1, 1, 8).setFontWeight('bold').setBackground('#f3f4f6');
   }
   
   const timestamp = new Date();
@@ -119,7 +119,8 @@ function submitOrder(orderData) {
         orderData.branchName, 
         item.id, 
         item.name, 
-        item.qty
+        item.qty,
+        'รอจ่าย'
       ];
     });
     
@@ -193,7 +194,6 @@ function getBranchOrders(branchCode, role) {
   
   const rows = [];
   
-  // Headers: Timestamp, ชื่อผู้เบิก, รหัสสาขา, ชื่อสาขา, รหัสสินค้า, ชื่อสินค้า, จำนวน
   for (let i = 1; i < data.length; i++) {
     if (role === 'Admin' || String(data[i][2]).trim() === String(branchCode).trim()) {
       let ts = data[i][0];
@@ -206,14 +206,66 @@ function getBranchOrders(branchCode, role) {
         }
       }
       
+      let status = String(data[i][7] || 'รอจ่าย').trim();
+      
       rows.push([
         ts,
-        role === 'Admin' ? `${data[i][1]} (${data[i][3]})` : data[i][1], // ผู้เบิก (โชว์สาขาด้วยถ้าเป็นแอดมิน)
-        data[i][5], // ชื่อสินค้า
-        data[i][6]  // จำนวน
+        role === 'Admin' ? `${data[i][1]} (${data[i][3]})` : data[i][1],
+        data[i][5],
+        data[i][6],
+        status,
+        i + 1 // Add row number
       ]);
     }
   }
   
   return rows.reverse(); // Newest first
+}
+
+function updateOrderStatus(rowIndex, newStatus) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Order');
+    if (sheet) {
+      let statusToSave = newStatus;
+      if (newStatus !== 'รอจ่าย') {
+        const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+        statusToSave = `${newStatus} ${today}`;
+      }
+      sheet.getRange(rowIndex, 8).setValue(statusToSave);
+      return { success: true };
+    }
+    return { success: false, message: 'ไม่พบตาราง Order' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateMultipleOrderStatuses(updates) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Order');
+    if (sheet) {
+      const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy');
+      updates.forEach(u => {
+        let statusToSave = u.newStatus;
+        if (statusToSave !== 'รอจ่าย') {
+          statusToSave = `${statusToSave} ${today}`;
+        }
+        sheet.getRange(u.rowIndex, 8).setValue(statusToSave);
+      });
+      return { success: true, message: `อัพเดท ${updates.length} รายการเรียบร้อยแล้ว` };
+    }
+    return { success: false, message: 'ไม่พบตาราง Order' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
 }
