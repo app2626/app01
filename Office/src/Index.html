@@ -316,15 +316,15 @@
     <h1>ประวัติการเบิกอุปกรณ์</h1>
     
     <div id="history-filters" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-      <input type="text" id="filter-date" placeholder="ค้นหาวัน-เวลา..." oninput="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
+      <input type="text" id="filter-date" placeholder="ค้นหาวัน-เวลา..." oninput="filterHistoryTable(true)" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
       
-      <input type="text" list="branch-list" id="filter-branch" placeholder="ค้นหาสาขา/ผู้เบิก..." oninput="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
+      <input type="text" list="branch-list" id="filter-branch" placeholder="ค้นหาสาขา/ผู้เบิก..." oninput="filterHistoryTable(true)" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
       <datalist id="branch-list"></datalist>
       
-      <input type="text" list="item-list" id="filter-item" placeholder="ค้นหารายการ..." oninput="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
+      <input type="text" list="item-list" id="filter-item" placeholder="ค้นหารายการ..." oninput="filterHistoryTable(true)" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
       <datalist id="item-list"></datalist>
       
-      <select id="filter-status" onchange="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-family: inherit; font-size: 14px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main);">
+      <select id="filter-status" onchange="filterHistoryTable(true)" style="flex: 1; min-width: 120px; padding: 10px; font-family: inherit; font-size: 14px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main);">
         <option value="" style="color: var(--text-main);">ทุกสถานะ</option>
         <option value="รอจ่าย" style="color: var(--text-main);">รอจ่าย</option>
         <option value="จ่ายแล้ว" style="color: var(--text-main);">จ่ายแล้ว</option>
@@ -947,6 +947,7 @@
         wrapper.innerHTML = html;
         
         populateHistoryFilters(res.locations, res.products, rows);
+        filterHistoryTable(true);
         
       }).withFailureHandler(function(error) {
         document.getElementById('history-loading').style.display = 'none';
@@ -1085,7 +1086,12 @@
         }
       });
     }
-    function filterHistoryTable() {
+    let currentHistoryPage = 1;
+    const HISTORY_PAGE_SIZE = 20;
+
+    function filterHistoryTable(resetPage = false) {
+      if (resetPage === true) currentHistoryPage = 1;
+      
       const dateFilter = document.getElementById('filter-date').value.toLowerCase();
       const branchFilter = document.getElementById('filter-branch').value.toLowerCase();
       const itemFilter = document.getElementById('filter-item').value.toLowerCase();
@@ -1096,6 +1102,8 @@
       
       const rows = table.querySelectorAll('tbody tr');
       const role = sessionStorage.getItem('req_role');
+      
+      const matchedRows = [];
       
       rows.forEach(row => {
         let offset = (role === 'Admin') ? 1 : 0;
@@ -1126,11 +1134,53 @@
         const matchesStatus = statusFilter === '' || statusText.includes(statusFilter);
         
         if (dateText.includes(dateFilter) && branchText.includes(branchFilter) && itemText.includes(itemFilter) && matchesStatus) {
-          row.style.display = '';
+          row.dataset.filteredOut = 'false';
+          matchedRows.push(row);
         } else {
-          row.style.display = 'none';
+          row.dataset.filteredOut = 'true';
         }
+        
+        row.style.display = 'none'; // hide all initially for pagination
       });
+      
+      const totalPages = Math.ceil(matchedRows.length / HISTORY_PAGE_SIZE) || 1;
+      if (currentHistoryPage > totalPages) currentHistoryPage = totalPages;
+      
+      const startIndex = (currentHistoryPage - 1) * HISTORY_PAGE_SIZE;
+      const endIndex = startIndex + HISTORY_PAGE_SIZE;
+      
+      for (let i = startIndex; i < endIndex && i < matchedRows.length; i++) {
+         matchedRows[i].style.display = ''; // show only this page
+      }
+      
+      renderHistoryPagination(totalPages);
+    }
+
+    function renderHistoryPagination(totalPages) {
+       let container = document.getElementById('history-pagination');
+       if (!container) {
+          const wrapper = document.getElementById('history-table-wrapper');
+          container = document.createElement('div');
+          container.id = 'history-pagination';
+          container.style.marginTop = '15px';
+          container.style.display = 'flex';
+          container.style.justifyContent = 'center';
+          container.style.gap = '10px';
+          container.style.alignItems = 'center';
+          wrapper.parentNode.insertBefore(container, wrapper.nextSibling);
+       }
+       
+       let html = '';
+       html += `<button class="btn-action-small" style="padding:4px 8px; font-size:12px; background:var(--glass-bg);" onclick="changeHistoryPage(${currentHistoryPage - 1})" ${currentHistoryPage === 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>&laquo; ก่อนหน้า</button>`;
+       html += `<span style="font-size:13px; color:var(--text-main);">หน้า ${currentHistoryPage} จาก ${totalPages}</span>`;
+       html += `<button class="btn-action-small" style="padding:4px 8px; font-size:12px; background:var(--glass-bg);" onclick="changeHistoryPage(${currentHistoryPage + 1})" ${currentHistoryPage === totalPages ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>ถัดไป &raquo;</button>`;
+       
+       container.innerHTML = html;
+    }
+    
+    function changeHistoryPage(newPage) {
+       currentHistoryPage = newPage;
+       filterHistoryTable(); // don't reset page
     }
 
     function editHistoryRow(btn, rowIdx) {
@@ -1240,7 +1290,7 @@
       const rows = table.querySelectorAll('tr');
       
       rows.forEach(row => {
-        if (row.style.display === 'none') return; 
+        if (row.dataset.filteredOut === 'true') return; 
         
         let rowData = [];
         const cells = row.querySelectorAll('th, td');
