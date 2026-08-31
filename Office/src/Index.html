@@ -289,7 +289,6 @@
       <div class="tab active" onclick="showAdminTab('Users')" id="tab-Users">พนักงาน (Users)</div>
       <div class="tab" onclick="showAdminTab('Location')" id="tab-Location">สาขา (Location)</div>
       <div class="tab" onclick="showAdminTab('Product')" id="tab-Product">สินค้า (Product)</div>
-      <div class="tab" onclick="showAdminTab('Order')" id="tab-Order">ประวัติการเบิก (Order)</div>
     </div>
     
     <div class="admin-table-wrapper" id="admin-table-wrapper">
@@ -298,10 +297,6 @@
     
     <div style="display: flex; gap: 16px;">
       <button class="btn-add" onclick="addAdminRow()" style="margin-bottom: 0; flex: 1;">+ เพิ่มรายการ</button>
-      <button class="btn-submit" onclick="saveAdmin()" id="btn-save-admin" style="flex: 2;">
-        <span id="btn-save-admin-text">บันทึกข้อมูล</span>
-        <div class="loader" id="btn-save-admin-loader"></div>
-      </button>
     </div>
     
     <div id="admin-message" class="message"></div>
@@ -637,8 +632,8 @@
     }
 
     // ----- Admin Logic -----
-    function loadAdminData() {
-      if (Object.keys(adminDataCache).length > 0) {
+    function loadAdminData(force = false) {
+      if (!force && Object.keys(adminDataCache).length > 0) {
         renderAdminTable();
         return;
       }
@@ -669,7 +664,6 @@
     }
 
     function showAdminTab(tabName) {
-      saveCurrentTableToCache();
       currentAdminTab = tabName;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + tabName).classList.add('active');
@@ -694,8 +688,9 @@
       headers.forEach(h => html += `<th>${h}</th>`);
       html += '<th style="width: 80px; text-align:center;">จัดการ</th></tr></thead><tbody>';
       
-      rows.forEach((row, rIndex) => {
-        html += '<tr>';
+      rows.forEach((row) => {
+        let rowIdx = row[headers.length];
+        html += `<tr data-rowindex="${rowIdx}">`;
         headers.forEach((h, cIndex) => {
           if (h.includes('สถานะ') || h.includes('ช่องทางการมองเห็น')) {
             let val = (row[cIndex] || '').toString().trim();
@@ -703,12 +698,13 @@
             let btnClass = val === 'เปิด' ? 'btn-status-on' : 'btn-status-off';
             html += `<td><button type="button" class="btn-status ${btnClass}" value="${val}" onclick="toggleStatus(this)" disabled>${val}</button></td>`;
           } else {
-            html += `<td><input type="text" value="${escapeHtml(row[cIndex] || '')}" readonly /></td>`;
+            let val = (currentAdminTab === 'Users' && cIndex === 1) ? '********' : escapeHtml(row[cIndex] || '');
+            html += `<td><input type="text" value="${val}" data-original="${val}" readonly /></td>`;
           }
         });
         html += `<td style="text-align:center; white-space:nowrap;">
-                  <button type="button" class="btn-action-small edit-btn" onclick="editRow(this)" title="แก้ไข">✏️</button>
-                  <button type="button" class="btn-action-small delete-btn" onclick="deleteRow(this)" title="ลบ">🗑️</button>
+                  <button type="button" class="btn-action-small edit-btn" onclick="editRow(this, ${rowIdx})" title="แก้ไข">✏️</button>
+                  <button type="button" class="btn-action-small delete-btn" onclick="deleteRow(this, ${rowIdx})" title="ลบ">🗑️</button>
                  </td></tr>`;
       });
       html += '</tbody></table>';
@@ -747,13 +743,13 @@
         }
       }
       tr.innerHTML += `<td style="text-align:center; white-space:nowrap;">
-                  <button type="button" class="btn-action-small edit-btn editing" onclick="editRow(this)" title="บันทึก">💾</button>
-                  <button type="button" class="btn-action-small delete-btn" onclick="deleteRow(this)" title="ลบ">🗑️</button>
+                  <button type="button" class="btn-action-small edit-btn editing" onclick="editRow(this, null)" title="บันทึก">💾</button>
+                  <button type="button" class="btn-action-small delete-btn" onclick="deleteRow(this, null)" title="ลบ">🗑️</button>
                  </td>`;
       tbody.appendChild(tr);
     }
 
-    function deleteRow(btn) {
+    function deleteRow(btn, rowIdx) {
       Swal.fire({
         title: 'ยืนยันการลบ',
         text: 'คุณต้องการลบรายการนี้ใช่หรือไม่?',
@@ -765,18 +761,33 @@
         cancelButtonText: 'ยกเลิก'
       }).then((result) => {
         if (result.isConfirmed) {
-          btn.closest('tr').remove();
-          saveAdmin(true);
+          if (!rowIdx) {
+             btn.closest('tr').remove();
+             return;
+          }
+          document.getElementById('admin-loading').style.display = 'flex';
+          google.script.run.withSuccessHandler(function(res) {
+             if (res.success) {
+               showAdminMessage(res.message, 'success');
+               loadAdminData(true);
+             } else {
+               document.getElementById('admin-loading').style.display = 'none';
+               showAdminMessage(res.message, 'error');
+             }
+          }).withFailureHandler(function(err) {
+             document.getElementById('admin-loading').style.display = 'none';
+             showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
+          }).deleteAdminRowData(currentAdminTab, rowIdx);
         }
       });
     }
 
-    function editRow(btn) {
+    function editRow(btn, rowIdx) {
       const tr = btn.closest('tr');
       if (btn.classList.contains('editing')) {
         Swal.fire({
-          title: 'ยืนยันการแก้ไข',
-          text: 'คุณต้องการยืนยันการแก้ไขข้อมูลใช่หรือไม่?',
+          title: 'ยืนยันการบันทึก',
+          text: 'คุณต้องการยืนยันการบันทึกข้อมูลใช่หรือไม่?',
           icon: 'question',
           showCancelButton: true,
           confirmButtonColor: '#10b981',
@@ -785,16 +796,48 @@
           cancelButtonText: 'ยกเลิก'
         }).then((result) => {
           if (result.isConfirmed) {
-             tr.querySelectorAll('input').forEach(inp => inp.readOnly = true);
-             tr.querySelectorAll('.btn-status').forEach(b => b.disabled = true);
-             btn.classList.remove('editing');
-             btn.innerHTML = '✏️';
-             btn.title = 'แก้ไข';
-             saveAdmin(true);
+             const inputs = tr.querySelectorAll('input, .btn-status');
+             const rowData = [];
+             inputs.forEach(input => {
+               // If it's a password and wasn't changed, send the original hash/placeholder? 
+               // Actually, if it's ******** we send it as is, backend updateAdminRowData won't rehash it if it matches old hash?
+               // Wait! The backend compares with oldPass (which is the actual hash). '********' won't match oldPass! So it will hash '********'!
+               // Fix: In frontend, if input value is still '********', don't send it, send the original value? We don't have it.
+               // Let's handle this carefully in the backend or frontend.
+               // We will attach data-original to input, and if value == '********', we send the original hash?
+               // But we don't have the original hash if we masked it. 
+               // Let's let the backend handle it: if rowData[1] === '********', backend ignores it!
+               rowData.push(input.value);
+             });
+             
+             document.getElementById('admin-loading').style.display = 'flex';
+             if (!rowIdx) {
+               google.script.run.withSuccessHandler(function(res) {
+                 if (res.success) {
+                   showAdminMessage(res.message, 'success');
+                   loadAdminData(true);
+                 } else {
+                   document.getElementById('admin-loading').style.display = 'none';
+                   showAdminMessage(res.message, 'error');
+                 }
+               }).addAdminRowData(currentAdminTab, rowData);
+             } else {
+               google.script.run.withSuccessHandler(function(res) {
+                 if (res.success) {
+                   showAdminMessage(res.message, 'success');
+                   loadAdminData(true);
+                 } else {
+                   document.getElementById('admin-loading').style.display = 'none';
+                   showAdminMessage(res.message, 'error');
+                 }
+               }).updateAdminRowData(currentAdminTab, rowIdx, rowData);
+             }
           }
         });
       } else {
-        tr.querySelectorAll('input').forEach(inp => inp.readOnly = false);
+        tr.querySelectorAll('input').forEach(inp => {
+          inp.readOnly = false;
+        });
         tr.querySelectorAll('.btn-status').forEach(b => b.disabled = false);
         btn.classList.add('editing');
         btn.innerHTML = '💾';
@@ -802,84 +845,7 @@
       }
     }
 
-    function saveCurrentTableToCache() {
-      const table = document.getElementById('admin-table');
-      if (!table) return;
-      
-      const headers = adminDataCache[currentAdminTab][0];
-      const newData = [headers];
-      
-      const rows = table.querySelectorAll('tbody tr');
-      rows.forEach(tr => {
-        const inputs = tr.querySelectorAll('input, .btn-status');
-        const rowData = [];
-        let hasData = false;
-        inputs.forEach(input => {
-          rowData.push(input.value);
-          if (input.value.trim() !== '') hasData = true;
-        });
-        if (hasData) newData.push(rowData);
-      });
-      
-      adminDataCache[currentAdminTab] = newData;
-    }
-
-    function saveAdmin(skipConfirm = false) {
-      if(!skipConfirm) {
-        Swal.fire({
-          title: 'ยืนยันการบันทึก',
-          text: 'คุณต้องการบันทึกการเปลี่ยนแปลงข้อมูลใช่หรือไม่?',
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonColor: '#3b82f6',
-          cancelButtonColor: '#94a3b8',
-          confirmButtonText: 'ใช่, บันทึก',
-          cancelButtonText: 'ยกเลิก'
-        }).then((result) => {
-          if (result.isConfirmed) {
-            executeSaveAdmin();
-          }
-        });
-        return;
-      }
-      executeSaveAdmin();
-    }
-
-    function executeSaveAdmin() {
-      saveCurrentTableToCache();
-      const sheetName = currentAdminTab;
-      const dataToSave = adminDataCache[sheetName];
-      
-      const btn = document.getElementById('btn-save-admin');
-      const text = document.getElementById('btn-save-admin-text');
-      const loader = document.getElementById('btn-save-admin-loader');
-      
-      btn.disabled = true;
-      text.style.display = 'none';
-      loader.style.display = 'block';
-      
-      google.script.run.withSuccessHandler(function(res) {
-        btn.disabled = false;
-        text.style.display = 'block';
-        loader.style.display = 'none';
-        
-        if (res.success) {
-          showAdminMessage(res.message, 'success');
-          // Update globalProducts if product saved
-          if (sheetName === 'Product') {
-            globalProducts = []; // force reload on main view
-          }
-          setTimeout(() => { document.getElementById('admin-message').style.display = 'none'; }, 3000);
-        } else {
-          showAdminMessage(res.message, 'error');
-        }
-      }).withFailureHandler(function(err) {
-        btn.disabled = false;
-        text.style.display = 'block';
-        loader.style.display = 'none';
-        showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
-      }).saveAdminData(sheetName, dataToSave);
-    }
+    // saveAdmin and saveCurrentTableToCache removed for row-level operations
 
     function showAdminMessage(msg, type) {
       Swal.fire({
@@ -896,12 +862,15 @@
       const branchCode = sessionStorage.getItem('req_branchCode');
       const role = sessionStorage.getItem('req_role');
       
-      google.script.run.withSuccessHandler(function(rows) {
+      google.script.run.withSuccessHandler(function(res) {
         document.getElementById('history-loading').style.display = 'none';
         
+        const rows = res.orders;
         const wrapper = document.getElementById('history-table-wrapper');
         if (!rows || rows.length === 0) {
           wrapper.innerHTML = '<p style="text-align:center; color:var(--text-muted);">ยังไม่มีประวัติการเบิก</p>';
+          // Even if no rows, still populate filters with master data
+          populateHistoryFilters(res.locations, res.products, []);
           return;
         }
         
@@ -977,26 +946,32 @@
         html += '</tbody></table>';
         wrapper.innerHTML = html;
         
-        let branchSet = new Set();
-        let itemSet = new Set();
-        rows.forEach(row => {
-          branchSet.add(String(row[1] || '')); // ชื่อผู้เบิก
-          branchSet.add(String(row[3] || '')); // ชื่อสาขา
-          itemSet.add(String(row[5] || '')); // ชื่อสินค้า
-        });
-        
-        let branchHtml = '';
-        branchSet.forEach(opt => branchHtml += `<option value="${escapeHtml(opt)}">`);
-        document.getElementById('branch-list').innerHTML = branchHtml;
-        
-        let itemHtml = '';
-        itemSet.forEach(opt => itemHtml += `<option value="${escapeHtml(opt)}">`);
-        document.getElementById('item-list').innerHTML = itemHtml;
+        populateHistoryFilters(res.locations, res.products, rows);
         
       }).withFailureHandler(function(error) {
         document.getElementById('history-loading').style.display = 'none';
         document.getElementById('history-table-wrapper').innerHTML = '<p style="color:var(--danger);">เกิดข้อผิดพลาด: ' + error + '</p>';
       }).getBranchOrders(branchCode, role);
+    }
+
+    function populateHistoryFilters(locations, products, rows) {
+      let branchSet = new Set(locations);
+      let itemSet = new Set(products);
+      
+      // Also include names that might only be in the order history
+      rows.forEach(row => {
+        branchSet.add(String(row[1] || '')); // ชื่อผู้เบิก
+        branchSet.add(String(row[3] || '')); // ชื่อสาขา
+        itemSet.add(String(row[5] || '')); // ชื่อสินค้า
+      });
+      
+      let branchHtml = '';
+      branchSet.forEach(opt => branchHtml += `<option value="${escapeHtml(opt)}">`);
+      document.getElementById('branch-list').innerHTML = branchHtml;
+      
+      let itemHtml = '';
+      itemSet.forEach(opt => itemHtml += `<option value="${escapeHtml(opt)}">`);
+      document.getElementById('item-list').innerHTML = itemHtml;
     }
     
     function updateDispenseStatus(rowIdx, selectEl) {

@@ -5,6 +5,18 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+function hashPassword(password) {
+  const rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password, Utilities.Charset.UTF_8);
+  let txtHash = '';
+  for (let i = 0; i < rawHash.length; i++) {
+    let hashVal = rawHash[i];
+    if (hashVal < 0) hashVal += 256;
+    if (hashVal.toString(16).length === 1) txtHash += '0';
+    txtHash += hashVal.toString(16);
+  }
+  return txtHash;
+}
+
 function login(username, password) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let userSheet = ss.getSheetByName('Users');
@@ -13,7 +25,7 @@ function login(username, password) {
   if (!userSheet) {
     userSheet = ss.insertSheet('Users');
     userSheet.appendRow(['Branch Code', 'Password', 'Name', 'Role']);
-    userSheet.appendRow(['B001', '1234', 'ผู้ดูแลระบบ', 'Admin']);
+    userSheet.appendRow(['B001', hashPassword('1234'), 'ผู้ดูแลระบบ', 'Admin']);
     userSheet.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#f3f4f6');
   }
   
@@ -26,9 +38,12 @@ function login(username, password) {
   }
   
   const data = userSheet.getDataRange().getValues();
+  const hashedInput = hashPassword(String(password).trim());
+  
   for (let i = 1; i < data.length; i++) {
+    const storedPass = String(data[i][1]).trim();
     if (String(data[i][0]).trim() === String(username).trim() && 
-        String(data[i][1]).trim() === String(password).trim()) {
+        (storedPass === String(password).trim() || storedPass === hashedInput)) {
       
       const branchCode = String(data[i][0]).trim();
       const branchName = locMap[branchCode] || branchCode;
@@ -114,6 +129,26 @@ function submitOrder(orderData) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000); // wait 10 seconds for others to finish
   try {
+    // 1) Validate maxQty against Product sheet
+    let maxQtyMap = {};
+    const productSheet = ss.getSheetByName('Product');
+    if (productSheet) {
+      const prodData = productSheet.getDataRange().getValues();
+      for (let i = 1; i < prodData.length; i++) {
+        const pId = String(prodData[i][0] || '').trim();
+        const maxQ = parseInt(prodData[i][3]) || 0;
+        if (pId) maxQtyMap[pId] = maxQ;
+      }
+    }
+    
+    // 2) Enforce maxQty limit
+    orderData.items.forEach(item => {
+      const max = maxQtyMap[item.id] || 0;
+      if (max > 0 && item.qty > max) {
+        item.qty = max; // clamp to max allowed
+      }
+    });
+
     const rowsToInsert = orderData.items.map(item => {
       return [
         timestamp, 
@@ -149,12 +184,16 @@ function getAdminData() {
     const sheet = ss.getSheetByName(name);
     if (!sheet) return [];
     const data = sheet.getDataRange().getValues();
-    return data.map(row => row.map(cell => {
-      if (cell instanceof Date) {
-        return Utilities.formatDate(cell, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
-      }
-      return String(cell);
-    }));
+    return data.map((row, idx) => {
+      let r = row.map(cell => {
+        if (cell instanceof Date) {
+          return Utilities.formatDate(cell, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss');
+        }
+        return String(cell);
+      });
+      r.push(idx + 1);
+      return r;
+    });
   };
   
   return {
@@ -165,7 +204,7 @@ function getAdminData() {
   };
 }
 
-function saveAdminData(sheetName, data) {
+function addAdminRowData(sheetName, rowData) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -173,14 +212,60 @@ function saveAdminData(sheetName, data) {
     let sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-    } else {
-      sheet.clearContents();
     }
     
-    if (data && data.length > 0) {
-      sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    // Hash password if Users sheet and index 1
+    if (sheetName === 'Users' && rowData[1]) {
+      rowData[1] = hashPassword(rowData[1]);
     }
-    return { success: true, message: 'บันทึกข้อมูล ' + sheetName + ' เรียบร้อยแล้ว' };
+    
+    sheet.appendRow(rowData);
+    return { success: true, message: 'เพิ่มข้อมูลเรียบร้อยแล้ว' };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateAdminRowData(sheetName, rowIndex, rowData) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      // If Users sheet and password is changed, hash it
+      if (sheetName === 'Users') {
+        const oldPass = sheet.getRange(rowIndex, 2).getValue();
+        if (rowData[1] === '********') {
+          rowData[1] = oldPass; // Keep original
+        } else if (String(rowData[1]) !== String(oldPass)) {
+          rowData[1] = hashPassword(rowData[1]);
+        }
+      }
+      sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+      return { success: true, message: 'แก้ไขข้อมูลเรียบร้อยแล้ว' };
+    }
+    return { success: false, message: 'ไม่พบชีต ' + sheetName };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteAdminRowData(sheetName, rowIndex) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      sheet.deleteRow(rowIndex);
+      return { success: true, message: 'ลบข้อมูลเรียบร้อยแล้ว' };
+    }
+    return { success: false, message: 'ไม่พบชีต ' + sheetName };
   } catch(e) {
     return { success: false, message: e.toString() };
   } finally {
@@ -226,7 +311,31 @@ function getBranchOrders(branchCode, role) {
     }
   }
   
-  return rows.reverse(); // Newest first
+  const locations = [];
+  const locSheet = ss.getSheetByName('Location');
+  if (locSheet) {
+    const locData = locSheet.getDataRange().getValues();
+    for(let i=1; i<locData.length; i++) {
+       const loc = String(locData[i][1] || '').trim();
+       if(loc) locations.push(loc);
+    }
+  }
+
+  const products = [];
+  const prodSheet = ss.getSheetByName('Product');
+  if (prodSheet) {
+    const prodData = prodSheet.getDataRange().getValues();
+    for(let i=1; i<prodData.length; i++) {
+       const prod = String(prodData[i][1] || '').trim();
+       if(prod) products.push(prod);
+    }
+  }
+
+  return {
+    orders: rows.reverse(), // Newest first
+    locations: locations,
+    products: products
+  };
 }
 
 function updateOrderStatus(rowIndex, newStatus) {
