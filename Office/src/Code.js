@@ -191,7 +191,7 @@ function getAdminData() {
         }
         return String(cell);
       });
-      r.push(idx + 1);
+      if (idx > 0) r.push(idx + 1);
       return r;
     });
   };
