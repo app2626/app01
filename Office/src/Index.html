@@ -275,7 +275,7 @@
 
   <div class="container" id="admin-container" style="display: none;">
     <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; position: absolute; top: 20px; right: 20px; z-index: 10;">
-      <button class="btn-switch-relative" onclick="switchView('main')">เบิกอุปกรณ์</button>
+      <button class="btn-switch-relative" onclick="gotoMainApp()">เบิกอุปกรณ์</button>
       <button class="btn-logout-relative" onclick="logout()">ออกจากระบบ</button>
     </div>
     
@@ -305,7 +305,7 @@
   <!-- History Container -->
   <div class="container" id="history-container" style="display: none;">
     <div style="display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; position: absolute; top: 20px; right: 20px; z-index: 10;">
-      <button class="btn-switch-relative" onclick="switchView('main')">เบิกอุปกรณ์</button>
+      <button class="btn-switch-relative" onclick="gotoMainApp()">เบิกอุปกรณ์</button>
       <button class="btn-logout-relative" onclick="logout()">ออกจากระบบ</button>
     </div>
     
@@ -443,6 +443,14 @@
     }
 
     // ----- Main App Logic -----
+    function gotoMainApp() {
+      const u = sessionStorage.getItem('req_user');
+      const bc = sessionStorage.getItem('req_branchCode');
+      const bn = sessionStorage.getItem('req_branchName');
+      const r = sessionStorage.getItem('req_role');
+      if (u) showMainApp(u, bc, bn, r);
+    }
+
     function showMainApp(userName, userBranchCode, userBranchName, role) {
       switchView('main');
       
