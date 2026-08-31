@@ -70,8 +70,9 @@ function getInitialData(branchCode) {
       if (!pName) continue;
       
       const pCategory = String(prodData[i][2] || '').trim() || 'อื่นๆ';
-      const pChannel = String(prodData[i][3] || '').trim(); // Column D
-      const pUnit = String(prodData[i][4] || '').trim(); // Column E
+      const pMaxQty = parseInt(prodData[i][3]) || 0; // Column D (จำนวนเบิก/ครั้ง)
+      const pChannel = String(prodData[i][4] || '').trim(); // Column E (ช่องทางการมองเห็น)
+      const pUnit = String(prodData[i][5] || '').trim(); // Column F (หน่วย)
       
       let isVisible = false;
       if (!pChannel) {
@@ -87,7 +88,8 @@ function getInitialData(branchCode) {
           id: pId,
           name: pName,
           category: pCategory,
-          unit: pUnit
+          unit: pUnit,
+          maxQty: pMaxQty
         });
       }
     }
@@ -105,6 +107,7 @@ function submitOrder(orderData) {
     orderSheet = ss.insertSheet('Order');
     orderSheet.appendRow(['Timestamp', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน', 'สถานะจ่าย']);
     orderSheet.getRange(1, 1, 1, 8).setFontWeight('bold').setBackground('#f3f4f6');
+    orderSheet.getRange("A:A").setNumberFormat('dd/MM/yyyy HH:mm:ss');
   }
   
   const timestamp = new Date();
@@ -129,6 +132,7 @@ function submitOrder(orderData) {
       const numRows = rowsToInsert.length;
       const numCols = rowsToInsert[0].length;
       orderSheet.getRange(startRow, 1, numRows, numCols).setValues(rowsToInsert);
+      orderSheet.getRange(startRow, 1, numRows, 1).setNumberFormat('dd/MM/yyyy HH:mm:ss');
     }
     return { success: true, message: 'บันทึกข้อมูลเรียบร้อยแล้ว!' };
   } catch (e) {
@@ -209,12 +213,15 @@ function getBranchOrders(branchCode, role) {
       let status = String(data[i][7] || 'รอจ่าย').trim();
       
       rows.push([
-        ts,
-        role === 'Admin' ? `${data[i][1]} (${data[i][3]})` : data[i][1],
-        data[i][5],
-        data[i][6],
-        status,
-        i + 1 // Add row number
+        ts,         // 0: Timestamp
+        data[i][1], // 1: ชื่อผู้เบิก
+        data[i][2], // 2: รหัสสาขา
+        data[i][3], // 3: ชื่อสาขา
+        data[i][4], // 4: รหัสสินค้า
+        data[i][5], // 5: ชื่อสินค้า
+        data[i][6], // 6: จำนวน
+        status,     // 7: สถานะการจ่าย
+        i + 1       // 8: Add row number for updates
       ]);
     }
   }
@@ -235,6 +242,71 @@ function updateOrderStatus(rowIndex, newStatus) {
         statusToSave = `${newStatus} ${today}`;
       }
       sheet.getRange(rowIndex, 8).setValue(statusToSave);
+      return { success: true };
+    }
+    return { success: false, message: 'ไม่พบตาราง Order' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteOrderRow(rowIndex) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Order');
+    if (sheet) {
+      sheet.deleteRow(rowIndex);
+      return { success: true };
+    }
+    return { success: false, message: 'ไม่พบตาราง Order' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateOrderRowData(rowIndex, rowData) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Order');
+    if (sheet) {
+      sheet.getRange(rowIndex, 2, 1, 6).setValues([[
+        rowData.requester,
+        rowData.branchCode,
+        rowData.branchName,
+        rowData.itemCode,
+        rowData.itemName,
+        rowData.qty
+      ]]);
+      return { success: true };
+    }
+    return { success: false, message: 'ไม่พบตาราง Order' };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteMultipleOrderRows(rowIndices) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Order');
+    if (sheet) {
+      // Sort indices descending so deleting lower rows doesn't shift higher ones
+      rowIndices.sort((a, b) => b - a);
+      for (let i = 0; i < rowIndices.length; i++) {
+        sheet.deleteRow(rowIndices[i]);
+      }
       return { success: true };
     }
     return { success: false, message: 'ไม่พบตาราง Order' };

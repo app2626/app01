@@ -328,6 +328,15 @@
       
       <input type="text" list="item-list" id="filter-item" placeholder="ค้นหารายการ..." oninput="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">
       <datalist id="item-list"></datalist>
+      
+      <select id="filter-status" onchange="filterHistoryTable()" style="flex: 1; min-width: 120px; padding: 10px; font-family: inherit; font-size: 14px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main);">
+        <option value="" style="color: var(--text-main);">ทุกสถานะ</option>
+        <option value="รอจ่าย" style="color: var(--text-main);">รอจ่าย</option>
+        <option value="จ่ายแล้ว" style="color: var(--text-main);">จ่ายแล้ว</option>
+        <option value="ยกเลิก" style="color: var(--text-main);">ยกเลิก</option>
+      </select>
+      
+      <button class="btn-submit" style="flex: 0 0 auto; padding: 10px 15px; width: auto; font-size: 14px; background: #10b981;" onclick="downloadHistoryCSV()">📥 ดาวน์โหลด CSV</button>
     </div>
     
     <div class="admin-table-wrapper" id="history-table-wrapper">
@@ -415,12 +424,27 @@
     
     function logout() {
       sessionStorage.clear();
+      
+      // Clear data caches so next login fetches fresh data based on their role/branch
+      globalProducts = [];
+      adminDataCache = {};
+      document.getElementById('items-container').innerHTML = '';
+      document.getElementById('history-table-wrapper').innerHTML = '';
+      document.getElementById('branch-list').innerHTML = '';
+      document.getElementById('item-list').innerHTML = '';
+      document.getElementById('filter-date').value = '';
+      document.getElementById('filter-branch').value = '';
+      document.getElementById('filter-item').value = '';
+      
       document.getElementById('main-container').style.display = 'none';
       document.getElementById('admin-container').style.display = 'none';
       document.getElementById('history-container').style.display = 'none';
       document.getElementById('login-container').style.display = 'block';
       document.getElementById('loginForm').reset();
-      document.getElementById('login-message').style.display = 'none';
+      document.getElementById('requisitionForm').reset();
+      
+      const loginMessage = document.getElementById('login-message');
+      if(loginMessage) loginMessage.style.display = 'none';
     }
 
     // ----- Main App Logic -----
@@ -433,7 +457,7 @@
         document.getElementById('btn-goto-admin').style.display = 'none';
       }
       
-      document.getElementById('location').value = (userBranchName || 'ไม่ระบุสาขา') + (userBranchCode ? ` (${userBranchCode})` : '');
+      document.getElementById('location').value = `ผู้ใช้งาน: ${userName} | ` + (userBranchName || 'ไม่ระบุสาขา') + (userBranchCode ? ` (${userBranchCode})` : '');
       
       if (globalProducts.length === 0) {
         document.getElementById('main-loading').style.display = 'flex';
@@ -471,9 +495,12 @@
         categories[cat].forEach(p => {
           const opt = document.createElement('option');
           opt.value = p.id;
-          opt.textContent = p.name + (p.unit ? ` (${p.unit})` : '');
+          let label = p.name + (p.unit ? ` (${p.unit})` : '');
+          if (p.maxQty > 0) label += ` [จำกัด ${p.maxQty}]`;
+          opt.textContent = label;
           opt.setAttribute('data-name', p.name);
           opt.setAttribute('data-category', p.category || '');
+          opt.setAttribute('data-maxqty', p.maxQty || 0);
           optgroup.appendChild(opt);
         });
         select.appendChild(optgroup);
@@ -485,23 +512,51 @@
       
       select.onchange = function() {
         const selectedOption = select.options[select.selectedIndex];
-        if (!selectedOption.value) return;
+        if (!selectedOption.value) {
+          qty.removeAttribute('max');
+          return;
+        }
         
         const category = selectedOption.getAttribute('data-category') || '';
+        const maxQty = parseInt(selectedOption.getAttribute('data-maxqty')) || 0;
+        
+        if (maxQty > 0) {
+          qty.max = maxQty;
+        } else {
+          qty.removeAttribute('max');
+        }
         
         if (category.includes('ถุง')) {
           qty.min = '100';
           qty.step = '100';
           qty.placeholder = 'ทีละ 100';
-          if (qty.value) {
+          if (!qty.value || parseInt(qty.value) < 100) {
+            qty.value = '100';
+          } else {
             let val = parseInt(qty.value);
-            if (val < 100) qty.value = '100';
-            else if (val % 100 !== 0) qty.value = Math.ceil(val / 100) * 100;
+            if (val % 100 !== 0) qty.value = Math.ceil(val / 100) * 100;
           }
         } else {
           qty.min = '1';
           qty.step = '1';
           qty.placeholder = 'จำนวน';
+          if (!qty.value || parseInt(qty.value) < 1) {
+            qty.value = '1';
+          }
+        }
+        
+        // Enforce max immediately if exceeded
+        if (maxQty > 0 && qty.value && parseInt(qty.value) > maxQty) {
+          qty.value = maxQty;
+        }
+      };
+      
+      qty.oninput = function() {
+        const selectedOption = select.options[select.selectedIndex];
+        if (!selectedOption || !selectedOption.value) return;
+        const maxQty = parseInt(selectedOption.getAttribute('data-maxqty')) || 0;
+        if (maxQty > 0 && parseInt(this.value) > maxQty) {
+          this.value = maxQty;
         }
       };
       
@@ -552,7 +607,8 @@
           document.getElementById('requisitionForm').reset();
           const bc = sessionStorage.getItem('req_branchCode');
           const bn = sessionStorage.getItem('req_branchName');
-          document.getElementById('location').value = (bn || 'ไม่ระบุสาขา') + (bc ? ` (${bc})` : '');
+          const usr = sessionStorage.getItem('req_user');
+          document.getElementById('location').value = `ผู้ใช้งาน: ${usr} | ` + (bn || 'ไม่ระบุสาขา') + (bc ? ` (${bc})` : '');
           document.getElementById('items-container').innerHTML = '';
           addItemRow();
           setTimeout(() => { document.getElementById('main-message').style.display = 'none'; }, 5000);
@@ -599,7 +655,7 @@
           adminDataCache.Location = [['รหัสสาขา', 'ชื่อสาขา', 'ช่องทางการมองเห็น']];
         }
         if (!adminDataCache.Product || adminDataCache.Product.length === 0) {
-          adminDataCache.Product = [['รหัสสินค้า', 'ชื่อสินค้า', 'หมวดหมู่', 'ช่องทางการมองเห็น', 'หน่วยนับ']];
+          adminDataCache.Product = [['รหัสสินค้า', 'ชื่อสินค้า', 'หมวดหมู่', 'กำหนดจำนวนเบิก/ครั้ง', 'ช่องทางการมองเห็น', 'หน่วยนับ']];
         }
         if (!adminDataCache.Order || adminDataCache.Order.length === 0) {
           adminDataCache.Order = [['Timestamp', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน', 'สถานะจ่าย']];
@@ -860,6 +916,7 @@
                 <option value="ยกเลิก">ยกเลิก</option>
               </select>
               <button class="btn-submit" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="applyBatchStatus()">อัพเดท</button>
+              <button class="btn-submit" style="width: auto; padding: 6px 12px; font-size: 12px; background: #ef4444;" onclick="deleteSelectedHistory()">ลบที่เลือก</button>
             </div>
           `;
         }
@@ -868,23 +925,29 @@
         if (role === 'Admin') {
            html += `<th style="width: 30px; text-align: center;"><input type="checkbox" onchange="toggleAllHistoryCheckboxes(this)"></th>`;
         }
-        let headers = ['วัน-เวลา', 'ผู้เบิก', 'รายการ', 'จำนวน', 'สถานะจ่าย'];
+        let headers = ['วันที่และเวลา', 'ชื่อผู้เบิก', 'รหัสสาขา', 'ชื่อสาขา', 'รหัสสินค้า', 'ชื่อสินค้า', 'จำนวน', 'สถานะการจ่าย'];
         headers.forEach(h => html += `<th>${h}</th>`);
+        if (role === 'Admin') {
+           html += `<th style="width: 80px; text-align:center;">จัดการ</th>`;
+        }
         html += '</tr></thead><tbody>';
         
         rows.forEach(row => {
           html += '<tr>';
-          let rowIdx = row[5];
+          let rowIdx = row[8];
           if (role === 'Admin') {
             html += `<td style="text-align: center;"><input type="checkbox" class="history-row-checkbox" value="${rowIdx}"></td>`;
           }
           
-          html += `<td>${escapeHtml(String(row[0]))}</td>`;
-          html += `<td>${escapeHtml(String(row[1]))}</td>`;
-          html += `<td>${escapeHtml(String(row[2]))}</td>`;
-          html += `<td>${escapeHtml(String(row[3]))}</td>`;
+          html += `<td>${escapeHtml(String(row[0] || ''))}</td>`;
+          html += `<td>${escapeHtml(String(row[1] || ''))}</td>`;
+          html += `<td>${escapeHtml(String(row[2] || ''))}</td>`;
+          html += `<td>${escapeHtml(String(row[3] || ''))}</td>`;
+          html += `<td>${escapeHtml(String(row[4] || ''))}</td>`;
+          html += `<td>${escapeHtml(String(row[5] || ''))}</td>`;
+          html += `<td>${escapeHtml(String(row[6] || ''))}</td>`;
           
-          let fullStatus = String(row[4] || 'รอจ่าย').trim();
+          let fullStatus = String(row[7] || 'รอจ่าย').trim();
           let statusBase = fullStatus.split(' ')[0];
           let statusDate = fullStatus.substring(statusBase.length).trim();
           
@@ -897,6 +960,10 @@
               </select>
               ${statusDate ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 4px; text-align: center;">${escapeHtml(statusDate)}</div>` : ''}
             </td>`;
+            html += `<td style="text-align:center; white-space:nowrap;">
+                      <button type="button" class="btn-action-small edit-btn" onclick="editHistoryRow(this, ${rowIdx})" title="แก้ไข">✏️</button>
+                      <button type="button" class="btn-action-small delete-btn" onclick="deleteHistoryRow(this, ${rowIdx})" title="ลบ">🗑️</button>
+                     </td>`;
           } else {
             let color = statusBase === 'จ่ายแล้ว' ? 'var(--success)' : (statusBase === 'ยกเลิก' ? 'var(--danger)' : 'var(--text-muted)');
             html += `<td style="color:${color}; font-weight:600;">
@@ -913,8 +980,9 @@
         let branchSet = new Set();
         let itemSet = new Set();
         rows.forEach(row => {
-          branchSet.add(String(row[1]));
-          itemSet.add(String(row[2]));
+          branchSet.add(String(row[1] || '')); // ชื่อผู้เบิก
+          branchSet.add(String(row[3] || '')); // ชื่อสาขา
+          itemSet.add(String(row[5] || '')); // ชื่อสินค้า
         });
         
         let branchHtml = '';
@@ -1002,10 +1070,51 @@
         }
       });
     }
+
+    function deleteSelectedHistory() {
+      const checkboxes = document.querySelectorAll('.history-row-checkbox:checked');
+      if (checkboxes.length === 0) {
+        Swal.fire('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการลบอย่างน้อย 1 รายการ', 'warning');
+        return;
+      }
+      
+      const rowIndices = [];
+      checkboxes.forEach(cb => {
+        rowIndices.push(parseInt(cb.value));
+      });
+      
+      Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `คุณต้องการลบข้อมูลประวัติการเบิกจำนวน ${rowIndices.length} รายการใช่หรือไม่? การกระทำนี้ไม่สามารถยกเลิกได้`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          document.getElementById('history-loading').style.display = 'flex';
+          google.script.run.withSuccessHandler(function(res) {
+            document.getElementById('history-loading').style.display = 'none';
+            if (res.success) {
+              Swal.fire('ลบสำเร็จ', 'ข้อมูลถูกลบเรียบร้อยแล้ว', 'success');
+              loadHistoryData();
+            } else {
+              Swal.fire('ข้อผิดพลาด', res.message, 'error');
+            }
+          }).withFailureHandler(function(err) {
+            document.getElementById('history-loading').style.display = 'none';
+            Swal.fire('ข้อผิดพลาด', String(err), 'error');
+          }).deleteMultipleOrderRows(rowIndices);
+        }
+      });
+    }
     function filterHistoryTable() {
       const dateFilter = document.getElementById('filter-date').value.toLowerCase();
       const branchFilter = document.getElementById('filter-branch').value.toLowerCase();
       const itemFilter = document.getElementById('filter-item').value.toLowerCase();
+      const statusFilter = document.getElementById('filter-status').value;
       
       const table = document.querySelector('#history-table-wrapper table.admin-table');
       if (!table) return;
@@ -1014,30 +1123,179 @@
       const role = sessionStorage.getItem('req_role');
       
       rows.forEach(row => {
-        let dateCell, branchCell, itemCell;
+        let offset = (role === 'Admin') ? 1 : 0;
         
-        if (role === 'Admin') {
-          dateCell = row.cells[1];
-          branchCell = row.cells[2];
-          itemCell = row.cells[3];
-        } else {
-          dateCell = row.cells[0];
-          branchCell = row.cells[1];
-          itemCell = row.cells[2];
-        }
+        let dateCell = row.cells[0 + offset];
+        let reqCell = row.cells[1 + offset];
+        let branchCodeCell = row.cells[2 + offset];
+        let branchNameCell = row.cells[3 + offset];
+        let itemCodeCell = row.cells[4 + offset];
+        let itemNameCell = row.cells[5 + offset];
+        let statusCell = row.cells[7 + offset];
         
-        if (!dateCell || !branchCell || !itemCell) return;
+        if (!dateCell) return;
         
         const dateText = dateCell.textContent.toLowerCase();
-        const branchText = branchCell.textContent.toLowerCase();
-        const itemText = itemCell.textContent.toLowerCase();
+        const branchText = `${reqCell.textContent} ${branchCodeCell.textContent} ${branchNameCell.textContent}`.toLowerCase();
+        const itemText = `${itemCodeCell.textContent} ${itemNameCell.textContent}`.toLowerCase();
         
-        if (dateText.includes(dateFilter) && branchText.includes(branchFilter) && itemText.includes(itemFilter)) {
+        let statusText = '';
+        if (statusCell) {
+          const selectEl = statusCell.querySelector('select');
+          if (selectEl) {
+            statusText = selectEl.value;
+          } else {
+            statusText = statusCell.textContent;
+          }
+        }
+        const matchesStatus = statusFilter === '' || statusText.includes(statusFilter);
+        
+        if (dateText.includes(dateFilter) && branchText.includes(branchFilter) && itemText.includes(itemFilter) && matchesStatus) {
           row.style.display = '';
         } else {
           row.style.display = 'none';
         }
       });
+    }
+
+    function editHistoryRow(btn, rowIdx) {
+      const tr = btn.closest('tr');
+      // For Admin:
+      // cells[0]: checkbox
+      // cells[1]: Timestamp
+      // cells[2]: ชื่อผู้เบิก
+      // cells[3]: รหัสสาขา
+      // cells[4]: ชื่อสาขา
+      // cells[5]: รหัสสินค้า
+      // cells[6]: ชื่อสินค้า
+      // cells[7]: จำนวน
+      
+      const reqName = tr.cells[2].textContent.trim();
+      const branchCode = tr.cells[3].textContent.trim();
+      const branchName = tr.cells[4].textContent.trim();
+      const itemCode = tr.cells[5].textContent.trim();
+      const itemName = tr.cells[6].textContent.trim();
+      const qty = tr.cells[7].textContent.trim();
+
+      Swal.fire({
+        title: 'แก้ไขข้อมูลการเบิก',
+        html: `
+          <div style="text-align: left; font-size: 14px;">
+            <label style="display:block; margin-top:10px; color:var(--text-muted);">ชื่อผู้เบิก</label>
+            <input id="swal-reqName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${reqName}">
+            <label style="display:block; margin-top:10px; color:var(--text-muted);">รหัสสาขา</label>
+            <input id="swal-branchCode" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${branchCode}">
+            <label style="display:block; margin-top:10px; color:var(--text-muted);">ชื่อสาขา</label>
+            <input id="swal-branchName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${branchName}">
+            <label style="display:block; margin-top:10px; color:var(--text-muted);">รหัสสินค้า</label>
+            <input id="swal-itemCode" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${itemCode}">
+            <label style="display:block; margin-top:10px; color:var(--text-muted);">ชื่อสินค้า</label>
+            <input id="swal-itemName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${itemName}">
+            <label style="display:block; margin-top:10px; color:var(--text-muted);">จำนวน</label>
+            <input id="swal-qty" type="number" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${qty}">
+          </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+          return {
+            requester: document.getElementById('swal-reqName').value,
+            branchCode: document.getElementById('swal-branchCode').value,
+            branchName: document.getElementById('swal-branchName').value,
+            itemCode: document.getElementById('swal-itemCode').value,
+            itemName: document.getElementById('swal-itemName').value,
+            qty: document.getElementById('swal-qty').value
+          }
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          document.getElementById('history-loading').style.display = 'flex';
+          google.script.run.withSuccessHandler(function(res) {
+            document.getElementById('history-loading').style.display = 'none';
+            if (res.success) {
+              Swal.fire('สำเร็จ', 'แก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
+              loadHistoryData();
+            } else {
+              Swal.fire('ข้อผิดพลาด', res.message, 'error');
+            }
+          }).withFailureHandler(function(err) {
+            document.getElementById('history-loading').style.display = 'none';
+            Swal.fire('ข้อผิดพลาด', String(err), 'error');
+          }).updateOrderRowData(rowIdx, result.value);
+        }
+      });
+    }
+
+    function deleteHistoryRow(btn, rowIdx) {
+      Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: 'คุณต้องการลบข้อมูลประวัติการเบิกนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถยกเลิกได้',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          document.getElementById('history-loading').style.display = 'flex';
+          google.script.run.withSuccessHandler(function(res) {
+            document.getElementById('history-loading').style.display = 'none';
+            if (res.success) {
+              Swal.fire('ลบสำเร็จ', 'ข้อมูลถูกลบเรียบร้อยแล้ว', 'success');
+              loadHistoryData();
+            } else {
+              Swal.fire('ข้อผิดพลาด', res.message, 'error');
+            }
+          }).withFailureHandler(function(err) {
+            document.getElementById('history-loading').style.display = 'none';
+            Swal.fire('ข้อผิดพลาด', String(err), 'error');
+          }).deleteOrderRow(rowIdx);
+        }
+      });
+    }
+
+    function downloadHistoryCSV() {
+      const table = document.querySelector('#history-table-wrapper table.admin-table');
+      if (!table) return;
+      
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+      const rows = table.querySelectorAll('tr');
+      
+      rows.forEach(row => {
+        if (row.style.display === 'none') return; 
+        
+        let rowData = [];
+        const cells = row.querySelectorAll('th, td');
+        
+        cells.forEach((cell) => {
+          if (cell.querySelector('.history-row-checkbox') || (cell.querySelector('input[type="checkbox"]') && cell.tagName === 'TH')) return;
+          if (cell.tagName === 'TH' && cell.textContent.trim() === 'จัดการ') return;
+          if (cell.querySelector('.edit-btn')) return; 
+          
+          let text = cell.textContent.trim().replace(/\n/g, ' ').replace(/\s+/g, ' ');
+          if (cell.querySelector('select')) {
+            text = cell.querySelector('select').value;
+          }
+          rowData.push(`"${text.replace(/"/g, '""')}"`);
+        });
+        
+        if (rowData.length > 0) {
+          csvContent += rowData.join(",") + "\r\n";
+        }
+      });
+      
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      
+      const dateStr = new Date().toISOString().slice(0, 10);
+      link.setAttribute("download", `ประวัติการเบิก_${dateStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   </script>
 </body>
