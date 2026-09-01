@@ -154,19 +154,19 @@
         #myTab { background: #fff !important; }
         .nav-pills .nav-item .nav-link { border-radius: 4px 4px 0 0; border: none; border-bottom: 3px solid transparent; transition: all 0.2s; color: #5a5c69; background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 10px 16px; }
         .nav-pills .nav-item .nav-link:hover { color: var(--navy); }
-        .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily, .tab-track, .tab-settings { border-color: transparent !important; color: #5a5c69 !important; background: transparent !important; }
-        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-settings.active { background: transparent !important; color: var(--navy) !important; border-bottom: 3px solid var(--gold) !important; }
+        .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily, .tab-track, .tab-transfer, .tab-settings { border-color: transparent !important; color: #5a5c69 !important; background: transparent !important; }
+        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-transfer.active, .tab-settings.active { background: transparent !important; color: var(--navy) !important; border-bottom: 3px solid var(--gold) !important; }
 
         [data-theme="dark"] .app-header-bar { background: var(--navy) !important; border-bottom: 2px solid var(--gold); }
         [data-theme="dark"] .app-header-badge { background: rgba(255,255,255,0.08) !important; color: var(--gold) !important; border: 1px solid rgba(30,163,102,0.5); }
         [data-theme="dark"] #myTab { background: var(--navy) !important; }
         [data-theme="dark"] .nav-pills .nav-item .nav-link { color: rgba(255,255,255,0.65); }
         [data-theme="dark"] .nav-pills .nav-item .nav-link:hover { color: #fff; }
-        [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily, [data-theme="dark"] .tab-track, [data-theme="dark"] .tab-settings { color: rgba(255,255,255,0.65) !important; }
-        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active, [data-theme="dark"] .tab-track.active, [data-theme="dark"] .tab-settings.active { background: var(--navy-dark) !important; color: var(--gold) !important; }
+        [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily, [data-theme="dark"] .tab-track, [data-theme="dark"] .tab-transfer, [data-theme="dark"] .tab-settings { color: rgba(255,255,255,0.65) !important; }
+        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active, [data-theme="dark"] .tab-track.active, [data-theme="dark"] .tab-transfer.active, [data-theme="dark"] .tab-settings.active { background: var(--navy-dark) !important; color: var(--gold) !important; }
 
         /* กรอบบนของเนื้อหา (Pane) โทนเดียวกันทั้งระบบ */
-        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #settings-pane { border-top: 3px solid var(--gold) !important; }
+        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #settings-pane { border-top: 3px solid var(--gold) !important; }
 
         /* รีโทนสี Bootstrap utility ให้เป็นโทน Deep Navy + Gold ทั้งระบบ */
         .bg-primary { background-color: var(--navy) !important; }
@@ -288,6 +288,9 @@
                 <button type="button" class="theme-toggle-btn" id="changePwBtn" title="เปลี่ยนรหัสผ่าน" style="display:none;">
                     <i class="fas fa-key"></i>
                 </button>
+                <div class="badge app-header-badge p-2" id="currentUserDisplay" style="display:none;">
+                    <i class="fas fa-user"></i> <span id="currentUserDisplayText"></span>
+                </div>
                 <button type="button" class="theme-toggle-btn" id="logoutBtn" title="ออกจากระบบ" style="display:none;">
                     <i class="fas fa-right-from-bracket"></i>
                 </button>
@@ -319,6 +322,9 @@
         </li>
         <li class="nav-item ms-2">
             <button class="nav-link tab-track fw-bold shadow-sm" id="track-tab" data-bs-toggle="tab" data-bs-target="#track-pane" type="button"><i class="fas fa-map-marker-alt"></i> ติดตามขายสินค้า(แอเรีย)</button>
+        </li>
+        <li class="nav-item ms-2">
+            <button class="nav-link tab-transfer fw-bold shadow-sm" id="transfer-tab" data-bs-toggle="tab" data-bs-target="#transfer-pane" type="button"><i class="fas fa-truck-arrow-right"></i> โอนย้ายสต๊อก</button>
         </li>
         <li class="nav-item ms-2" id="settingsTabLi" style="display:none;">
             <button class="nav-link tab-settings fw-bold shadow-sm" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane" type="button"><i class="fas fa-gears"></i> ตั้งค่าระบบ</button>
@@ -698,6 +704,69 @@
             </div>
         </div>
 
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="transfer-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="mb-0 text-dark fw-bold"><i class="fas fa-truck-arrow-right text-primary"></i> โอนย้ายสต๊อกข้ามสาขา (Transfer Stock)</h5>
+            </div>
+
+            <div id="transferViewerAlert" class="alert alert-info d-none fw-bold shadow-sm">
+                <i class="fas fa-eye"></i> บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว (พิเศษ) ไม่สามารถขอโอนย้ายหรือรับสินค้าเข้าได้
+            </div>
+            <div id="transferAdminAlert" class="alert alert-info d-none fw-bold shadow-sm">
+                <i class="fas fa-eye"></i> บัญชี Admin ไม่มีสาขา ไม่สามารถขอโอนย้ายสต๊อกได้
+            </div>
+
+            <form id="transferForm" class="card p-3 mb-4 bg-light border-0">
+                <h6 class="text-primary fw-bold mb-3 border-bottom pb-2"><i class="fas fa-paper-plane"></i> สร้างคำขอโอนย้ายสต๊อก</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label text-secondary fw-bold">Location Code ต้นทาง</label>
+                        <div class="form-control bg-light fw-bold text-primary" id="transferFromLocDisplay">-</div>
+                        <div class="form-text">ล็อกเป็นสาขาของคุณเสมอ — ดึงรายการสินค้าที่มีอยู่จริงที่สาขานี้จากชีต Stock all system อัตโนมัติ</div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label text-secondary fw-bold">Location Code ปลายทาง</label>
+                        <select class="form-select" id="transferToLoc" required><option value="">-- เลือกสาขาปลายทาง --</option></select>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label text-secondary fw-bold">รหัสสินค้า (SKU)</label>
+                        <select class="form-select" id="transferSku" required><option></option></select>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label text-secondary fw-bold">หมายเลขเครื่อง (IMEI)</label>
+                        <select class="form-select" id="transferImei" required><option></option></select>
+                    </div>
+                </div>
+                <div class="text-end mt-2">
+                    <button type="submit" class="btn btn-success fw-bold px-4"><i class="fas fa-paper-plane"></i> ส่งคำขอโอนย้าย</button>
+                </div>
+            </form>
+
+            <div class="card p-3 mb-4 shadow-sm border">
+                <h6 class="fw-bold text-primary mb-3"><i class="fas fa-box-open"></i> รายการรอรับเข้าที่สาขาของฉัน</h6>
+                <div class="table-responsive">
+                    <table id="incomingTransferTable" class="table table-hover table-bordered w-100">
+                        <thead class="table-dark">
+                            <tr><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ต้นทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card p-3 mb-4 shadow-sm border">
+                <h6 class="fw-bold text-primary mb-3"><i class="fas fa-history"></i> ประวัติคำขอโอนย้ายของสาขาฉัน</h6>
+                <div class="table-responsive">
+                    <table id="outgoingTransferTable" class="table table-hover table-bordered w-100">
+                        <thead class="table-dark">
+                            <tr><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ปลายทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="settings-pane">
             <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
                 <h5 class="mb-0 text-dark fw-bold"><i class="fas fa-gears text-primary"></i> ตั้งค่าระบบ (เฉพาะ Admin)</h5>
@@ -796,6 +865,7 @@
     // 💡 ป้องกัน Error ด้วยการประกาศตัวแปรให้เป็น Global Scope 100%
     var rawLocations = [];
     var branchStock = [];
+    var transferSourceStock = [];
     var globalAllRecords = [];
     var globalUnsoldPool = []; 
     var masterProductMap = {}; 
@@ -808,6 +878,8 @@
     var dailyModelTableInstance = null;
     var trackTableInstance = null;
     var settingsUsersTableInstance = null;
+    var incomingTransferTableInstance = null;
+    var outgoingTransferTableInstance = null;
     var adminToken = null;
     var requireCodeMyOppoField = false;
 
@@ -900,10 +972,18 @@
     }
 
     // ================= AUTH / SESSION =================
+    function updateUserDisplay() {
+        if (!currentLocCode) { $('#currentUserDisplay').hide(); return; }
+        var label = currentLocCode === '__ADMIN__' ? 'Admin' : (currentLocCode + ' - ' + currentLocName);
+        $('#currentUserDisplayText').text(label);
+        $('#currentUserDisplay').show();
+    }
+
     function showLoginScreen() {
         $('#overlay').fadeOut();
         $('#logoutBtn').hide();
         $('#changePwBtn').hide();
+        $('#currentUserDisplay').hide();
         $('#loginScreen').css('display', 'flex');
     }
 
@@ -911,6 +991,7 @@
         $('#loginScreen').css('display', 'none');
         $('#logoutBtn').show();
         $('#changePwBtn').show();
+        updateUserDisplay();
     }
 
     function handleAuthFailure(err) {
@@ -953,8 +1034,12 @@
                         adminToken = savedToken;
                         $('#settingsTabLi').show();
                     }
-                    hideLoginScreen();
-                    bootstrapApp();
+                    if (res.passwordExpired) {
+                        promptForcedPasswordChange();
+                    } else {
+                        hideLoginScreen();
+                        bootstrapApp();
+                    }
                 } else {
                     try { localStorage.removeItem('actssToken'); } catch(e) {}
                     showLoginScreen();
@@ -1022,8 +1107,12 @@
         if (currentRole === ROLE_VIEWER) {
             $('#actForm').addClass('form-locked');
             $('#viewerAlert').removeClass('d-none');
+            $('#transferForm').addClass('form-locked');
+            $('#transferViewerAlert').removeClass('d-none');
         } else {
             $('#viewerAlert').addClass('d-none');
+            $('#transferForm').removeClass('form-locked');
+            $('#transferViewerAlert').addClass('d-none');
         }
     }
 
@@ -1035,11 +1124,14 @@
         if (currentLocCode === '__ADMIN__') {
             $('#lockedBranchDisplay').text('Admin (ไม่มีสาขา — บันทึกฟอร์มไม่ได้)');
             $('#actForm').addClass('form-locked');
+            $('#transferForm').addClass('form-locked');
+            $('#transferAdminAlert').removeClass('d-none');
             return;
         }
 
         $('#actForm').removeClass('form-locked');
         $('#lockedBranchDisplay').text(currentLocCode + ' - ' + currentLocName);
+        $('#transferFromLocDisplay').text(currentLocCode + ' - ' + currentLocName);
 
         applyRoleRestrictions();
 
@@ -1049,6 +1141,11 @@
                 branchStock = stock;
                 $('.select-sku').each(function() { populateSkuDropdown($(this)); });
                 if (stock.length === 0) { Swal.fire('แจ้งคลังสินค้า', 'ไม่พบยอดสต๊อกผลิตภัณฑ์ที่สาขานี้', 'info'); }
+
+                // แท็บโอนย้ายสต๊อก: ต้นทางล็อกเป็นสาขาตัวเองเสมอ กรองเอาเฉพาะสินค้าที่ LocCode ตรงกับสาขาจริงๆ
+                // (ไม่รวม "Warehouse Transfer" ซึ่งเป็นคนละที่ตั้ง) แล้วเติม SKU dropdown ของฟอร์มโอนย้ายให้เลย
+                transferSourceStock = stock.filter(function(item) { return item.originalLoc === currentLocCode; });
+                populateTransferSkuDropdown();
             }).getStockByBranch(currentToken, currentLocCode);
     }
 
@@ -1250,6 +1347,98 @@
             trackImeiDebounceTimer = setTimeout(function() { generateTrackByAreaTable(); }, 300);
         });
         $('#track-tab').on('shown.bs.tab', function() { generateTrackByAreaTable(); });
+        $('#transfer-tab').on('shown.bs.tab', function() { loadMyTransfers(); });
+
+        $('#transferForm').on('submit', function(e) {
+            e.preventDefault();
+            if (currentLocCode === '__ADMIN__' || currentRole === ROLE_VIEWER) {
+                Swal.fire('ไม่สามารถทำรายการได้', 'บัญชีนี้ไม่สามารถขอโอนย้ายสต๊อกได้', 'warning');
+                return;
+            }
+            var sku = $('#transferSku').val();
+            var imei = $('#transferImei').val();
+            var toLoc = $('#transferToLoc').val();
+            if (!sku || !imei || !toLoc) {
+                Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือก SKU, IMEI และสาขาปลายทางให้ครบถ้วน', 'warning');
+                return;
+            }
+
+            showHUDLoader('กำลังสร้างคำขอโอนย้ายสต๊อก...');
+            google.script.run
+                .withFailureHandler(function(err) {
+                    Swal.close();
+                    if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                    Swal.fire('ผิดพลาด', 'สร้างคำขอไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+                })
+                .withSuccessHandler(function(res) {
+                    Swal.close();
+                    if (res.success) {
+                        Swal.fire('สำเร็จ', res.message, 'success');
+                        $('#transferToLoc').val(null).trigger('change');
+                        $('#transferSku').val(null).trigger('change');
+                        $('#transferImei').empty().append('<option></option>').val(null).trigger('change');
+                        loadMyTransfers();
+                    } else {
+                        Swal.fire('ผิดพลาด', res.message, 'error');
+                    }
+                }).createTransferRequest(currentToken, sku, imei, toLoc);
+        });
+
+        $('#transferSku').on('select2:select', function(e) {
+            var selectedSku = e.params.data.id;
+            var imeiList = transferSourceStock.filter(function(i) { return i.sku === selectedSku; });
+            var imeiDropdown = $('#transferImei');
+            imeiDropdown.empty().append('<option></option>');
+            imeiList.forEach(function(i) { imeiDropdown.append('<option value="' + escapeHtml(i.imei) + '">' + escapeHtml(i.imei) + '</option>'); });
+        });
+
+        $(document).on('click', '.btn-receive-transfer', function() {
+            var rowId = $(this).data('rowid');
+            Swal.fire({
+                title: 'ยืนยันรับสินค้าเข้า',
+                text: 'ระบบจะอัปเดต Location Code ของสินค้านี้เป็นสาขาของคุณ',
+                icon: 'question', showCancelButton: true,
+                confirmButtonText: 'รับเข้า', cancelButtonText: 'ยกเลิก'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังรับสินค้าเข้าและอัปเดตฐานข้อมูล...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).receiveTransfer(currentToken, rowId);
+            });
+        });
+
+        $(document).on('click', '.btn-cancel-transfer', function() {
+            var rowId = $(this).data('rowid');
+            Swal.fire({
+                title: 'ยืนยันยกเลิกคำขอโอนย้ายนี้?',
+                text: 'สินค้าจะยังคงอยู่ที่สาขาต้นทางเดิม ไม่มีการย้ายเกิดขึ้น',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonText: 'ยกเลิกคำขอ', cancelButtonText: 'ปิด'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังยกเลิกคำขอโอนย้าย...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).cancelTransfer(currentToken, rowId);
+            });
+        });
 
         $('#btnAddRow').click(function() {
             if(!$('#locCode').val()) { Swal.fire('ข้อกำหนดระบบ', 'โปรดระบุสถานที่ตั้งสาขาก่อนเพิ่มสินค้า', 'warning'); return; }
@@ -1382,7 +1571,19 @@
         });
     }
 
-    // 💡 2. ด่านการแสดงผล: เมื่อดึงข้อมูล Header พื้นฐานเสร็จ 
+    // เหมือน populateSkuDropdown แต่ดึงจาก transferSourceStock (สต๊อกของ Location ต้นทางที่เลือกในแท็บโอนย้ายสต๊อก)
+    function populateTransferSkuDropdown() {
+        var dropdown = $('#transferSku');
+        var skuList = [];
+        transferSourceStock.forEach(function(item) { if (skuList.indexOf(item.sku) === -1) skuList.push(item.sku); });
+        dropdown.empty().append('<option></option>');
+        skuList.forEach(function(sku) {
+            var desc = transferSourceStock.find(function(i) { return i.sku == sku; }).desc;
+            dropdown.append('<option value="' + escapeHtml(sku) + '">' + escapeHtml(sku) + ' - ' + escapeHtml(desc) + '</option>');
+        });
+    }
+
+    // 💡 2. ด่านการแสดงผล: เมื่อดึงข้อมูล Header พื้นฐานเสร็จ
     function initializeUI(data) {
         // ปิด Overlay หน้ากากสีขาวขุ่น
         $('#overlay').fadeOut();
@@ -1391,6 +1592,7 @@
         masterProductMap = data.productMap || {};
         requireCodeMyOppoField = !!data.requireCodeMyOppo;
         applyRequireCodeMyOppoUI();
+        var usersLocCodes = data.usersLocCodes || [];
 
         var areaSet = [];
         var locSet = [];
@@ -1409,16 +1611,24 @@
             $('#dashFilterArea').append(opt);
             $('#trackFilterArea').append(opt);
         });
+        $('#transferToLoc').empty().append('<option value="">-- เลือกสาขาปลายทาง --</option>');
         locSet.sort().forEach(function(c) {
             var display = locDisplayMap[c] || c;
             var opt = '<option value="' + escapeHtml(c) + '">' + escapeHtml(display) + '</option>';
             $('#filterLoc').append(opt);
             $('#deepFilterLoc').append(opt);
             $('#trackFilterLoc').append(opt);
+            // ปลายทางโอนย้ายสต๊อกได้เฉพาะ LocCode ที่มีบัญชีอยู่ในชีต Users จริง (ไม่งั้นปลายทางจะไม่มีใคร login มา "รับเข้า" ได้)
+            if (usersLocCodes.indexOf(c) !== -1) {
+                $('#transferToLoc').append(opt);
+            }
         });
 
         $('#filterArea, #filterLoc, #filterProduct, #deepFilterArea, #deepFilterLoc, #deepFilterAging, #dashFilterArea, #dashFilterAging, #trackFilterArea, #trackFilterLoc, #trackFilterStatus, #trackFilterAging').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "แสดงข้อมูลทั้งหมด..." });
         $('#filterModel, #dashFilterModel, #deepFilterModel').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, closeOnSelect: false, placeholder: "ติ๊กเลือกรุ่นได้หลายรายการ..." });
+        $('#transferToLoc').select2({ theme: 'bootstrap-5', width: '100%', placeholder: "-- เลือกสาขาปลายทาง --" });
+        $('#transferSku').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "ค้นหา SKU" });
+        $('#transferImei').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "เลือก SKU ก่อน" });
         initRowSelect2();
         applyLoggedBranch();
 
@@ -2044,6 +2254,77 @@
         }).adminGetSettings(adminToken);
     }
 
+    // ================= STOCK TRANSFER (โอนย้ายสต๊อกข้ามสาขา) =================
+    // ไม่มีขั้นตอนอนุมัติแล้ว: สร้างคำขอ = โอนออกจากต้นทางทันที รอแค่ปลายทางกด "รับเข้า" เพื่อยืนยันและอัปเดต Stock all system
+    function transferStatusBadge_(status) {
+        var cls = 'bg-secondary';
+        if (status === 'รอรับเข้า') cls = 'bg-warning text-dark';
+        else if (status === 'รับเข้าแล้ว') cls = 'bg-success';
+        else if (status === 'ยกเลิก') cls = 'bg-secondary';
+        return '<span class="badge ' + cls + '">' + escapeHtml(status) + '</span>';
+    }
+
+    function loadMyTransfers() {
+        google.script.run
+            .withFailureHandler(function(err) {
+                if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                console.error(err);
+            })
+            .withSuccessHandler(function(res) {
+                renderIncomingTransfers(res.incoming);
+                renderOutgoingTransfers(res.outgoing);
+            }).getMyTransfers(currentToken);
+    }
+
+    function renderIncomingTransfers(list) {
+        if (incomingTransferTableInstance) incomingTransferTableInstance.destroy();
+        var tbody = '';
+        (list || []).forEach(function(r) {
+            var btn = (r.status === 'รอรับเข้า')
+                ? '<button type="button" class="btn btn-sm btn-success fw-bold btn-receive-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-box-open"></i> รับเข้า</button> ' +
+                  '<button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-cancel-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-times"></i> ยกเลิก</button>'
+                : '<span class="text-muted small">-</span>';
+            tbody += '<tr>' +
+                '<td>' + escapeHtml(r.timestamp) + '</td>' +
+                '<td>' + escapeHtml(r.sku) + '</td>' +
+                '<td>' + escapeHtml(r.desc) + '</td>' +
+                '<td>' + escapeHtml(r.imei) + '</td>' +
+                '<td>' + escapeHtml(r.fromLocCode) + ' - ' + escapeHtml(r.fromLocName) + '</td>' +
+                '<td>' + transferStatusBadge_(r.status) + '</td>' +
+                '<td>' + btn + '</td>' +
+            '</tr>';
+        });
+        $('#incomingTransferTable tbody').html(tbody);
+        incomingTransferTableInstance = $('#incomingTransferTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [], "paging": false, "searching": false, "info": false
+        });
+    }
+
+    function renderOutgoingTransfers(list) {
+        if (outgoingTransferTableInstance) outgoingTransferTableInstance.destroy();
+        var tbody = '';
+        (list || []).forEach(function(r) {
+            var btn = (r.status === 'รอรับเข้า')
+                ? '<button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-cancel-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-times"></i> ยกเลิก</button>'
+                : '<span class="text-muted small">-</span>';
+            tbody += '<tr>' +
+                '<td>' + escapeHtml(r.timestamp) + '</td>' +
+                '<td>' + escapeHtml(r.sku) + '</td>' +
+                '<td>' + escapeHtml(r.desc) + '</td>' +
+                '<td>' + escapeHtml(r.imei) + '</td>' +
+                '<td>' + escapeHtml(r.toLocCode) + ' - ' + escapeHtml(r.toLocName) + '</td>' +
+                '<td>' + transferStatusBadge_(r.status) + '</td>' +
+                '<td>' + btn + '</td>' +
+            '</tr>';
+        });
+        $('#outgoingTransferTable tbody').html(tbody);
+        outgoingTransferTableInstance = $('#outgoingTransferTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [[0, "desc"]], "pageLength": 10
+        });
+    }
+
     function refreshSettingsUsers() {
         google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
             if (res.success) renderSettingsUsers(res.users);
@@ -2184,56 +2465,79 @@
         return parts[2] + '-' + parts[1] + '-' + parts[0];
     }
 
-    // สร้าง 1 แถวของฟอร์มแก้ไขใน Swal (label ชิด block + input เต็มความกว้าง)
-    // ต้อง override style ของ .swal2-input เอง (inline style ชนะ class เสมอ) เพราะ default ของมันคือ
-    // width:auto + margin:1em auto ซึ่งทำให้กล่องลอยกลางจอแคบกว่า container และ label (เดิมเป็น inline) ไปเรียงข้างๆ แทนที่จะอยู่คนละบรรทัด
-    function editFieldRow(labelText, inputHtml) {
-        return '<div style="margin-top:14px;text-align:left;">' +
-            '<label style="display:block;font-weight:700;font-size:13px;color:#6c757d;margin-bottom:5px;">' + labelText + '</label>' +
-            inputHtml +
-            '</div>';
-    }
-
     function editActRecord(rowId) {
         var record = globalAllRecords.find(function(r) { return Number(r.rowId) === Number(rowId); });
         if (!record) { Swal.fire('ผิดพลาด', 'ไม่พบรายการนี้ (อาจถูกลบหรือรีเฟรชข้อมูลไปแล้ว)', 'error'); return; }
 
         var displayActDate = record.actDate ? record.actDate.toString().replace(/'/g, '').trim() : '';
         var displayCodeMyOppo = record.codeMyOppo ? record.codeMyOppo.toString().replace(/'/g, '').trim() : '';
-        var inputStyle = 'width:100%;box-sizing:border-box;margin:0;font-size:15px;padding:9px 12px;';
 
         Swal.fire({
-            title: 'แก้ไขรายการ ACT (แถว ' + rowId + ')',
-            width: 480,
+            title: '<div class="text-start border-bottom pb-2 m-0"><i class="fas fa-pen text-primary"></i> <span class="fw-bold text-dark" style="font-size: 15px;">แก้ไขรายการ ACT</span> <span class="text-muted small">— แถว ' + rowId + '</span></div>',
             html:
-                editFieldRow('วันที่ ACT', '<input id="swalEditActDate" type="date" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(ddmmyyyyToInputDate(displayActDate)) + '">') +
-                editFieldRow('SKU', '<input id="swalEditSku" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(record.sku || '') + '">') +
-                editFieldRow('รายละเอียดสินค้า', '<input id="swalEditDesc" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(record.desc || '') + '">') +
-                editFieldRow('IMEI', '<input id="swalEditImei" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(record.imei || '') + '">') +
-                editFieldRow('Code MyOppo', '<input id="swalEditCodeMyOppo" class="swal2-input" style="' + inputStyle + '" value="' + escapeHtml(displayCodeMyOppo) + '">') +
-                editFieldRow('สถานะ', '<select id="swalEditStatus" class="swal2-input" style="' + inputStyle + '">' +
-                    '<option value="ยังไม่ขาย"' + (record.status === 'ยังไม่ขาย' ? ' selected' : '') + '>ยังไม่ขาย</option>' +
-                    '<option value="ขายแล้ว"' + (record.status === 'ขายแล้ว' ? ' selected' : '') + '>ขายแล้ว</option>' +
-                '</select>'),
-            confirmButtonText: 'บันทึกการแก้ไข',
+                '<div class="text-start px-1">' +
+                    '<h6 class="text-primary fw-bold small border-bottom pb-1 mb-2"><i class="fas fa-box"></i> ข้อมูลสินค้า <span class="text-muted fw-normal">(แก้ไขไม่ได้)</span></h6>' +
+                    '<div class="row g-2 mb-3">' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">รหัสสินค้า (SKU)</label>' +
+                            '<input type="text" class="form-control form-control-sm" value="' + escapeHtml(record.sku || '') + '" readonly disabled>' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">หมายเลข IMEI</label>' +
+                            '<input type="text" class="form-control form-control-sm" value="' + escapeHtml(record.imei || '') + '" readonly disabled>' +
+                        '</div>' +
+                        '<div class="col-12">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">รายละเอียดสินค้า</label>' +
+                            '<input type="text" class="form-control form-control-sm" value="' + escapeHtml(record.desc || '') + '" readonly disabled>' +
+                        '</div>' +
+                    '</div>' +
+                    '<h6 class="text-primary fw-bold small border-bottom pb-1 mb-2"><i class="fas fa-clipboard-check"></i> ข้อมูลการทำรายการ</h6>' +
+                    '<div class="row g-2">' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">วันที่ ACT</label>' +
+                            '<input id="swalEditActDate" type="date" class="form-control form-control-sm" value="' + escapeHtml(ddmmyyyyToInputDate(displayActDate)) + '">' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">สถานะ</label>' +
+                            '<select id="swalEditStatus" class="form-select form-select-sm">' +
+                                '<option value="ยังไม่ขาย"' + (record.status === 'ยังไม่ขาย' ? ' selected' : '') + '>ยังไม่ขาย</option>' +
+                                '<option value="ขายแล้ว"' + (record.status === 'ขายแล้ว' ? ' selected' : '') + '>ขายแล้ว</option>' +
+                            '</select>' +
+                        '</div>' +
+                        '<div class="col-12">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">Code MyOppo</label>' +
+                            '<input id="swalEditCodeMyOppo" type="text" class="form-control form-control-sm" value="' + escapeHtml(displayCodeMyOppo) + '">' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">ตัดบาร์ส่วนลด</label>' +
+                            '<input id="swalEditCutBarcode" type="text" class="form-control form-control-sm" value="' + escapeHtml(record.cutBarcode || '') + '">' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">ราคาแนะนำขาย</label>' +
+                            '<input id="swalEditSuggestPrice" type="text" class="form-control form-control-sm" value="' + escapeHtml(record.suggestPrice || '') + '">' +
+                        '</div>' +
+                    '</div>' +
+                '</div>',
+            confirmButtonText: '<i class="fas fa-save"></i> บันทึกการแก้ไข',
+            confirmButtonColor: '#1EA366',
             cancelButtonText: 'ยกเลิก',
             showCancelButton: true,
+            focusConfirm: false,
+            width: 650,
+            customClass: { popup: 'rounded-4 shadow-lg p-2', htmlContainer: 'text-start' },
             didOpen: function() {
                 // iOS Safari: ถ้า input[type=date] ได้ focus ตอนป๊อบอัพเปิด มันจะดีดปฏิทินเด้งขึ้นมาทันทีโดยไม่ได้ตั้งใจ
                 var dateInput = document.getElementById('swalEditActDate');
                 if (dateInput) dateInput.blur();
             },
             preConfirm: function() {
-                var fields = {
+                return {
                     actDate: document.getElementById('swalEditActDate').value,
-                    sku: document.getElementById('swalEditSku').value.trim(),
-                    desc: document.getElementById('swalEditDesc').value.trim(),
-                    imei: document.getElementById('swalEditImei').value.trim(),
                     codeMyOppo: document.getElementById('swalEditCodeMyOppo').value.trim(),
+                    cutBarcode: document.getElementById('swalEditCutBarcode').value.trim(),
+                    suggestPrice: document.getElementById('swalEditSuggestPrice').value.trim(),
                     status: document.getElementById('swalEditStatus').value
                 };
-                if (!fields.sku || !fields.imei) { Swal.showValidationMessage('กรุณาระบุ SKU และ IMEI'); return false; }
-                return fields;
             }
         }).then(function(result) {
             if (!result.isConfirmed) return;
@@ -2282,7 +2586,7 @@
                     .withSuccessHandler(function(res) {
                         if(res.success) { downloadCSV(res.csvData, "ACT_OPPO_Data_Master.csv"); Swal.fire('สำเร็จ', 'ดาวน์โหลดไฟล์เรียบร้อย', 'success'); }
                         else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-                    }).verifyAdminAndExport(result.value, filteredRowIds);
+                    }).verifyAdminAndExport(currentToken, result.value, filteredRowIds);
             }
         });
     }
