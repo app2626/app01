@@ -44,6 +44,15 @@ function getAccessLogSheet_(ss) {
   return findSheet(ss, "accesslog");
 }
 
+function getTransferSheet_(ss) {
+  return findSheet(ss, "transferrequests");
+}
+
+// ตัดขั้นตอนอนุมัติออกแล้ว: สร้างคำขอ = โอนออกจากต้นทางทันที รอแค่ปลายทางกด "รับเข้า" เพื่อยืนยัน
+const TRANSFER_STATUS_PENDING = "รอรับเข้า";
+const TRANSFER_STATUS_RECEIVED = "รับเข้าแล้ว";
+const TRANSFER_STATUS_CANCELLED = "ยกเลิก";
+
 // บันทึกประวัติการเข้าใช้งาน (login สำเร็จ / เปลี่ยนสถานะสินค้า) ลงชีต AccessLog
 // ล้มเหลวแบบเงียบถ้าไม่พบชีต เพื่อไม่ให้การ log ไปบล็อก flow หลัก (login/updateStatus)
 function logAccess_(ss, locCode, locName, role, action, detail) {
@@ -79,6 +88,21 @@ function getLocNameByCode_(ss, locCode) {
     if ((locData[i][3] || "").toString().trim() === locCode) return locData[i][4];
   }
   return "";
+}
+
+// รายชื่อ LocCode ทั้งหมดที่มีบัญชี Active อยู่ในชีต Users จริง — ใช้จำกัดตัวเลือกปลายทางของฟีเจอร์โอนย้ายสต๊อก
+// ให้เลือกได้เฉพาะสาขาที่มีบัญชีสำหรับ login เข้ามา "รับเข้า" ได้จริงเท่านั้น (บัญชีถูกระงับแล้วไม่นับ)
+function getUsersLocCodes_(ss) {
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet || usersSheet.getLastRow() <= 1) return [];
+  const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 5).getDisplayValues();
+  const codes = [];
+  data.forEach(function(r) {
+    const code = (r[0] || "").toString().trim();
+    const active = (r[4] || "").toString().trim().toUpperCase();
+    if (code && (active === "TRUE" || active === "Y") && codes.indexOf(code) === -1) codes.push(code);
+  });
+  return codes;
 }
 
 // อ่าน Role ของสาขาสดจากชีต Users ทุกครั้ง (ไม่ cache ไว้ใน Sessions) เพื่อให้ admin เปลี่ยนสิทธิ์
@@ -468,6 +492,34 @@ function setupAuthSheets() {
   }
 }
 
+// รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — สร้างชีต TransferRequests
+// สำหรับฟีเจอร์โอนย้ายสต๊อกข้ามสาขา เรียกได้ซ้ำอย่างปลอดภัย (ข้ามถ้ามีชีตอยู่แล้ว)
+function setupTransferSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!getTransferSheet_(ss)) {
+    const sheet = ss.insertSheet("TransferRequests");
+    sheet.getRange(1, 1, 1, 12).setValues([[
+      "Timestamp", "SKU", "Desc", "IMEI", "FromLocCode", "FromLocName",
+      "ToLocCode", "ToLocName", "RequestedBy", "Status",
+      "ReceivedAt", "ReceivedBy"
+    ]]);
+    sheet.setFrozenRows(1);
+  }
+}
+
+// รันเองจาก Apps Script editor เท่านั้น ครั้งเดียว — ลบคอลัมน์ ApprovedAt/ApprovedBy ที่เหลือค้างจากตอนยังมีขั้นตอนอนุมัติ
+// (ตัดขั้นตอนอนุมัติออกจากระบบแล้ว) ออกจากชีต TransferRequests ที่สร้างไปแล้ว คอลัมน์ ReceivedAt/ReceivedBy จะเลื่อนมาแทนที่อัตโนมัติ
+function migrateTransferSheetRemoveApprovalColumns() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getTransferSheet_(ss);
+  if (!sheet) throw new Error("ไม่พบชีต TransferRequests");
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const approvedAtIdx = headers.indexOf("ApprovedAt"); // 0-indexed
+  if (approvedAtIdx === -1) return "ไม่พบคอลัมน์ ApprovedAt — อาจถูกลบไปแล้ว ข้ามการทำงาน";
+  sheet.deleteColumns(approvedAtIdx + 1, 2);
+  return "ลบคอลัมน์ ApprovedAt/ApprovedBy ออกจากชีต TransferRequests สำเร็จ";
+}
+
 // รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — ใช้สร้าง/รีเซ็ตรหัสผ่านบัญชีสาขา
 // อ่านชีต "AccountSetup" (A: LocCode, B: PlainPassword) แล้ว hash เขียนลงชีต "Users"
 // ทำเสร็จแล้วให้ลบคอลัมน์ B ในชีต AccountSetup ทิ้ง อย่าปล่อยรหัสผ่าน plaintext ค้างไว้
@@ -573,7 +625,24 @@ function getAppData(token) {
     timeValid = checkIsTimeValid(timeData[0], timeData[1]);
   }
 
-  return { announcement, promotions, locations, timeValid, productMap }; // ส่งข้อมูล Model ออกไป
+  const usersLocCodes = getUsersLocCodes_(ss);
+
+  return { announcement, promotions, locations, timeValid, productMap, usersLocCodes }; // ส่งข้อมูล Model ออกไป
+}
+
+// IMEI ที่ถูกทำรายการ ACT ไปแล้ว (มีแถวอยู่ในชีต "อยู่ระหว่างดำเนินการ") — ถือว่าถูก "จับจอง" แล้ว
+// ห้ามให้ทั้งฟอร์ม ACT และฟีเจอร์โอนย้ายสต๊อกเลือก/ประมวลผลซ้ำ
+function getUsedImeis_(ss) {
+  const actSheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
+  const usedImeis = new Set();
+  if (actSheet && actSheet.getLastRow() > 1) {
+    const actData = actSheet.getDataRange().getDisplayValues();
+    for (let i = 1; i < actData.length; i++) {
+      const uImei = actData[i][7] ? actData[i][7].toString().trim() : "";
+      if (uImei !== "") usedImeis.add(uImei);
+    }
+  }
+  return usedImeis;
 }
 
 function getStockByBranch(token, locCode) {
@@ -582,16 +651,8 @@ function getStockByBranch(token, locCode) {
   const stockSheet = findSheet(ss, "stock");
   if(!stockSheet) return [];
 
-  const actSheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
-  let usedImeis = new Set(); 
-  if(actSheet && actSheet.getLastRow() > 1) {
-    const actData = actSheet.getDataRange().getDisplayValues();
-    for(let i = 1; i < actData.length; i++) {
-      let uImei = actData[i][7] ? actData[i][7].toString().trim() : "";
-      if(uImei !== "") usedImeis.add(uImei);
-    }
-  }
-  
+  const usedImeis = getUsedImeis_(ss);
+
   const data = stockSheet.getDataRange().getDisplayValues();
   let result = [];
   
@@ -828,6 +889,305 @@ function updateStatus(token, rowId, newStatus) {
   } catch(e) {
     return { success: false, message: e.message };
   }
+}
+
+// แก้ไขฟิลด์บริหารจัดการของแถวข้อมูล ACT (เฉพาะ Admin) — ตั้งใจไม่ให้แก้ SKU/IMEI/LocCode/LocName
+// เพราะผูกกับสต๊อกจริงในชีต Stock all system อยู่ (แก้ตรงนี้ตรงๆ จะทำให้ข้อมูลไม่ตรงกัน)
+function adminEditRecord(adminToken, rowId, fields) {
+  const admin = requireAdminSession_(adminToken);
+  rowId = Number(rowId);
+  fields = fields || {};
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
+  if (!sheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต 'อยู่ระหว่างดำเนินการ'" };
+  if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
+    return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+  }
+
+  const allowedStatus = ["ยังไม่ขาย", "ขายแล้ว"];
+  const newStatus = allowedStatus.indexOf(fields.status) !== -1 ? fields.status : allowedStatus[0];
+
+  let formattedActDate = (fields.actDate || "").toString();
+  const actD = formattedActDate.split('-');
+  if (actD.length === 3) { formattedActDate = "'" + actD[2] + "/" + actD[1] + "/" + actD[0]; }
+
+  sheet.getRange(rowId, 2, 1, 2).setValues([[formattedActDate, (fields.empName || "").toString()]]); // ActDate, EmpName
+  sheet.getRange(rowId, 9, 1, 6).setValues([[
+    newStatus,
+    (fields.rrp || "").toString(),
+    (fields.discount || "").toString(),
+    (fields.promoPrice || "").toString(),
+    (fields.cutBarcode || "").toString(),
+    (fields.suggestPrice || "").toString()
+  ]]); // Status, RRP, Discount, PromoPrice, CutBarcode, SuggestPrice
+
+  logAccess_(ss, ADMIN_SESSION_LOCCODE, "Admin (" + admin.username + ")", "admin", "EDIT_RECORD", "แถว " + rowId);
+
+  return { success: true, message: "แก้ไขข้อมูลสำเร็จ" };
+}
+
+// ลบแถวข้อมูล ACT ทิ้งถาวร (เฉพาะ Admin) — ไม่มี undo กันพลาดด้วยการยืนยันฝั่ง client ก่อนเรียก
+function adminDeleteRecord(adminToken, rowId) {
+  const admin = requireAdminSession_(adminToken);
+  rowId = Number(rowId);
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
+  if (!sheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต 'อยู่ระหว่างดำเนินการ'" };
+  if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
+    return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+  }
+
+  const rowVals = sheet.getRange(rowId, 6, 1, 4).getDisplayValues()[0]; // sku, desc, imei, status
+  sheet.deleteRow(rowId);
+
+  logAccess_(ss, ADMIN_SESSION_LOCCODE, "Admin (" + admin.username + ")", "admin", "DELETE_RECORD",
+    `แถว ${rowId} IMEI ${rowVals[2]} (${rowVals[0]}) สถานะ ${rowVals[3]}`);
+
+  return { success: true, message: "ลบข้อมูลสำเร็จ" };
+}
+
+// ================= STOCK TRANSFER (โอนย้ายสต๊อกข้ามสาขา) =================
+// ค้นหาแถวสินค้าใน "Stock all system" ด้วยคู่ SKU+IMEI (คอลัมน์ A=LocCode, C=SKU, D=Desc, E=IMEI ตามโครงสร้างเดิมของระบบ)
+function findStockRow_(stockSheet, sku, imei) {
+  const data = stockSheet.getDataRange().getDisplayValues();
+  for (let i = 1; i < data.length; i++) {
+    const rSku = data[i][2] ? data[i][2].toString().trim() : "";
+    const rImei = data[i][4] ? data[i][4].toString().trim() : "";
+    if (rSku === sku && rImei === imei) {
+      return { rowIndex: i + 1, locCode: data[i][0] ? data[i][0].toString().trim() : "", desc: data[i][3] || "" };
+    }
+  }
+  return null;
+}
+
+function mapTransferRow_(r, rowId) {
+  return {
+    rowId: rowId,
+    timestamp: r[0], sku: r[1], desc: r[2], imei: r[3],
+    fromLocCode: r[4], fromLocName: r[5], toLocCode: r[6], toLocName: r[7],
+    requestedBy: r[8], status: r[9],
+    receivedAt: r[10], receivedBy: r[11]
+  };
+}
+
+// สร้างคำขอโอนย้ายสต๊อก: ตรวจว่า SKU+IMEI มีอยู่จริงใน Stock all system, ปลายทางมีอยู่จริง,
+// และไม่ซ้ำกับคำขอที่ยังไม่เสร็จสิ้น (รอรับเข้า) ของสินค้าเดียวกัน — ไม่มีขั้นตอนอนุมัติแล้ว รอแค่ปลายทางกด "รับเข้า"
+function createTransferRequest(token, sku, imei, toLocCode) {
+  const session = requireSession_(token);
+  if (session.locCode === ADMIN_SESSION_LOCCODE) {
+    return { success: false, message: "บัญชี Admin ไม่มีสาขา ไม่สามารถขอโอนย้ายสต๊อกได้" };
+  }
+  if (session.role === ROLE_VIEWER) {
+    return { success: false, message: "บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถขอโอนย้ายสต๊อกได้" };
+  }
+  sku = (sku || "").toString().trim();
+  imei = (imei || "").toString().trim();
+  toLocCode = (toLocCode || "").toString().trim();
+  if (!sku || !imei || !toLocCode) {
+    return { success: false, message: "กรุณากรอก SKU, IMEI และรหัสสาขาปลายทางให้ครบถ้วน" };
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return { success: false, message: "ระบบกำลังประมวลผลคำขออื่นอยู่ กรุณารอสักครู่แล้วลองใหม่" };
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const stockSheet = findSheet(ss, "stock");
+    if (!stockSheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต Stock" };
+
+    const stockRow = findStockRow_(stockSheet, sku, imei);
+    if (!stockRow) return { success: false, message: "ไม่พบสินค้า SKU/IMEI นี้ในระบบ Stock all system" };
+    // บังคับต้นทางต้องเป็นสาขาของผู้ขอเองเท่านั้น (ฝั่ง client ล็อก dropdown ไว้แล้ว แต่ server ต้องเช็กซ้ำ กัน google.script.run ถูกเรียกตรงข้ามคำสั่งฝั่งเว็บ)
+    if (stockRow.locCode !== session.locCode) {
+      return { success: false, message: "สินค้านี้ไม่ได้อยู่ที่สาขาของคุณ ไม่สามารถขอโอนย้ายได้" };
+    }
+    if (stockRow.locCode === toLocCode) {
+      return { success: false, message: "สินค้านี้อยู่ที่ Location ปลายทางนี้อยู่แล้ว" };
+    }
+    // กันโอนย้ายสินค้าที่ถูกทำรายการ ACT (ขาย/บันทึกสถานะ) ไปแล้ว ไม่ให้ถูกจับจองซ้ำ
+    if (getUsedImeis_(ss).has(imei)) {
+      return { success: false, message: "สินค้า IMEI นี้ถูกทำรายการ ACT ไปแล้ว ไม่สามารถขอโอนย้ายได้" };
+    }
+
+    const toLocName = getLocNameByCode_(ss, toLocCode);
+    if (!toLocName) return { success: false, message: "ไม่พบรหัสสาขาปลายทางนี้ในระบบ" };
+    if (getUsersLocCodes_(ss).indexOf(toLocCode) === -1) {
+      return { success: false, message: "รหัสสาขาปลายทางนี้ยังไม่มีบัญชีผู้ใช้ (Users) ในระบบ ไม่สามารถโอนย้ายไปได้" };
+    }
+
+    const transferSheet = getTransferSheet_(ss);
+    if (!transferSheet) return { success: false, message: "ไม่พบชีต TransferRequests — กรุณาให้ผู้ดูแลระบบรัน setupTransferSheet() ก่อน" };
+
+    if (transferSheet.getLastRow() > 1) {
+      const existing = transferSheet.getRange(2, 1, transferSheet.getLastRow() - 1, 10).getDisplayValues();
+      for (let i = 0; i < existing.length; i++) {
+        const eSku = (existing[i][1] || "").toString().trim();
+        const eImei = (existing[i][3] || "").toString().trim();
+        const eStatus = (existing[i][9] || "").toString().trim();
+        if (eSku === sku && eImei === imei && eStatus === TRANSFER_STATUS_PENDING) {
+          return { success: false, message: "สินค้านี้มีคำขอโอนย้ายที่ยังไม่เสร็จสิ้นค้างอยู่แล้ว" };
+        }
+      }
+    }
+
+    const fromLocName = stockRow.locCode ? getLocNameByCode_(ss, stockRow.locCode) : "";
+    const now = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+
+    transferSheet.appendRow([
+      now, sku, stockRow.desc, imei, stockRow.locCode, fromLocName,
+      toLocCode, toLocName, session.locCode, TRANSFER_STATUS_PENDING,
+      "", ""
+    ]);
+
+    logAccess_(ss, session.locCode, getLocNameByCode_(ss, session.locCode), session.role, "TRANSFER_REQUEST",
+      `SKU ${sku} IMEI ${imei}: ${stockRow.locCode || "-"} -> ${toLocCode}`);
+
+    return { success: true, message: "สร้างคำขอโอนย้ายสำเร็จ รอสาขาปลายทางกดรับเข้า" };
+  } catch (err) {
+    return { success: false, message: "เกิดข้อผิดพลาด: " + err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// รายการโอนย้ายของสาขาที่ login อยู่ — incoming = ปลายทางคือสาขานี้, outgoing = สาขานี้เป็นผู้ขอ
+function getMyTransfers(token) {
+  const session = requireSession_(token);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getTransferSheet_(ss);
+  if (!sheet || sheet.getLastRow() <= 1) return { incoming: [], outgoing: [] };
+
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 12).getDisplayValues();
+  let incoming = [], outgoing = [];
+  data.forEach(function(r, idx) {
+    const rowId = idx + 2;
+    const toLoc = (r[6] || "").toString().trim();
+    const reqBy = (r[8] || "").toString().trim();
+    if (toLoc === session.locCode) incoming.push(mapTransferRow_(r, rowId));
+    if (reqBy === session.locCode) outgoing.push(mapTransferRow_(r, rowId));
+  });
+  incoming.sort(function(a, b) { return b.rowId - a.rowId; });
+  outgoing.sort(function(a, b) { return b.rowId - a.rowId; });
+  return { incoming: incoming, outgoing: outgoing };
+}
+
+// สาขาปลายทางกดรับสินค้าเข้า: อัปเดต LocCode ในชีต Stock all system ให้เป็นปลายทาง แล้วปิดคำขอเป็น "รับเข้าแล้ว"
+// อนุญาตให้ Admin รับแทนได้ด้วย (กรณีสาขาปลายทางไม่สะดวกเข้าระบบ)
+function receiveTransfer(token, rowId) {
+  const session = requireSession_(token);
+  if (session.role === ROLE_VIEWER) {
+    return { success: false, message: "บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถรับสินค้าเข้าได้" };
+  }
+  rowId = Number(rowId);
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return { success: false, message: "ระบบกำลังประมวลผลรายการอื่นอยู่ กรุณารอสักครู่แล้วลองใหม่" };
+  }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const transferSheet = getTransferSheet_(ss);
+    if (!transferSheet) return { success: false, message: "ไม่พบชีต TransferRequests" };
+    if (!Number.isInteger(rowId) || rowId < 2 || rowId > transferSheet.getLastRow()) {
+      return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+    }
+
+    const rowVals = transferSheet.getRange(rowId, 1, 1, 12).getDisplayValues()[0];
+    const sku = (rowVals[1] || "").toString().trim();
+    const imei = (rowVals[3] || "").toString().trim();
+    const fromLocCode = (rowVals[4] || "").toString().trim();
+    const toLocCode = (rowVals[6] || "").toString().trim();
+    const status = (rowVals[9] || "").toString().trim();
+
+    if (status !== TRANSFER_STATUS_PENDING) {
+      return { success: false, message: "คำขอนี้ถูกดำเนินการไปแล้ว หรือไม่อยู่ในสถานะที่รับเข้าได้" };
+    }
+    const isAdmin = session.locCode === ADMIN_SESSION_LOCCODE;
+    if (!isAdmin && session.locCode !== toLocCode) {
+      return { success: false, message: "คำขอนี้ไม่ได้ระบุปลายทางเป็นสาขาของคุณ" };
+    }
+    // กันรับเข้าสินค้าที่ถูกทำรายการ ACT ไปแล้วระหว่างที่คำขอโอนย้ายค้างอยู่
+    if (getUsedImeis_(ss).has(imei)) {
+      return { success: false, message: "สินค้า IMEI นี้ถูกทำรายการ ACT ไปแล้วระหว่างรอรับเข้า ไม่สามารถรับเข้าได้" };
+    }
+
+    const stockSheet = findSheet(ss, "stock");
+    if (!stockSheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต Stock" };
+    const stockRow = findStockRow_(stockSheet, sku, imei);
+    if (!stockRow) return { success: false, message: "ไม่พบสินค้านี้ในชีต Stock all system กรุณาติดต่อผู้ดูแลระบบ" };
+    // กันเผลอทับ Location Code ถ้าสินค้าถูกย้ายไปที่อื่นแล้วโดยวิธีอื่นระหว่างที่คำขอนี้ค้างอยู่ (ข้อมูลไม่ตรงกับตอนสร้างคำขอ)
+    if (stockRow.locCode !== fromLocCode) {
+      return { success: false, message: "ข้อมูลต้นทางในชีต Stock all system เปลี่ยนไปจากตอนสร้างคำขอ กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบ" };
+    }
+
+    // อัปเดตทั้ง Location Code (คอลัมน์ A) และ Location Name (คอลัมน์ B) ให้ตรงกับปลายทาง ไม่ใช่แค่ Location Code
+    const toLocNameFresh = getLocNameByCode_(ss, toLocCode);
+    stockSheet.getRange(stockRow.rowIndex, 1, 1, 2).setValues([[toLocCode, toLocNameFresh]]);
+
+    const now = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+    transferSheet.getRange(rowId, 10, 1, 3).setValues([[TRANSFER_STATUS_RECEIVED, now, session.locCode]]);
+
+    const actorLocName = isAdmin ? "Admin" : getLocNameByCode_(ss, session.locCode);
+    logAccess_(ss, session.locCode, actorLocName, session.role, "TRANSFER_RECEIVE",
+      `SKU ${sku} IMEI ${imei}: รับเข้าที่ ${toLocCode}`);
+
+    return { success: true, message: "รับสินค้าเข้าสาขาสำเร็จ อัปเดต Location Code เรียบร้อย" };
+  } catch (err) {
+    return { success: false, message: "เกิดข้อผิดพลาด: " + err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ยกเลิกคำขอโอนย้ายที่ยังไม่ถูกรับเข้า — ทำได้ทั้งสาขาต้นทาง (ผู้ขอ) และสาขาปลายทาง (ปฏิเสธ)
+// ไม่แตะ Stock all system เลย เพราะสินค้ายังไม่เคยถูกย้าย LocCode จริง (ย้ายจริงตอนกด "รับเข้า" เท่านั้น)
+// ใช้คอลัมน์ ReceivedAt/ReceivedBy ร่วมบันทึกเวลา/ผู้ยกเลิกด้วย เพราะคำขอหนึ่งจบที่สถานะปลายทางเดียวเสมอ (รับเข้า หรือ ยกเลิก อย่างใดอย่างหนึ่ง)
+function cancelTransfer(token, rowId) {
+  const session = requireSession_(token);
+  if (session.role === ROLE_VIEWER) {
+    return { success: false, message: "บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถยกเลิกคำขอโอนย้ายได้" };
+  }
+  rowId = Number(rowId);
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const transferSheet = getTransferSheet_(ss);
+  if (!transferSheet) return { success: false, message: "ไม่พบชีต TransferRequests" };
+  if (!Number.isInteger(rowId) || rowId < 2 || rowId > transferSheet.getLastRow()) {
+    return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+  }
+
+  const rowVals = transferSheet.getRange(rowId, 1, 1, 12).getDisplayValues()[0];
+  const sku = (rowVals[1] || "").toString().trim();
+  const imei = (rowVals[3] || "").toString().trim();
+  const fromLocCode = (rowVals[4] || "").toString().trim();
+  const toLocCode = (rowVals[6] || "").toString().trim();
+  const status = (rowVals[9] || "").toString().trim();
+
+  if (status !== TRANSFER_STATUS_PENDING) {
+    return { success: false, message: "คำขอนี้ถูกดำเนินการไปแล้ว ไม่สามารถยกเลิกได้" };
+  }
+  const isAdmin = session.locCode === ADMIN_SESSION_LOCCODE;
+  if (!isAdmin && session.locCode !== fromLocCode && session.locCode !== toLocCode) {
+    return { success: false, message: "คุณไม่มีสิทธิ์ยกเลิกคำขอนี้" };
+  }
+
+  const now = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+  transferSheet.getRange(rowId, 10, 1, 3).setValues([[TRANSFER_STATUS_CANCELLED, now, session.locCode]]);
+
+  const actorLocName = isAdmin ? "Admin" : getLocNameByCode_(ss, session.locCode);
+  logAccess_(ss, session.locCode, actorLocName, session.role, "TRANSFER_CANCEL",
+    `SKU ${sku} IMEI ${imei}: ${fromLocCode} -> ${toLocCode} ถูกยกเลิก`);
+
+  return { success: true, message: "ยกเลิกคำขอโอนย้ายสำเร็จ สินค้ายังคงอยู่ที่สาขาต้นทางเดิม" };
 }
 
 // ================= ADMIN SETTINGS (gate ด้วยระบบ login Admin แยกต่างหาก) =================
