@@ -224,6 +224,10 @@
         <label for="password">รหัสผ่าน (Password)</label>
         <input type="password" id="password" required>
       </div>
+      <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 24px;">
+        <input type="checkbox" id="remember-login" style="width: auto;">
+        <label for="remember-login" style="margin-bottom: 0; cursor: pointer;">จดจำรหัสสาขาและรหัสผ่าน</label>
+      </div>
       <button type="submit" class="btn-submit" id="btn-login">
         <span id="btn-login-text">เข้าสู่ระบบ</span>
         <div class="loader" id="btn-login-loader"></div>
@@ -247,7 +251,9 @@
     </div>
     
     <h1>เบิกอุปกรณ์</h1>
-    
+
+    <div id="pending-order-banner" class="message error" style="display: none;">สาขานี้มีรายการเบิกที่ยังรอจ่ายอยู่ ไม่สามารถเบิกรายการใหม่ได้จนกว่าจะจ่ายแล้ว</div>
+
     <form id="requisitionForm">
       <div class="form-group">
         <label for="location">สาขาที่เบิก</label>
@@ -291,10 +297,21 @@
       <div class="tab" onclick="showAdminTab('Product')" id="tab-Product">สินค้า (Product)</div>
     </div>
     
+    <div style="margin-bottom: 15px;">
+      <input type="text" id="admin-search" placeholder="ค้นหาข้อมูล..." oninput="filterAdminTable()" style="width: 100%; padding: 10px 14px; font-family: inherit; font-size: 14px; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: var(--text-main); box-sizing: border-box;">
+    </div>
+
+    <div id="admin-batch-bar" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <button type="button" class="btn-submit" style="width: auto; padding: 8px 16px; font-size: 13px;" onclick="enableBatchEditSelected()">แก้ไขรายการที่เลือก</button>
+      <button type="button" class="btn-submit" id="btn-save-batch" style="width: auto; padding: 8px 16px; font-size: 13px; background: #10b981; display: none;" onclick="saveBatchEdits()">บันทึกการแก้ไข</button>
+      <button type="button" class="btn-submit" id="btn-cancel-batch" style="width: auto; padding: 8px 16px; font-size: 13px; background: #94a3b8; display: none;" onclick="cancelBatchEdits()">ยกเลิก</button>
+      <button type="button" class="btn-submit" style="width: auto; padding: 8px 16px; font-size: 13px; background: #ef4444;" onclick="deleteSelectedAdminRows()">ลบรายการที่เลือก</button>
+    </div>
+
     <div class="admin-table-wrapper" id="admin-table-wrapper">
       <!-- Injected table -->
     </div>
-    
+
     <div style="display: flex; gap: 16px;">
       <button class="btn-add" onclick="addAdminRow()" style="margin-bottom: 0; flex: 1;">+ เพิ่มรายการ</button>
     </div>
@@ -347,13 +364,43 @@
     // Check login state
     window.onload = function() {
       const savedUser = sessionStorage.getItem('req_user');
+      const savedToken = sessionStorage.getItem('req_token');
       const savedBranchCode = sessionStorage.getItem('req_branchCode');
       const savedBranchName = sessionStorage.getItem('req_branchName');
       const savedRole = sessionStorage.getItem('req_role');
-      if (savedUser) {
+      if (savedUser && savedToken) {
         showMainApp(savedUser, savedBranchCode, savedBranchName, savedRole);
       }
+
+      const rememberedUser = localStorage.getItem('req_remember_user');
+      const rememberedPass = localStorage.getItem('req_remember_pass');
+      if (rememberedUser && rememberedPass) {
+        document.getElementById('username').value = rememberedUser;
+        document.getElementById('password').value = rememberedPass;
+        document.getElementById('remember-login').checked = true;
+      }
     };
+
+    function getToken() {
+      return sessionStorage.getItem('req_token') || '';
+    }
+
+    function isAuthError(err) {
+      const msg = String((err && err.message) || err || '');
+      return msg.indexOf('เซสชันหมดอายุ') !== -1 || msg.indexOf('ไม่มีสิทธิ์') !== -1;
+    }
+
+    // Returns true (and forces logout) if the error was an auth/session failure, so
+    // the caller can skip showing its own generic error message.
+    function handleAuthError(err) {
+      if (isAuthError(err)) {
+        Swal.fire('หมดเวลาการใช้งาน', String((err && err.message) || err), 'warning').then(() => {
+          logout();
+        });
+        return true;
+      }
+      return false;
+    }
 
     // --- Switch View ---
     function switchView(view) {
@@ -384,10 +431,19 @@
         setLoginLoading(false);
         if (response.success) {
           sessionStorage.setItem('req_user', response.name);
+          sessionStorage.setItem('req_token', response.token);
           sessionStorage.setItem('req_branchCode', response.branchCode);
           sessionStorage.setItem('req_branchName', response.branchName);
           sessionStorage.setItem('req_role', response.role);
-          
+
+          if (document.getElementById('remember-login').checked) {
+            localStorage.setItem('req_remember_user', user);
+            localStorage.setItem('req_remember_pass', pass);
+          } else {
+            localStorage.removeItem('req_remember_user');
+            localStorage.removeItem('req_remember_pass');
+          }
+
           if (response.role === 'Admin') {
             switchView('admin');
           } else {
@@ -418,8 +474,13 @@
     }
     
     function logout() {
+      if (hasUnsavedBatchEdits()) { warnUnsavedBatchEdits(); return; }
+      const token = getToken();
+      if (token) {
+        google.script.run.logoutSession(token); // best-effort, fire and forget
+      }
       sessionStorage.clear();
-      
+
       // Clear data caches so next login fetches fresh data based on their role/branch
       globalProducts = [];
       adminDataCache = {};
@@ -430,7 +491,8 @@
       document.getElementById('filter-date').value = '';
       document.getElementById('filter-branch').value = '';
       document.getElementById('filter-item').value = '';
-      
+      setPendingOrderUI([]);
+
       document.getElementById('main-container').style.display = 'none';
       document.getElementById('admin-container').style.display = 'none';
       document.getElementById('history-container').style.display = 'none';
@@ -444,6 +506,7 @@
 
     // ----- Main App Logic -----
     function gotoMainApp() {
+      if (hasUnsavedBatchEdits()) { warnUnsavedBatchEdits(); return; }
       const u = sessionStorage.getItem('req_user');
       const bc = sessionStorage.getItem('req_branchCode');
       const bn = sessionStorage.getItem('req_branchName');
@@ -461,7 +524,13 @@
       }
       
       document.getElementById('location').value = `ผู้ใช้งาน: ${userName} | ` + (userBranchName || 'ไม่ระบุสาขา') + (userBranchCode ? ` (${userBranchCode})` : '');
-      
+
+      google.script.run.withSuccessHandler(function(res) {
+        setPendingOrderUI(res.pendingItems);
+      }).withFailureHandler(function(error) {
+        handleAuthError(error);
+      }).checkPendingOrder(getToken());
+
       if (globalProducts.length === 0) {
         document.getElementById('main-loading').style.display = 'flex';
         google.script.run.withSuccessHandler(function(data) {
@@ -470,9 +539,42 @@
           if(document.getElementById('items-container').children.length === 0) addItemRow();
         }).withFailureHandler(function(error) {
           document.getElementById('main-loading').style.display = 'none';
+          if (handleAuthError(error)) return;
           showMainMessage('ไม่สามารถดึงข้อมูลได้: ' + error, 'error');
-        }).getInitialData(userBranchCode);
+        }).getInitialData(getToken());
       }
+    }
+
+    let pendingItemIds = new Set();
+
+    function setPendingOrderUI(pendingItems) {
+      pendingItems = pendingItems || [];
+      pendingItemIds = new Set(pendingItems.map(p => String(p.id)));
+
+      const banner = document.getElementById('pending-order-banner');
+      if (pendingItems.length > 0) {
+        banner.textContent = 'รายการต่อไปนี้ยังรอจ่ายอยู่ ไม่สามารถเบิกซ้ำได้จนกว่าจะจ่ายแล้ว: ' + pendingItems.map(p => p.name).join(', ');
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      applyPendingRestrictionsToSelects();
+    }
+
+    function applyPendingRestrictionsToSelects() {
+      document.querySelectorAll('.product-select').forEach(select => {
+        Array.from(select.options).forEach(opt => {
+          if (!opt.value) return;
+          opt.disabled = pendingItemIds.has(opt.value);
+        });
+        // If the currently selected option just became blocked, clear it
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption && selectedOption.disabled) {
+          select.value = '';
+          select.dispatchEvent(new Event('change'));
+        }
+      });
     }
 
     function addItemRow() {
@@ -570,6 +672,7 @@
       
       row.appendChild(select); row.appendChild(qty); row.appendChild(btnRemove);
       container.appendChild(row);
+      applyPendingRestrictionsToSelects();
     }
 
     document.getElementById('btn-add-item').addEventListener('click', addItemRow);
@@ -594,12 +697,10 @@
       if(items.length === 0) return showMainMessage('กรุณาระบุอย่างน้อย 1 รายการ', 'error');
       
       const payload = {
-        branchCode: sessionStorage.getItem('req_branchCode'),
-        branchName: sessionStorage.getItem('req_branchName'),
         requester: requester,
         items: items
       };
-      
+
       setSubmitLoading(true);
       google.script.run.withSuccessHandler(function(response) {
         setSubmitLoading(false);
@@ -612,14 +713,18 @@
           document.getElementById('location').value = `ผู้ใช้งาน: ${usr} | ` + (bn || 'ไม่ระบุสาขา') + (bc ? ` (${bc})` : '');
           document.getElementById('items-container').innerHTML = '';
           addItemRow();
+          google.script.run.withSuccessHandler(function(res) {
+            setPendingOrderUI(res.pendingItems);
+          }).checkPendingOrder(getToken());
           setTimeout(() => { document.getElementById('main-message').style.display = 'none'; }, 5000);
         } else {
           showMainMessage(response.message, 'error');
         }
       }).withFailureHandler(function(error) {
         setSubmitLoading(false);
+        if (handleAuthError(error)) return;
         showMainMessage('เกิดข้อผิดพลาด: ' + error, 'error');
-      }).submitOrder(payload);
+      }).submitOrder(getToken(), payload);
     });
 
     function setSubmitLoading(isLoading) {
@@ -662,37 +767,76 @@
         renderAdminTable();
       }).withFailureHandler(function(error) {
         document.getElementById('admin-loading').style.display = 'none';
+        if (handleAuthError(error)) return;
         showAdminMessage('ไม่สามารถโหลดข้อมูลได้: ' + error, 'error');
-      }).getAdminData();
+      }).getAdminData(getToken());
+    }
+
+    function hasUnsavedBatchEdits() {
+      return batchEditRowIndices.size > 0;
+    }
+
+    function warnUnsavedBatchEdits() {
+      Swal.fire('แจ้งเตือน', 'กรุณาบันทึกหรือกดยกเลิกการแก้ไขที่ค้างอยู่ก่อน', 'warning');
     }
 
     function showAdminTab(tabName) {
+      if (hasUnsavedBatchEdits()) { warnUnsavedBatchEdits(); return; }
       currentAdminTab = tabName;
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + tabName).classList.add('active');
-      
-      // Reset admin pagination when switching tab
+
+      // Reset admin pagination and search when switching tab
       currentAdminPage = 1;
-      
+      const searchInput = document.getElementById('admin-search');
+      if (searchInput) searchInput.value = '';
+      adminSearchTerm = '';
+
       renderAdminTable();
       document.getElementById('admin-message').style.display = 'none';
     }
-    
+
     let currentAdminPage = 1;
+    let adminSearchTerm = '';
+    let batchEditRowIndices = new Set();
     const ADMIN_PAGE_SIZE = 20;
+
+    function filterAdminTable() {
+      adminSearchTerm = document.getElementById('admin-search').value.toLowerCase();
+      currentAdminPage = 1;
+      renderAdminTable();
+    }
 
     function renderAdminTable() {
       const data = adminDataCache[currentAdminTab];
       const wrapper = document.getElementById('admin-table-wrapper');
-      
+
+      // Any pending batch edit is discarded whenever the table is re-rendered
+      batchEditRowIndices.clear();
+      const saveBatchBtn = document.getElementById('btn-save-batch');
+      const cancelBatchBtn = document.getElementById('btn-cancel-batch');
+      const searchInput = document.getElementById('admin-search');
+      if (saveBatchBtn) saveBatchBtn.style.display = 'none';
+      if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
+      if (searchInput) searchInput.disabled = false;
+
       if (!data || data.length === 0) {
         wrapper.innerHTML = '<p>ไม่มีข้อมูล</p>';
         return;
       }
-      
+
       const headers = data[0];
-      const allRows = data.slice(1);
-      
+      let allRows = data.slice(1);
+
+      if (adminSearchTerm) {
+        allRows = allRows.filter(row => {
+          return headers.some((h, cIndex) => {
+            if (currentAdminTab === 'Users' && cIndex === 1) return false; // skip password column
+            return String(row[cIndex] || '').toLowerCase().includes(adminSearchTerm);
+          });
+        });
+      }
+
       const totalPages = Math.ceil(allRows.length / ADMIN_PAGE_SIZE) || 1;
       if (currentAdminPage > totalPages) currentAdminPage = totalPages;
       
@@ -702,12 +846,14 @@
       
       let html = '<table class="admin-table" id="admin-table">';
       html += '<thead><tr>';
+      html += '<th style="width: 30px; text-align:center;"><input type="checkbox" onchange="toggleAllAdminCheckboxes(this)"></th>';
       headers.forEach(h => html += `<th>${h}</th>`);
       html += '<th style="width: 80px; text-align:center;">จัดการ</th></tr></thead><tbody>';
-      
+
       rows.forEach((row) => {
         let rowIdx = row[headers.length];
         html += `<tr data-rowindex="${rowIdx}">`;
+        html += `<td style="text-align:center;"><input type="checkbox" class="admin-row-checkbox" value="${rowIdx}"></td>`;
         headers.forEach((h, cIndex) => {
           if (h.includes('สถานะ') || h.includes('ช่องทางการมองเห็น')) {
             let val = (row[cIndex] || '').toString().trim();
@@ -753,6 +899,7 @@
     }
     
     function changeAdminPage(newPage) {
+       if (hasUnsavedBatchEdits()) { warnUnsavedBatchEdits(); return; }
        currentAdminPage = newPage;
        renderAdminTable();
     }
@@ -780,6 +927,7 @@
       
       const tbody = table.querySelector('tbody');
       const tr = document.createElement('tr');
+      tr.innerHTML += '<td></td>';
       for (let i = 0; i < headersCount; i++) {
         const h = adminDataCache[currentAdminTab][0][i];
         if (h.includes('สถานะ') || h.includes('ช่องทางการมองเห็น')) {
@@ -822,8 +970,9 @@
              }
           }).withFailureHandler(function(err) {
              document.getElementById('admin-loading').style.display = 'none';
+             if (handleAuthError(err)) return;
              showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
-          }).deleteAdminRowData(currentAdminTab, rowIdx);
+          }).deleteAdminRowData(getToken(), currentAdminTab, rowIdx);
         }
       });
     }
@@ -831,6 +980,13 @@
     function editRow(btn, rowIdx) {
       const tr = btn.closest('tr');
       if (btn.classList.contains('editing')) {
+        if (!rowIdx && currentAdminTab === 'Users') {
+          const passwordInput = tr.querySelectorAll('input[type="text"]')[1];
+          if (!passwordInput || !passwordInput.value.trim()) {
+            Swal.fire('แจ้งเตือน', 'กรุณาระบุรหัสผ่าน', 'warning');
+            return;
+          }
+        }
         Swal.fire({
           title: 'ยืนยันการบันทึก',
           text: 'คุณต้องการยืนยันการบันทึกข้อมูลใช่หรือไม่?',
@@ -842,7 +998,7 @@
           cancelButtonText: 'ยกเลิก'
         }).then((result) => {
           if (result.isConfirmed) {
-             const inputs = tr.querySelectorAll('input, .btn-status');
+             const inputs = tr.querySelectorAll('input[type="text"], .btn-status');
              const rowData = [];
              inputs.forEach(input => {
                rowData.push(input.value);
@@ -858,7 +1014,11 @@
                    document.getElementById('admin-loading').style.display = 'none';
                    showAdminMessage(res.message, 'error');
                  }
-               }).addAdminRowData(currentAdminTab, rowData);
+               }).withFailureHandler(function(err) {
+                 document.getElementById('admin-loading').style.display = 'none';
+                 if (handleAuthError(err)) return;
+                 showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
+               }).addAdminRowData(getToken(), currentAdminTab, rowData);
              } else {
                google.script.run.withSuccessHandler(function(res) {
                  if (res.success) {
@@ -868,19 +1028,155 @@
                    document.getElementById('admin-loading').style.display = 'none';
                    showAdminMessage(res.message, 'error');
                  }
-               }).updateAdminRowData(currentAdminTab, rowIdx, rowData);
+               }).withFailureHandler(function(err) {
+                 document.getElementById('admin-loading').style.display = 'none';
+                 if (handleAuthError(err)) return;
+                 showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
+               }).updateAdminRowData(getToken(), currentAdminTab, rowIdx, rowData);
              }
           }
         });
       } else {
-        tr.querySelectorAll('input').forEach(inp => {
+        const textInputs = tr.querySelectorAll('input[type="text"]');
+        textInputs.forEach(inp => {
           inp.readOnly = false;
         });
+        // The password column shows a masked placeholder ('********'), not the real value.
+        // Clear it so typing doesn't get appended to the asterisks - leaving it blank keeps
+        // the existing password unchanged (enforced server-side).
+        if (rowIdx && currentAdminTab === 'Users' && textInputs[1]) {
+          textInputs[1].value = '';
+          textInputs[1].placeholder = 'เว้นว่างไว้ = ไม่เปลี่ยนรหัสผ่าน';
+        }
         tr.querySelectorAll('.btn-status').forEach(b => b.disabled = false);
         btn.classList.add('editing');
         btn.innerHTML = '💾';
         btn.title = 'บันทึก';
+        const cb = tr.querySelector('.admin-row-checkbox');
+        if (cb) cb.disabled = true;
       }
+    }
+
+    function toggleAllAdminCheckboxes(master) {
+      document.querySelectorAll('.admin-row-checkbox').forEach(cb => {
+        if (!cb.disabled) cb.checked = master.checked;
+      });
+    }
+
+    function enableBatchEditSelected() {
+      const checked = document.querySelectorAll('.admin-row-checkbox:checked');
+      if (checked.length === 0) {
+        Swal.fire('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการแก้ไขอย่างน้อย 1 รายการ', 'warning');
+        return;
+      }
+      checked.forEach(cb => {
+        const tr = cb.closest('tr');
+        const textInputs = tr.querySelectorAll('input[type="text"]');
+        textInputs.forEach(inp => inp.readOnly = false);
+        if (currentAdminTab === 'Users' && textInputs[1]) {
+          textInputs[1].value = '';
+          textInputs[1].placeholder = 'เว้นว่างไว้ = ไม่เปลี่ยนรหัสผ่าน';
+        }
+        tr.querySelectorAll('.btn-status').forEach(b => b.disabled = false);
+        tr.classList.add('batch-editing');
+        tr.style.background = 'rgba(59, 130, 246, 0.08)';
+        tr.querySelectorAll('.edit-btn, .delete-btn').forEach(b => b.disabled = true);
+        cb.disabled = true;
+        batchEditRowIndices.add(cb.value);
+      });
+      document.getElementById('btn-save-batch').style.display = 'inline-block';
+      document.getElementById('btn-cancel-batch').style.display = 'inline-block';
+      document.getElementById('admin-search').disabled = true;
+    }
+
+    function cancelBatchEdits() {
+      batchEditRowIndices.clear();
+      document.getElementById('btn-save-batch').style.display = 'none';
+      document.getElementById('btn-cancel-batch').style.display = 'none';
+      renderAdminTable();
+    }
+
+    function saveBatchEdits() {
+      if (batchEditRowIndices.size === 0) return;
+
+      const updates = [];
+      document.querySelectorAll('#admin-table tbody tr.batch-editing').forEach(tr => {
+        const rowIdx = tr.dataset.rowindex;
+        const inputs = tr.querySelectorAll('input[type="text"], .btn-status');
+        const rowData = [];
+        inputs.forEach(input => rowData.push(input.value));
+        updates.push({ rowIndex: parseInt(rowIdx), rowData: rowData });
+      });
+
+      Swal.fire({
+        title: 'ยืนยันการบันทึก',
+        text: `คุณต้องการบันทึกการแก้ไข ${updates.length} รายการใช่หรือไม่?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, บันทึก',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          document.getElementById('admin-loading').style.display = 'flex';
+          google.script.run.withSuccessHandler(function(res) {
+            document.getElementById('admin-loading').style.display = 'none';
+            batchEditRowIndices.clear();
+            document.getElementById('btn-save-batch').style.display = 'none';
+            document.getElementById('btn-cancel-batch').style.display = 'none';
+            if (res.success) {
+              showAdminMessage(res.message, 'success');
+              loadAdminData(true);
+            } else {
+              showAdminMessage(res.message, 'error');
+            }
+          }).withFailureHandler(function(err) {
+            document.getElementById('admin-loading').style.display = 'none';
+            if (handleAuthError(err)) return;
+            showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
+          }).updateMultipleAdminRows(getToken(), currentAdminTab, updates);
+        }
+      });
+    }
+
+    function deleteSelectedAdminRows() {
+      const checked = document.querySelectorAll('.admin-row-checkbox:checked');
+      if (checked.length === 0) {
+        Swal.fire('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการลบอย่างน้อย 1 รายการ', 'warning');
+        return;
+      }
+
+      const rowIndices = [];
+      checked.forEach(cb => rowIndices.push(parseInt(cb.value)));
+
+      Swal.fire({
+        title: 'ยืนยันการลบ',
+        text: `คุณต้องการลบข้อมูลจำนวน ${rowIndices.length} รายการใช่หรือไม่? การกระทำนี้ไม่สามารถยกเลิกได้`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'ใช่, ลบเลย',
+        cancelButtonText: 'ยกเลิก'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          document.getElementById('admin-loading').style.display = 'flex';
+          google.script.run.withSuccessHandler(function(res) {
+            document.getElementById('admin-loading').style.display = 'none';
+            if (res.success) {
+              showAdminMessage(res.message, 'success');
+              loadAdminData(true);
+            } else {
+              showAdminMessage(res.message, 'error');
+            }
+          }).withFailureHandler(function(err) {
+            document.getElementById('admin-loading').style.display = 'none';
+            if (handleAuthError(err)) return;
+            showAdminMessage('เกิดข้อผิดพลาด: ' + err, 'error');
+          }).deleteMultipleAdminRows(getToken(), currentAdminTab, rowIndices);
+        }
+      });
     }
 
     function showAdminMessage(msg, type) {
@@ -895,9 +1191,8 @@
     // ----- History Logic -----
     function loadHistoryData() {
       document.getElementById('history-loading').style.display = 'flex';
-      const branchCode = sessionStorage.getItem('req_branchCode');
       const role = sessionStorage.getItem('req_role');
-      
+
       google.script.run.withSuccessHandler(function(res) {
         document.getElementById('history-loading').style.display = 'none';
         
@@ -987,8 +1282,9 @@
         
       }).withFailureHandler(function(error) {
         document.getElementById('history-loading').style.display = 'none';
+        if (handleAuthError(error)) return;
         document.getElementById('history-table-wrapper').innerHTML = '<p style="color:var(--danger);">เกิดข้อผิดพลาด: ' + error + '</p>';
-      }).getBranchOrders(branchCode, role);
+      }).getBranchOrders(getToken());
     }
 
     function populateHistoryFilters(locations, products, rows) {
@@ -1037,9 +1333,10 @@
             }
           }).withFailureHandler(function(err) {
             document.getElementById('history-loading').style.display = 'none';
+            if (handleAuthError(err)) return;
             Swal.fire('ข้อผิดพลาด', String(err), 'error');
             loadHistoryData();
-          }).updateOrderStatus(rowIdx, newStatus);
+          }).updateOrderStatus(getToken(), rowIdx, newStatus);
         } else {
           loadHistoryData(); // revert UI if cancelled
         }
@@ -1093,8 +1390,9 @@
             }
           }).withFailureHandler(function(err) {
             document.getElementById('history-loading').style.display = 'none';
+            if (handleAuthError(err)) return;
             Swal.fire('ข้อผิดพลาด', String(err), 'error');
-          }).updateMultipleOrderStatuses(updates);
+          }).updateMultipleOrderStatuses(getToken(), updates);
         }
       });
     }
@@ -1133,8 +1431,9 @@
             }
           }).withFailureHandler(function(err) {
             document.getElementById('history-loading').style.display = 'none';
+            if (handleAuthError(err)) return;
             Swal.fire('ข้อผิดพลาด', String(err), 'error');
-          }).deleteMultipleOrderRows(rowIndices);
+          }).deleteMultipleOrderRows(getToken(), rowIndices);
         }
       });
     }
@@ -1267,17 +1566,17 @@
         html: `
           <div style="text-align: left; font-size: 14px;">
             <label style="display:block; margin-top:10px; color:var(--text-muted);">ชื่อผู้เบิก</label>
-            <input id="swal-reqName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${reqName}">
+            <input id="swal-reqName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${escapeHtml(reqName)}">
             <label style="display:block; margin-top:10px; color:var(--text-muted);">รหัสสาขา</label>
-            <input id="swal-branchCode" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${branchCode}">
+            <input id="swal-branchCode" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${escapeHtml(branchCode)}">
             <label style="display:block; margin-top:10px; color:var(--text-muted);">ชื่อสาขา</label>
-            <input id="swal-branchName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${branchName}">
+            <input id="swal-branchName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${escapeHtml(branchName)}">
             <label style="display:block; margin-top:10px; color:var(--text-muted);">รหัสสินค้า</label>
-            <input id="swal-itemCode" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${itemCode}">
+            <input id="swal-itemCode" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${escapeHtml(itemCode)}">
             <label style="display:block; margin-top:10px; color:var(--text-muted);">ชื่อสินค้า</label>
-            <input id="swal-itemName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${itemName}">
+            <input id="swal-itemName" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${escapeHtml(itemName)}">
             <label style="display:block; margin-top:10px; color:var(--text-muted);">จำนวน</label>
-            <input id="swal-qty" type="number" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${qty}">
+            <input id="swal-qty" type="number" class="swal2-input" style="width: 100%; margin: 5px 0;" value="${escapeHtml(qty)}">
           </div>
         `,
         focusConfirm: false,
@@ -1307,8 +1606,9 @@
             }
           }).withFailureHandler(function(err) {
             document.getElementById('history-loading').style.display = 'none';
+            if (handleAuthError(err)) return;
             Swal.fire('ข้อผิดพลาด', String(err), 'error');
-          }).updateOrderRowData(rowIdx, result.value);
+          }).updateOrderRowData(getToken(), rowIdx, result.value);
         }
       });
     }
@@ -1336,8 +1636,9 @@
             }
           }).withFailureHandler(function(err) {
             document.getElementById('history-loading').style.display = 'none';
+            if (handleAuthError(err)) return;
             Swal.fire('ข้อผิดพลาด', String(err), 'error');
-          }).deleteOrderRow(rowIdx);
+          }).deleteOrderRow(getToken(), rowIdx);
         }
       });
     }
@@ -1346,7 +1647,7 @@
       const table = document.querySelector('#history-table-wrapper table.admin-table');
       if (!table) return;
       
-      let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+      const csvRows = [];
       const rows = table.querySelectorAll('tr');
       
       rows.forEach(row => {
@@ -1368,19 +1669,25 @@
         });
         
         if (rowData.length > 0) {
-          csvContent += rowData.join(",") + "\r\n";
+          csvRows.push(rowData.join(","));
         }
       });
-      
-      const encodedUri = encodeURI(csvContent);
+
+      // Use a Blob instead of a data: URI - data: URIs have a length limit that a large
+      // history table can exceed, silently truncating or failing the download.
+      const csvContent = '﻿' + csvRows.join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
       const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      
+      link.href = url;
+
       const dateStr = new Date().toISOString().slice(0, 10);
       link.setAttribute("download", `ประวัติการเบิก_${dateStr}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
   </script>
 </body>
