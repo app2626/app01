@@ -325,6 +325,9 @@
         <li class="nav-item ms-2">
             <button class="nav-link tab-transfer fw-bold shadow-sm" id="transfer-tab" data-bs-toggle="tab" data-bs-target="#transfer-pane" type="button"><i class="fas fa-truck-arrow-right"></i> โอนย้ายสต๊อก</button>
         </li>
+        <li class="nav-item ms-2">
+            <button class="nav-link tab-act-transfer fw-bold shadow-sm" id="act-transfer-tab" data-bs-toggle="tab" data-bs-target="#act-transfer-pane" type="button"><i class="fas fa-right-left"></i> โอนย้ายรายการ ACT</button>
+        </li>
         <li class="nav-item ms-2" id="settingsTabLi" style="display:none;">
             <button class="nav-link tab-settings fw-bold shadow-sm" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane" type="button"><i class="fas fa-gears"></i> ตั้งค่าระบบ</button>
         </li>
@@ -722,26 +725,43 @@
                         <label class="form-label text-secondary fw-bold">Location Code ปลายทาง</label>
                         <select class="form-select" id="transferToLoc" required><option value="">-- เลือกสาขาปลายทาง --</option></select>
                     </div>
-                    <div class="col-md-6 mb-2">
-                        <label class="form-label text-secondary fw-bold">รหัสสินค้า (SKU)</label>
-                        <select class="form-select" id="transferSku" required><option></option></select>
-                    </div>
-                    <div class="col-md-6 mb-2">
-                        <label class="form-label text-secondary fw-bold">หมายเลขเครื่อง (IMEI)</label>
-                        <select class="form-select" id="transferImei" required><option></option></select>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2 mt-2">
+                    <h6 class="text-dark fw-bold m-0"><i class="fas fa-boxes-stacked text-primary"></i> รายการสินค้าที่จะโอนย้าย</h6>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold" id="btnAddTransferRow"><i class="fas fa-plus-circle"></i> เพิ่มรายการ</button>
+                </div>
+                <div id="transferItemsContainer">
+                    <div class="item-row row shadow-sm align-items-center">
+                        <button type="button" class="btn btn-danger btn-remove-row"><i class="fas fa-times"></i></button>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label fw-bold text-muted">รหัสสินค้า (SKU)</label>
+                            <select class="form-select transfer-select-sku" required><option></option></select>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label fw-bold text-muted">หมายเลขเครื่อง (IMEI)</label>
+                            <select class="form-select transfer-select-imei" required><option></option></select>
+                        </div>
                     </div>
                 </div>
+
                 <div class="text-end mt-2">
                     <button type="submit" class="btn btn-success fw-bold px-4"><i class="fas fa-paper-plane"></i> ส่งคำขอโอนย้าย</button>
                 </div>
             </form>
 
             <div class="card p-3 mb-4 shadow-sm border">
-                <h6 class="fw-bold text-primary mb-3"><i class="fas fa-box-open"></i> รายการรอรับเข้าที่สาขาของฉัน</h6>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h6 class="fw-bold text-primary m-0"><i class="fas fa-box-open"></i> รายการรอรับเข้าที่สาขาของฉัน</h6>
+                    <div>
+                        <button type="button" class="btn btn-success btn-sm fw-bold" id="btnReceiveSelectedTransfer" disabled><i class="fas fa-check-double"></i> รับเข้าที่เลือก (<span id="selectedTransferCount">0</span>)</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="btnCancelSelectedTransfer" disabled><i class="fas fa-times"></i> ยกเลิกที่เลือก</button>
+                    </div>
+                </div>
                 <div class="table-responsive">
                     <table id="incomingTransferTable" class="table table-hover table-bordered w-100">
                         <thead class="table-dark">
-                            <tr><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ต้นทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
+                            <tr><th><input type="checkbox" id="selectAllTransfer"></th><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ต้นทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -749,11 +769,97 @@
             </div>
 
             <div class="card p-3 mb-4 shadow-sm border">
-                <h6 class="fw-bold text-primary mb-3"><i class="fas fa-history"></i> ประวัติคำขอโอนย้ายของสาขาฉัน</h6>
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h6 class="fw-bold text-primary m-0"><i class="fas fa-history"></i> ประวัติคำขอโอนย้ายของสาขาฉัน</h6>
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="btnCancelSelectedOutgoingTransfer" disabled><i class="fas fa-times"></i> ยกเลิกที่เลือก (<span id="selectedOutgoingTransferCount">0</span>)</button>
+                </div>
                 <div class="table-responsive">
                     <table id="outgoingTransferTable" class="table table-hover table-bordered w-100">
                         <thead class="table-dark">
-                            <tr><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ปลายทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
+                            <tr><th><input type="checkbox" id="selectAllOutgoingTransfer"></th><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ปลายทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade bg-white p-3 rounded shadow-sm" id="act-transfer-pane">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="mb-0 text-dark fw-bold"><i class="fas fa-right-left text-primary"></i> โอนย้ายรายการ ACT ข้ามสาขา (Transfer ACT Record)</h5>
+            </div>
+
+            <div id="actTransferViewerAlert" class="alert alert-info d-none fw-bold shadow-sm">
+                <i class="fas fa-eye"></i> บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว (พิเศษ) ไม่สามารถขอโอนย้ายหรือรับรายการเข้าได้
+            </div>
+            <div id="actTransferAdminAlert" class="alert alert-info d-none fw-bold shadow-sm">
+                <i class="fas fa-eye"></i> บัญชี Admin ไม่มีสาขา ไม่สามารถขอโอนย้ายรายการ ACT ได้
+            </div>
+
+            <form id="actTransferForm" class="card p-3 mb-4 bg-light border-0">
+                <h6 class="text-primary fw-bold mb-3 border-bottom pb-2"><i class="fas fa-paper-plane"></i> สร้างคำขอโอนย้ายรายการ ACT</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label text-secondary fw-bold">Location Code ต้นทาง</label>
+                        <div class="form-control bg-light fw-bold text-primary" id="actTransferFromLocDisplay">-</div>
+                        <div class="form-text">ล็อกเป็นสาขาของคุณเสมอ — ดึงรายการ ACT ที่คีย์ไว้ที่สาขานี้จากชีต 'อยู่ระหว่างดำเนินการ' อัตโนมัติ</div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label text-secondary fw-bold">Location Code ปลายทาง</label>
+                        <select class="form-select" id="actTransferToLoc" required><option value="">-- เลือกสาขาปลายทาง --</option></select>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2 mt-2">
+                    <h6 class="text-dark fw-bold m-0"><i class="fas fa-boxes-stacked text-primary"></i> รายการ ACT ที่จะโอนย้าย</h6>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold" id="btnAddActTransferRow"><i class="fas fa-plus-circle"></i> เพิ่มรายการ</button>
+                </div>
+                <div id="actTransferItemsContainer">
+                    <div class="item-row row shadow-sm align-items-center">
+                        <button type="button" class="btn btn-danger btn-remove-row"><i class="fas fa-times"></i></button>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label fw-bold text-muted">รหัสสินค้า (SKU)</label>
+                            <select class="form-select act-transfer-select-sku" required><option></option></select>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label fw-bold text-muted">หมายเลขเครื่อง (IMEI)</label>
+                            <select class="form-select act-transfer-select-imei" required><option></option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-end mt-2">
+                    <button type="submit" class="btn btn-success fw-bold px-4"><i class="fas fa-paper-plane"></i> ส่งคำขอโอนย้าย</button>
+                </div>
+            </form>
+
+            <div class="card p-3 mb-4 shadow-sm border">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h6 class="fw-bold text-primary m-0"><i class="fas fa-box-open"></i> รายการรอรับเข้าที่สาขาของฉัน</h6>
+                    <div>
+                        <button type="button" class="btn btn-success btn-sm fw-bold" id="btnReceiveSelectedActTransfer" disabled><i class="fas fa-check-double"></i> รับเข้าที่เลือก (<span id="selectedActTransferCount">0</span>)</button>
+                        <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="btnCancelSelectedActTransfer" disabled><i class="fas fa-times"></i> ยกเลิกที่เลือก</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table id="incomingActTransferTable" class="table table-hover table-bordered w-100">
+                        <thead class="table-dark">
+                            <tr><th><input type="checkbox" id="selectAllActTransfer"></th><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ต้นทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card p-3 mb-4 shadow-sm border">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h6 class="fw-bold text-primary m-0"><i class="fas fa-history"></i> ประวัติคำขอโอนย้ายของสาขาฉัน</h6>
+                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="btnCancelSelectedOutgoingActTransfer" disabled><i class="fas fa-times"></i> ยกเลิกที่เลือก (<span id="selectedOutgoingActTransferCount">0</span>)</button>
+                </div>
+                <div class="table-responsive">
+                    <table id="outgoingActTransferTable" class="table table-hover table-bordered w-100">
+                        <thead class="table-dark">
+                            <tr><th><input type="checkbox" id="selectAllOutgoingActTransfer"></th><th>วันที่ขอโอน</th><th>SKU</th><th>รายละเอียดสินค้า</th><th>IMEI</th><th>ปลายทาง</th><th>สถานะ</th><th>จัดการ</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -849,6 +955,7 @@
     var rawLocations = [];
     var branchStock = [];
     var transferSourceStock = [];
+    var actTransferSourceRecords = [];
     var globalAllRecords = [];
     var globalUnsoldPool = []; 
     var masterProductMap = {}; 
@@ -863,6 +970,8 @@
     var settingsUsersTableInstance = null;
     var incomingTransferTableInstance = null;
     var outgoingTransferTableInstance = null;
+    var incomingActTransferTableInstance = null;
+    var outgoingActTransferTableInstance = null;
     var adminToken = null;
 
     var currentToken = null;
@@ -1076,10 +1185,14 @@
             $('#viewerAlert').removeClass('d-none');
             $('#transferForm').addClass('form-locked');
             $('#transferViewerAlert').removeClass('d-none');
+            $('#actTransferForm').addClass('form-locked');
+            $('#actTransferViewerAlert').removeClass('d-none');
         } else {
             $('#viewerAlert').addClass('d-none');
             $('#transferForm').removeClass('form-locked');
             $('#transferViewerAlert').addClass('d-none');
+            $('#actTransferForm').removeClass('form-locked');
+            $('#actTransferViewerAlert').addClass('d-none');
         }
     }
 
@@ -1093,12 +1206,15 @@
             $('#actForm').addClass('form-locked');
             $('#transferForm').addClass('form-locked');
             $('#transferAdminAlert').removeClass('d-none');
+            $('#actTransferForm').addClass('form-locked');
+            $('#actTransferAdminAlert').removeClass('d-none');
             return;
         }
 
         $('#actForm').removeClass('form-locked');
         $('#lockedBranchDisplay').text(currentLocCode + ' - ' + currentLocName);
         $('#transferFromLocDisplay').text(currentLocCode + ' - ' + currentLocName);
+        $('#actTransferFromLocDisplay').text(currentLocCode + ' - ' + currentLocName);
 
         applyRoleRestrictions();
 
@@ -1112,8 +1228,16 @@
                 // แท็บโอนย้ายสต๊อก: ต้นทางล็อกเป็นสาขาตัวเองเสมอ กรองเอาเฉพาะสินค้าที่ LocCode ตรงกับสาขาจริงๆ
                 // (ไม่รวม "Warehouse Transfer" ซึ่งเป็นคนละที่ตั้ง) แล้วเติม SKU dropdown ของฟอร์มโอนย้ายให้เลย
                 transferSourceStock = stock.filter(function(item) { return item.originalLoc === currentLocCode; });
-                populateTransferSkuDropdown();
+                $('.transfer-select-sku').each(function() { populateTransferSkuDropdown($(this)); });
             }).getStockByBranch(currentToken, currentLocCode);
+
+        // แท็บโอนย้ายรายการ ACT: คนละหน้า/คนละข้อมูลต้นทางกับโอนย้ายสต๊อก — ดึงรายการที่คีย์ ACT ไปแล้วของสาขาตัวเองจากชีต "อยู่ระหว่างดำเนินการ"
+        google.script.run
+            .withFailureHandler(handleAuthFailure)
+            .withSuccessHandler(function(records) {
+                actTransferSourceRecords = records || [];
+                $('.act-transfer-select-sku').each(function() { populateActTransferSkuDropdown($(this)); });
+            }).getActRecordsByBranch(currentToken, currentLocCode);
     }
 
     $(document).ready(function() {
@@ -1337,6 +1461,38 @@
         });
         $('#track-tab').on('shown.bs.tab', function() { generateTrackByAreaTable(); });
         $('#transfer-tab').on('shown.bs.tab', function() { loadMyTransfers(); });
+        $('#act-transfer-tab').on('shown.bs.tab', function() { loadMyActTransfers(); });
+
+        $('#btnAddTransferRow').click(function() {
+            $('.transfer-select-sku, .transfer-select-imei').select2('destroy');
+            var newRow = $('#transferItemsContainer .item-row').first().clone();
+            newRow.appendTo('#transferItemsContainer');
+            initTransferRowSelect2();
+            populateTransferSkuDropdown(newRow.find('.transfer-select-sku'));
+            newRow.find('.transfer-select-imei').empty().append('<option></option>');
+        });
+
+        $(document).on('select2:select', '.transfer-select-sku', function(e) {
+            var selectedSku = e.params.data.id;
+            var row = $(this).closest('.item-row');
+            var imeiList = transferSourceStock.filter(function(i) { return i.sku === selectedSku; });
+            var imeiDropdown = row.find('.transfer-select-imei');
+            imeiDropdown.empty().append('<option></option>');
+            imeiList.forEach(function(i) { imeiDropdown.append('<option value="' + escapeHtml(i.imei) + '">' + escapeHtml(i.imei) + '</option>'); });
+        });
+
+        $(document).on('change', '.transfer-select-imei', function() {
+            var currentVal = $(this).val();
+            var currentDropdown = this;
+            if (currentVal) {
+                $('#transferItemsContainer .transfer-select-imei').not(currentDropdown).each(function() {
+                    if ($(this).val() === currentVal) {
+                        Swal.fire('ข้อผิดพลาด', 'หมายเลข IMEI ถูกระบุซ้ำในคำขอเดียวกัน', 'error');
+                        $(currentDropdown).val(null).trigger('change');
+                    }
+                });
+            }
+        });
 
         $('#transferForm').on('submit', function(e) {
             e.preventDefault();
@@ -1344,11 +1500,17 @@
                 Swal.fire('ไม่สามารถทำรายการได้', 'บัญชีนี้ไม่สามารถขอโอนย้ายสต๊อกได้', 'warning');
                 return;
             }
-            var sku = $('#transferSku').val();
-            var imei = $('#transferImei').val();
             var toLoc = $('#transferToLoc').val();
-            if (!sku || !imei || !toLoc) {
-                Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือก SKU, IMEI และสาขาปลายทางให้ครบถ้วน', 'warning');
+            var items = [];
+            var validationError = false;
+            $('#transferItemsContainer .item-row').each(function() {
+                var sku = $(this).find('.transfer-select-sku').val();
+                var imei = $(this).find('.transfer-select-imei').val();
+                if (!sku || !imei) { validationError = true; return; }
+                items.push({ sku: sku, imei: imei });
+            });
+            if (!toLoc || items.length === 0 || validationError) {
+                Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือกสาขาปลายทาง และ SKU/IMEI ให้ครบทุกรายการ', 'warning');
                 return;
             }
 
@@ -1364,21 +1526,105 @@
                     if (res.success) {
                         Swal.fire('สำเร็จ', res.message, 'success');
                         $('#transferToLoc').val(null).trigger('change');
-                        $('#transferSku').val(null).trigger('change');
-                        $('#transferImei').empty().append('<option></option>').val(null).trigger('change');
+                        $('#transferItemsContainer .item-row:not(:first)').remove();
+                        $('.transfer-select-sku').val(null).trigger('change');
+                        $('.transfer-select-imei').empty().append('<option></option>').val(null).trigger('change');
                         loadMyTransfers();
                     } else {
                         Swal.fire('ผิดพลาด', res.message, 'error');
                     }
-                }).createTransferRequest(currentToken, sku, imei, toLoc);
+                }).createTransferRequest(currentToken, items, toLoc);
         });
 
-        $('#transferSku').on('select2:select', function(e) {
-            var selectedSku = e.params.data.id;
-            var imeiList = transferSourceStock.filter(function(i) { return i.sku === selectedSku; });
-            var imeiDropdown = $('#transferImei');
-            imeiDropdown.empty().append('<option></option>');
-            imeiList.forEach(function(i) { imeiDropdown.append('<option value="' + escapeHtml(i.imei) + '">' + escapeHtml(i.imei) + '</option>'); });
+        $(document).on('change', '#selectAllTransfer', function() {
+            var checked = $(this).is(':checked');
+            $('.transfer-receive-check').prop('checked', checked);
+            updateSelectedTransferCount();
+        });
+
+        $(document).on('change', '.transfer-receive-check', function() { updateSelectedTransferCount(); });
+
+        $('#btnReceiveSelectedTransfer').on('click', function() {
+            var rowIds = $('.transfer-receive-check:checked').map(function() { return $(this).data('rowid'); }).get();
+            if (rowIds.length === 0) return;
+            Swal.fire({
+                title: 'ยืนยันรับสินค้าเข้า ' + rowIds.length + ' รายการ',
+                text: 'ระบบจะอัปเดต Location Code ของสินค้าที่เลือกทั้งหมดเป็นสาขาของคุณ',
+                icon: 'question', showCancelButton: true,
+                confirmButtonText: 'รับเข้าทั้งหมด', cancelButtonText: 'ยกเลิก'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังรับสินค้าเข้าและอัปเดตฐานข้อมูล...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).receiveTransferBatch(currentToken, rowIds);
+            });
+        });
+
+        $('#btnCancelSelectedTransfer').on('click', function() {
+            var rowIds = $('.transfer-receive-check:checked').map(function() { return $(this).data('rowid'); }).get();
+            if (rowIds.length === 0) return;
+            Swal.fire({
+                title: 'ยืนยันยกเลิกคำขอ ' + rowIds.length + ' รายการ',
+                text: 'สินค้าที่เลือกจะยังคงอยู่ที่สาขาต้นทางเดิม ไม่มีการย้ายเกิดขึ้น',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonText: 'ยกเลิกทั้งหมด', cancelButtonText: 'ปิด'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังยกเลิกคำขอโอนย้าย...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).cancelTransferBatch(currentToken, rowIds);
+            });
+        });
+
+        $(document).on('change', '#selectAllOutgoingTransfer', function() {
+            var checked = $(this).is(':checked');
+            $('.transfer-cancel-check').prop('checked', checked);
+            updateSelectedOutgoingTransferCount();
+        });
+
+        $(document).on('change', '.transfer-cancel-check', function() { updateSelectedOutgoingTransferCount(); });
+
+        $('#btnCancelSelectedOutgoingTransfer').on('click', function() {
+            var rowIds = $('.transfer-cancel-check:checked').map(function() { return $(this).data('rowid'); }).get();
+            if (rowIds.length === 0) return;
+            Swal.fire({
+                title: 'ยืนยันยกเลิกคำขอ ' + rowIds.length + ' รายการ',
+                text: 'สินค้าที่เลือกจะยังคงอยู่ที่สาขาต้นทางเดิม ไม่มีการย้ายเกิดขึ้น',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonText: 'ยกเลิกทั้งหมด', cancelButtonText: 'ปิด'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังยกเลิกคำขอโอนย้าย...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).cancelTransferBatch(currentToken, rowIds);
+            });
         });
 
         $(document).on('click', '.btn-receive-transfer', function() {
@@ -1429,11 +1675,224 @@
             });
         });
 
+        $('#btnAddActTransferRow').click(function() {
+            $('.act-transfer-select-sku, .act-transfer-select-imei').select2('destroy');
+            var newRow = $('#actTransferItemsContainer .item-row').first().clone();
+            newRow.appendTo('#actTransferItemsContainer');
+            initActTransferRowSelect2();
+            populateActTransferSkuDropdown(newRow.find('.act-transfer-select-sku'));
+            newRow.find('.act-transfer-select-imei').empty().append('<option></option>');
+        });
+
+        $(document).on('select2:select', '.act-transfer-select-sku', function(e) {
+            var selectedSku = e.params.data.id;
+            var row = $(this).closest('.item-row');
+            var imeiList = actTransferSourceRecords.filter(function(i) { return i.sku === selectedSku; });
+            var imeiDropdown = row.find('.act-transfer-select-imei');
+            imeiDropdown.empty().append('<option></option>');
+            imeiList.forEach(function(i) { imeiDropdown.append('<option value="' + escapeHtml(i.imei) + '">' + escapeHtml(i.imei) + '</option>'); });
+        });
+
+        $(document).on('change', '.act-transfer-select-imei', function() {
+            var currentVal = $(this).val();
+            var currentDropdown = this;
+            if (currentVal) {
+                $('#actTransferItemsContainer .act-transfer-select-imei').not(currentDropdown).each(function() {
+                    if ($(this).val() === currentVal) {
+                        Swal.fire('ข้อผิดพลาด', 'หมายเลข IMEI ถูกระบุซ้ำในคำขอเดียวกัน', 'error');
+                        $(currentDropdown).val(null).trigger('change');
+                    }
+                });
+            }
+        });
+
+        $('#actTransferForm').on('submit', function(e) {
+            e.preventDefault();
+            if (currentLocCode === '__ADMIN__' || currentRole === ROLE_VIEWER) {
+                Swal.fire('ไม่สามารถทำรายการได้', 'บัญชีนี้ไม่สามารถขอโอนย้ายรายการ ACT ได้', 'warning');
+                return;
+            }
+            var toLoc = $('#actTransferToLoc').val();
+            var items = [];
+            var validationError = false;
+            $('#actTransferItemsContainer .item-row').each(function() {
+                // sku ใช้แค่ตรวจว่าผู้ใช้เลือกครบขั้นตอน SKU->IMEI ในฟอร์มเท่านั้น ไม่ได้ส่งไป server เพราะ server ค้นด้วย imei อย่างเดียวพออยู่แล้ว (ดู findActRecordRow_/buildActRecordIndex_)
+                var sku = $(this).find('.act-transfer-select-sku').val();
+                var imei = $(this).find('.act-transfer-select-imei').val();
+                if (!sku || !imei) { validationError = true; return; }
+                items.push({ imei: imei });
+            });
+            if (!toLoc || items.length === 0 || validationError) {
+                Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเลือกสาขาปลายทาง และ SKU/IMEI ให้ครบทุกรายการ', 'warning');
+                return;
+            }
+
+            showHUDLoader('กำลังสร้างคำขอโอนย้ายรายการ ACT...');
+            google.script.run
+                .withFailureHandler(function(err) {
+                    Swal.close();
+                    if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                    Swal.fire('ผิดพลาด', 'สร้างคำขอไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+                })
+                .withSuccessHandler(function(res) {
+                    Swal.close();
+                    if (res.success) {
+                        Swal.fire('สำเร็จ', res.message, 'success');
+                        $('#actTransferToLoc').val(null).trigger('change');
+                        $('#actTransferItemsContainer .item-row:not(:first)').remove();
+                        $('.act-transfer-select-sku').val(null).trigger('change');
+                        $('.act-transfer-select-imei').empty().append('<option></option>').val(null).trigger('change');
+                        loadMyActTransfers();
+                    } else {
+                        Swal.fire('ผิดพลาด', res.message, 'error');
+                    }
+                }).createActTransferRequest(currentToken, items, toLoc);
+        });
+
+        $(document).on('change', '#selectAllActTransfer', function() {
+            var checked = $(this).is(':checked');
+            $('.act-transfer-receive-check').prop('checked', checked);
+            updateSelectedActTransferCount();
+        });
+
+        $(document).on('change', '.act-transfer-receive-check', function() { updateSelectedActTransferCount(); });
+
+        $('#btnReceiveSelectedActTransfer').on('click', function() {
+            var rowIds = $('.act-transfer-receive-check:checked').map(function() { return $(this).data('rowid'); }).get();
+            if (rowIds.length === 0) return;
+            Swal.fire({
+                title: 'ยืนยันรับรายการ ACT เข้า ' + rowIds.length + ' รายการ',
+                text: 'ระบบจะอัปเดต Location Code ของรายการที่เลือกทั้งหมดเป็นสาขาของคุณ',
+                icon: 'question', showCancelButton: true,
+                confirmButtonText: 'รับเข้าทั้งหมด', cancelButtonText: 'ยกเลิก'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังรับรายการเข้าและอัปเดตฐานข้อมูล...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyActTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).receiveActTransferBatch(currentToken, rowIds);
+            });
+        });
+
+        $('#btnCancelSelectedActTransfer').on('click', function() {
+            var rowIds = $('.act-transfer-receive-check:checked').map(function() { return $(this).data('rowid'); }).get();
+            if (rowIds.length === 0) return;
+            Swal.fire({
+                title: 'ยืนยันยกเลิกคำขอ ' + rowIds.length + ' รายการ',
+                text: 'รายการที่เลือกจะยังคงอยู่ที่สาขาต้นทางเดิม ไม่มีการย้ายเกิดขึ้น',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonText: 'ยกเลิกทั้งหมด', cancelButtonText: 'ปิด'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังยกเลิกคำขอโอนย้าย...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyActTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).cancelActTransferBatch(currentToken, rowIds);
+            });
+        });
+
+        $(document).on('change', '#selectAllOutgoingActTransfer', function() {
+            var checked = $(this).is(':checked');
+            $('.act-transfer-cancel-check').prop('checked', checked);
+            updateSelectedOutgoingActTransferCount();
+        });
+
+        $(document).on('change', '.act-transfer-cancel-check', function() { updateSelectedOutgoingActTransferCount(); });
+
+        $('#btnCancelSelectedOutgoingActTransfer').on('click', function() {
+            var rowIds = $('.act-transfer-cancel-check:checked').map(function() { return $(this).data('rowid'); }).get();
+            if (rowIds.length === 0) return;
+            Swal.fire({
+                title: 'ยืนยันยกเลิกคำขอ ' + rowIds.length + ' รายการ',
+                text: 'รายการที่เลือกจะยังคงอยู่ที่สาขาต้นทางเดิม ไม่มีการย้ายเกิดขึ้น',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonText: 'ยกเลิกทั้งหมด', cancelButtonText: 'ปิด'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังยกเลิกคำขอโอนย้าย...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyActTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).cancelActTransferBatch(currentToken, rowIds);
+            });
+        });
+
+        $(document).on('click', '.btn-receive-act-transfer', function() {
+            var rowId = $(this).data('rowid');
+            Swal.fire({
+                title: 'ยืนยันรับรายการ ACT เข้า',
+                text: 'ระบบจะอัปเดต Location Code ของรายการนี้เป็นสาขาของคุณ',
+                icon: 'question', showCancelButton: true,
+                confirmButtonText: 'รับเข้า', cancelButtonText: 'ยกเลิก'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังรับรายการเข้าและอัปเดตฐานข้อมูล...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyActTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).receiveActTransfer(currentToken, rowId);
+            });
+        });
+
+        $(document).on('click', '.btn-cancel-act-transfer', function() {
+            var rowId = $(this).data('rowid');
+            Swal.fire({
+                title: 'ยืนยันยกเลิกคำขอโอนย้ายนี้?',
+                text: 'รายการจะยังคงอยู่ที่สาขาต้นทางเดิม ไม่มีการย้ายเกิดขึ้น',
+                icon: 'warning', showCancelButton: true,
+                confirmButtonText: 'ยกเลิกคำขอ', cancelButtonText: 'ปิด'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                showHUDLoader('กำลังยกเลิกคำขอโอนย้าย...');
+                google.script.run
+                    .withFailureHandler(function(err) {
+                        Swal.close();
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                        Swal.fire('ผิดพลาด', err && err.message ? err.message : String(err), 'error');
+                    })
+                    .withSuccessHandler(function(res) {
+                        Swal.close();
+                        if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); loadMyActTransfers(); }
+                        else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                    }).cancelActTransfer(currentToken, rowId);
+            });
+        });
+
         $('#btnAddRow').click(function() {
             if(!$('#locCode').val()) { Swal.fire('ข้อกำหนดระบบ', 'โปรดระบุสถานที่ตั้งสาขาก่อนเพิ่มสินค้า', 'warning'); return; }
             $('.select-sku').select2('destroy');
             $('.select-imei').select2('destroy');
-            var newRow = $('.item-row').first().clone();
+            var newRow = $('#itemsContainer .item-row').first().clone();
             newRow.find('.input-desc').val('');
             newRow.appendTo('#itemsContainer');
             initRowSelect2();
@@ -1507,7 +1966,7 @@
             var payload = { actDate: $('#actDate').val(), empName: $('#empName').val(), items: [] };
             var validationError = false;
 
-            $('.item-row').each(function() {
+            $('#itemsContainer .item-row').each(function() {
                 var sku = $(this).find('.select-sku').val();
                 var desc = $(this).find('.input-desc').val();
                 var imei = $(this).find('.select-imei').val();
@@ -1529,7 +1988,7 @@
                     Swal.close();
                     if(res.success) {
                         Swal.fire('บันทึกสำเร็จ!', res.message, 'success');
-                        $('.item-row:not(:first)').remove();
+                        $('#itemsContainer .item-row:not(:first)').remove();
                         $('.select-sku').val(null).trigger('change');
                         $('.select-imei').empty().append('<option></option>').val(null).trigger('change');
                         $('#empName').val('');
@@ -1545,6 +2004,16 @@
         $('.select-imei').select2({ theme: 'bootstrap-5', placeholder: "เลือก IMEI", allowClear: true, width: '100%' });
     }
 
+    function initTransferRowSelect2() {
+        $('.transfer-select-sku').select2({ theme: 'bootstrap-5', placeholder: "ค้นหา SKU", allowClear: true, width: '100%' });
+        $('.transfer-select-imei').select2({ theme: 'bootstrap-5', placeholder: "เลือก IMEI", allowClear: true, width: '100%' });
+    }
+
+    function initActTransferRowSelect2() {
+        $('.act-transfer-select-sku').select2({ theme: 'bootstrap-5', placeholder: "ค้นหา SKU", allowClear: true, width: '100%' });
+        $('.act-transfer-select-imei').select2({ theme: 'bootstrap-5', placeholder: "เลือก IMEI", allowClear: true, width: '100%' });
+    }
+
     function populateSkuDropdown(dropdownElement) {
         var skuList = [];
         branchStock.forEach(function(item) { if (skuList.indexOf(item.sku) === -1) skuList.push(item.sku); });
@@ -1555,15 +2024,25 @@
         });
     }
 
-    // เหมือน populateSkuDropdown แต่ดึงจาก transferSourceStock (สต๊อกของ Location ต้นทางที่เลือกในแท็บโอนย้ายสต๊อก)
-    function populateTransferSkuDropdown() {
-        var dropdown = $('#transferSku');
+    // เหมือน populateSkuDropdown แต่ดึงจาก transferSourceStock (สต๊อกของ Location ต้นทางที่เลือกในแท็บโอนย้ายสต๊อก) — รับ dropdownElement เพราะตอนนี้มีได้หลายแถว (โอนย้ายทีละหลายรายการ)
+    function populateTransferSkuDropdown(dropdownElement) {
         var skuList = [];
         transferSourceStock.forEach(function(item) { if (skuList.indexOf(item.sku) === -1) skuList.push(item.sku); });
-        dropdown.empty().append('<option></option>');
+        dropdownElement.empty().append('<option></option>');
         skuList.forEach(function(sku) {
             var desc = transferSourceStock.find(function(i) { return i.sku == sku; }).desc;
-            dropdown.append('<option value="' + escapeHtml(sku) + '">' + escapeHtml(sku) + ' - ' + escapeHtml(desc) + '</option>');
+            dropdownElement.append('<option value="' + escapeHtml(sku) + '">' + escapeHtml(sku) + ' - ' + escapeHtml(desc) + '</option>');
+        });
+    }
+
+    // เหมือน populateTransferSkuDropdown แต่ดึงจาก actTransferSourceRecords (รายการ ACT ที่คีย์ไว้แล้วของสาขาตัวเอง — แท็บโอนย้ายรายการ ACT คนละหน้ากับโอนย้ายสต๊อก)
+    function populateActTransferSkuDropdown(dropdownElement) {
+        var skuList = [];
+        actTransferSourceRecords.forEach(function(item) { if (skuList.indexOf(item.sku) === -1) skuList.push(item.sku); });
+        dropdownElement.empty().append('<option></option>');
+        skuList.forEach(function(sku) {
+            var desc = actTransferSourceRecords.find(function(i) { return i.sku == sku; }).desc;
+            dropdownElement.append('<option value="' + escapeHtml(sku) + '">' + escapeHtml(sku) + ' - ' + escapeHtml(desc) + '</option>');
         });
     }
 
@@ -1594,24 +2073,27 @@
             $('#trackFilterArea').append(opt);
         });
         $('#transferToLoc').empty().append('<option value="">-- เลือกสาขาปลายทาง --</option>');
+        $('#actTransferToLoc').empty().append('<option value="">-- เลือกสาขาปลายทาง --</option>');
         locSet.sort().forEach(function(c) {
             var display = locDisplayMap[c] || c;
             var opt = '<option value="' + escapeHtml(c) + '">' + escapeHtml(display) + '</option>';
             $('#filterLoc').append(opt);
             $('#deepFilterLoc').append(opt);
             $('#trackFilterLoc').append(opt);
-            // ปลายทางโอนย้ายสต๊อกได้เฉพาะ LocCode ที่มีบัญชีอยู่ในชีต Users จริง (ไม่งั้นปลายทางจะไม่มีใคร login มา "รับเข้า" ได้)
+            // ปลายทางโอนย้าย (สต๊อก/รายการ ACT) ได้เฉพาะ LocCode ที่มีบัญชีอยู่ในชีต Users จริง (ไม่งั้นปลายทางจะไม่มีใคร login มา "รับเข้า" ได้)
             if (usersLocCodes.indexOf(c) !== -1) {
                 $('#transferToLoc').append(opt);
+                $('#actTransferToLoc').append(opt);
             }
         });
 
         $('#filterArea, #filterLoc, #filterProduct, #deepFilterArea, #deepFilterLoc, #deepFilterAging, #dashFilterArea, #dashFilterAging, #trackFilterArea, #trackFilterLoc, #trackFilterStatus, #trackFilterAging').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "แสดงข้อมูลทั้งหมด..." });
         $('#filterModel, #dashFilterModel, #deepFilterModel').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, closeOnSelect: false, placeholder: "ติ๊กเลือกรุ่นได้หลายรายการ..." });
         $('#transferToLoc').select2({ theme: 'bootstrap-5', width: '100%', placeholder: "-- เลือกสาขาปลายทาง --" });
-        $('#transferSku').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "ค้นหา SKU" });
-        $('#transferImei').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: "เลือก SKU ก่อน" });
+        $('#actTransferToLoc').select2({ theme: 'bootstrap-5', width: '100%', placeholder: "-- เลือกสาขาปลายทาง --" });
         initRowSelect2();
+        initTransferRowSelect2();
+        initActTransferRowSelect2();
         applyLoggedBranch();
 
         if(!data.timeValid) {
@@ -2233,6 +2715,34 @@
         return '<span class="badge ' + cls + '">' + escapeHtml(status) + '</span>';
     }
 
+    // อัปเดตจำนวนที่ติ๊กเลือกไว้ในตารางรอรับเข้า และเปิด/ปิดปุ่ม "รับเข้าที่เลือก"/"ยกเลิกที่เลือก" ตามจำนวนที่เลือก (ใช้ checkbox ชุดเดียวกันสำหรับทั้งสองปุ่ม)
+    function updateSelectedTransferCount() {
+        var count = $('.transfer-receive-check:checked').length;
+        $('#selectedTransferCount').text(count);
+        $('#btnReceiveSelectedTransfer').prop('disabled', count === 0);
+        $('#btnCancelSelectedTransfer').prop('disabled', count === 0);
+    }
+
+    function updateSelectedActTransferCount() {
+        var count = $('.act-transfer-receive-check:checked').length;
+        $('#selectedActTransferCount').text(count);
+        $('#btnReceiveSelectedActTransfer').prop('disabled', count === 0);
+        $('#btnCancelSelectedActTransfer').prop('disabled', count === 0);
+    }
+
+    // ตารางประวัติ (outgoing) มี checkbox แยกชุดของตัวเอง ใช้ได้แค่ "ยกเลิกที่เลือก" (ไม่มีปุ่มรับเข้าเพราะเป็นฝั่งผู้ขอ)
+    function updateSelectedOutgoingTransferCount() {
+        var count = $('.transfer-cancel-check:checked').length;
+        $('#selectedOutgoingTransferCount').text(count);
+        $('#btnCancelSelectedOutgoingTransfer').prop('disabled', count === 0);
+    }
+
+    function updateSelectedOutgoingActTransferCount() {
+        var count = $('.act-transfer-cancel-check:checked').length;
+        $('#selectedOutgoingActTransferCount').text(count);
+        $('#btnCancelSelectedOutgoingActTransfer').prop('disabled', count === 0);
+    }
+
     function loadMyTransfers() {
         google.script.run
             .withFailureHandler(function(err) {
@@ -2249,11 +2759,14 @@
         if (incomingTransferTableInstance) incomingTransferTableInstance.destroy();
         var tbody = '';
         (list || []).forEach(function(r) {
-            var btn = (r.status === 'รอรับเข้า')
+            var pending = (r.status === 'รอรับเข้า');
+            var checkbox = pending ? '<input type="checkbox" class="transfer-receive-check" data-rowid="' + r.rowId + '">' : '';
+            var btn = pending
                 ? '<button type="button" class="btn btn-sm btn-success fw-bold btn-receive-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-box-open"></i> รับเข้า</button> ' +
                   '<button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-cancel-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-times"></i> ยกเลิก</button>'
                 : '<span class="text-muted small">-</span>';
             tbody += '<tr>' +
+                '<td class="text-center">' + checkbox + '</td>' +
                 '<td>' + escapeHtml(r.timestamp) + '</td>' +
                 '<td>' + escapeHtml(r.sku) + '</td>' +
                 '<td>' + escapeHtml(r.desc) + '</td>' +
@@ -2266,18 +2779,23 @@
         $('#incomingTransferTable tbody').html(tbody);
         incomingTransferTableInstance = $('#incomingTransferTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [], "paging": false, "searching": false, "info": false
+            "order": [], "paging": false, "searching": false, "info": false, "columnDefs": [{ "orderable": false, "targets": 0 }]
         });
+        $('#selectAllTransfer').prop('checked', false);
+        updateSelectedTransferCount();
     }
 
     function renderOutgoingTransfers(list) {
         if (outgoingTransferTableInstance) outgoingTransferTableInstance.destroy();
         var tbody = '';
         (list || []).forEach(function(r) {
-            var btn = (r.status === 'รอรับเข้า')
+            var pending = (r.status === 'รอรับเข้า');
+            var checkbox = pending ? '<input type="checkbox" class="transfer-cancel-check" data-rowid="' + r.rowId + '">' : '';
+            var btn = pending
                 ? '<button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-cancel-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-times"></i> ยกเลิก</button>'
                 : '<span class="text-muted small">-</span>';
             tbody += '<tr>' +
+                '<td class="text-center">' + checkbox + '</td>' +
                 '<td>' + escapeHtml(r.timestamp) + '</td>' +
                 '<td>' + escapeHtml(r.sku) + '</td>' +
                 '<td>' + escapeHtml(r.desc) + '</td>' +
@@ -2290,8 +2808,84 @@
         $('#outgoingTransferTable tbody').html(tbody);
         outgoingTransferTableInstance = $('#outgoingTransferTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[0, "desc"]], "pageLength": 10
+            "order": [[1, "desc"]], "pageLength": 10, "columnDefs": [{ "orderable": false, "targets": 0 }]
         });
+        $('#selectAllOutgoingTransfer').prop('checked', false);
+        updateSelectedOutgoingTransferCount();
+    }
+
+    // ================= ACT RECORD TRANSFER (โอนย้ายรายการ ACT ข้ามสาขา) =================
+    // แยกระบบจากโอนย้ายสต๊อกด้านบนเพราะทำงานคนละหน้า/คนละข้อมูลต้นทาง แต่ใช้หลักการเดียวกันทุกประการ:
+    // สร้างคำขอ = โอนออกจากต้นทางทันที รอแค่ปลายทางกด "รับเข้า" เพื่อยืนยันและอัปเดตชีต "อยู่ระหว่างดำเนินการ" หรือฝ่ายใดฝ่ายหนึ่งกด "ยกเลิก"
+    function loadMyActTransfers() {
+        google.script.run
+            .withFailureHandler(function(err) {
+                if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                console.error(err);
+            })
+            .withSuccessHandler(function(res) {
+                renderIncomingActTransfers(res.incoming);
+                renderOutgoingActTransfers(res.outgoing);
+            }).getMyActTransfers(currentToken);
+    }
+
+    function renderIncomingActTransfers(list) {
+        if (incomingActTransferTableInstance) incomingActTransferTableInstance.destroy();
+        var tbody = '';
+        (list || []).forEach(function(r) {
+            var pending = (r.status === 'รอรับเข้า');
+            var checkbox = pending ? '<input type="checkbox" class="act-transfer-receive-check" data-rowid="' + r.rowId + '">' : '';
+            var btn = pending
+                ? '<button type="button" class="btn btn-sm btn-success fw-bold btn-receive-act-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-box-open"></i> รับเข้า</button> ' +
+                  '<button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-cancel-act-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-times"></i> ยกเลิก</button>'
+                : '<span class="text-muted small">-</span>';
+            tbody += '<tr>' +
+                '<td class="text-center">' + checkbox + '</td>' +
+                '<td>' + escapeHtml(r.timestamp) + '</td>' +
+                '<td>' + escapeHtml(r.sku) + '</td>' +
+                '<td>' + escapeHtml(r.desc) + '</td>' +
+                '<td>' + escapeHtml(r.imei) + '</td>' +
+                '<td>' + escapeHtml(r.fromLocCode) + ' - ' + escapeHtml(r.fromLocName) + '</td>' +
+                '<td>' + transferStatusBadge_(r.status) + '</td>' +
+                '<td>' + btn + '</td>' +
+            '</tr>';
+        });
+        $('#incomingActTransferTable tbody').html(tbody);
+        incomingActTransferTableInstance = $('#incomingActTransferTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [], "paging": false, "searching": false, "info": false, "columnDefs": [{ "orderable": false, "targets": 0 }]
+        });
+        $('#selectAllActTransfer').prop('checked', false);
+        updateSelectedActTransferCount();
+    }
+
+    function renderOutgoingActTransfers(list) {
+        if (outgoingActTransferTableInstance) outgoingActTransferTableInstance.destroy();
+        var tbody = '';
+        (list || []).forEach(function(r) {
+            var pending = (r.status === 'รอรับเข้า');
+            var checkbox = pending ? '<input type="checkbox" class="act-transfer-cancel-check" data-rowid="' + r.rowId + '">' : '';
+            var btn = pending
+                ? '<button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-cancel-act-transfer" data-rowid="' + r.rowId + '"><i class="fas fa-times"></i> ยกเลิก</button>'
+                : '<span class="text-muted small">-</span>';
+            tbody += '<tr>' +
+                '<td class="text-center">' + checkbox + '</td>' +
+                '<td>' + escapeHtml(r.timestamp) + '</td>' +
+                '<td>' + escapeHtml(r.sku) + '</td>' +
+                '<td>' + escapeHtml(r.desc) + '</td>' +
+                '<td>' + escapeHtml(r.imei) + '</td>' +
+                '<td>' + escapeHtml(r.toLocCode) + ' - ' + escapeHtml(r.toLocName) + '</td>' +
+                '<td>' + transferStatusBadge_(r.status) + '</td>' +
+                '<td>' + btn + '</td>' +
+            '</tr>';
+        });
+        $('#outgoingActTransferTable tbody').html(tbody);
+        outgoingActTransferTableInstance = $('#outgoingActTransferTable').DataTable({
+            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
+            "order": [[1, "desc"]], "pageLength": 10, "columnDefs": [{ "orderable": false, "targets": 0 }]
+        });
+        $('#selectAllOutgoingActTransfer').prop('checked', false);
+        updateSelectedOutgoingActTransferCount();
     }
 
     function refreshSettingsUsers() {
