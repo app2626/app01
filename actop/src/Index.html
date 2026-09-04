@@ -20,54 +20,85 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            /* โทนสีแบรนด์ OPPO — เขียว OPPO (#1EA366) เป็นสีเน้น, ดำอมเขียวเข้มเป็นสีหลัก (ตัวแปรยังใช้ชื่อเดิม --navy/--gold เพื่อไม่ต้องแก้ทุกจุดที่อ้างอิง) */
-            --navy: #16231C;
-            --navy-dark: #0B120E;
-            --gold: #1EA366;
-            --gold-dark: #158055;
-            --gold-light: #E6F7EF;
-            --accent-blue: #17A05C;
-            --accent-blue-dark: #0E7D46;
-            --soft-panel: #EFF8F3;
-            --muted-green: #2E7D57;
-            --muted-red: #B23A3A;
+            /* โทนสีแบรนด์ OPPO ปรับเป็นธีม Organic Biophilic — เขียวมอสส์/เขียวใบไม้เป็นสีหลัก, ดินเผา/เทอราคอตต้าเป็นสีรอง, ครีม/หินทรายเป็นพื้นหลัง (ตัวแปรยังใช้ชื่อเดิม --navy/--gold/--accent-blue ฯลฯ เพื่อไม่ต้องแก้ทุกจุดที่อ้างอิง) */
+            --navy: #2B3B26;
+            --navy-dark: #10160D;
+            --gold: #5EA858;
+            --gold-dark: #457A41;
+            --gold-light: #EAF3E1;
+            --accent-blue: #C97B4A;
+            --accent-blue-dark: #A85F35;
+            --soft-panel: #F1F5E9;
+            --muted-green: #5C8A52;
+            --muted-red: #B25A45;
             --muted-amber: #C98A2E;
-            --border-gray: #dee2e6;
-            --bg-page: #f8fafc;
+            --border-gray: #E3DDCC;
+            --bg-page: #FAF7EE;
+            --organic-radius: 18px;
+            --organic-radius-sm: 12px;
+            --leaf-shadow: 0 4px 16px rgba(43,59,38,0.10);
+            --leaf-shadow-lg: 0 10px 30px rgba(43,59,38,0.14);
         }
 
         /* บังคับขนาดตัวอักษร 12px ทั้งระบบ */
         body, table, .btn, .form-control, .form-select, .form-label, .small, .badge {
             font-size: 12px !important;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Prompt', 'Kanit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
+        h1, h2, h3, h4, h5, h6, .nav-link, .kpi-container h1 { font-family: 'Kanit', 'Prompt', 'Segoe UI', Tahoma, sans-serif; }
         h2, h3, h4 { font-size: 18px !important; }
         h5, h6 { font-size: 14px !important; }
         .kpi-container h1 { font-size: 26px !important; }
 
-        body { background-color: var(--bg-page); }
-        .card { border-radius: 8px; box-shadow: 0 1px 3px rgba(22,35,28,0.08); margin-bottom: 20px; border: 1px solid var(--border-gray); }
-        .marquee-container { background: var(--gold-light); border-left: 4px solid var(--gold); padding: 10px 14px; border-radius: 6px; color: var(--navy); font-weight: 600; }
+        body {
+            background-color: var(--bg-page);
+            background-image:
+                radial-gradient(circle at 8% 12%, rgba(76,140,74,0.05) 0%, transparent 40%),
+                radial-gradient(circle at 94% 6%, rgba(201,123,74,0.05) 0%, transparent 38%),
+                radial-gradient(circle at 88% 92%, rgba(76,140,74,0.04) 0%, transparent 42%),
+                url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%234C8C4A' stroke-width='1' opacity='0.05'%3E%3Cpath d='M10 100 C 10 60, 40 40, 60 10 C 80 40, 110 60, 110 100'/%3E%3Cpath d='M60 10 L60 100'/%3E%3C/g%3E%3C/svg%3E");
+            background-attachment: fixed;
+            background-size: auto, auto, auto, 120px 120px;
+        }
+        [data-theme="dark"] body {
+            background-image:
+                radial-gradient(circle at 8% 12%, rgba(76,140,74,0.07) 0%, transparent 40%),
+                radial-gradient(circle at 94% 6%, rgba(201,123,74,0.05) 0%, transparent 38%),
+                radial-gradient(circle at 88% 92%, rgba(76,140,74,0.06) 0%, transparent 42%),
+                url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%234C8C4A' stroke-width='1' opacity='0.08'%3E%3Cpath d='M10 100 C 10 60, 40 40, 60 10 C 80 40, 110 60, 110 100'/%3E%3Cpath d='M60 10 L60 100'/%3E%3C/g%3E%3C/svg%3E");
+        }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: var(--soft-panel); }
+        ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 20px; border: 2px solid var(--soft-panel); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--gold-dark); }
+        [data-theme="dark"] ::-webkit-scrollbar-track { background: #182013; }
+        [data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--gold); border-color: #182013; }
+
+        .card { border-radius: var(--organic-radius); box-shadow: var(--leaf-shadow); margin-bottom: 20px; border: 1px solid var(--border-gray); }
+        .marquee-container { background: var(--gold-light); border-left: 4px solid var(--gold); padding: 10px 14px; border-radius: var(--organic-radius-sm); color: var(--navy); font-weight: 600; }
         .form-locked { opacity: 0.5; pointer-events: none; }
-        .item-row { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e3e6f0; margin-bottom: 12px; position: relative; transition: all 0.2s; }
-        .item-row:hover { border-color: var(--gold); box-shadow: 0 2px 8px rgba(30,163,102,0.15); }
+        .item-row { background: #fff; padding: 15px; border-radius: var(--organic-radius-sm); border: 1px solid var(--border-gray); margin-bottom: 12px; position: relative; transition: all 0.2s; }
+        .item-row:hover { border-color: var(--gold); box-shadow: 0 4px 14px rgba(76,140,74,0.16); transform: translateY(-1px); }
         .btn-remove-row { position: absolute; top: -10px; right: -10px; border-radius: 50%; width: 24px; height: 24px; padding: 0; line-height: 1; z-index: 10; display: none; }
         .item-row:not(:first-child) .btn-remove-row { display: block; }
 
         th { white-space: nowrap; background-color: var(--soft-panel) !important; color: var(--navy) !important; font-weight: 600; border-bottom: 2px solid var(--gold) !important; }
         table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control:before, table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control:before { background-color: var(--gold); }
 
-        .kpi-container { background: var(--gold-light); border: 1px solid var(--border-gray); border-left: 4px solid var(--gold); border-radius: 8px; color: var(--navy); padding: 16px 20px; text-align: left; box-shadow: 0 1px 3px rgba(22,35,28,0.06); transition: box-shadow 0.2s; }
-        .kpi-container:hover { box-shadow: 0 4px 10px rgba(22,35,28,0.12); }
+        .kpi-container { background: var(--gold-light); border: 1px solid var(--border-gray); border-left: 4px solid var(--gold); border-radius: var(--organic-radius); color: var(--navy); padding: 16px 20px; text-align: left; box-shadow: var(--leaf-shadow); transition: box-shadow 0.2s, transform 0.2s; }
+        .kpi-container:hover { box-shadow: var(--leaf-shadow-lg); transform: translateY(-2px); }
         .kpi-container h6 { color: #6c757d !important; opacity: 1 !important; }
         .kpi-container h1 { color: var(--gold) !important; }
-        .kpi-container.kpi-sold { border-left-color: var(--muted-green); background: #E7F3EC; }
+        .kpi-container.kpi-sold { border-left-color: var(--muted-green); background: #E9F2E4; }
         .kpi-container.kpi-unsold { border-left-color: var(--muted-amber); background: #FBF0DE; }
-        .select2-container--bootstrap-5 .select2-selection { min-height: 32px; font-size: 12px; }
+        .select2-container--bootstrap-5 .select2-selection { min-height: 32px; font-size: 12px; border-radius: 10px !important; }
         td.model-details-control { cursor: pointer; }
 
         /* ตัวกรอง Model แบบติ๊กหลายรายการ (checkbox style) */
@@ -147,26 +178,29 @@
         .swal2-html-container { margin: 0 !important; padding: 0 !important; }
 
         /* แถบ Header หลัก */
-        .app-header-bar { background: var(--soft-panel) !important; border-bottom: 2px solid var(--gold); }
-        .app-header-badge { background: #fff !important; color: var(--navy) !important; border: 1px solid var(--border-gray); }
+        .app-header-bar { background: var(--soft-panel) !important; border-bottom: 2px solid var(--gold); border-radius: var(--organic-radius) !important; position: relative; overflow: hidden; }
+        .app-header-bar::before { content: ""; position: absolute; top: -30px; right: -30px; width: 110px; height: 110px; background: radial-gradient(circle, rgba(76,140,74,0.16) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+        .app-header-bar::after { content: ""; position: absolute; bottom: -40px; left: 30%; width: 90px; height: 90px; background: radial-gradient(circle, rgba(201,123,74,0.12) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+        .app-header-bar > * { position: relative; z-index: 1; }
+        .app-header-badge { background: #fff !important; color: var(--navy) !important; border: 1px solid var(--border-gray); border-radius: 999px !important; }
 
-        /* แท็บหลัก: โทนอ่อน มินิมอล พื้นขาว ตัวหนังสือเข้มชัดเจน เส้นใต้ทองเมื่อ active */
-        #myTab { background: #fff !important; }
-        .nav-pills .nav-item .nav-link { border-radius: 4px 4px 0 0; border: none; border-bottom: 3px solid transparent; transition: all 0.2s; color: #5a5c69; background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 10px 16px; }
-        .nav-pills .nav-item .nav-link:hover { color: var(--navy); }
+        /* แท็บหลัก: ทรงใบไม้โค้งมน พื้นครีม ตัวหนังสือเข้มชัดเจน active เป็นแคปซูลเขียวมอสส์ */
+        #myTab { background: #fff !important; border-radius: var(--organic-radius) !important; }
+        .nav-pills .nav-item .nav-link { border-radius: 999px; border: none; transition: all 0.2s; color: #5a5c69; background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 10px 16px; }
+        .nav-pills .nav-item .nav-link:hover { color: var(--navy); background: var(--gold-light); }
         .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily, .tab-track, .tab-transfer, .tab-settings { border-color: transparent !important; color: #5a5c69 !important; background: transparent !important; }
-        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-transfer.active, .tab-settings.active { background: transparent !important; color: var(--navy) !important; border-bottom: 3px solid var(--gold) !important; }
+        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-transfer.active, .tab-settings.active { background: linear-gradient(135deg, var(--gold), var(--gold-dark)) !important; color: #fff !important; box-shadow: 0 3px 10px rgba(76,140,74,0.35) !important; }
 
         [data-theme="dark"] .app-header-bar { background: var(--navy) !important; border-bottom: 2px solid var(--gold); }
-        [data-theme="dark"] .app-header-badge { background: rgba(255,255,255,0.08) !important; color: var(--gold) !important; border: 1px solid rgba(30,163,102,0.5); }
+        [data-theme="dark"] .app-header-badge { background: rgba(255,255,255,0.08) !important; color: var(--gold) !important; border: 1px solid rgba(76,140,74,0.5); }
         [data-theme="dark"] #myTab { background: var(--navy) !important; }
         [data-theme="dark"] .nav-pills .nav-item .nav-link { color: rgba(255,255,255,0.65); }
-        [data-theme="dark"] .nav-pills .nav-item .nav-link:hover { color: #fff; }
+        [data-theme="dark"] .nav-pills .nav-item .nav-link:hover { color: #fff; background: rgba(76,140,74,0.15); }
         [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily, [data-theme="dark"] .tab-track, [data-theme="dark"] .tab-transfer, [data-theme="dark"] .tab-settings { color: rgba(255,255,255,0.65) !important; }
-        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active, [data-theme="dark"] .tab-track.active, [data-theme="dark"] .tab-transfer.active, [data-theme="dark"] .tab-settings.active { background: var(--navy-dark) !important; color: var(--gold) !important; }
+        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active, [data-theme="dark"] .tab-track.active, [data-theme="dark"] .tab-transfer.active, [data-theme="dark"] .tab-settings.active { background: linear-gradient(135deg, var(--gold), var(--gold-dark)) !important; color: #fff !important; }
 
         /* กรอบบนของเนื้อหา (Pane) โทนเดียวกันทั้งระบบ */
-        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #settings-pane { border-top: 3px solid var(--gold) !important; }
+        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #settings-pane { border-top: 3px solid var(--gold) !important; border-radius: var(--organic-radius) !important; }
 
         /* รีโทนสี Bootstrap utility ให้เป็นโทน Deep Navy + Gold ทั้งระบบ */
         .bg-primary { background-color: var(--navy) !important; }
@@ -186,6 +220,13 @@
         .btn-success { background-color: var(--accent-blue) !important; border-color: var(--accent-blue) !important; color: #fff !important; }
         .btn-success:hover, .btn-success:focus { background-color: var(--accent-blue-dark) !important; border-color: var(--accent-blue-dark) !important; color: #fff !important; }
 
+        /* ปุ่มทรงมนแบบออร์แกนิก + ยกตัวเบาๆ เวลาชี้ */
+        .btn { border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .btn:hover { transform: translateY(-1px); }
+        .btn.btn-remove-row, .btn-close { border-radius: 50%; }
+        .form-control, .form-select, .input-group-text { border-radius: 10px !important; border-color: var(--border-gray); }
+        .badge { border-radius: 999px; }
+
         [data-theme="dark"] .btn-primary, [data-theme="dark"] .btn-success { background-color: var(--navy) !important; border-color: var(--navy) !important; color: var(--gold) !important; }
         [data-theme="dark"] .btn-primary:hover, [data-theme="dark"] .btn-primary:focus,
         [data-theme="dark"] .btn-success:hover, [data-theme="dark"] .btn-success:focus { background-color: var(--navy-dark) !important; border-color: var(--navy-dark) !important; color: var(--gold) !important; }
@@ -195,56 +236,59 @@
         .text-gold { color: var(--gold) !important; }
 
         /* ปุ่มสลับโหมดมืด/สว่าง */
-        .theme-toggle-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(30,163,102,0.5); color: var(--gold); border-radius: 6px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .theme-toggle-btn:hover { background: rgba(30,163,102,0.2); color: var(--gold); }
+        .theme-toggle-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(76,140,74,0.5); color: var(--gold); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .theme-toggle-btn:hover { background: rgba(76,140,74,0.2); color: var(--gold); transform: translateY(-1px) rotate(-8deg); }
 
-        /* ===================== โหมดมืด (Dark Mode) ===================== */
-        [data-theme="dark"] { --bg-page: #0b120e; }
-        [data-theme="dark"] body { background-color: var(--bg-page); color: #dfe4ee; }
+        /* ===================== โหมดมืด (Dark Mode) — โทนป่าไม้ยามค่ำคืน ===================== */
+        [data-theme="dark"] { --bg-page: #10160D; }
+        [data-theme="dark"] body { background-color: var(--bg-page); color: #E7ECDF; }
         [data-theme="dark"] .card,
-        [data-theme="dark"] .item-row { background-color: #131b2e; border-color: #263252; color: #dfe4ee; }
-        [data-theme="dark"] .kpi-container { background-color: rgba(30,163,102,0.12); border-color: #263252; color: #dfe4ee; }
-        [data-theme="dark"] .kpi-container.kpi-sold { background-color: rgba(46,125,87,0.15); }
+        [data-theme="dark"] .item-row { background-color: #1B2417; border-color: #2C3A26; color: #E7ECDF; }
+        [data-theme="dark"] .kpi-container { background-color: rgba(76,140,74,0.12); border-color: #2C3A26; color: #E7ECDF; }
+        [data-theme="dark"] .kpi-container.kpi-sold { background-color: rgba(92,138,82,0.15); }
         [data-theme="dark"] .kpi-container.kpi-unsold { background-color: rgba(201,138,46,0.15); }
-        [data-theme="dark"] .kpi-container h6 { color: #93a0b8 !important; }
+        [data-theme="dark"] .kpi-container h6 { color: #9BA88E !important; }
         [data-theme="dark"] th { background-color: var(--navy) !important; color: white !important; border-bottom: 2px solid var(--gold) !important; }
-        [data-theme="dark"] table.dataTable, [data-theme="dark"] table.dataTable td { color: #dfe4ee; background-color: #131b2e; }
-        [data-theme="dark"] table.dataTable.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #182238; box-shadow: none; }
-        [data-theme="dark"] .table-hover > tbody > tr:hover > * { background-color: #1d2944; color: #fff; }
-        [data-theme="dark"] .table-bordered, [data-theme="dark"] .table-bordered td, [data-theme="dark"] .table-bordered th { border-color: #263252; }
-        [data-theme="dark"] .bg-light { background-color: #101828 !important; }
-        [data-theme="dark"] .bg-white { background-color: #131b2e !important; }
-        [data-theme="dark"] .text-dark { color: #e7ebf3 !important; }
-        [data-theme="dark"] .text-secondary, [data-theme="dark"] .text-muted { color: #93a0b8 !important; }
+        [data-theme="dark"] table.dataTable, [data-theme="dark"] table.dataTable td { color: #E7ECDF; background-color: #1B2417; }
+        [data-theme="dark"] table.dataTable.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #212C1B; box-shadow: none; }
+        [data-theme="dark"] .table-hover > tbody > tr:hover > * { background-color: #283523; color: #fff; }
+        [data-theme="dark"] .table-bordered, [data-theme="dark"] .table-bordered td, [data-theme="dark"] .table-bordered th { border-color: #2C3A26; }
+        [data-theme="dark"] .bg-light { background-color: #161F11 !important; }
+        [data-theme="dark"] .bg-white { background-color: #1B2417 !important; }
+        [data-theme="dark"] .text-dark { color: #EDF0E5 !important; }
+        [data-theme="dark"] .text-secondary, [data-theme="dark"] .text-muted { color: #9BA88E !important; }
         [data-theme="dark"] .text-primary, [data-theme="dark"] .text-info { color: var(--gold) !important; }
         [data-theme="dark"] .border-primary, [data-theme="dark"] .border-info { border-color: var(--gold) !important; }
-        [data-theme="dark"] .border, [data-theme="dark"] .border-top, [data-theme="dark"] .border-bottom { border-color: #263252 !important; }
-        [data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background-color: #101828; border-color: #2b3a5c; color: #e7ebf3; }
-        [data-theme="dark"] .form-control::placeholder { color: #6c7891; }
-        [data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { background-color: #101828; color: #e7ebf3; }
-        [data-theme="dark"] .input-group-text { background-color: #182238; border-color: #2b3a5c; color: #dfe4ee; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection { background-color: #101828; border-color: #2b3a5c; color: #e7ebf3; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection__rendered { color: #e7ebf3 !important; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-dropdown { background-color: #101828; border-color: #2b3a5c; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option { color: #e7ebf3; }
-        [data-theme="dark"] .select2-search__field { background-color: #101828 !important; color: #e7ebf3 !important; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] { background-color: #22304f !important; }
-        [data-theme="dark"] .select2-selection__choice { background-color: #1d2944 !important; border-color: #2b3a5c !important; color: #e7ebf3 !important; }
-        [data-theme="dark"] .select2-selection__choice__display { color: #e7ebf3 !important; }
-        [data-theme="dark"] .marquee-container { background: rgba(30,163,102,0.12); color: var(--gold); }
-        [data-theme="dark"] #overlay { background: rgba(11,18,14,0.97); }
+        [data-theme="dark"] .border, [data-theme="dark"] .border-top, [data-theme="dark"] .border-bottom { border-color: #2C3A26 !important; }
+        [data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background-color: #161F11; border-color: #35452D; color: #EDF0E5; }
+        [data-theme="dark"] .form-control::placeholder { color: #7A8570; }
+        [data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { background-color: #161F11; color: #EDF0E5; }
+        [data-theme="dark"] .input-group-text { background-color: #212C1B; border-color: #35452D; color: #E7ECDF; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection { background-color: #161F11; border-color: #35452D; color: #EDF0E5; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection__rendered { color: #EDF0E5 !important; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-dropdown { background-color: #161F11; border-color: #35452D; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option { color: #EDF0E5; }
+        [data-theme="dark"] .select2-search__field { background-color: #161F11 !important; color: #EDF0E5 !important; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] { background-color: #2A3823 !important; }
+        [data-theme="dark"] .select2-selection__choice { background-color: #283523 !important; border-color: #35452D !important; color: #EDF0E5 !important; }
+        [data-theme="dark"] .select2-selection__choice__display { color: #EDF0E5 !important; }
+        [data-theme="dark"] .marquee-container { background: rgba(76,140,74,0.12); color: var(--gold); }
+        [data-theme="dark"] #overlay { background: rgba(16,22,13,0.97); }
         [data-theme="dark"] #overlay .spinner-border { color: var(--gold) !important; }
-        [data-theme="dark"] .swal2-popup { background: #131b2e !important; color: #e7ebf3 !important; border: 1px solid #263252 !important; }
-        [data-theme="dark"] .swal2-container { background: rgba(11,18,14,0.85) !important; }
-        [data-theme="dark"] .hud-ring { border-color: #263252; border-top-color: var(--gold); }
+        [data-theme="dark"] .swal2-popup { background: #1B2417 !important; color: #EDF0E5 !important; border: 1px solid #2C3A26 !important; }
+        [data-theme="dark"] .swal2-container { background: rgba(16,22,13,0.85) !important; }
+        [data-theme="dark"] .hud-ring { border-color: #2C3A26; border-top-color: var(--gold); }
 
         /* หน้าจอเข้าสู่ระบบ */
-        #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-page); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; }
-        .login-box { background: #fff; border: 1px solid var(--border-gray); border-top: 4px solid var(--gold); border-radius: 10px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 4px 16px rgba(22,35,28,0.12); }
-        [data-theme="dark"] .login-box { background: #131b2e; border-color: #263252; }
+        #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-page); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
+        #loginScreen::before { content: ""; position: absolute; top: -80px; left: -80px; width: 260px; height: 260px; background: radial-gradient(circle, rgba(76,140,74,0.14) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+        #loginScreen::after { content: ""; position: absolute; bottom: -100px; right: -100px; width: 320px; height: 320px; background: radial-gradient(circle, rgba(201,123,74,0.12) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+        .login-box { background: #fff; border: 1px solid var(--border-gray); border-top: 4px solid var(--gold); border-radius: 28px 28px var(--organic-radius) var(--organic-radius); padding: 32px; width: 100%; max-width: 380px; box-shadow: var(--leaf-shadow-lg); position: relative; z-index: 1; }
+        [data-theme="dark"] .login-box { background: #1B2417; border-color: #2C3A26; }
 
         /* SweetAlert2 ต้องอยู่เหนือ #loginScreen (z-index 10000) เสมอ ไม่งั้น modal บังคับเปลี่ยนรหัสผ่านจะโผล่มาแบบมองไม่เห็น */
         .swal2-container { z-index: 10001 !important; }
+        .swal2-popup { border-radius: var(--organic-radius) !important; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
