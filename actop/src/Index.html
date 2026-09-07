@@ -235,6 +235,16 @@
         .btn-outline-danger:hover { background-color: var(--muted-red) !important; color: #fff !important; }
         .text-gold { color: var(--gold) !important; }
 
+        /* ลูกเล่นสีตัวเลขราคาในตาราง: ราคาป้าย/ราคาส่วนลด/ราคาโปร */
+        .price-rrp { color: #9A9484; text-decoration: line-through; text-decoration-thickness: 1.5px; font-weight: 500; white-space: nowrap; }
+        .price-discount { color: var(--muted-red); font-weight: 700; white-space: nowrap; }
+        .price-discount:before { content: "\f02f"; font-family: "Font Awesome 5 Free"; font-weight: 900; font-size: 10px; margin-right: 4px; opacity: 0.75; }
+        .price-promo { color: var(--gold-dark); font-weight: 800; font-size: 13px !important; white-space: nowrap; background: var(--gold-light); padding: 2px 8px; border-radius: 20px; display: inline-block; }
+        .price-promo:before { content: "\f0e7"; font-family: "Font Awesome 5 Free"; font-weight: 900; font-size: 10px; margin-right: 4px; }
+        [data-theme="dark"] .price-rrp { color: #7A8072; }
+        [data-theme="dark"] .price-discount { color: #E08A6F; }
+        [data-theme="dark"] .price-promo { color: #8FD986; background: rgba(94,168,88,0.15); }
+
         /* ปุ่มสลับโหมดมืด/สว่าง */
         .theme-toggle-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(76,140,74,0.5); color: var(--gold); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .theme-toggle-btn:hover { background: rgba(76,140,74,0.2); color: var(--gold); transform: translateY(-1px) rotate(-8deg); }
@@ -2254,9 +2264,9 @@
                     '<td>' + escapeHtml(r.sku) + '</td>' +
                     '<td>' + escapeHtml(r.imei) + '</td>' +
                     '<td>' + escapeHtml(displayCodeMyOppo) + '</td>' +
-                    '<td>' + escapeHtml(r.rrp) + '</td>' +
-                    '<td>' + escapeHtml(r.discount) + '</td>' +
-                    '<td>' + escapeHtml(r.promoPrice) + '</td>' +
+                    '<td><span class="price-rrp">' + escapeHtml(r.rrp) + '</span></td>' +
+                    '<td><span class="price-discount">' + escapeHtml(r.discount) + '</span></td>' +
+                    '<td><span class="price-promo">' + escapeHtml(r.promoPrice) + '</span></td>' +
                     '<td>' + escapeHtml(r.locCode) + '</td>' +
                     '<td>' + escapeHtml(r.locName) + '</td>' +
                     '<td class="fw-bold text-dark">' + escapeHtml(r.area) + '</td>' +

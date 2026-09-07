@@ -8,7 +8,7 @@
         (function() {
             try {
                 var t = localStorage.getItem('actssTheme');
-                if (!t) t = 'dark';
+                if (!t) t = 'light';
                 document.documentElement.setAttribute('data-theme', t);
             } catch (e) {}
         })();
@@ -26,72 +26,68 @@
 
     <style>
         /* ===================== Design tokens ===================== */
-        /* ค่าคงที่ของแบรนด์ (เหมือนกันทั้งสองธีม) */
+        /* AI-Native UI + Minimalism & Swiss Style: สีเน้นเดียว (ม่วง AI #6366F1) บนพื้นกลางเรียบ ไร้เงา ขอบเหลี่ยมคม ไร้ลวดลายตกแต่ง */
         :root {
             --navy: #101B33;
             --navy-dark: #0A1226;
-            --gold: #D4A94A;
-            --gold-dark: #B8862E;
-            --gold-soft: rgba(212,169,74,0.14);
-            --gold-strong: rgba(212,169,74,0.4);
-            --muted-green: #3FA372;
-            --muted-red: #D75C55;
-            --muted-amber: #D98B3B;
+            --trust: #6366F1;
+            --trust-dark: #4F46E5;
+            --trust-soft: rgba(99,102,241,0.16);
+            --trust-strong: rgba(99,102,241,0.42);
+            --success: #10B981;
+            --danger: #DC2626;
+            --warning: #F59E0B;
 
-            --radius-sm: 10px;
-            --radius-md: 16px;
-            --radius-lg: 24px;
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 10px;
 
             /* โทนหลัก: ดีฟอลต์เป็นโหมดมืด (identity หลักของระบบ) */
             --bg-page: #0a0d13;
-            --grad-1: rgba(212,169,74,0.07);
-            --grad-2: rgba(76,126,176,0.05);
             --surface-1: #12161f;
             --surface-2: #171c28;
             --surface-3: #1c2231;
             --surface-hover: #202737;
             --border: rgba(255,255,255,0.08);
             --border-strong: rgba(255,255,255,0.16);
-            --text-primary: #E9ECF3;
-            --text-secondary: #98A2B7;
+            --text-primary: #F5F7FB;
+            --text-secondary: #9CA6BC;
             --text-muted: #67718C;
 
-            /* กระจกโปร่งแสง (Glassmorphism) เฉพาะ overlay: login/modal */
-            --glass-strong: rgba(23,28,40,0.56);
-            --glass-soft: rgba(18,22,31,0.88);
+            /* กระจกโปร่งแสง (Glassmorphism) เฉพาะ overlay: login/modal — ส่วนหลักของระบบใช้พื้นผิวทึบ ไร้เงา (Minimalism) เพื่อตัวหนังสือคมชัด */
+            --glass-strong: rgba(23,28,40,0.6);
+            --glass-soft: rgba(18,22,31,0.9);
             --glass-border: rgba(255,255,255,0.12);
             --glass-highlight: rgba(255,255,255,0.08);
             --glass-blur: 20px;
 
-            --shadow-soft: 0 1px 2px rgba(0,0,0,0.4), 0 16px 34px -20px rgba(0,0,0,0.75);
-            --shadow-soft-hover: 0 10px 18px -8px rgba(0,0,0,0.55), 0 32px 52px -22px rgba(0,0,0,0.8);
-            --shadow-gold-ring: 0 0 0 3px rgba(212,169,74,0.28);
+            --shadow-card: none;
+            --shadow-soft-hover: 0 10px 18px -8px rgba(0,0,0,0.5), 0 22px 40px -18px rgba(0,0,0,0.65);
+            --shadow-trust-ring: 0 0 0 3px rgba(99,102,241,0.35);
         }
 
-        /* โหมดสว่าง: สลับเฉพาะค่าพื้นผิว/ตัวหนังสือ ส่วนสี brand (gold/navy) คงเดิม */
+        /* โหมดสว่าง: สลับเฉพาะค่าพื้นผิว/ตัวหนังสือ ส่วนสี brand (trust/navy) คงเดิม */
         [data-theme="light"] {
-            --bg-page: #F3F6FB;
-            --grad-1: rgba(212,169,74,0.08);
-            --grad-2: rgba(76,126,176,0.07);
+            --bg-page: #FFFFFF;
             --surface-1: #FFFFFF;
-            --surface-2: #EEF3FA;
-            --surface-3: #E6ECF6;
-            --surface-hover: #E3E9F5;
+            --surface-2: #F5F7FB;
+            --surface-3: #EEF1F7;
+            --surface-hover: #E9EDF5;
             --border: #E3E8F0;
             --border-strong: #D3DAE8;
             --text-primary: #16213C;
             --text-secondary: #5B6577;
             --text-muted: #7C8598;
 
-            --glass-strong: rgba(255,255,255,0.55);
-            --glass-soft: rgba(255,255,255,0.88);
+            --glass-strong: rgba(255,255,255,0.98);
+            --glass-soft: rgba(255,255,255,0.98);
             --glass-border: rgba(16,27,51,0.10);
-            --glass-highlight: rgba(255,255,255,0.75);
+            --glass-highlight: rgba(255,255,255,0.8);
             --glass-blur: 20px;
 
-            --shadow-soft: 0 1px 2px rgba(15,27,51,0.05), 0 10px 24px -14px rgba(15,27,51,0.18);
-            --shadow-soft-hover: 0 4px 10px rgba(15,27,51,0.08), 0 20px 34px -16px rgba(15,27,51,0.24);
-            --shadow-gold-ring: 0 0 0 3px rgba(212,169,74,0.2);
+            --shadow-card: none;
+            --shadow-soft-hover: 0 4px 10px rgba(15,27,51,0.08), 0 20px 34px -16px rgba(15,27,51,0.22);
+            --shadow-trust-ring: 0 0 0 3px rgba(79,70,229,0.25);
         }
 
         /* บังคับขนาดตัวอักษร 12px ทั้งระบบ */
@@ -106,59 +102,64 @@
         .kpi-container h1 { font-size: 26px !important; }
 
         body {
-            background:
-                radial-gradient(1100px 550px at 100% -10%, var(--grad-1), transparent 60%),
-                radial-gradient(900px 500px at -10% 0%, var(--grad-2), transparent 55%),
-                var(--bg-page);
-            background-attachment: fixed;
+            background: var(--bg-page);
             color: var(--text-primary);
             font-variant-numeric: tabular-nums;
             transition: background-color 0.25s ease, color 0.25s ease;
         }
-        /* แถบหัวกระดาษทางการ (letterhead) พาดบนสุดของทุกหน้าจอ เพื่อสื่อถึงความน่าเชื่อถือ */
+        /* เส้นบางบนสุดของทุกหน้าจอ สีเน้นเดียว (trust) เรียบ ไม่มีลวดลาย — มินิมอล */
         body::after {
             content: "";
             position: fixed;
             top: 0; left: 0; right: 0;
-            height: 3px;
+            height: 2px;
             z-index: 3;
             pointer-events: none;
-            background: linear-gradient(90deg, var(--gold-dark), var(--gold) 45%, var(--gold-soft), var(--gold) 80%, var(--gold-dark));
+            background: var(--trust);
         }
 
-        /* พื้นผิวเรียบแบบ Flat: สีทึบ ไร้เงา ไร้เกรเดียนต์ ใช้กับ UI หลักทั้งหมด */
-        .card { background-color: var(--surface-1); border-radius: var(--radius-md); margin-bottom: 20px; border: 1px solid var(--border); color: var(--text-primary); }
-        .marquee-container { background-color: var(--gold-soft); border: 1px solid var(--gold-strong); border-left: 4px solid var(--gold); padding: 10px 16px; border-radius: var(--radius-sm); color: var(--gold); font-weight: 600; }
+        /* พื้นผิวทึบ ไร้เงา ขอบเหลี่ยมคม (Minimalism & Swiss Style): เน้นตัวหนังสือคมชัด ไม่ใช้กระจกเบลอ/เงา/เกรเดียนต์กับเนื้อหาหลัก hover แค่เข้มขอบเบาๆ (AI-Native: minimal chrome) */
+        .card { background-color: var(--surface-1); border-radius: var(--radius-md); margin-bottom: 20px; border: 1px solid var(--border); color: var(--text-primary); box-shadow: var(--shadow-card); transition: border-color 0.2s ease; }
+        .card:hover { border-color: var(--trust-strong); }
+        .marquee-container { background-color: var(--trust-soft); border: 1px solid var(--trust-strong); border-left: 4px solid var(--trust); padding: 10px 16px; border-radius: var(--radius-sm); color: var(--trust); font-weight: 600; }
         .form-locked { opacity: 0.5; pointer-events: none; }
         .item-row { background-color: var(--surface-1); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 12px; position: relative; color: var(--text-primary); transition: border-color 0.15s ease, background-color 0.15s ease; }
-        .item-row:hover { border-color: var(--gold); background-color: var(--surface-hover); }
-        .btn-remove-row { position: absolute; top: -10px; right: -10px; border-radius: 50%; width: 26px; height: 26px; padding: 0; line-height: 1; z-index: 10; display: none; box-shadow: 0 3px 8px rgba(178,58,58,0.35); }
+        .item-row:hover { border-color: var(--trust); background-color: var(--surface-hover); }
+        .btn-remove-row { position: absolute; top: -10px; right: -10px; border-radius: 50%; width: 26px; height: 26px; padding: 0; line-height: 1; z-index: 10; display: none; box-shadow: 0 3px 8px rgba(220,38,38,0.4); }
         .item-row:not(:first-child) .btn-remove-row { display: block; }
 
-        th { white-space: nowrap; background-color: var(--surface-2) !important; color: var(--text-primary) !important; font-weight: 700; letter-spacing: .01em; border-bottom: 2px solid var(--gold) !important; }
+        th { white-space: nowrap; background-color: var(--surface-2) !important; color: var(--text-primary) !important; font-weight: 700; letter-spacing: .01em; border-bottom: 2px solid var(--trust) !important; }
         table.dataTable, table.dataTable td { color: var(--text-primary); background-color: var(--surface-1); }
+        /* ลูกเล่นสีตัวเลขราคา: ป้าย=จาง+ขีดฆ่า, ส่วนลด=ป้ายแดง, โปร=น้ำเงินเด่น */
+        .price-rrp { color: var(--text-muted); text-decoration: line-through; font-variant-numeric: tabular-nums; }
+        .price-discount { display: inline-block; color: var(--danger); font-weight: 700; background: rgba(220,38,38,0.14); border-radius: 999px; padding: 2px 9px; font-variant-numeric: tabular-nums; }
+        .price-promo { color: var(--trust); font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; }
         table.dataTable.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: var(--surface-2); box-shadow: none; }
         .table-hover > tbody > tr:hover > * { background-color: var(--surface-hover); color: var(--text-primary); }
         .table-bordered, .table-bordered td, .table-bordered th { border-color: var(--border); }
-        table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control:before, table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control:before { background-color: var(--gold); }
+        table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control:before, table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control:before { background-color: var(--trust); }
         .table-dark, .table-dark th, .table-dark td { background-color: var(--navy) !important; color: #fff !important; border-color: rgba(255,255,255,0.15) !important; }
-        .table-danger, .table-danger th, .table-danger td { background-color: rgba(215,92,85,0.18) !important; color: var(--muted-red) !important; border-color: rgba(215,92,85,0.3) !important; }
+        .table-danger, .table-danger th, .table-danger td { background-color: rgba(220,38,38,0.18) !important; color: var(--danger) !important; border-color: rgba(220,38,38,0.3) !important; }
 
         /* ตัวควบคุมของ DataTables (ค้นหา/แบ่งหน้า/จำนวนแถว) */
         .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_length label, .dataTables_wrapper .dataTables_filter label { color: var(--text-secondary); }
         .dataTables_wrapper .dataTables_paginate .paginate_button { color: var(--text-secondary) !important; border-radius: var(--radius-sm); border: 1px solid transparent !important; background: transparent !important; }
-        .dataTables_wrapper .dataTables_paginate .paginate_button:hover { background: var(--gold-soft) !important; color: var(--text-primary) !important; border-color: var(--gold-strong) !important; }
-        .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: var(--gold) !important; color: var(--navy-dark) !important; border-color: var(--gold) !important; }
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover { background: var(--trust-soft) !important; color: var(--text-primary) !important; border-color: var(--trust-strong) !important; }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: var(--trust) !important; color: #fff !important; border-color: var(--trust) !important; }
         .dataTables_wrapper .dataTables_paginate .paginate_button.disabled { color: var(--text-muted) !important; opacity: .5; }
 
-        .kpi-container { background-color: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: var(--radius-md); color: var(--text-primary); padding: 18px 22px; text-align: left; transition: background-color 0.15s ease; position: relative; }
+        /* KPI = การ์ดบริบท (AI-Native "context card"): ขอบซ้ายสีเน้นตามความหมาย ไอคอนเป็นตราวงกลม ไร้เงา hover แค่เข้มพื้นเบาๆ */
+        .kpi-container { background-color: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--trust); border-radius: var(--radius-md); color: var(--text-primary); padding: 18px 22px; text-align: left; transition: background-color 0.15s ease; position: relative; box-shadow: var(--shadow-card); }
         .kpi-container:hover { background-color: var(--surface-hover); }
         .kpi-container h6 { color: var(--text-secondary) !important; opacity: 1 !important; letter-spacing: .02em; }
-        .kpi-container h1 { color: var(--gold) !important; font-weight: 700 !important; }
-        .kpi-container.kpi-sold { border-left-color: var(--muted-green); }
-        .kpi-container.kpi-sold h1 { color: var(--muted-green) !important; }
-        .kpi-container.kpi-unsold { border-left-color: var(--muted-amber); }
-        .kpi-container.kpi-unsold h1 { color: var(--muted-amber) !important; }
+        .kpi-container h1 { color: var(--trust) !important; font-weight: 700 !important; }
+        .kpi-container h6 i { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; margin-right: 6px; background: var(--trust-soft); color: var(--trust); font-size: 12px; }
+        .kpi-container.kpi-sold { border-left-color: var(--success); }
+        .kpi-container.kpi-sold h1 { color: var(--success) !important; }
+        .kpi-container.kpi-sold h6 i { background: rgba(5,150,105,0.16); color: var(--success); }
+        .kpi-container.kpi-unsold { border-left-color: var(--warning); }
+        .kpi-container.kpi-unsold h1 { color: var(--warning) !important; }
+        .kpi-container.kpi-unsold h6 i { background: rgba(245,158,11,0.16); color: var(--warning); }
         .select2-container--bootstrap-5 .select2-selection { min-height: 32px; font-size: 12px; border-radius: var(--radius-sm) !important; background-color: var(--surface-1); border-color: var(--border-strong); color: var(--text-primary); }
         .select2-container--bootstrap-5 .select2-selection__rendered { color: var(--text-primary) !important; }
         .select2-container--bootstrap-5 .select2-dropdown { background-color: var(--surface-1); border-color: var(--border-strong); }
@@ -193,8 +194,8 @@
         #select2-filterModel-results .select2-results__option[aria-selected="true"]:before,
         #select2-dashFilterModel-results .select2-results__option[aria-selected="true"]:before,
         #select2-deepFilterModel-results .select2-results__option[aria-selected="true"]:before {
-            background: var(--gold);
-            border-color: var(--gold);
+            background: var(--trust);
+            border-color: var(--trust);
         }
         #select2-filterModel-results .select2-results__option[aria-selected="true"]:after,
         #select2-dashFilterModel-results .select2-results__option[aria-selected="true"]:after,
@@ -203,7 +204,7 @@
             font-family: "Font Awesome 6 Free";
             font-weight: 900;
             font-size: 9px;
-            color: var(--navy-dark);
+            color: #fff;
             position: absolute;
             left: 0.85rem;
             top: 50%;
@@ -236,10 +237,10 @@
 
         /* HUD Loader แบบทางการ */
         #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: color-mix(in srgb, var(--bg-page) 92%, transparent); backdrop-filter: blur(3px); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #overlay .spinner-border { color: var(--gold) !important; }
+        #overlay .spinner-border { color: var(--trust) !important; }
         #overlay .text-secondary { color: var(--text-secondary) !important; }
         .hud-loader { position: relative; width: 64px; height: 64px; margin: 0 auto; }
-        .hud-ring { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--gold-soft); border-top-color: var(--gold); animation: spin 1s linear infinite; }
+        .hud-ring { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 3px solid var(--trust-soft); border-top-color: var(--trust); animation: spin 1s linear infinite; }
         .hud-core { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .tracking-wider { letter-spacing: 0.5px; }
@@ -249,77 +250,77 @@
         .swal2-popup { border-radius: var(--radius-md) !important; background: var(--glass-strong) !important; backdrop-filter: blur(var(--glass-blur)) saturate(160%); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%); color: var(--text-primary) !important; border: 1px solid var(--glass-border) !important; box-shadow: var(--shadow-soft-hover), inset 0 1px 0 var(--glass-highlight) !important; }
         .swal2-container { z-index: 10001 !important; background: color-mix(in srgb, var(--navy-dark) 55%, transparent) !important; }
 
-        /* แถบ Header หลัก: สีทึบแบบเรียบ (Flat) หัวกระดาษทางการ */
-        .app-header-bar { background-color: var(--surface-2) !important; border-bottom: 2px solid var(--gold); border-radius: var(--radius-md) !important; }
+        /* แถบ Header หลัก: พื้นผิวทึบทางการ ขอบล่างน้ำเงิน = เส้นสีเน้นเดียวมินิมอล */
+        .app-header-bar { background-color: var(--surface-2) !important; border-bottom: 2px solid var(--trust); border-radius: var(--radius-md) !important; box-shadow: var(--shadow-card); }
         .app-header-badge { background-color: var(--surface-1) !important; color: var(--text-primary) !important; border: 1px solid var(--border); border-radius: 999px !important; }
-        /* ตราสัญลักษณ์ (seal) รอบไอคอนโล่ ในหัวข้อระบบ เพื่อสื่อถึงความน่าเชื่อถือ */
-        .app-header-bar h3 .fa-shield-halved { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 6px; border-radius: 50%; border: 1px solid var(--gold-strong); background-color: var(--gold-soft); vertical-align: middle; margin-right: 2px; }
+        /* ไอคอนโล่ในหัวข้อระบบ: วงกลมกลาง เรียบ ไม่มีขอบเรืองแสง (มินิมอล) */
+        .app-header-bar h3 .fa-shield-halved { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 6px; border-radius: 50%; border: 1px solid var(--border-strong); background-color: var(--surface-1); color: var(--trust); vertical-align: middle; margin-right: 2px; }
 
-        /* ปุ่มสลับโหมดมืด/สว่าง */
-        .theme-toggle-btn { background-color: var(--gold-soft); border: 1px solid var(--gold-strong); color: var(--gold-dark); border-radius: 10px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
-        .theme-toggle-btn:hover { background-color: var(--gold-strong); color: var(--navy-dark); }
+        /* ปุ่มสลับโหมดมืด/สว่าง: สีน้ำเงินเดียวกับสีเน้นหลัก */
+        .theme-toggle-btn { background-color: var(--trust-soft); border: 1px solid var(--trust-strong); color: var(--trust-dark); border-radius: 10px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+        .theme-toggle-btn:hover { background-color: var(--trust-strong); color: #fff; }
 
-        /* แท็บหลัก: สีทึบแบบเรียบ เส้นใต้ทองเมื่อ active */
-        #myTab { background-color: var(--surface-1) !important; border: 1px solid var(--border); border-radius: var(--radius-md) !important; padding: 8px !important; }
+        /* แท็บหลัก: พื้นผิวทึบ เส้นใต้น้ำเงินเมื่อ active */
+        #myTab { background-color: var(--surface-1) !important; border: 1px solid var(--border); border-radius: var(--radius-md) !important; padding: 8px !important; box-shadow: var(--shadow-card); }
         .nav-pills .nav-item .nav-link { border-radius: var(--radius-sm) var(--radius-sm) 4px 4px; border: none; border-bottom: 3px solid transparent; transition: all 0.2s ease; color: var(--text-secondary); background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 11px 18px; font-weight: 600; }
-        .nav-pills .nav-item .nav-link:hover { color: var(--text-primary); background: var(--gold-soft); }
+        .nav-pills .nav-item .nav-link:hover { color: var(--text-primary); background: var(--trust-soft); }
         .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily, .tab-track, .tab-transfer, .tab-act-transfer, .tab-settings { border-color: transparent !important; color: var(--text-secondary) !important; background: transparent !important; }
-        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-transfer.active, .tab-act-transfer.active, .tab-settings.active { background: var(--surface-hover) !important; color: var(--gold) !important; border-bottom: 3px solid var(--gold) !important; }
+        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-transfer.active, .tab-act-transfer.active, .tab-settings.active { background: var(--surface-hover) !important; color: var(--trust) !important; border-bottom: 3px solid var(--trust) !important; }
 
         /* กรอบบนของเนื้อหา (Pane) โทนเดียวกันทั้งระบบ */
-        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #act-transfer-pane, #settings-pane { border-top: 3px solid var(--gold) !important; }
+        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #act-transfer-pane, #settings-pane { border-top: 3px solid var(--trust) !important; }
 
-        /* รีโทนสี Bootstrap utility ให้ยึดโทนพื้นผิว + ทองเป็นสีเน้นเดียวทั้งระบบ */
-        .bg-primary { background-color: var(--navy) !important; }
-        .bg-success { background-color: var(--muted-green) !important; }
-        .bg-danger { background-color: var(--muted-red) !important; }
-        .bg-warning { background-color: var(--muted-amber) !important; }
+        /* รีโทนสี Bootstrap utility: น้ำเงิน (trust) เป็นสีปฏิสัมพันธ์หลัก + ทองเป็นตราสัญลักษณ์รับรอง */
+        .bg-primary { background-color: var(--trust) !important; }
+        .bg-success { background-color: var(--success) !important; }
+        .bg-danger { background-color: var(--danger) !important; }
+        .bg-warning { background-color: var(--warning) !important; }
         .bg-light { background-color: var(--surface-2) !important; }
         .bg-white { background-color: var(--surface-1) !important; }
         .text-dark, .text-primary, .text-info { color: var(--text-primary) !important; }
         .text-secondary, .text-muted { color: var(--text-secondary) !important; }
-        .text-warning { color: var(--muted-amber) !important; }
-        .text-success { color: var(--muted-green) !important; }
-        .text-danger { color: var(--muted-red) !important; }
-        .text-gold { color: var(--gold) !important; }
+        .text-warning { color: var(--warning) !important; }
+        .text-success { color: var(--success) !important; }
+        .text-danger { color: var(--danger) !important; }
+        .text-gold { color: var(--trust) !important; }
         .border, .border-top, .border-bottom, .border-start, .border-end { border-color: var(--border) !important; }
-        .border-primary, .border-info { border-color: var(--gold-strong) !important; }
-        .border-danger { border-color: var(--muted-red) !important; }
-        /* Flat design: ปิดเงา Bootstrap utility ทั้งหมด ยึดขอบ (border) แทนความลึก */
+        .border-primary, .border-info { border-color: var(--trust-strong) !important; }
+        .border-danger { border-color: var(--danger) !important; }
+        /* Flat design: ปิดเงา Bootstrap utility เริ่มต้นทั้งหมด ยึดขอบ (border) + เงายกระดับของ --shadow-card แทน */
         .shadow-sm, .shadow, .shadow-lg { box-shadow: none !important; }
 
-        .btn { border-radius: var(--radius-sm) !important; font-weight: 600; transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+        .btn { border-radius: var(--radius-sm) !important; font-weight: 600; transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
         .btn:active { transform: scale(0.98); }
-        .btn:focus-visible { box-shadow: var(--shadow-gold-ring) !important; outline: none; }
-        .btn-primary, .btn-success { background-color: var(--gold) !important; border-color: var(--gold) !important; color: var(--navy-dark) !important; }
-        .btn-primary:hover, .btn-primary:focus, .btn-success:hover, .btn-success:focus { background-color: var(--gold-dark) !important; border-color: var(--gold-dark) !important; color: #fff !important; }
-        .btn-danger { background-color: var(--muted-red) !important; border-color: var(--muted-red) !important; }
-        .btn-outline-danger { color: var(--muted-red) !important; border-color: var(--muted-red) !important; }
-        .btn-outline-danger:hover { background-color: var(--muted-red) !important; color: #fff !important; }
-        .btn-outline-primary, .btn-outline-info { color: var(--gold-dark) !important; border-color: var(--gold-strong) !important; }
-        .btn-outline-primary:hover, .btn-outline-info:hover { background-color: var(--gold) !important; border-color: var(--gold) !important; color: var(--navy-dark) !important; }
-        .btn-outline-success { color: var(--muted-green) !important; border-color: var(--muted-green) !important; }
-        .btn-outline-success:hover { background-color: var(--muted-green) !important; color: #fff !important; }
+        .btn:focus-visible { box-shadow: var(--shadow-trust-ring) !important; outline: none; }
+        .btn-primary, .btn-success { background-color: var(--trust) !important; border-color: var(--trust) !important; color: #fff !important; }
+        .btn-primary:hover, .btn-primary:focus, .btn-success:hover, .btn-success:focus { background-color: var(--trust-dark) !important; border-color: var(--trust-dark) !important; color: #fff !important; }
+        .btn-danger { background-color: var(--danger) !important; border-color: var(--danger) !important; }
+        .btn-outline-danger { color: var(--danger) !important; border-color: var(--danger) !important; }
+        .btn-outline-danger:hover { background-color: var(--danger) !important; color: #fff !important; }
+        .btn-outline-primary, .btn-outline-info { color: var(--trust-dark) !important; border-color: var(--trust-strong) !important; }
+        .btn-outline-primary:hover, .btn-outline-info:hover { background-color: var(--trust) !important; border-color: var(--trust) !important; color: #fff !important; }
+        .btn-outline-success { color: var(--success) !important; border-color: var(--success) !important; }
+        .btn-outline-success:hover { background-color: var(--success) !important; color: #fff !important; }
 
-        /* ฟอร์มอินพุต: ขอบมนขึ้น + โฟกัสเรืองแสงทอง */
+        /* ฟอร์มอินพุต: ขอบมนขึ้น + โฟกัสเรืองแสงน้ำเงิน */
         .form-control, .form-select { background-color: var(--surface-1); border-radius: var(--radius-sm) !important; border-color: var(--border-strong); color: var(--text-primary); transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease; }
         .form-control::placeholder { color: var(--text-muted); }
-        .form-control:focus, .form-select:focus { background-color: var(--surface-1); color: var(--text-primary); border-color: var(--gold); box-shadow: var(--shadow-gold-ring); }
+        .form-control:focus, .form-select:focus { background-color: var(--surface-1); color: var(--text-primary); border-color: var(--trust); box-shadow: var(--shadow-trust-ring); }
         .input-group-text { background-color: var(--surface-2); border-color: var(--border-strong); color: var(--text-primary); }
         .badge { border-radius: 999px !important; }
 
         /* กล่องแจ้งเตือน */
         .alert { border-radius: var(--radius-sm); border: 1px solid transparent; }
-        .alert-danger { background: rgba(215,92,85,0.14); border-color: rgba(215,92,85,0.35); color: var(--muted-red); }
-        .alert-info { background: var(--gold-soft); border-color: var(--gold-strong); color: var(--gold-dark); }
-        .alert-success { background: rgba(63,163,114,0.14); border-color: rgba(63,163,114,0.35); color: var(--muted-green); }
-        .alert-warning { background: rgba(217,139,59,0.14); border-color: rgba(217,139,59,0.35); color: var(--muted-amber); }
+        .alert-danger { background: rgba(220,38,38,0.14); border-color: rgba(220,38,38,0.35); color: var(--danger); }
+        .alert-info { background: var(--trust-soft); border-color: var(--trust-strong); color: var(--trust-dark); }
+        .alert-success { background: rgba(5,150,105,0.14); border-color: rgba(5,150,105,0.35); color: var(--success); }
+        .alert-warning { background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.35); color: var(--warning); }
 
         /* สกรอลบาร์บางนุ่มนวล */
         ::-webkit-scrollbar { height: 10px; width: 10px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--gold-strong); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--trust-strong); }
 
         @media (prefers-reduced-motion: reduce) {
             .btn, .card, .kpi-container, .item-row, .theme-toggle-btn, .nav-link { transition: none !important; }
@@ -328,15 +329,12 @@
         /* หน้าจอเข้าสู่ระบบ */
         #loginScreen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background:
-                radial-gradient(900px 500px at 12% 8%, var(--grad-1), transparent 60%),
-                radial-gradient(900px 500px at 88% 92%, var(--grad-2), transparent 60%),
-                var(--bg-page);
+            background: var(--bg-page);
             z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center;
         }
         .login-box { background: var(--glass-strong); backdrop-filter: blur(var(--glass-blur)) saturate(160%); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 40px 36px; width: 100%; max-width: 380px; box-shadow: var(--shadow-soft-hover), inset 0 1px 0 var(--glass-highlight); position: relative; overflow: hidden; color: var(--text-primary); }
-        .login-box::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 6px; background: linear-gradient(90deg, var(--gold-dark), var(--gold), var(--gold-soft)); }
-        .login-icon-badge { width: 68px; height: 68px; border-radius: 50%; background: var(--gold-soft); display: inline-flex; align-items: center; justify-content: center; margin: 0 auto 14px; box-shadow: inset 0 0 0 1px var(--gold-strong); }
+        .login-box::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--trust); }
+        .login-icon-badge { width: 68px; height: 68px; border-radius: 50%; background: var(--trust-soft); display: inline-flex; align-items: center; justify-content: center; margin: 0 auto 14px; box-shadow: inset 0 0 0 1px var(--trust-strong); }
         .login-icon-badge i { font-size: 30px !important; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -2274,9 +2272,9 @@
                     '<td>' + escapeHtml(r.desc) + '</td>' +
                     '<td>' + escapeHtml(r.sku) + '</td>' +
                     '<td>' + escapeHtml(r.imei) + '</td>' +
-                    '<td>' + escapeHtml(r.rrp) + '</td>' +
-                    '<td>' + escapeHtml(r.discount) + '</td>' +
-                    '<td>' + escapeHtml(r.promoPrice) + '</td>' +
+                    '<td>' + (r.rrp ? '<span class="price-rrp">' + escapeHtml(r.rrp) + '</span>' : '') + '</td>' +
+                    '<td>' + (r.discount ? '<span class="price-discount">' + escapeHtml(r.discount) + '</span>' : '') + '</td>' +
+                    '<td>' + (r.promoPrice ? '<span class="price-promo">' + escapeHtml(r.promoPrice) + '</span>' : '') + '</td>' +
                     '<td>' + escapeHtml(r.locCode) + '</td>' +
                     '<td>' + escapeHtml(r.locName) + '</td>' +
                     '<td class="fw-bold text-dark">' + escapeHtml(r.area) + '</td>' +
