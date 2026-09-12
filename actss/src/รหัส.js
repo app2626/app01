@@ -6,6 +6,7 @@
 
 const ADMIN_PIN = "9999";
 const PASSWORD_EXPIRY_DAYS = 40;
+const SESSION_EXPIRY_HOURS = 24;
 
 // สิทธิ์บัญชีสาขา: ทั่วไป = คีย์ข้อมูลได้ตามปกติ, พิเศษ = ดูข้อมูล/แดชบอร์ดได้แต่คีย์ฟอร์ม/เปลี่ยนสถานะไม่ได้
 const ROLE_NORMAL = "ทั่วไป";
@@ -80,6 +81,29 @@ function parseDdMmYyyy_(str) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// แปลง timestamp รูปแบบ "dd/MM/yyyy HH:mm:ss" (ตามที่บันทึกไว้ตอนสร้าง session ด้วย Utilities.formatDate ... "Asia/Bangkok")
+// กลับเป็น Date — ใช้เช็คอายุ session (SESSION_EXPIRY_HOURS)
+function parseSessionTimestamp_(str) {
+  const trimmed = (str || "").toString().trim();
+  const spaceIdx = trimmed.indexOf(" ");
+  const datePart = spaceIdx === -1 ? trimmed : trimmed.substring(0, spaceIdx);
+  const timePart = spaceIdx === -1 ? "00:00:00" : trimmed.substring(spaceIdx + 1);
+  const dateBits = datePart.split(/[-/]/);
+  if (dateBits.length !== 3) return null;
+  const timeBits = timePart.split(":");
+  const d = new Date(Number(dateBits[2]), Number(dateBits[1]) - 1, Number(dateBits[0]),
+    Number(timeBits[0] || 0), Number(timeBits[1] || 0), Number(timeBits[2] || 0));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// session ที่ parse เวลาสร้างไม่ได้ ถือว่ายังไม่หมดอายุ (กันเคสข้อมูลเก่า/ผิดรูปแบบไปบล็อก login ทั้งระบบ)
+function isSessionExpired_(createdAtStr) {
+  const created = parseSessionTimestamp_(createdAtStr);
+  if (!created) return false;
+  const hoursSince = (Date.now() - created.getTime()) / (1000 * 60 * 60);
+  return hoursSince >= SESSION_EXPIRY_HOURS;
+}
+
 function hashPassword_(password, salt) {
   const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password + salt, Utilities.Charset.UTF_8);
   return bytes.map(function(b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
@@ -130,9 +154,13 @@ function resolveSession_(token) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getSessionsSheet_(ss);
   if (!sheet || sheet.getLastRow() <= 1) return null;
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues();
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getDisplayValues();
   for (let i = 0; i < data.length; i++) {
     if (data[i][0] === token) {
+      if (isSessionExpired_(data[i][2])) {
+        sheet.deleteRow(i + 2);
+        return null;
+      }
       const locCode = (data[i][1] || "").toString().trim();
       return { locCode: locCode, role: getUserRole_(ss, locCode) };
     }
@@ -160,9 +188,15 @@ function resolveAdminSession_(token) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getAdminAuthSheet_(ss);
   if (!sheet || sheet.getLastRow() <= 1) return null;
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getDisplayValues();
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getDisplayValues();
   for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === token) return { username: (data[i][1] || "").toString().trim() };
+    if (data[i][0] === token) {
+      if (isSessionExpired_(data[i][2])) {
+        sheet.deleteRow(i + 2);
+        return null;
+      }
+      return { username: (data[i][1] || "").toString().trim() };
+    }
   }
   return null;
 }

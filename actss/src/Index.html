@@ -362,6 +362,10 @@
                 <label class="form-label fw-bold text-secondary">รหัสผ่าน</label>
                 <input type="password" class="form-control" id="loginPassword" placeholder="รหัสผ่าน" required autocomplete="current-password">
             </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="loginRememberMe">
+                <label class="form-check-label text-secondary" for="loginRememberMe">จดจำรหัสสาขาและรหัสผ่าน</label>
+            </div>
             <div id="loginErrorMsg" class="alert alert-danger py-2 d-none"></div>
             <button type="submit" class="btn btn-primary w-100 fw-bold py-2"><i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
         </form>
@@ -1345,6 +1349,16 @@
             updateThemeIcon(newTheme);
         });
 
+        try {
+            var rememberedLocCode = localStorage.getItem('actssRememberedLocCode');
+            var rememberedPassword = localStorage.getItem('actssRememberedPassword');
+            if (rememberedLocCode && rememberedPassword) {
+                $('#loginLocCode').val(rememberedLocCode);
+                $('#loginPassword').val(rememberedPassword);
+                $('#loginRememberMe').prop('checked', true);
+            }
+        } catch(e) {}
+
         // 💡 1. เข้าเว็บครั้งแรก เช็ค session ที่ค้างไว้ก่อน ถ้าไม่มี/หมดอายุ ให้โชว์หน้า login
         attemptSessionRestore();
 
@@ -1367,6 +1381,16 @@
                     currentLocName = res.locName;
                     currentRole = res.role || 'ทั่วไป';
                     try { localStorage.setItem('actssToken', res.token); } catch(e) {}
+
+                    try {
+                        if ($('#loginRememberMe').is(':checked')) {
+                            localStorage.setItem('actssRememberedLocCode', locCode);
+                            localStorage.setItem('actssRememberedPassword', password);
+                        } else {
+                            localStorage.removeItem('actssRememberedLocCode');
+                            localStorage.removeItem('actssRememberedPassword');
+                        }
+                    } catch(e) {}
 
                     if (res.isAdmin) {
                         adminToken = res.token;
