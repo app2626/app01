@@ -977,7 +977,7 @@ window.app = {
             // แบบใหม่ — รูป + หัวข้อ + คำอธิบาย + ปุ่ม CTA (พอร์ตแนวคิดจาก pbzf8's PromoPopupModal แต่ปุ่มลิงก์ URL ทั่วไป
             // แทนระบบ route หน้าโปรโมชั่น/คูปอง/หมวดหมู่ของ pbzf8 — f8 เป็นระบบพนักงานภายใน ไม่มีแนวคิดหน้าเหล่านั้น)
             const btnHtml = (item.buttonText && item.buttonText.trim())
-                ? `<a href="${this.esc(item.link || '#')}" target="_blank" class="inline-flex items-center justify-center px-6 py-2.5 mt-4 bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 hover:shadow-xl transition-all">${this.esc(item.buttonText)}</a>`
+                ? `<a href="${this.esc(item.link || '#')}" target="_blank" class="inline-flex items-center justify-center px-6 py-2.5 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 hover:shadow-xl transition-all">${this.esc(item.buttonText)}</a>`
                 : `<button type="button" onclick="window.app.closePopupBanner()" class="mt-3 text-xs text-slate-400 hover:text-slate-600 font-medium">ปิดหน้าต่างนี้</button>`;
             html += `
               <div class="bg-slate-50 rounded-2xl shadow-lg border border-white/10 overflow-hidden text-center">
@@ -1053,8 +1053,8 @@ window.app = {
     // ซึ่งจะจางหายไปบนพื้นหลังเข้มใหม่ทั้งแอป ตั้งค่า default ระดับ global ที่จุดเดียวนี้ (ก่อนสร้างกราฟใดๆ) แก้ทุกกราฟทั้งระบบพร้อมกัน
     // (บางกราฟ hardcode สี tick/legend/grid ของตัวเองทับอยู่ — จุดเหล่านั้นแก้แยกเป็นกรณีไป ไม่ได้รับผลจาก default นี้)
     if (typeof Chart !== 'undefined') {
-      Chart.defaults.color = '#b8b3a8';
-      Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.08)';
+      Chart.defaults.color = '#64748b';
+      Chart.defaults.borderColor = 'rgba(15, 23, 42, 0.08)';
     }
     setInterval(() => {
       const d = new Date();
@@ -1105,7 +1105,7 @@ window.app = {
       const res = await new Promise((resolve, reject) => {
         google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).setupDatabase(window.app.user);
       });
-      Swal.fire({ icon: 'success', title: 'สร้างฐานข้อมูลสำเร็จ!', text: 'กรุณาเข้าสู่ระบบด้วย admin / admin123', confirmButtonColor: '#254d71' });
+      Swal.fire({ icon: 'success', title: 'สร้างฐานข้อมูลสำเร็จ!', text: 'กรุณาเข้าสู่ระบบด้วย admin / admin123', confirmButtonColor: '#2748b8' });
     } catch(e) {
       Swal.fire('ข้อผิดพลาด', e.toString(), 'error');
     }
@@ -1498,7 +1498,7 @@ window.app = {
       showCancelButton: true,
       confirmButtonText: 'บันทึก',
       cancelButtonText: 'ยกเลิก',
-      confirmButtonColor: '#254d71',
+      confirmButtonColor: '#2748b8',
       preConfirm: () => {
         const oldPassword = document.getElementById('cp-old').value;
         const newPassword = document.getElementById('cp-new').value;
@@ -1790,7 +1790,7 @@ window.app = {
           let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); trendData[d] = (trendData[d] || 0) + (isNaN(qty) ? 0 : qty); 
         }
       });
-      this.createChart('chartSalesTrend', 'line', Object.keys(trendData), Object.values(trendData), 'จำนวนเครื่อง', '#254d71');
+      this.createChart('chartSalesTrend', 'line', Object.keys(trendData), Object.values(trendData), 'จำนวนเครื่อง', '#2748b8');
       
       const weeklyTrend = {};
       this.filteredOrders.forEach(o => {
@@ -1819,8 +1819,8 @@ window.app = {
       if(ctxModel) {
         this.charts['chartModelAdvanced'] = new Chart(ctxModel.getContext('2d'), {
             type: 'bar',
-            data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.08)' }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
+            data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#2748b8', borderRadius: 6 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: 'rgba(15, 23, 42, 0.08)' }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
         });
         window.app.chartExportButtons('chartModelAdvanced');
       }
@@ -1845,7 +1845,7 @@ window.app = {
       const branchCounts = {};
       this.filteredOrders.forEach(o => { if(o['Order Status'] !== 'Cancelled' && isDevice(o)) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); branchCounts[o['Branch Code']] = (branchCounts[o['Branch Code']] || 0) + (isNaN(qty) ? 0 : qty); } });
       let sortedBranches = Object.keys(branchCounts).sort((a,b)=>branchCounts[b]-branchCounts[a]).slice(0, 10);
-      this.createChart('chartTopBranches', 'bar', sortedBranches, sortedBranches.map(b=>branchCounts[b]), 'จำนวนเครื่องรวม', '#254d71');
+      this.createChart('chartTopBranches', 'bar', sortedBranches, sortedBranches.map(b=>branchCounts[b]), 'จำนวนเครื่องรวม', '#2748b8');
 
       const salesCounts = {};
       this.filteredOrders.forEach(o => { if(o['Order Status'] !== 'Cancelled' && isDevice(o) && o['Staff']) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); salesCounts[o['Staff']] = (salesCounts[o['Staff']] || 0) + (isNaN(qty) ? 0 : qty); } });
@@ -1884,7 +1884,7 @@ window.app = {
       const renderStackedChart = (canvasId, dataMap, channelsSet) => {
           let topModels = Object.keys(dataMap).sort((a,b) => dataMap[b].total - dataMap[a].total).slice(0, 15);
           let datasets = [];
-          let colorsChannel = ['#254d71', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#14b8a6', '#f43f5e', '#64748b'];
+          let colorsChannel = ['#2748b8', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#14b8a6', '#f43f5e', '#64748b'];
           let chIdx = 0;
           
           Array.from(channelsSet).forEach(ch => {
@@ -1910,7 +1910,7 @@ window.app = {
                     responsive: true, maintainAspectRatio: false,
                     indexAxis: 'y',
                     scales: { 
-                        x: { stacked: true, grid: { color: 'rgba(255, 255, 255, 0.08)' }, grace: '15%' }, 
+                        x: { stacked: true, grid: { color: 'rgba(15, 23, 42, 0.08)' }, grace: '15%' }, 
                         y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Prompt', size: 10 } } } 
                     },
                     plugins: {
@@ -2014,7 +2014,7 @@ window.app = {
       const el = document.getElementById(id); if(!el) return;
       const ctx = el.getContext('2d');
       
-      const themeColor = col || '#254d71';
+      const themeColor = col || '#2748b8';
       let datasetConfig = {
         label: lblName,
         data: data,
@@ -2072,7 +2072,7 @@ window.app = {
           },
           scales: {
             y: {
-              grid: { color: 'rgba(255, 255, 255, 0.08)', drawBorder: false },
+              grid: { color: 'rgba(15, 23, 42, 0.08)', drawBorder: false },
               ticks: {
                 color: '#b8b3a8',
                 font: { family: 'Prompt', size: 10, weight: '500' }
@@ -2335,7 +2335,7 @@ window.app = {
                   }
                }
             },
-            scales: { y: { beginAtZero: true, grid: { borderDash: [2,4], color: 'rgba(255, 255, 255, 0.08)' } }, x: { grid: { display: false } } },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2,4], color: 'rgba(15, 23, 42, 0.08)' } }, x: { grid: { display: false } } },
             interaction: { mode: 'index', intersect: false }
          }
       });
@@ -2653,7 +2653,7 @@ window.app = {
         + '</table>';
 
       return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-200/80 p-4">'
+        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
         + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[400px]">' + tableHtml + '</div>'
@@ -2873,7 +2873,7 @@ window.app = {
         + '</table>';
 
       return '<div class="chart-card !p-0 overflow-hidden mb-6">'
-        + '<div class="bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-200/80 p-4">'
+        + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
         + '<h6 class="!mb-0"><i class="fas fa-table text-indigo-500"></i>' + window.app.esc(title) + '</h6>'
         + '</div>'
         + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[500px]">' + tableHtml + '</div>'
@@ -3089,7 +3089,7 @@ window.app = {
           + '</tr>';
 
         html += '<div class="chart-card !p-0 overflow-hidden mb-6">'
-          + '<div class="bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-200/80 p-4">'
+          + '<div class="bg-slate-50 border-b border-slate-200/80 p-4">'
           + '<h6 class="!mb-0"><i class="fas fa-boxes-stacked text-indigo-500"></i>' + window.app.esc(cat) + '</h6>'
           + '</div>'
           + '<div class="w-full overflow-x-auto custom-scrollbar max-h-[400px]">'
@@ -3203,17 +3203,17 @@ window.app = {
           
           timerDisplay.innerHTML = `
             <div class="flex items-center gap-1.5">
-              <div class="flex flex-col items-center bg-slate-50 text-white px-2 py-0.5 rounded-lg shadow-sm min-w-[32px]">
+              <div class="flex flex-col items-center bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-sm min-w-[32px]">
                 <span class="text-xs font-black">${String(days).padStart(2, '0')}</span>
                 <span class="text-[7px] text-slate-400 font-bold uppercase -mt-0.5">วัน</span>
               </div>
               <div class="text-slate-400 font-bold text-xs">:</div>
-              <div class="flex flex-col items-center bg-slate-50 text-white px-2 py-0.5 rounded-lg shadow-sm min-w-[32px]">
+              <div class="flex flex-col items-center bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-sm min-w-[32px]">
                 <span class="text-xs font-black">${String(hours).padStart(2, '0')}</span>
                 <span class="text-[7px] text-slate-400 font-bold uppercase -mt-0.5">ชม.</span>
               </div>
               <div class="text-slate-400 font-bold text-xs">:</div>
-              <div class="flex flex-col items-center bg-slate-50 text-white px-2 py-0.5 rounded-lg shadow-sm min-w-[32px]">
+              <div class="flex flex-col items-center bg-slate-900 text-white px-2 py-0.5 rounded-lg shadow-sm min-w-[32px]">
                 <span class="text-xs font-black">${String(mins).padStart(2, '0')}</span>
                 <span class="text-[7px] text-slate-400 font-bold uppercase -mt-0.5">น.</span>
               </div>
@@ -3257,7 +3257,7 @@ window.app = {
           checkoutBtn.className = 'w-full h-full bg-slate-200 text-slate-400 text-sm font-bold rounded-lg cursor-not-allowed transition-all flex items-center justify-center';
         } else {
           checkoutBtn.disabled = false;
-          checkoutBtn.className = 'w-full h-full bg-gradient-to-r from-slate-100 to-slate-50 hover:from-slate-50 hover:to-black text-white text-sm font-bold rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center group';
+          checkoutBtn.className = 'w-full h-full bg-slate-900 hover:bg-black text-white text-sm font-bold rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center group';
         }
       }
     },
@@ -3751,11 +3751,11 @@ window.app = {
       // ปุ่มจอง: path เดิมทั้งหมด — เปิด addToCartModal ด้วย SKU ของ variant ที่เลือก (จำนวน/ของแถม/validation อยู่ใน modal เดิม)
       let bookBtn = '';
       if (!isGift) {
-        if (outOfStock) bookBtn = '<button type="button" disabled class="w-full py-2 rounded-full bg-slate-100 text-slate-400 text-xs font-bold cursor-not-allowed border border-slate-200">สินค้าหมด</button>';
-        else bookBtn = '<button type="button" class="w-full py-2 rounded-full bg-slate-50 text-white text-xs font-bold hover:bg-slate-200 transition-colors" onclick="window.app.pos.openAddToCartModal(\'' + escJs(variant.SKU) + '\')" aria-label="จอง ' + pName + '">จอง</button>';
+        if (outOfStock) bookBtn = '<button type="button" disabled class="w-full py-2 rounded-full bg-slate-200 text-slate-500 text-xs font-bold cursor-not-allowed border border-slate-300">สินค้าหมด</button>';
+        else bookBtn = '<button type="button" class="w-full py-2 rounded-full bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm transition-colors" onclick="window.app.pos.openAddToCartModal(\'' + escJs(variant.SKU) + '\')" aria-label="จอง ' + pName + '">จอง</button>';
       }
 
-      let card = '<div class="pos-card relative flex flex-col h-full bg-slate-50 border border-[#e5e7eb] rounded-[14px] overflow-hidden' + (isGift ? ' opacity-80' : '') + '" data-card-key="' + esc(cardKey) + '">';
+      let card = '<div class="pos-card relative flex flex-col h-full bg-slate-50 border border-slate-200 rounded-[14px] overflow-hidden' + (isGift ? ' opacity-80' : '') + '" data-card-key="' + esc(cardKey) + '">';
       card +=      giftTag;
       card +=      savePctBadge;
       card +=      stockBadge;
@@ -3763,13 +3763,13 @@ window.app = {
       card += '       <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://via.placeholder.com/150?text=No+Image\';" alt="' + pName + '" class="max-h-full max-w-full object-contain transition-transform duration-300">';
       card += '    </div>';
       card += '    <div class="p-3 pt-1 flex flex-col flex-1 gap-2">';
-      card += '      <div class="font-bold text-[#f7f7f9] text-[12px] md:text-[15px] line-clamp-2 leading-tight" title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
+      card += '      <div class="font-bold text-slate-900 text-[12px] md:text-[15px] line-clamp-2 leading-tight" title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
       card +=      bundleBadge;
       if (dotsHtml) card += '<div class="flex items-center gap-1.5 flex-wrap">' + dotsHtml + '</div>';
       if (chipsHtml) card += '<div class="flex items-center gap-1.5 flex-wrap">' + chipsHtml + '</div>';
       if (p.isGroup) card += '<div class="text-[10px] text-slate-500 line-clamp-1" title="' + pName + '">' + pName + '</div>';
       card += '      <div class="mt-auto pt-1">';
-      card += '        <div class="text-[#c19a4b] font-black text-base' + (hasSave ? '' : ' mb-2') + '">฿' + price + '</div>';
+      card += '        <div class="text-indigo-600 font-black text-base' + (hasSave ? '' : ' mb-2') + '">฿' + price + '</div>';
       if (hasSave) {
         card += '    <div class="flex items-center gap-1.5 flex-wrap mb-2"><span class="text-[10px] text-rose-600 font-bold">ประหยัด ฿' + (origNum - priceNum).toLocaleString() + '</span><span class="text-[10px] text-slate-400 line-through">เดิม ฿' + origNum.toLocaleString() + '</span></div>';
       }
@@ -4164,7 +4164,7 @@ window.app = {
         if (appliedRules.length > 0) {
             let texts = appliedRules.map(r => r.msg + ` (ลดไป ฿${r.val.toLocaleString()})`).join('<br>');
             suggestBox.innerHTML = `
-              <div class="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-3 shadow-sm flex items-start gap-3 transition-all">
+              <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 shadow-sm flex items-start gap-3 transition-all">
                  <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5"><i class="fas fa-magic"></i></div>
                  <div>
                     <h6 class="text-[15px] font-bold text-indigo-800 leading-tight mb-1">Bundle Promotion ทำงานแล้ว!</h6>
@@ -4180,7 +4180,7 @@ window.app = {
         } else if (suggestRules.length > 0) {
             let texts = suggestRules.join('<br><br>');
             suggestBox.innerHTML = `
-              <div class="bg-gradient-to-r from-rose-50 to-red-50 border border-rose-200 rounded-xl p-3 shadow-sm flex items-start gap-3 animate-[pulse_2s_ease-in-out_infinite]">
+              <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 shadow-sm flex items-start gap-3 animate-[pulse_2s_ease-in-out_infinite]">
                  <div class="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5"><i class="fas fa-lightbulb"></i></div>
                  <div>
                     <h6 class="text-[15px] font-bold text-rose-800 leading-tight mb-1">ผู้ช่วยขายอัจฉริยะ (Smart Suggest)</h6>
@@ -4396,7 +4396,7 @@ window.app = {
       window.app.hideModal('checkoutModal'); 
       
       setTimeout(async () => {
-          if((await Swal.fire({ title: 'ยืนยันการบันทึกใบจอง?', text: "กรุณาตรวจสอบข้อมูลให้ถูกต้องก่อนกดยืนยันออเดอร์", icon: 'question', showCancelButton: true, confirmButtonColor: '#a67c32', confirmButtonText: 'ยืนยันการจอง', cancelButtonText: 'ย้อนกลับ' })).isConfirmed) {
+          if((await Swal.fire({ title: 'ยืนยันการบันทึกใบจอง?', text: "กรุณาตรวจสอบข้อมูลให้ถูกต้องก่อนกดยืนยันออเดอร์", icon: 'question', showCancelButton: true, confirmButtonColor: '#2748b8', confirmButtonText: 'ยืนยันการจอง', cancelButtonText: 'ย้อนกลับ' })).isConfirmed) {
              if (window.app.pos.isSubmitting) return;
              window.app.pos.isSubmitting = true;
              const btnSubmit = document.querySelector('[onclick="window.app.pos.submitCheckout()"]');
@@ -5500,8 +5500,8 @@ window.app = {
             <div class="p-8 space-y-6">
               <div class="h-[240px] w-full rounded-2xl border border-slate-200 bg-slate-100 flex items-center justify-center overflow-hidden relative group">
                 <img id="loginBgPreview" src="${previewUrl}" class="max-h-full max-w-full object-cover w-full h-full transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/600x300?text=No+Preview+Available'">
-                <div class="absolute inset-0 bg-slate-50/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span class="text-white text-xs font-bold bg-slate-50/80 px-3 py-1.5 rounded-full"><i class="fas fa-search-plus mr-1"></i> ภาพตัวอย่าง</span>
+                <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span class="text-white text-xs font-bold bg-slate-900/80 px-3 py-1.5 rounded-full"><i class="fas fa-search-plus mr-1"></i> ภาพตัวอย่าง</span>
                 </div>
               </div>
               
@@ -5561,7 +5561,7 @@ window.app = {
               <div class="bg-slate-50 border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-all duration-300">
                 <div class="h-[160px] bg-slate-100 overflow-hidden relative group">
                   <img id="bannerImg-${item.rowIndex}" src="${previewUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://via.placeholder.com/300x150?text=Invalid+Image+URL'">
-                  <div class="absolute top-2 left-2 px-2 py-0.5 bg-slate-50/70 text-white text-[10px] font-bold rounded-lg pointer-events-none">#${item.rowIndex}</div>
+                  <div class="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/70 text-white text-[10px] font-bold rounded-lg pointer-events-none">#${item.rowIndex}</div>
                   ${hasLink ? '<div class="absolute top-2 right-2 w-6 h-6 bg-white/90 text-indigo-600 rounded-lg flex items-center justify-center shadow-sm pointer-events-none" title="มีลิงก์ปลายทาง"><i class="fas fa-link text-[10px]"></i></div>' : ''}
                 </div>
                 <div class="flex items-center justify-between px-3 py-2 border-t border-slate-100">
@@ -5627,7 +5627,7 @@ window.app = {
         title: 'รูปภาพพรีวิว',
         imageUrl: window.app.formatImageUrl(url),
         imageAlt: 'Preview',
-        confirmButtonColor: '#254d71',
+        confirmButtonColor: '#2748b8',
         confirmButtonText: 'ปิด'
       });
     },
@@ -5729,7 +5729,7 @@ window.app = {
         showCancelButton: true,
         confirmButtonText: 'บันทึก',
         cancelButtonText: 'ยกเลิก',
-        confirmButtonColor: '#254d71',
+        confirmButtonColor: '#2748b8',
         preConfirm: async () => {
           let url = document.getElementById('swal-url').value.trim();
           const link = document.getElementById('swal-link').value.trim();

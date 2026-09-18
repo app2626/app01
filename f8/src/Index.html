@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Mobile Pre Order System — Enterprise Portal</title>
   <meta name="description" content="ระบบจองสินค้าล่วงหน้าสำหรับองค์กร - Enterprise Pre-Order Management">
-  <meta name="theme-color" content="#254d71">
+  <meta name="theme-color" content="#2748b8">
   
   <!-- PWA & Mobile Native App Config -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -23,7 +23,7 @@
         start_url: window.location.href.split('?')[0],
         display: "standalone",
         background_color: "#f8fafc",
-        theme_color: "#254d71",
+        theme_color: "#2748b8",
         icons: [
           { src: iconUrl, sizes: "192x192", type: "image/png" },
           { src: iconUrl, sizes: "512x512", type: "image/png" }
@@ -42,27 +42,26 @@
 
   <?!= include('CSS'); ?>
 </head>
-<body class="bg-gradient-to-br from-slate-50 via-indigo-50/10 to-slate-100/60 text-slate-800 antialiased min-h-screen relative overflow-x-hidden">
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen relative overflow-x-hidden">
   <div id="app" class="w-full min-h-screen flex flex-col"></div>
 
   <template id="tmpl-login">
     <div class="relative flex items-center justify-center min-h-screen bg-slate-50 px-4 overflow-hidden">
       <div id="loginBg" class="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000 opacity-30 pointer-events-none"></div>
-      <div class="absolute inset-0 bg-gradient-to-br from-slate-50/80 via-indigo-900/50 to-slate-50/70 backdrop-blur-[2px] z-0 pointer-events-none"></div>
+      <div class="absolute inset-0 bg-slate-50/75 backdrop-blur-[2px] z-0 pointer-events-none"></div>
 
-      <!-- Animated gradient orbs — โทนพรีเมี่ยม (2026-07-10): navy + slate เรียบ + bronze แตะเบาๆ (ใช้ arbitrary hex [#..] แทนการตั้งชื่อสีใหม่ใน Tailwind config — ชื่อสีใหม่ "bronze" ไม่ยอม render ใน Tailwind CDN runtime ของโปรเจกต์นี้ ไม่ทราบสาเหตุแน่ชัด แต่ arbitrary value ใช้ได้ปกติ) แทนสีสดเดิม (indigo/cyan/purple) -->
+      <!-- Ambient glass blobs — โทน flat indigo เดียว (ambient background ของ glassmorphism ยังคงไว้ แต่ตัด multi-hue gradient ออก) -->
       <div class="absolute top-1/4 -left-32 w-64 h-64 bg-indigo-500 rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob pointer-events-none"></div>
       <div class="absolute top-1/3 -right-32 w-72 h-72 bg-slate-400 rounded-full mix-blend-multiply filter blur-[100px] opacity-15 animate-blob animation-delay-2000 pointer-events-none"></div>
-      <div class="absolute -bottom-32 left-1/3 w-72 h-72 bg-[#c19a4b] rounded-full mix-blend-multiply filter blur-[100px] opacity-10 animate-blob animation-delay-4000 pointer-events-none"></div>
-      
+      <div class="absolute -bottom-32 left-1/3 w-72 h-72 bg-indigo-400 rounded-full mix-blend-multiply filter blur-[100px] opacity-10 animate-blob animation-delay-4000 pointer-events-none"></div>
+
       <div class="relative z-10 login-card p-10 rounded-[2rem] w-full max-w-[420px] animate-fade-in-up">
         <!-- Top accent line -->
-        <div class="absolute top-0 left-8 right-8 h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent rounded-full opacity-60 pointer-events-none"></div>
-        
+        <div class="absolute top-0 left-8 right-8 h-1 bg-indigo-500 rounded-full opacity-60 pointer-events-none"></div>
+
         <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-[72px] h-[72px] rounded-2xl bg-gradient-to-br from-[#c19a4b] to-[#8a6428] mb-5 shadow-lg shadow-[#8a6428]/30 relative">
+          <div class="inline-flex items-center justify-center w-[72px] h-[72px] rounded-2xl bg-indigo-600 mb-5 shadow-lg shadow-indigo-600/30 relative">
              <i class="fas fa-layer-group text-3xl text-white"></i>
-             <div class="absolute -inset-1 bg-[#c19a4b] rounded-2xl opacity-20 blur-md pointer-events-none"></div>
           </div>
           <h3 class="text-2xl font-black text-slate-800 tracking-tight leading-tight">Mobile Pre Order</h3>
           <p class="text-[11px] text-slate-400 mt-2 font-bold uppercase tracking-[0.2em]">Enterprise Management Portal</p>
@@ -83,7 +82,7 @@
               <input type="password" class="w-full pl-11 pr-4 py-3.5 bg-slate-50/60 border border-slate-200/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-slate-50 transition-all text-sm font-medium" id="loginPassword" placeholder="Password" required>
             </div>
           </div>
-          <button type="submit" class="w-full py-4 bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-700 hover:from-indigo-700 hover:via-indigo-700 hover:to-indigo-800 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 hover:shadow-xl hover:shadow-indigo-600/40 transition-all transform hover:-translate-y-0.5 text-sm tracking-wide" id="btnLogin">
+          <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full shadow-lg shadow-indigo-600/30 hover:shadow-xl hover:shadow-indigo-600/40 transition-all transform hover:-translate-y-0.5 text-sm tracking-wide" id="btnLogin">
             <i class="fas fa-sign-in-alt mr-2"></i>เข้าสู่ระบบ
           </button>
         </form>
@@ -99,14 +98,14 @@
   </template>
 
   <template id="tmpl-main">
-    <div class="min-h-screen flex w-full relative z-10"><div class="fixed top-0 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-25 animate-blob z-[-1]"></div><div class="fixed top-0 -right-40 w-96 h-96 bg-slate-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob animation-delay-2000 z-[-1]"></div><div class="fixed -bottom-40 left-20 w-96 h-96 bg-[#e0c088] rounded-full mix-blend-multiply filter blur-[128px] opacity-15 animate-blob animation-delay-4000 z-[-1]"></div>
+    <div class="min-h-screen flex w-full relative z-10"><div class="fixed top-0 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-25 animate-blob z-[-1]"></div><div class="fixed top-0 -right-40 w-96 h-96 bg-slate-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob animation-delay-2000 z-[-1]"></div><div class="fixed -bottom-40 left-20 w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-[128px] opacity-15 animate-blob animation-delay-4000 z-[-1]"></div>
       
       <!-- Desktop Sidebar -->
       <aside class="hidden lg:flex flex-col w-[260px] bg-slate-50/80 backdrop-blur-md border-r border-slate-200 sticky top-0 h-screen overflow-hidden flex-shrink-0 z-50 transition-all duration-300" id="desktopSidebar">
         <!-- Logo Area -->
         <div class="px-6 py-5 flex items-center justify-between border-b border-slate-100">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c19a4b] to-[#8a6428] flex items-center justify-center shadow-md shadow-[#8a6428]/20 flex-shrink-0">
+            <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-600/20 flex-shrink-0">
               <i class="fas fa-layer-group text-white text-lg"></i>
             </div>
             <div class="flex flex-col overflow-hidden">
@@ -125,7 +124,7 @@
         <!-- User Profile Area -->
         <div class="p-4 border-t border-slate-100 bg-slate-50/50 mt-auto">
            <div class="flex items-center gap-3 mb-4">
-             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 border-2 border-white shadow-sm flex items-center justify-center flex-shrink-0">
+             <div class="w-10 h-10 rounded-full bg-indigo-50 border-2 border-white shadow-sm flex items-center justify-center flex-shrink-0">
                <i class="fas fa-user text-indigo-500 text-sm"></i>
              </div>
              <div class="flex-1 min-w-0">
@@ -162,7 +161,7 @@
           <div class="px-4 w-full">
             <div class="flex justify-between items-center h-[60px] w-full">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#c19a4b] to-[#8a6428] flex items-center justify-center shadow-sm">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
                   <i class="fas fa-layer-group text-white text-xs"></i>
                 </div>
                 <div class="flex flex-col">
@@ -202,7 +201,7 @@
         <footer class="mt-auto w-full relative z-0 border-t border-slate-100 bg-slate-50/30 backdrop-blur-sm">
            <div class="w-full py-4 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-3">
               <div class="flex items-center gap-3">
-                <div class="w-6 h-6 rounded bg-gradient-to-br from-[#c19a4b] to-[#8a6428] flex items-center justify-center shadow-sm opacity-80">
+                <div class="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center shadow-sm opacity-80">
                   <i class="fas fa-layer-group text-white text-[10px]"></i>
                 </div>
                 <p class="text-slate-400 text-xs font-medium">© 2026 Mobile Pre Order System.</p>
@@ -218,7 +217,7 @@
       </div>
 
       <div id="popupBannerModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true" aria-label="แบนเนอร์ประชาสัมพันธ์">
-        <div class="fixed inset-0 bg-slate-50/80 backdrop-blur-sm transition-opacity" onclick="window.app.closePopupBanner()"></div>
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm transition-opacity" onclick="window.app.closePopupBanner()"></div>
         <div class="fixed inset-0 z-10 overflow-y-auto">
           <div class="flex min-h-full items-center justify-center p-4 text-center">
             <div class="relative transform overflow-hidden rounded-3xl bg-transparent text-left shadow-2xl transition-all w-full max-w-3xl flex flex-col items-center animate-fade-in-up">
@@ -298,14 +297,14 @@
 
         <!-- Section 1: Sales Trends & Performance -->
         <div class="flex items-center gap-3 pt-8 pb-3 mb-6 relative">
-           <div class="w-1 h-7 bg-gradient-to-b from-indigo-500 to-indigo-700 rounded-full shadow-sm shadow-indigo-500/30"></div>
+           <div class="w-1 h-7 bg-indigo-600 rounded-full shadow-sm shadow-indigo-500/30"></div>
            <h4 class="font-extrabold text-[15px] text-slate-800 tracking-tight flex items-center gap-2.5">
              <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
                <i class="fas fa-chart-line text-indigo-500 text-sm"></i>
              </div>
              วิเคราะห์แนวโน้มยอดจองและผลงาน
            </h4>
-           <div class="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent"></div>
+           <div class="flex-1 h-px bg-slate-200"></div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 mb-6">
@@ -332,14 +331,14 @@
 
         <!-- Section 2: Products & Campaigns -->
         <div class="flex items-center gap-3 pt-8 pb-3 mb-6 relative">
-           <div class="w-1 h-7 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-full shadow-sm shadow-emerald-500/30"></div>
+           <div class="w-1 h-7 bg-emerald-500 rounded-full shadow-sm shadow-emerald-500/30"></div>
            <h4 class="font-extrabold text-[15px] text-slate-800 tracking-tight flex items-center gap-2.5">
              <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
                <i class="fas fa-mobile-alt text-emerald-500 text-sm"></i>
              </div>
              เจาะลึกแคมเปญสินค้าและพฤติกรรมลูกค้า
            </h4>
-           <div class="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent"></div>
+           <div class="flex-1 h-px bg-slate-200"></div>
         </div>
 
         <div class="chart-card mb-6">
@@ -351,7 +350,7 @@
         
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6 mb-8">
            <div class="chart-card !p-0 overflow-hidden flex flex-col h-full">
-             <div class="bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-200/80 p-4 shrink-0">
+             <div class="bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
                <h6 class="!mb-0"><i class="fas fa-tags text-pink-500"></i>โปรโมชั่นที่นิยม (บิล)</h6>
              </div>
              <div class="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
@@ -368,7 +367,7 @@
              </div>
            </div>
            <div class="chart-card !p-0 overflow-hidden flex flex-col h-full">
-             <div class="bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-200/80 p-4 shrink-0">
+             <div class="bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
                <h6 class="!mb-0"><i class="fas fa-gift text-emerald-500"></i>สรุปของแถมทั้งหมด (ชิ้น)</h6>
              </div>
              <div class="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
@@ -385,7 +384,7 @@
              </div>
            </div>
            <div class="chart-card !p-0 overflow-hidden flex flex-col h-full">
-             <div class="bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-200/80 p-4 shrink-0">
+             <div class="bg-slate-50 border-b border-slate-200/80 p-4 shrink-0">
                <h6 class="!mb-0"><i class="fas fa-users text-indigo-500"></i>สรุปสัดส่วนความสนใจของลูกค้า</h6>
              </div>
              <div class="overflow-y-auto overflow-x-auto custom-scrollbar flex-1 max-h-[250px]">
@@ -405,14 +404,14 @@
 
         <!-- Section 3: Branch Dimensions & Regions -->
         <div class="flex items-center gap-3 pt-8 pb-3 mb-6 relative admin-filter">
-           <div class="w-1 h-7 bg-gradient-to-b from-amber-400 to-amber-600 rounded-full shadow-sm shadow-amber-500/30"></div>
+           <div class="w-1 h-7 bg-amber-500 rounded-full shadow-sm shadow-amber-500/30"></div>
            <h4 class="font-extrabold text-[15px] text-slate-800 tracking-tight flex items-center gap-2.5">
              <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
                <i class="fas fa-map-marked-alt text-amber-500 text-sm"></i>
              </div>
              วิเคราะห์มิติสาขาและภูมิภาค (Demographics)
            </h4>
-           <div class="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent"></div>
+           <div class="flex-1 h-px bg-slate-200"></div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 lg:gap-6 mb-8 admin-filter">
@@ -428,18 +427,18 @@
   <template id="tmpl-pos">
     <div class="flex flex-col lg:h-full gap-4 pb-8 lg:pb-0 relative">
       <!-- Floating Cart Button (FAB) -->
-      <button id="posCartFab" onclick="window.app.pos.toggleCart()" aria-label="เปิดตะกร้าสินค้า" class="fixed bottom-6 right-6 lg:bottom-10 lg:right-10 z-[40] bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-2xl w-16 h-16 shadow-[0_10px_30px_rgba(37,77,113,0.45)] hover:shadow-[0_14px_40px_rgba(37,77,113,0.55)] hover:scale-105 transition-all flex items-center justify-center group border-2 border-white/30">
+      <button id="posCartFab" onclick="window.app.pos.toggleCart()" aria-label="เปิดตะกร้าสินค้า" class="fixed bottom-6 right-6 lg:bottom-10 lg:right-10 z-[40] bg-indigo-600 text-white rounded-2xl w-16 h-16 shadow-[0_10px_30px_rgba(79,70,229,0.4)] hover:shadow-[0_14px_40px_rgba(79,70,229,0.5)] hover:scale-105 transition-all flex items-center justify-center group border-2 border-white/30">
          <i class="fas fa-shopping-cart text-xl group-hover:animate-bounce"></i>
-         <span id="floatingCartCount" class="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[11px] font-black w-7 h-7 rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 border-2 border-white">0</span>
+         <span id="floatingCartCount" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[11px] font-black w-7 h-7 rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 border-2 border-white">0</span>
       </button>
 
       <!-- Off-canvas Cart Overlay -->
-      <div id="cartOverlay" class="fixed inset-0 bg-slate-50/60 backdrop-blur-sm z-[55] hidden transition-opacity opacity-0" onclick="window.app.pos.toggleCart()"></div>
+      <div id="cartOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[55] hidden transition-opacity opacity-0" onclick="window.app.pos.toggleCart()"></div>
       
       <!-- มือถือ: ห้ามล็อกการ์ดที่ความสูงคงที่ (เดิม 65vh) — ส่วนหัวบนจอแคบ (timer แนวตั้ง + select 2 ช่อง + ค้นหา + tiles + chips) กินพื้นที่เกือบหมด เหลือให้กริดสินค้า ~0px = หน้าดูว่างเปล่า (บั๊กที่เจอบน iPhone 2026-07-11); ให้การ์ดสูงตามเนื้อหาแล้วเลื่อนทั้งหน้าแทน ส่วน lg ขึ้นไปคง layout เดิม (การ์ดเต็มจอ + กริด scroll ข้างใน) -->
       <div class="lg:flex-1 flex flex-col bg-slate-50/80 backdrop-blur-xl border border-indigo-200/20 shadow-[0_8px_30px_rgb(0,0,0,0.3)] rounded-3xl transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] p-4 md:p-6 overflow-hidden relative min-h-[65vh] lg:h-full shrink-0 lg:shrink">
           <!-- Countdown Timer Banner -->
-          <div id="posTimerBanner" class="hidden mb-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-50 via-slate-50 to-indigo-50 border border-indigo-100/80 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <div id="posTimerBanner" class="hidden mb-4 p-4 rounded-2xl bg-indigo-50 border border-indigo-100/80 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
              <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
                    <i class="fas fa-hourglass-half text-lg"></i>
@@ -498,7 +497,7 @@
 
       <!-- Off-canvas Cart Drawer -->
       <div id="cartDrawer" role="dialog" aria-label="ตะกร้าสินค้า" class="fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[400px] lg:w-[450px] max-w-full h-[100dvh] flex flex-col bg-slate-50 shadow-2xl transform translate-x-full transition-transform duration-300">
-          <div class="cart-drawer-header bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-700 text-white px-5 flex justify-between items-center relative overflow-hidden">
+          <div class="cart-drawer-header bg-indigo-600 text-white px-5 flex justify-between items-center relative overflow-hidden">
               <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImEiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHBhdGggZD0iTTAgMGg0MHY0MEgweiIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjYSkiLz48L3N2Zz4=')] opacity-50"></div>
               <div class="flex items-center relative z-10">
                   <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center mr-3">
@@ -547,7 +546,7 @@
           </div>
 
           <div class="cart-drawer-footer bg-slate-50 p-2 border-t border-slate-100 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.02)]">
-              <button class="w-full h-full bg-gradient-to-r from-slate-100 to-slate-50 hover:from-slate-50 hover:to-black text-white text-sm font-bold rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center group" onclick="window.app.pos.openCheckoutModal()">
+              <button class="w-full h-full bg-slate-900 hover:bg-black text-white text-sm font-bold rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center group" onclick="window.app.pos.openCheckoutModal()">
                   <i class="fas fa-file-invoice mr-2 opacity-70"></i>
                   ดำเนินการข้อมูลลูกค้า <i class="fas fa-arrow-right ml-2 opacity-70 group-hover:translate-x-1 transition-transform"></i>
               </button>
@@ -556,7 +555,7 @@
     </div>
 
     <div id="addToCartModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="เลือกสินค้าลงตะกร้า">
-      <div class="fixed inset-0 bg-slate-50/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('addToCartModal')"></div>
+      <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('addToCartModal')"></div>
       
       <div class="fixed inset-0 z-10 overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4 text-center">
@@ -630,7 +629,7 @@
             
             <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
                <button type="button" class="px-5 py-2.5 bg-slate-50 border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm" onclick="window.app.hideModal('addToCartModal')">ยกเลิก</button>
-               <button type="button" class="px-6 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl shadow-md hover:bg-indigo-700 transition-colors" onclick="window.app.pos.confirmAddToCart()">เพิ่มลงตะกร้า</button>
+               <button type="button" class="px-6 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-full shadow-md hover:bg-indigo-700 transition-colors" onclick="window.app.pos.confirmAddToCart()">เพิ่มลงตะกร้า</button>
             </div>
             
           </div>
@@ -640,13 +639,13 @@
 
     <!-- Modal บันทึกใบจอง -->
     <div id="checkoutModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="ยืนยันการสั่งจอง">
-      <div class="fixed inset-0 bg-slate-50/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('checkoutModal')"></div>
+      <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('checkoutModal')"></div>
       
       <div class="fixed inset-0 z-10 overflow-y-auto py-6">
         <div class="flex min-h-full items-center justify-center px-4 text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-slate-50 text-left shadow-2xl transition-all w-full max-w-5xl flex flex-col max-h-[90vh]">
             
-            <div class="px-8 py-5 flex justify-between items-center bg-gradient-to-r from-slate-100 to-slate-50 text-white relative overflow-hidden">
+            <div class="px-8 py-5 flex justify-between items-center bg-slate-900 text-white relative overflow-hidden">
                <div class="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImEiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCI+PHBhdGggZD0iTTAgMGg2MHY2MEgweiIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMzAiIHI9IjEuNSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPjwvc3ZnPg==')]"></div>
                <h3 class="text-lg font-bold tracking-wide relative z-10 flex items-center gap-3">
                  <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
@@ -716,11 +715,11 @@
 
             </div>
             
-            <div class="px-8 py-5 bg-gradient-to-r from-slate-50 to-slate-50 border-t border-slate-200 flex justify-between items-center rounded-b-3xl">
-               <button type="button" class="px-5 py-3 text-slate-500 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors text-sm flex items-center gap-2" onclick="window.app.hideModal('checkoutModal')">
+            <div class="px-8 py-5 bg-slate-50 border-t border-slate-200 flex justify-between items-center rounded-b-3xl">
+ <button type="button" class="px-5 py-3 text-slate-500 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors text-sm flex items-center gap-2" onclick="window.app.hideModal('checkoutModal')">
                   <i class="fas fa-arrow-left text-xs"></i> ย้อนกลับ
                </button>
-               <button type="button" class="px-8 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-all flex items-center transform hover:-translate-y-0.5" onclick="window.app.pos.submitCheckout()">
+               <button type="button" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 transition-all flex items-center transform hover:-translate-y-0.5" onclick="window.app.pos.submitCheckout()">
                   ยืนยันการสั่งจอง <i class="fas fa-check-circle ml-2"></i>
                </button>
             </div>
@@ -747,22 +746,22 @@
        <!-- KPI Cards -->
        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="bg-slate-50 border border-slate-200 shadow-sm rounded-2xl p-5 relative overflow-hidden group">
-             <div class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
+             <div class="absolute right-0 top-0 w-24 h-24 bg-indigo-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
              <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2 relative z-10"><i class="fas fa-box text-indigo-500 mr-1.5 opacity-80"></i>ยอดรวม (ไม่รวมของแถม)</p>
              <h3 class="text-2xl md:text-3xl font-black text-indigo-600 relative z-10" id="anKpiTotal">0</h3>
           </div>
           <div class="bg-slate-50 border border-slate-200 shadow-sm rounded-2xl p-5 relative overflow-hidden group">
-             <div class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-blue-100 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
+             <div class="absolute right-0 top-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
              <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2 relative z-10"><i class="fas fa-mobile-alt text-blue-500 mr-1.5 opacity-80"></i>ยอดขาย โมบาย</p>
              <h3 class="text-2xl md:text-3xl font-black text-slate-800 relative z-10" id="anKpiMobile">0</h3>
           </div>
           <div class="bg-slate-50 border border-slate-200 shadow-sm rounded-2xl p-5 relative overflow-hidden group">
-             <div class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-pink-50 to-pink-100 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
+             <div class="absolute right-0 top-0 w-24 h-24 bg-pink-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
              <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2 relative z-10"><i class="fas fa-headphones text-pink-500 mr-1.5 opacity-80"></i>ยอดขาย อุปกรณ์เสริม</p>
              <h3 class="text-2xl md:text-3xl font-black text-slate-800 relative z-10" id="anKpiAcc">0</h3>
           </div>
           <div class="bg-slate-50 border border-slate-200 shadow-sm rounded-2xl p-5 relative overflow-hidden group">
-             <div class="absolute right-0 top-0 w-24 h-24 bg-gradient-to-br from-amber-50 to-amber-100 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
+             <div class="absolute right-0 top-0 w-24 h-24 bg-amber-50 rounded-bl-full -mr-4 -mt-4 opacity-50"></div>
              <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2 relative z-10"><i class="fas fa-bullseye text-amber-500 mr-1.5 opacity-80"></i>คาดการณ์รวมเมื่อจบแคมเปญ</p>
              <h3 class="text-2xl md:text-3xl font-black text-amber-500 relative z-10" id="anKpiForecast">0</h3>
           </div>
@@ -798,7 +797,7 @@
 
        <!-- Table Section -->
        <div class="chart-card !p-0 overflow-hidden mb-8">
-           <div class="bg-gradient-to-r from-slate-50 to-slate-50 border-b border-slate-200/80 p-4">
+           <div class="bg-slate-50 border-b border-slate-200/80 p-4">
              <h6 class="!mb-0"><i class="fas fa-crosshairs text-indigo-500"></i>Target vs ยอดจองตาม Area</h6>
            </div>
            <div class="overflow-x-auto">
@@ -886,7 +885,7 @@
 
   <template id="tmpl-datagrid">
     <div class="chart-card !p-0 flex flex-col overflow-hidden mb-8">
-      <div class="bg-gradient-to-r from-slate-50 to-slate-50/80 border-b border-slate-200/80 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="bg-slate-50 border-b border-slate-200/80 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div class="relative w-full sm:w-1/2 md:w-1/3">
            <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
            <input type="text" class="w-full pl-11 pr-10 py-2.5 bg-slate-100/80 border border-slate-200/50 rounded-xl text-sm font-medium focus:bg-slate-50 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none" id="gridSearch" placeholder="พิมพ์เพื่อค้นหาข้อมูล..." onkeyup="window.app.grid.filter()">
@@ -906,7 +905,7 @@
       
       <div class="w-full overflow-x-auto custom-scrollbar max-h-[75vh]">
         <table class="w-full min-w-[1000px] text-left border-collapse whitespace-nowrap" id="dataTable">
-          <thead id="dataGridHead" class="bg-gradient-to-r from-indigo-600 to-indigo-700 relative z-20"></thead>
+          <thead id="dataGridHead" class="bg-indigo-600 relative z-20"></thead>
           <tbody id="dataGridBody" class="divide-y divide-slate-100 bg-slate-50 relative z-0"></tbody>
         </table>
       </div>
@@ -914,7 +913,7 @@
     </div>
 
     <div id="formModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="ฟอร์มจัดการข้อมูล">
-      <div class="fixed inset-0 bg-slate-50/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('formModal')"></div>
+      <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('formModal')"></div>
       <div class="fixed inset-0 z-10 overflow-y-auto py-6">
         <div class="flex min-h-full items-center justify-center px-4 text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-slate-50 text-left shadow-2xl transition-all w-full max-w-4xl flex flex-col max-h-[90vh]">
@@ -940,7 +939,7 @@
 
     <!-- เพิ่มสินค้าใหม่แบบหลาย SKU (Products เท่านั้น) — กรอกข้อมูลร่วมของสินค้าครั้งเดียว แล้วเพิ่มหลายแถว SKU ในคำขอเดียว -->
     <div id="productGroupModal" class="fixed inset-0 z-[65] hidden" role="dialog" aria-modal="true" aria-label="เพิ่มสินค้าใหม่แบบหลาย SKU">
-      <div class="fixed inset-0 bg-slate-50/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('productGroupModal')"></div>
+      <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('productGroupModal')"></div>
       <div class="fixed inset-0 z-10 overflow-y-auto py-6">
         <div class="flex min-h-full items-center justify-center px-4 text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-slate-50 text-left shadow-2xl transition-all w-full max-w-4xl flex flex-col max-h-[90vh]">
@@ -1200,39 +1199,11 @@
     </div>
   </template>
 
-  <script>
-    window.tailwind = {
-      config: {
-        theme: {
-          extend: {
-            colors: {
-              // รอบปรับโทน "Luxury Liquid Glass" (2026-09-18): เปลี่ยนจากพรีเมี่ยม slate-navy กลางวัน เป็น dark charcoal + champagne gold
-              // จุดเดียวนี้ไล่สีทั่วแอปอัตโนมัติ เพราะปุ่ม/แถบเมนู/badge ส่วนใหญ่อ้างอิง indigo-*/slate-* คลาสอยู่แล้ว ไม่ต้องแก้ทีละจุด
-              // indigo = สีเน้นหลัก (ทอง/champagne — อ้างอิง #c19a4b/#8a6428 ที่มีอยู่แล้วในโลโก้หน้า login เดิม)
-              indigo: { 50: '#fdf8ee', 100: '#f8ecd2', 200: '#f0dba8', 300: '#e4c078', 400: '#d4a94f', 500: '#c19a4b', 600: '#a67c32', 700: '#8a6428', 800: '#6b4d1e', 900: '#4a3515' },
-              // slate = สเกลกลาง กลับด้านทั้งหมด (50↔900) เพื่อพลิกทุกจุดที่เคยเป็น "พื้นอ่อน+ตัวอักษรเข้ม" (ธีมกลางวัน)
-              // ให้กลายเป็น "พื้นเข้ม+ตัวอักษรอ่อน" (ธีมกลางคืน) โดยไม่ต้องไล่แก้ class ทีละพันจุดใน Index.html/JS.html
-              slate: { 50: '#0b0b0e', 100: '#131317', 200: '#1e1e24', 300: '#2d2d35', 400: '#54545f', 500: '#7d7d89', 600: '#a3a3ad', 700: '#c7c7cf', 800: '#e6e6ea', 900: '#f7f7f9' },
-              emerald: { 50: '#ecfdf5', 100: '#d1fae5', 400: '#34d399', 500: '#10b981', 600: '#059669' },
-              amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
-              rose: { 50: '#fff1f2', 100: '#ffe4e6', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48' },
-              cyan: { 50: '#ecfeff', 400: '#22d3ee', 500: '#06b6d4' },
-              purple: { 50: '#faf5ff', 400: '#c084fc', 500: '#a855f7' }
-            },
-            fontFamily: {
-              sans: ['Prompt', 'Inter', 'sans-serif'],
-            },
-            boxShadow: {
-              'enterprise': '0 10px 25px -3px rgba(0, 0, 0, 0.35), 0 4px 10px -4px rgba(0, 0, 0, 0.3)',
-              'enterprise-lg': '0 20px 40px -8px rgba(0, 0, 0, 0.5), 0 8px 16px -6px rgba(0, 0, 0, 0.35)',
-              'glow-indigo': '0 0 20px -5px rgba(193, 154, 75, 0.45)',
-            }
-          }
-        }
-      }
-    };
-  </script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind ถูก precompile เป็น static CSS แล้ว (ดู ../tailwind.config.js + ../build-tailwind.js ที่ root ของโปรเจกต์)
+       เดิมใช้ cdn.tailwindcss.com + window.tailwind.config รันสด แต่พบว่า config ไม่ถูก apply จริงบน GAS /exec production
+       (ยืนยันด้วย headless screenshot ของหน้า live จริง 2026-09-18 — เห็นพาเลตเริ่มต้นของ Tailwind แทนสีที่ตั้งไว้)
+       ⚠️ ถ้าเพิ่ม/แก้ Tailwind utility class ใหม่ใน Index.html หรือ JS.html ต้องรัน `node build-tailwind.js` (ที่ root โปรเจกต์) ก่อน clasp push ทุกครั้ง มิฉะนั้น class ใหม่จะไม่มีสไตล์ -->
+  <?!= include('TailwindCompiled'); ?>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
