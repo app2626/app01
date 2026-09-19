@@ -23,8 +23,9 @@ function setupDatabase(userToken) {
     if (!caller || caller.Role !== 'Admin') throw new Error("Permission Denied: เฉพาะ Admin เท่านั้น");
   }
   const tables = {
-    // 6C.1 — Original Price ต่อท้ายเสมอ (display-only: ป้าย "ประหยัด/เดิม" บนการ์ด POS — ราคาคิดเงินจริงคือ Price)
-    "Products": ["SKU", "Product Name", "Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Stock", "Unit", "Category", "Status", "Channel", "Original Price"],
+    // 6C.3 (2026-09-19) — Marketing Model เพิ่มใหม่ ต่อจาก Model (ผู้ใช้เพิ่มคอลัมน์เองในชีตจริงที่ท้ายสุด แล้วขอให้ย้าย)
+    // 6C.2 (2026-09-19) — Original Price ย้ายมาอยู่ถัดจาก Price ตามคำขอ (เดิมต่อท้ายสุด) — ยังเป็น display-only เหมือนเดิม: ป้าย "ประหยัด/เดิม" บนการ์ด POS ราคาคิดเงินจริงคือ Price
+    "Products": ["SKU", "Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Original Price", "Stock", "Unit", "Category", "Status", "Channel"],
     "Members": ["Username", "Password", "Role", "Name", "Branch Code", "Accessible Menus"],
     "Branches": ["Channel", "Branch Code", "Branch Name", "Area", "Mall", "Region", "Province", "Type Name"],
     "Channels": ["Channel ID", "Channel Name", "Description"],
@@ -68,12 +69,12 @@ function setupDatabase(userToken) {
       ["B-008", "popupbanner", "https://via.placeholder.com/800x800/10b981/ffffff?text=Popup+Banner+1", "Active"]
     ],
     "Products": [
-      ["SKU-S24U", "Samsung Galaxy S24 Ultra", "S24 Ultra", "S24-Series", "512GB", "Titanium Black", "https://images.samsung.com/is/image/samsung/p6pim/th/2401/gallery/th-galaxy-s24-s928-sm-s928bzththl-thumb-539325419", 46900, 50, "เครื่อง", "โมบาย", "เปิด", "ALL"],
-      ["SKU-IP15P", "iPhone 15 Pro Max", "15 Pro Max", "IP15-Series", "256GB", "Natural", "https://store.storeimages.cdn-apple.com/8756/as-images.apple.com/is/iphone-15-pro-max-natural-titanium-select", 48900, 20, "เครื่อง", "โมบาย", "เปิด", "ALL"],
-      ["GF-SAM-ADPT", "Samsung Adapter 25W (Black)", "Adapter", "-", "-", "Black", "https://images.samsung.com/is/image/samsung/p6pim/th/ep-ta800nbegww/gallery/th-25w-pd-adapter-ta800-ep-ta800nbegww-thumb-536852431", 490, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL"],
-      ["GF-SAM-CASE", "Samsung Clear Case S24U", "Case", "-", "-", "Clear", "https://images.samsung.com/is/image/samsung/p6pim/th/ef-qs928ctegww/gallery/th-clear-case-for-galaxy-s24-ultra-ef-qs928-ef-qs928ctegww-thumb-539326442", 590, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL"],
-      ["GF-TG-PB10K", "TG Powerbank 10000mAh", "PB", "-", "10000", "White", "https://via.placeholder.com/150/ffffff/000000?text=Powerbank", 990, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL"],
-      ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL"]
+      ["SKU-S24U", "Samsung Galaxy S24 Ultra", "S24 Ultra", "", "S24-Series", "512GB", "Titanium Black", "https://images.samsung.com/is/image/samsung/p6pim/th/2401/gallery/th-galaxy-s24-s928-sm-s928bzththl-thumb-539325419", 46900, "", 50, "เครื่อง", "โมบาย", "เปิด", "ALL"],
+      ["SKU-IP15P", "iPhone 15 Pro Max", "15 Pro Max", "", "IP15-Series", "256GB", "Natural", "https://store.storeimages.cdn-apple.com/8756/as-images.apple.com/is/iphone-15-pro-max-natural-titanium-select", 48900, "", 20, "เครื่อง", "โมบาย", "เปิด", "ALL"],
+      ["GF-SAM-ADPT", "Samsung Adapter 25W (Black)", "Adapter", "", "-", "-", "Black", "https://images.samsung.com/is/image/samsung/p6pim/th/ep-ta800nbegww/gallery/th-25w-pd-adapter-ta800-ep-ta800nbegww-thumb-536852431", 490, "", 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL"],
+      ["GF-SAM-CASE", "Samsung Clear Case S24U", "Case", "", "-", "-", "Clear", "https://images.samsung.com/is/image/samsung/p6pim/th/ef-qs928ctegww/gallery/th-clear-case-for-galaxy-s24-ultra-ef-qs928-ef-qs928ctegww-thumb-539326442", 590, "", 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL"],
+      ["GF-TG-PB10K", "TG Powerbank 10000mAh", "PB", "", "-", "10000", "White", "https://via.placeholder.com/150/ffffff/000000?text=Powerbank", 990, "", 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL"],
+      ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, "", 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL"]
     ],
     "GiftMappings": [
       ["GM-001", "S24-Series", "Retail", "adapter, case", "bag", "เปิด"],
@@ -124,6 +125,91 @@ function setupDatabase(userToken) {
     }
   }
   return { status: 'success', message: 'Database Ready' };
+}
+
+// One-time migration (2026-09-19): ย้ายคอลัมน์ "Original Price" ในชีต Products จริงให้มาอยู่ถัดจาก "Price" ทันที
+// ปลอดภัยกับโค้ดทั้งหมด เพราะ getTableDataAsJson/saveRecord/saveProductGroup/updateProductGroup ทุกจุดอิงชื่อ header
+// เสมอ ไม่มีจุดใดอิงตำแหน่งคอลัมน์ตายตัว — รันครั้งเดียวจาก Apps Script Editor เท่านั้น (เลือกฟังก์ชันนี้แล้วกด Run)
+// ห้ามเรียกผ่าน apiHandler/หน้าเว็บ/clasp run สำรองชีตทั้งใบไว้ให้อัตโนมัติก่อนย้ายทุกครั้ง ลบสำเนาสำรองเองได้ภายหลังเมื่อมั่นใจว่าถูกต้อง
+function migrateProductsMoveOriginalPriceColumn() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Products");
+  if (!sheet) throw new Error("ไม่พบชีต Products");
+
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  const headersBefore = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
+  Logger.log("Headers ก่อนย้าย: " + JSON.stringify(headersBefore));
+
+  const priceIdx0 = headersBefore.indexOf("Price");
+  const origIdx0 = headersBefore.indexOf("Original Price");
+  if (priceIdx0 === -1) throw new Error('ไม่พบคอลัมน์ "Price" ในชีต Products');
+  if (origIdx0 === -1) throw new Error('ไม่พบคอลัมน์ "Original Price" ในชีต Products');
+  if (origIdx0 === priceIdx0 + 1) {
+    Logger.log('"Original Price" อยู่ถัดจาก "Price" อยู่แล้ว — ไม่ต้องย้าย');
+    return { status: 'success', message: 'อยู่ตำแหน่งที่ถูกต้องอยู่แล้ว ไม่มีการเปลี่ยนแปลง', headers: headersBefore };
+  }
+
+  const backupName = "Products_backup_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "Asia/Bangkok", "yyyyMMdd_HHmmss");
+  sheet.copyTo(ss).setName(backupName);
+  Logger.log("สำรองชีตไว้แล้วที่: " + backupName);
+
+  const origCol1based = origIdx0 + 1;
+  // moveColumns อิงตำแหน่งคอลัมน์ "ก่อนย้าย" เสมอ — ย้ายคอลัมน์ที่อยู่ index สูงกว่าไปแทรกหลัง Price
+  // ต้องใช้ destinationIndex = priceIdx0 + 2 (คือตำแหน่ง 1-based ถัดจาก Price พอดี ณ ก่อนย้าย)
+  const destinationIndex = priceIdx0 + 2;
+  const rangeToMove = sheet.getRange(1, origCol1based, Math.max(lastRow, 1));
+  sheet.moveColumns(rangeToMove, destinationIndex);
+  SpreadsheetApp.flush();
+
+  const headersAfter = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
+  Logger.log("Headers หลังย้าย: " + JSON.stringify(headersAfter));
+
+  return { status: 'success', message: 'ย้ายคอลัมน์สำเร็จ', before: headersBefore, after: headersAfter, backupSheet: backupName };
+}
+
+// One-time migration (2026-09-19): ย้ายคอลัมน์ "Marketing Model" (ที่ผู้ใช้เพิ่มเองท้ายชีต) ให้มาอยู่ถัดจาก "Model" ทันที
+// หลักการเดียวกับ migrateProductsMoveOriginalPriceColumn ด้านบนทุกประการ — รันครั้งเดียวจาก Apps Script Editor เท่านั้น
+function migrateProductsMoveMarketingModelColumn() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Products");
+  if (!sheet) throw new Error("ไม่พบชีต Products");
+
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  const headersBefore = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
+  Logger.log("Headers ก่อนย้าย: " + JSON.stringify(headersBefore));
+
+  const modelIdx0 = headersBefore.indexOf("Model");
+  const mktIdx0 = headersBefore.indexOf("Marketing Model");
+  if (modelIdx0 === -1) throw new Error('ไม่พบคอลัมน์ "Model" ในชีต Products');
+  if (mktIdx0 === -1) throw new Error('ไม่พบคอลัมน์ "Marketing Model" ในชีต Products (ตรวจว่าเพิ่มหัวคอลัมน์ถูกชื่อแล้ว)');
+  if (mktIdx0 === modelIdx0 + 1) {
+    Logger.log('"Marketing Model" อยู่ถัดจาก "Model" อยู่แล้ว — ไม่ต้องย้าย');
+    return { status: 'success', message: 'อยู่ตำแหน่งที่ถูกต้องอยู่แล้ว ไม่มีการเปลี่ยนแปลง', headers: headersBefore };
+  }
+
+  const backupName = "Products_backup_" + Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "Asia/Bangkok", "yyyyMMdd_HHmmss");
+  sheet.copyTo(ss).setName(backupName);
+  Logger.log("สำรองชีตไว้แล้วที่: " + backupName);
+
+  const mktCol1based = mktIdx0 + 1;
+  const destinationIndex = modelIdx0 + 2; // แทรกให้อยู่ถัดจาก Model ทันที (อิงตำแหน่งก่อนย้าย)
+  const rangeToMove = sheet.getRange(1, mktCol1based, Math.max(lastRow, 1));
+  sheet.moveColumns(rangeToMove, destinationIndex);
+  SpreadsheetApp.flush();
+
+  const headersAfter = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
+  Logger.log("Headers หลังย้าย: " + JSON.stringify(headersAfter));
+
+  return { status: 'success', message: 'ย้ายคอลัมน์สำเร็จ', before: headersBefore, after: headersAfter, backupSheet: backupName };
+}
+
+// One-time utility (2026-09-19): ล้าง cache ของชีต Products (TTL 6 ชม. ดู getTableDataAsJson) — รันครั้งเดียวจาก Apps Script Editor
+// ใช้เมื่อแก้ไขชีต Products ตรงๆ (เช่น เพิ่ม/กรอกคอลัมน์เอง) เพราะการแก้ตรงชีตไม่ทริกเกอร์ล้าง cache แบบที่บันทึกผ่านแอปทำอัตโนมัติ
+function clearProductsCache() {
+  CacheService.getScriptCache().remove("TABLE_Products");
+  Logger.log("ล้าง cache ของ Products แล้ว");
 }
 
 function hashPassword(password) {
@@ -1143,6 +1229,15 @@ function saveProductGroup(payload, secureUser, ss) {
       sharedForRows = shared;
     }
 
+    // ราคาเป็นฟิลด์ร่วมของสินค้าแล้ว (ทุก SKU ของสินค้าเดียวกันใช้ราคาเดียวกัน) — ตรวจครั้งเดียวจากค่าที่จะใช้จริง
+    // (ที่ client ส่งมาตอนสร้างใหม่ / จากแถวเดิมของสินค้านั้นตอน append กันข้อมูลไม่ตรงกันระหว่าง SKU เดิม/ใหม่)
+    const sharedPrice = parseFloat(sharedForRows['Price']);
+    if (isNaN(sharedPrice) || sharedPrice < 0) throw new Error("กรุณาระบุราคาให้ถูกต้อง");
+    sharedForRows['Price'] = sharedPrice;
+    // ความจุเป็นฟิลด์ร่วมของสินค้าเช่นเดียวกับราคา (2026-09-19) — ทุก SKU ของ Model เดียวกันใช้ความจุเดียวกัน มีแค่สีที่ต่างกันต่อแถว
+    const sharedCapacity = (sharedForRows['Capacity'] || '').toString().trim();
+    sharedForRows['Capacity'] = sharedCapacity;
+
     // SKU เป็นรหัสหลักของทั้งชีต ต้องไม่ซ้ำทั้งกันเองในฟอร์มและกับ SKU ใดๆ ที่มีอยู่แล้วในระบบ (รวมถึง SKU เดิมของสินค้านี้เองตอน append)
     const existingSkus = {};
     for (let i = 1; i < data.length; i++) {
@@ -1158,20 +1253,15 @@ function saveProductGroup(payload, secureUser, ss) {
       if (existingSkus[sku]) throw new Error("SKU ซ้ำกับสินค้าอื่นที่มีอยู่แล้วในระบบ: " + sku);
       seenSku[sku] = true;
 
-      const price = parseFloat(v.price);
-      if (isNaN(price) || price < 0) throw new Error("ราคาของ SKU " + sku + " ไม่ถูกต้อง");
       const stock = parseInt(v.stock, 10);
       if (!Number.isInteger(stock) || stock < 0) throw new Error("สต๊อกของ SKU " + sku + " ไม่ถูกต้อง");
 
-      const capacity = (v.capacity || '').toString().trim();
       const color = (v.color || '').toString().trim();
       const rowObj = Object.assign({}, sharedForRows, {
         'SKU': sku,
-        'Capacity': capacity,
         'Color': color,
-        'Price': price,
         'Stock': stock,
-        'Product Name': buildAutoProductName_(model, capacity, color)
+        'Product Name': buildAutoProductName_(model, sharedCapacity, color)
       });
       // รูปเฉพาะ SKU นี้ (ถ้ามี) แทนที่รูปเริ่มต้นของสินค้าเฉพาะแถวนี้แถวเดียว
       const perSkuImage = (v.image || '').toString().trim();
@@ -1211,6 +1301,14 @@ function updateProductGroup(payload, secureUser, ss) {
     const variantsIn = Array.isArray(payload.variants) ? payload.variants : [];
     if (variantsIn.length === 0) throw new Error("กรุณาเหลืออย่างน้อย 1 SKU (ถ้าต้องการลบสินค้าทั้งหมด กรุณาลบทีละแถวจากตารางแทน)");
 
+    // ราคาเป็นฟิลด์ร่วมของสินค้าแล้ว (ทุก SKU ใช้ราคาเดียวกัน) — ตรวจครั้งเดียวจากค่าที่ client ส่งมา
+    const sharedPrice = parseFloat(shared['Price']);
+    if (isNaN(sharedPrice) || sharedPrice < 0) throw new Error("กรุณาระบุราคาให้ถูกต้อง");
+    shared['Price'] = sharedPrice;
+    // ความจุเป็นฟิลด์ร่วมของสินค้าเช่นเดียวกับราคา (2026-09-19) — ทุก SKU ของ Model เดียวกันใช้ความจุเดียวกัน มีแค่สีที่ต่างกันต่อแถว
+    const sharedCapacity = (shared['Capacity'] || '').toString().trim();
+    shared['Capacity'] = sharedCapacity;
+
     const sheet = ss.getSheetByName("Products");
     if (!sheet) throw new Error("ไม่พบชีต Products");
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
@@ -1238,21 +1336,16 @@ function updateProductGroup(payload, secureUser, ss) {
       if (otherSkus[sku]) throw new Error("SKU ซ้ำกับสินค้าอื่นที่มีอยู่แล้วในระบบ: " + sku);
       seenSku[sku] = true;
 
-      const price = parseFloat(v.price);
-      if (isNaN(price) || price < 0) throw new Error("ราคาของ SKU " + sku + " ไม่ถูกต้อง");
       const stock = parseInt(v.stock, 10);
       if (!Number.isInteger(stock) || stock < 0) throw new Error("สต๊อกของ SKU " + sku + " ไม่ถูกต้อง");
 
-      const capacity = (v.capacity || '').toString().trim();
       const color = (v.color || '').toString().trim();
       const rowObj = Object.assign({}, shared, {
         'Model': originalModel,
         'SKU': sku,
-        'Capacity': capacity,
         'Color': color,
-        'Price': price,
         'Stock': stock,
-        'Product Name': buildAutoProductName_(originalModel, capacity, color)
+        'Product Name': buildAutoProductName_(originalModel, sharedCapacity, color)
       });
       const perSkuImage = (v.image || '').toString().trim();
       if (perSkuImage) rowObj['Image URL'] = perSkuImage;
