@@ -368,6 +368,9 @@
             </div>
             <div id="loginErrorMsg" class="alert alert-danger py-2 d-none"></div>
             <button type="submit" class="btn btn-primary w-100 fw-bold py-2"><i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
+            <div class="text-center mt-3">
+                <a href="#" id="forgotPasswordLink" class="text-secondary small">ลืมรหัสผ่าน?</a>
+            </div>
         </form>
     </div>
 </div>
@@ -1272,6 +1275,84 @@
         });
     }
 
+    function promptForgotPassword() {
+        Swal.fire({
+            title: 'ลืมรหัสผ่าน',
+            html: 'กรอกรหัสสาขาเพื่อรับรหัส OTP ทางอีเมลที่ลงทะเบียนไว้<br><br>' +
+                  '<input type="text" id="swalForgotLocCode" class="swal2-input" placeholder="รหัสสาขา (Location Code)">',
+            confirmButtonText: 'ส่งรหัส OTP',
+            showCancelButton: true,
+            cancelButtonText: 'ยกเลิก',
+            preConfirm: function() {
+                var locCode = document.getElementById('swalForgotLocCode').value.trim();
+                if (!locCode) {
+                    Swal.showValidationMessage('กรุณากรอกรหัสสาขา');
+                    return false;
+                }
+                return new Promise(function(resolve) {
+                    google.script.run
+                        .withFailureHandler(function(err) {
+                            Swal.showValidationMessage('เกิดข้อผิดพลาด: ' + err.message);
+                            resolve(false);
+                        })
+                        .withSuccessHandler(function(res) {
+                            if (!res.success) {
+                                Swal.showValidationMessage(res.message);
+                                resolve(false);
+                            } else {
+                                resolve({ locCode: locCode, message: res.message });
+                            }
+                        }).requestPasswordReset(locCode);
+                });
+            }
+        }).then(function(result) {
+            if (result.isConfirmed && result.value) {
+                Swal.fire('ส่งรหัส OTP แล้ว', result.value.message, 'success').then(function() {
+                    promptResetPasswordWithOtp(result.value.locCode);
+                });
+            }
+        });
+    }
+
+    function promptResetPasswordWithOtp(locCode) {
+        Swal.fire({
+            title: 'ตั้งรหัสผ่านใหม่',
+            html: 'รหัสสาขา: <b>' + locCode + '</b><br><br>' +
+                  '<input type="text" id="swalResetOtp" class="swal2-input" placeholder="รหัส OTP 6 หลัก" maxlength="6">' +
+                  '<input type="password" id="swalResetNewPassword" class="swal2-input" placeholder="รหัสผ่านใหม่">',
+            confirmButtonText: 'ยืนยันตั้งรหัสผ่านใหม่',
+            showCancelButton: true,
+            cancelButtonText: 'ยกเลิก',
+            preConfirm: function() {
+                var otp = document.getElementById('swalResetOtp').value.trim();
+                var newPw = document.getElementById('swalResetNewPassword').value;
+                if (!otp || !newPw) {
+                    Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน');
+                    return false;
+                }
+                return new Promise(function(resolve) {
+                    google.script.run
+                        .withFailureHandler(function(err) {
+                            Swal.showValidationMessage('เกิดข้อผิดพลาด: ' + err.message);
+                            resolve(false);
+                        })
+                        .withSuccessHandler(function(res) {
+                            if (!res.success) {
+                                Swal.showValidationMessage(res.message);
+                                resolve(false);
+                            } else {
+                                resolve(true);
+                            }
+                        }).resetPasswordWithOtp(locCode, otp, newPw);
+                });
+            }
+        }).then(function(result) {
+            if (result.isConfirmed && result.value) {
+                Swal.fire('สำเร็จ', 'ตั้งรหัสผ่านใหม่เรียบร้อย กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่', 'success');
+            }
+        });
+    }
+
     // บัญชีสิทธิ์ "พิเศษ" ดูข้อมูล/แดชบอร์ดได้ทุกแท็บเหมือน user ทั่วไป แต่คีย์ฟอร์ม ACT และเปลี่ยนสถานะไม่ได้
     // (บัญชี Admin ถูกล็อกฟอร์มอยู่แล้วจากเงื่อนไข __ADMIN__ ด้านบน ไม่ต้องซ้อนข้อความเตือนอีกชั้น)
     function applyRoleRestrictions() {
@@ -1413,6 +1494,11 @@
 
         $('#changePwBtn').on('click', function() {
             promptChangePassword(false);
+        });
+
+        $('#forgotPasswordLink').on('click', function(e) {
+            e.preventDefault();
+            promptForgotPassword();
         });
 
         $('#logoutBtn').on('click', function() {

@@ -45,6 +45,10 @@ function getAccessLogSheet_(ss) {
   return findSheet(ss, "accesslog");
 }
 
+function getPasswordResetsSheet_(ss) {
+  return findSheet(ss, "passwordresets");
+}
+
 function getTransferSheet_(ss) {
   return findSheet(ss, "transferrequests");
 }
@@ -363,6 +367,141 @@ function logout(token) {
   return { success: true };
 }
 
+// ================= FORGOT PASSWORD (OTP ทางอีเมล) =================
+const OTP_EXPIRY_MINUTES = 10;
+
+function maskEmail_(email) {
+  const parts = (email || "").toString().split("@");
+  if (parts.length !== 2 || !parts[0]) return "";
+  const visible = parts[0].length <= 2 ? parts[0].charAt(0) : parts[0].substring(0, 2);
+  return visible + "***@" + parts[1];
+}
+
+// ขอ OTP รีเซ็ตรหัสผ่าน ส่งไปยังอีเมลที่ลงทะเบียนไว้ในชีต Users คอลัมน์ G (Email) เท่านั้น
+// ออก OTP ใหม่ทุกครั้งที่ขอ และล้าง OTP เก่าของสาขานั้นทิ้งก่อน กัน OTP เก่าที่ยังไม่หมดอายุถูกใช้ซ้ำ
+function requestPasswordReset(locCode) {
+  locCode = (locCode || "").toString().trim();
+  if (!locCode) return { success: false, message: "กรุณากรอกรหัสสาขา" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบรหัสสาขานี้ในระบบ" };
+
+  const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 7).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if ((data[i][0] || "").toString().trim() !== locCode) continue;
+
+    const active = (data[i][4] || "").toString().trim().toUpperCase();
+    if (active !== "TRUE" && active !== "Y") {
+      return { success: false, message: "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ" };
+    }
+
+    const email = (data[i][6] || "").toString().trim();
+    if (!email) {
+      return { success: false, message: "บัญชีนี้ยังไม่ได้ลงทะเบียนอีเมลไว้ กรุณาติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน" };
+    }
+
+    const resetsSheet = getPasswordResetsSheet_(ss);
+    if (!resetsSheet) return { success: false, message: "ระบบยังไม่พร้อมใช้งานฟีเจอร์นี้ กรุณาติดต่อผู้ดูแลระบบ" };
+
+    if (resetsSheet.getLastRow() > 1) {
+      const resetData = resetsSheet.getRange(2, 1, resetsSheet.getLastRow() - 1, 1).getDisplayValues();
+      for (let r = resetData.length - 1; r >= 0; r--) {
+        if ((resetData[r][0] || "").toString().trim() === locCode) resetsSheet.deleteRow(r + 2);
+      }
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const salt = Utilities.getUuid();
+    const otpHash = hashPassword_(otp, salt);
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    resetsSheet.appendRow([
+      locCode, otpHash, salt,
+      Utilities.formatDate(expiresAt, "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss"),
+      Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")
+    ]);
+
+    const locName = getLocNameByCode_(ss, locCode);
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน — ACT SAMSUNG System",
+        body: "รหัสสาขา: " + locCode + (locName ? " (" + locName + ")" : "") + "\n\n" +
+              "รหัส OTP สำหรับตั้งรหัสผ่านใหม่ของคุณคือ: " + otp + "\n" +
+              "รหัสนี้จะหมดอายุภายใน " + OTP_EXPIRY_MINUTES + " นาที\n\n" +
+              "หากคุณไม่ได้เป็นผู้ขอรีเซ็ตรหัสผ่าน กรุณาละเว้นอีเมลนี้"
+      });
+    } catch (err) {
+      return { success: false, message: "ส่งอีเมลไม่สำเร็จ: " + err.message };
+    }
+
+    logAccess_(ss, locCode, locName, ROLE_NORMAL, "REQUEST_PASSWORD_RESET", "");
+    return { success: true, message: "ส่งรหัส OTP ไปที่อีเมล " + maskEmail_(email) + " แล้ว กรุณาตรวจสอบกล่องขาเข้า" };
+  }
+
+  return { success: false, message: "ไม่พบรหัสสาขานี้ในระบบ" };
+}
+
+// ยืนยัน OTP แล้วตั้งรหัสผ่านใหม่ให้บัญชีสาขา — สำเร็จแล้วเพิกถอนทุก session เดิมของสาขานี้ บังคับ login ใหม่ด้วยรหัสผ่านใหม่
+function resetPasswordWithOtp(locCode, otp, newPassword) {
+  locCode = (locCode || "").toString().trim();
+  otp = (otp || "").toString().trim();
+  newPassword = (newPassword || "").toString();
+  if (!locCode || !otp) return { success: false, message: "กรุณากรอกรหัส OTP" };
+  if (newPassword.length < 4) return { success: false, message: "รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const resetsSheet = getPasswordResetsSheet_(ss);
+  if (!resetsSheet || resetsSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบคำขอรีเซ็ตรหัสผ่าน กรุณาขอ OTP ใหม่" };
+
+  const data = resetsSheet.getRange(2, 1, resetsSheet.getLastRow() - 1, 5).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if ((data[i][0] || "").toString().trim() !== locCode) continue;
+
+    const storedHash = data[i][1];
+    const salt = data[i][2];
+    const expiresAt = parseSessionTimestamp_(data[i][3]);
+    if (!expiresAt || Date.now() > expiresAt.getTime()) {
+      resetsSheet.deleteRow(i + 2);
+      return { success: false, message: "รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่" };
+    }
+
+    if (hashPassword_(otp, salt) !== storedHash) {
+      return { success: false, message: "รหัส OTP ไม่ถูกต้อง" };
+    }
+
+    const usersSheet = getUsersSheet_(ss);
+    if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
+    const usersLocCodes = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues();
+    let userRow = -1;
+    for (let u = 0; u < usersLocCodes.length; u++) {
+      if ((usersLocCodes[u][0] || "").toString().trim() === locCode) { userRow = u + 2; break; }
+    }
+    if (userRow === -1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
+
+    const newSalt = Utilities.getUuid();
+    const newHash = hashPassword_(newPassword, newSalt);
+    usersSheet.getRange(userRow, 2, 1, 3).setValues([[newHash, newSalt, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy")]]);
+
+    resetsSheet.deleteRow(i + 2);
+
+    const sessionsSheet = getSessionsSheet_(ss);
+    if (sessionsSheet && sessionsSheet.getLastRow() > 1) {
+      const sessData = sessionsSheet.getRange(2, 1, sessionsSheet.getLastRow() - 1, 2).getDisplayValues();
+      for (let r = sessData.length - 1; r >= 0; r--) {
+        if ((sessData[r][1] || "").toString().trim() === locCode) sessionsSheet.deleteRow(r + 2);
+      }
+    }
+
+    const locName = getLocNameByCode_(ss, locCode);
+    logAccess_(ss, locCode, locName, ROLE_NORMAL, "RESET_PASSWORD_OTP", "");
+
+    return { success: true, message: "ตั้งรหัสผ่านใหม่สำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่" };
+  }
+
+  return { success: false, message: "ไม่พบคำขอรีเซ็ตรหัสผ่าน กรุณาขอ OTP ใหม่" };
+}
+
 function validateSessionToken(token) {
   const session = resolveSession_(token);
   if (!session) return { valid: false };
@@ -490,12 +629,22 @@ function setupAuthSheets() {
   let usersSheet = getUsersSheet_(ss);
   if (!usersSheet) {
     usersSheet = ss.insertSheet("Users");
-    usersSheet.getRange(1, 1, 1, 6).setValues([["LocCode", "PasswordHash", "Salt", "LastPasswordChangedDate", "Active", "Role"]]);
+    usersSheet.getRange(1, 1, 1, 7).setValues([["LocCode", "PasswordHash", "Salt", "LastPasswordChangedDate", "Active", "Role", "Email"]]);
     usersSheet.setFrozenRows(1);
   }
   // เผื่อชีต Users เดิมสร้างไว้ก่อนเพิ่มฟีเจอร์สิทธิ์ผู้ใช้ (มีแค่ 5 คอลัมน์) — เติมหัวคอลัมน์ Role ให้โดยไม่กระทบข้อมูลเดิม
   if (usersSheet.getRange(1, 6).getValue() === "") {
     usersSheet.getRange(1, 6).setValue("Role");
+  }
+  // เผื่อชีต Users เดิมสร้างไว้ก่อนเพิ่มฟีเจอร์ลืมรหัสผ่าน (มีแค่ 6 คอลัมน์) — เติมหัวคอลัมน์ Email ให้โดยไม่กระทบข้อมูลเดิม
+  if (usersSheet.getRange(1, 7).getValue() === "") {
+    usersSheet.getRange(1, 7).setValue("Email");
+  }
+
+  if (!getPasswordResetsSheet_(ss)) {
+    const sheet = ss.insertSheet("PasswordResets");
+    sheet.getRange(1, 1, 1, 5).setValues([["LocCode", "OtpHash", "Salt", "ExpiresAt", "CreatedAt"]]);
+    sheet.setFrozenRows(1);
   }
 
   if (!getSessionsSheet_(ss)) {
