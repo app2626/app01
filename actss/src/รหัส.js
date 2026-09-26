@@ -934,13 +934,25 @@ function getRecords(token) {
     });
   }
 
+  // จับคู่ IMEI (คอลัมน์ H ของชีต "อยู่ระหว่างดำเนินการ") กับชีต FOTA คอลัมน์ A เพื่อดึงวันที่ FOTA (คอลัมน์ B) มาแสดง
+  const fotaSheet = findSheet(ss, "fota");
+  let fotaMap = {};
+  if (fotaSheet && fotaSheet.getLastRow() > 1) {
+    const fotaData = fotaSheet.getRange(2, 1, fotaSheet.getLastRow() - 1, 2).getDisplayValues();
+    fotaData.forEach(function(row) {
+      const key = row[0] ? row[0].toString().trim() : "";
+      if (key) fotaMap[key] = row[1] || "";
+    });
+  }
+
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 14).getDisplayValues();
   
   let validData = [];
   data.forEach(function(r, index) {
-    if(r[7] && r[7].toString().trim() !== "") { 
+    if(r[7] && r[7].toString().trim() !== "") {
       let targetLocCode = r[3] ? r[3].toString().trim() : "";
       let mappedArea = locAreaMap[targetLocCode] || "ไม่ระบุ Area";
+      let imeiKey = r[7].toString().trim();
 
       validData.push({
         rowId: index + 2,
@@ -958,7 +970,8 @@ function getRecords(token) {
         promoPrice: r[11] || "",
         cutBarcode: r[12] || "",
         suggestPrice: r[13] || "",
-        area: mappedArea 
+        area: mappedArea,
+        fotaDate: fotaMap[imeiKey] || ""
       });
     }
   });
@@ -2019,14 +2032,15 @@ function adminGetSettings(adminToken) {
   const usersSheet = getUsersSheet_(ss);
   let users = [];
   if (usersSheet && usersSheet.getLastRow() > 1) {
-    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 6).getDisplayValues();
+    const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 7).getDisplayValues();
     users = data
       .map(function(r) {
         return {
           locCode: (r[0] || "").toString().trim(),
           lastPasswordChangedDate: r[3] || "",
           active: (r[4] || "").toString().trim().toUpperCase() === "TRUE",
-          role: (r[5] || "").toString().trim() || ROLE_NORMAL
+          role: (r[5] || "").toString().trim() || ROLE_NORMAL,
+          email: (r[6] || "").toString().trim()
         };
       })
       .filter(function(u) { return u.locCode !== ""; });
@@ -2060,10 +2074,11 @@ function adminGetSettings(adminToken) {
 // role: ระบุเฉพาะตอนสร้างบัญชีใหม่เท่านั้น (ค่าเริ่มต้น ROLE_NORMAL ถ้าไม่ระบุ) — ตอนรีเซ็ตรหัสผ่านบัญชีเดิม
 // จะไม่แตะคอลัมน์ Role เลย กัน bug ที่รีเซ็ตรหัสผ่านแล้วสิทธิ์ "พิเศษ" ที่ตั้งไว้หลุดกลับเป็นทั่วไปโดยไม่ตั้งใจ
 // เปลี่ยนสิทธิ์ของบัญชีที่มีอยู่แล้วให้ใช้ adminSetUserRole แทน
-function adminUpsertUser(adminToken, locCode, newPassword, role) {
+function adminUpsertUser(adminToken, locCode, newPassword, role, email) {
   requireAdminSession_(adminToken);
   locCode = (locCode || "").toString().trim();
   newPassword = (newPassword || "").toString();
+  email = (email || "").toString().trim();
   if (!locCode) return { success: false, message: "กรุณากรอกรหัสสาขา (LocCode)" };
   if (newPassword.length < 4) return { success: false, message: "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร" };
 
@@ -2082,9 +2097,10 @@ function adminUpsertUser(adminToken, locCode, newPassword, role) {
   const idx = existing.indexOf(locCode);
 
   if (idx !== -1) {
+    // แก้ไขบัญชีเดิม (รีเซ็ตรหัสผ่าน) — ไม่แตะคอลัมน์ Role/Email เดิม แก้อีเมลแยกผ่าน adminSetUserEmail
     usersSheet.getRange(idx + 2, 2, 1, 4).setValues([[hash, salt, today, "TRUE"]]);
   } else {
-    usersSheet.appendRow([locCode, hash, salt, today, "TRUE", newAccountRole]);
+    usersSheet.appendRow([locCode, hash, salt, today, "TRUE", newAccountRole, email]);
   }
 
   // เปลี่ยนรหัสผ่านแล้วเพิกถอน session เดิมของสาขานี้ทั้งหมด บังคับ login ใหม่
@@ -2147,6 +2163,26 @@ function adminSetUserRole(adminToken, locCode, role) {
     if ((data[i][0] || "").toString().trim() === locCode) {
       usersSheet.getRange(i + 2, 6).setValue(roleValue);
       return { success: true, message: "อัปเดตสิทธิ์บัญชี " + locCode + " เป็น " + roleValue + " สำเร็จ" };
+    }
+  }
+  return { success: false, message: "ไม่พบบัญชี " + locCode };
+}
+
+// แก้ไขอีเมล (คอลัมน์ G) ของบัญชีสาขาที่มีอยู่แล้ว — ใช้สำหรับฟีเจอร์ลืมรหัสผ่าน (ส่ง OTP ไปที่อีเมลนี้)
+function adminSetUserEmail(adminToken, locCode, email) {
+  requireAdminSession_(adminToken);
+  locCode = (locCode || "").toString().trim();
+  email = (email || "").toString().trim();
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const usersSheet = getUsersSheet_(ss);
+  if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
+
+  const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues();
+  for (let i = 0; i < data.length; i++) {
+    if ((data[i][0] || "").toString().trim() === locCode) {
+      usersSheet.getRange(i + 2, 7).setValue(email);
+      return { success: true, message: "อัปเดตอีเมลบัญชี " + locCode + " สำเร็จ" };
     }
   }
   return { success: false, message: "ไม่พบบัญชี " + locCode };

@@ -325,8 +325,15 @@
                 <label class="form-label fw-bold text-secondary">รหัสผ่าน</label>
                 <input type="password" class="form-control" id="loginPassword" placeholder="รหัสผ่าน" required autocomplete="current-password">
             </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="loginRememberMe">
+                <label class="form-check-label text-secondary" for="loginRememberMe">จดจำรหัสสาขาและรหัสผ่าน</label>
+            </div>
             <div id="loginErrorMsg" class="alert alert-danger py-2 d-none"></div>
             <button type="submit" class="btn btn-primary w-100 fw-bold py-2"><i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
+            <div class="text-center mt-3">
+                <a href="#" id="forgotPasswordLink" class="text-secondary small">ลืมรหัสผ่าน?</a>
+            </div>
         </form>
     </div>
 </div>
@@ -946,7 +953,7 @@
                     </div>
                     <div class="table-responsive">
                         <table id="settingsUsersTable" class="table table-hover table-bordered w-100">
-                            <thead class="table-dark"><tr><th>LocCode</th><th>เปลี่ยนรหัสผ่านล่าสุด</th><th>สถานะ</th><th>สิทธิ์</th><th>จัดการ</th></tr></thead>
+                            <thead class="table-dark"><tr><th>LocCode</th><th>Email</th><th>เปลี่ยนรหัสผ่านล่าสุด</th><th>สถานะ</th><th>สิทธิ์</th><th>จัดการ</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
@@ -1142,6 +1149,29 @@
         $('#currentUserDisplay').show();
     }
 
+    var REMEMBER_LOGIN_KEY = 'actopRememberedLogin';
+
+    function saveRememberedLogin(locCode, password) {
+        try {
+            localStorage.setItem(REMEMBER_LOGIN_KEY, btoa(unescape(encodeURIComponent(JSON.stringify({ locCode: locCode, password: password })))));
+        } catch (e) {}
+    }
+
+    function clearRememberedLogin() {
+        try { localStorage.removeItem(REMEMBER_LOGIN_KEY); } catch (e) {}
+    }
+
+    function loadRememberedLogin() {
+        try {
+            var raw = localStorage.getItem(REMEMBER_LOGIN_KEY);
+            if (!raw) return;
+            var data = JSON.parse(decodeURIComponent(escape(atob(raw))));
+            $('#loginLocCode').val(data.locCode || '');
+            $('#loginPassword').val(data.password || '');
+            $('#loginRememberMe').prop('checked', true);
+        } catch (e) { clearRememberedLogin(); }
+    }
+
     function showLoginScreen() {
         $('#overlay').fadeOut();
         $('#logoutBtn').hide();
@@ -1263,6 +1293,84 @@
         });
     }
 
+    function promptForgotPassword() {
+        Swal.fire({
+            title: 'ลืมรหัสผ่าน',
+            html: 'กรอกรหัสสาขาเพื่อรับรหัส OTP ทางอีเมลที่ลงทะเบียนไว้<br><br>' +
+                  '<input type="text" id="swalForgotLocCode" class="swal2-input" placeholder="รหัสสาขา (Location Code)">',
+            confirmButtonText: 'ส่งรหัส OTP',
+            showCancelButton: true,
+            cancelButtonText: 'ยกเลิก',
+            preConfirm: function() {
+                var locCode = document.getElementById('swalForgotLocCode').value.trim();
+                if (!locCode) {
+                    Swal.showValidationMessage('กรุณากรอกรหัสสาขา');
+                    return false;
+                }
+                return new Promise(function(resolve) {
+                    google.script.run
+                        .withFailureHandler(function(err) {
+                            Swal.showValidationMessage('เกิดข้อผิดพลาด: ' + err.message);
+                            resolve(false);
+                        })
+                        .withSuccessHandler(function(res) {
+                            if (!res.success) {
+                                Swal.showValidationMessage(res.message);
+                                resolve(false);
+                            } else {
+                                resolve({ locCode: locCode, message: res.message });
+                            }
+                        }).requestPasswordReset(locCode);
+                });
+            }
+        }).then(function(result) {
+            if (result.isConfirmed && result.value) {
+                Swal.fire('ส่งรหัส OTP แล้ว', result.value.message, 'success').then(function() {
+                    promptResetPasswordWithOtp(result.value.locCode);
+                });
+            }
+        });
+    }
+
+    function promptResetPasswordWithOtp(locCode) {
+        Swal.fire({
+            title: 'ตั้งรหัสผ่านใหม่',
+            html: 'รหัสสาขา: <b>' + locCode + '</b><br><br>' +
+                  '<input type="text" id="swalResetOtp" class="swal2-input" placeholder="รหัส OTP 6 หลัก" maxlength="6">' +
+                  '<input type="password" id="swalResetNewPassword" class="swal2-input" placeholder="รหัสผ่านใหม่">',
+            confirmButtonText: 'ยืนยันตั้งรหัสผ่านใหม่',
+            showCancelButton: true,
+            cancelButtonText: 'ยกเลิก',
+            preConfirm: function() {
+                var otp = document.getElementById('swalResetOtp').value.trim();
+                var newPw = document.getElementById('swalResetNewPassword').value;
+                if (!otp || !newPw) {
+                    Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน');
+                    return false;
+                }
+                return new Promise(function(resolve) {
+                    google.script.run
+                        .withFailureHandler(function(err) {
+                            Swal.showValidationMessage('เกิดข้อผิดพลาด: ' + err.message);
+                            resolve(false);
+                        })
+                        .withSuccessHandler(function(res) {
+                            if (!res.success) {
+                                Swal.showValidationMessage(res.message);
+                                resolve(false);
+                            } else {
+                                resolve(true);
+                            }
+                        }).resetPasswordWithOtp(locCode, otp, newPw);
+                });
+            }
+        }).then(function(result) {
+            if (result.isConfirmed && result.value) {
+                Swal.fire('สำเร็จ', 'ตั้งรหัสผ่านใหม่เรียบร้อย กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่', 'success');
+            }
+        });
+    }
+
     // บัญชีสิทธิ์ "พิเศษ" ดูข้อมูล/แดชบอร์ดได้ทุกแท็บเหมือน user ทั่วไป แต่คีย์ฟอร์ม ACT และเปลี่ยนสถานะไม่ได้
     // (บัญชี Admin ถูกล็อกฟอร์มอยู่แล้วจากเงื่อนไข __ADMIN__ ด้านบน ไม่ต้องซ้อนข้อความเตือนอีกชั้น)
     function applyRoleRestrictions() {
@@ -1342,11 +1450,13 @@
 
         // 💡 1. เข้าเว็บครั้งแรก เช็ค session ที่ค้างไว้ก่อน ถ้าไม่มี/หมดอายุ ให้โชว์หน้า login
         attemptSessionRestore();
+        loadRememberedLogin();
 
         $('#loginForm').on('submit', function(e) {
             e.preventDefault();
             var locCode = $('#loginLocCode').val();
             var password = $('#loginPassword').val();
+            var rememberMe = $('#loginRememberMe').is(':checked');
             $('#loginErrorMsg').addClass('d-none');
             google.script.run
                 .withFailureHandler(function(err) {
@@ -1362,6 +1472,12 @@
                     currentLocName = res.locName;
                     currentRole = res.role || 'ทั่วไป';
                     try { localStorage.setItem('actssToken', res.token); } catch(e) {}
+
+                    if (rememberMe) {
+                        saveRememberedLogin(locCode, password);
+                    } else {
+                        clearRememberedLogin();
+                    }
 
                     if (res.isAdmin) {
                         adminToken = res.token;
@@ -1386,6 +1502,11 @@
             promptChangePassword(false);
         });
 
+        $('#forgotPasswordLink').on('click', function(e) {
+            e.preventDefault();
+            promptForgotPassword();
+        });
+
         $('#logoutBtn').on('click', function() {
             Swal.fire({ title: 'ออกจากระบบ?', icon: 'question', showCancelButton: true, confirmButtonText: 'ออกจากระบบ', cancelButtonText: 'ยกเลิก' }).then(function(result) {
                 if (result.isConfirmed) {
@@ -1398,10 +1519,12 @@
                         adminToken = null;
                         $('#loginLocCode').val('');
                         $('#loginPassword').val('');
+                        $('#loginRememberMe').prop('checked', false);
                         $('#settingsContent').addClass('d-none');
                         $('#settingsLocked').removeClass('d-none');
                         $('#settingsTabLi').hide();
                         showLoginScreen();
+                        loadRememberedLogin();
                     };
                     // ออกจากระบบฝั่ง client เสมอ แม้เรียก server ไม่สำเร็จ (เช่น เน็ตหลุด) เพื่อไม่ให้ผู้ใช้ค้างอยู่ในระบบ
                     google.script.run.withFailureHandler(finishLogout).withSuccessHandler(finishLogout).logout(currentToken);
@@ -1436,6 +1559,25 @@
             google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
                 if (res.success) { refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
             }).adminSetUserRole(adminToken, locCode, newRole);
+        });
+
+        $(document).on('click', '.btn-edit-email', function() {
+            var locCode = $(this).data('loccode');
+            var currentEmail = $(this).data('email') || '';
+            Swal.fire({
+                title: 'แก้ไข Email ' + locCode,
+                input: 'email',
+                inputValue: currentEmail,
+                inputLabel: 'ใช้รับรหัส OTP ตอนลืมรหัสผ่าน (เว้นว่างได้)',
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                    if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                }).adminSetUserEmail(adminToken, locCode, result.value || '');
+            });
         });
 
         $(document).on('click', '.btn-reset-user', function() {
@@ -2991,12 +3133,15 @@
             var isViewer = u.role === 'พิเศษ';
             var roleBadge = isViewer ? '<span class="badge bg-info text-dark">พิเศษ (ดูอย่างเดียว)</span>' : '<span class="badge bg-primary">ทั่วไป (คีย์ข้อมูลได้)</span>';
             var roleToggleLabel = isViewer ? 'ปรับเป็นทั่วไป' : 'ปรับเป็นพิเศษ';
+            var emailDisplay = u.email ? escapeHtml(u.email) : '<span class="text-muted fst-italic">ยังไม่ได้ตั้งค่า</span>';
             tbody += '<tr>' +
                 '<td class="fw-bold">' + escapeHtml(u.locCode) + '</td>' +
+                '<td>' + emailDisplay + '</td>' +
                 '<td>' + escapeHtml(u.lastPasswordChangedDate) + '</td>' +
                 '<td>' + statusBadge + '</td>' +
                 '<td>' + roleBadge + '</td>' +
                 '<td>' +
+                    '<button type="button" class="btn btn-sm btn-outline-secondary btn-edit-email" data-loccode="' + escapeHtml(u.locCode) + '" data-email="' + escapeHtml(u.email) + '">แก้ไข Email</button> ' +
                     '<button type="button" class="btn btn-sm btn-outline-primary btn-reset-user" data-loccode="' + escapeHtml(u.locCode) + '">รีเซ็ตรหัสผ่าน</button> ' +
                     '<button type="button" class="btn btn-sm ' + toggleClass + ' btn-toggle-user" data-loccode="' + escapeHtml(u.locCode) + '" data-active="' + u.active + '">' + toggleLabel + '</button> ' +
                     '<button type="button" class="btn btn-sm btn-outline-info btn-toggle-role" data-loccode="' + escapeHtml(u.locCode) + '" data-role="' + escapeHtml(u.role) + '">' + roleToggleLabel + '</button>' +
@@ -3015,6 +3160,7 @@
             title: 'เพิ่มบัญชีสาขาใหม่',
             html: '<input id="swalNewLocCode" class="swal2-input" placeholder="LocCode เช่น BKK01">' +
                   '<input id="swalNewUserPassword" type="password" class="swal2-input" placeholder="รหัสผ่านเริ่มต้น">' +
+                  '<input id="swalNewUserEmail" type="email" class="swal2-input" placeholder="Email (สำหรับลืมรหัสผ่าน, ไม่บังคับ)">' +
                   '<select id="swalNewUserRole" class="swal2-input">' +
                       '<option value="ทั่วไป">ทั่วไป (คีย์ข้อมูลได้)</option>' +
                       '<option value="พิเศษ">พิเศษ (ดูอย่างเดียว)</option>' +
@@ -3024,15 +3170,16 @@
             preConfirm: function() {
                 var loc = document.getElementById('swalNewLocCode').value.trim();
                 var pw = document.getElementById('swalNewUserPassword').value;
+                var email = document.getElementById('swalNewUserEmail').value.trim();
                 var role = document.getElementById('swalNewUserRole').value;
                 if (!loc || !pw) { Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน'); return false; }
-                return { loc: loc, pw: pw, role: role };
+                return { loc: loc, pw: pw, role: role, email: email };
             }
         }).then(function(result) {
             if (!result.isConfirmed) return;
             google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
                 if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-            }).adminUpsertUser(adminToken, result.value.loc, result.value.pw, result.value.role);
+            }).adminUpsertUser(adminToken, result.value.loc, result.value.pw, result.value.role, result.value.email);
         });
     }
 

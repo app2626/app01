@@ -564,6 +564,7 @@
                             <th class="desktop">ประทับตราวันที่</th>
                             <th data-priority="3">พนักงานผู้บันทึก</th>
                             <th data-priority="3">วันที่ ACT</th>
+                            <th data-priority="4">FOTA DATE</th>
                             <th data-priority="1">อายุสต๊อก</th>
                             <th data-priority="1">สถานะปัจจุบัน</th>
                             <th data-priority="1">จัดการ</th>
@@ -985,7 +986,7 @@
                     </div>
                     <div class="table-responsive">
                         <table id="settingsUsersTable" class="table table-hover table-bordered w-100">
-                            <thead class="table-dark"><tr><th>LocCode</th><th>เปลี่ยนรหัสผ่านล่าสุด</th><th>สถานะ</th><th>สิทธิ์</th><th>จัดการ</th></tr></thead>
+                            <thead class="table-dark"><tr><th>LocCode</th><th>อีเมล</th><th>เปลี่ยนรหัสผ่านล่าสุด</th><th>สถานะ</th><th>สิทธิ์</th><th>จัดการ</th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
@@ -1585,6 +1586,24 @@
             });
         });
 
+        $(document).on('click', '.btn-edit-email', function() {
+            var locCode = $(this).data('loccode');
+            var currentEmail = $(this).data('email') || '';
+            Swal.fire({
+                title: 'แก้ไขอีเมล ' + locCode,
+                input: 'email',
+                inputLabel: 'อีเมล (สำหรับรับ OTP ลืมรหัสผ่าน)',
+                inputValue: currentEmail,
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก'
+            }).then(function(result) {
+                if (!result.isConfirmed) return;
+                google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
+                    if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
+                }).adminSetUserEmail(adminToken, locCode, result.value);
+            });
+        });
+
         $(document).on('click', '.btn-remove-promo', function() { $(this).closest('.promo-row').remove(); });
 
         $('#settings-tab').on('shown.bs.tab', function() {
@@ -1645,7 +1664,7 @@
         $('#filterArea').on('change', function() { if(dataTableInstance) dataTableInstance.column(8).search(this.value).draw(); });
         $('#filterLoc').on('change', function() { if(dataTableInstance) dataTableInstance.column(6).search(this.value).draw(); });
         $('#filterImei').on('keyup', function() { if(dataTableInstance) dataTableInstance.column(2).search(this.value).draw(); });
-        $('#filterStatus').on('change', function() { if(dataTableInstance) dataTableInstance.column(15).search(this.value).draw(); });
+        $('#filterStatus').on('change', function() { if(dataTableInstance) dataTableInstance.column(16).search(this.value).draw(); });
         $('#filterProduct').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
         $('#filterModel').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
 
@@ -2393,6 +2412,7 @@
                     '<td>' + escapeHtml(displayTimestamp) + '</td>' +
                     '<td>' + escapeHtml(r.empName) + '</td>' +
                     '<td>' + escapeHtml(displayActDate) + '</td>' +
+                    '<td>' + escapeHtml(r.fotaDate) + '</td>' +
                     '<td><span class="badge ' + ageBadgeColor + ' rounded-pill">' + ageDays + ' วัน</span></td>' +
                     '<td><span class="badge ' + statusStyle + '">' + escapeHtml(r.status) + '</span></td>' +
                     '<td>' + btnManage + '</td>' +
@@ -2400,7 +2420,7 @@
                 '</tr>';
             });
         } else {
-            tbody = '<tr><td colspan="18" class="text-center text-muted py-4">ยังไม่มีบันทึกข้อมูลในฐานระบบ</td></tr>';
+            tbody = '<tr><td colspan="19" class="text-center text-muted py-4">ยังไม่มีบันทึกข้อมูลในฐานระบบ</td></tr>';
         }
         
         $('#dataTable tbody').html(tbody);
@@ -2423,7 +2443,7 @@
         dataTableInstance = $('#dataTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
             "order": [[11, "desc"]],
-            "columnDefs": [{ targets: 17, visible: false, searchable: true }],
+            "columnDefs": [{ targets: 18, visible: false, searchable: true }],
             "responsive": {
                 details: {
                     display: function (row, update, render) {
@@ -3106,13 +3126,16 @@
             var isViewer = u.role === 'พิเศษ';
             var roleBadge = isViewer ? '<span class="badge bg-info text-dark">พิเศษ (ดูอย่างเดียว)</span>' : '<span class="badge bg-primary">ทั่วไป (คีย์ข้อมูลได้)</span>';
             var roleToggleLabel = isViewer ? 'ปรับเป็นทั่วไป' : 'ปรับเป็นพิเศษ';
+            var emailDisplay = u.email ? escapeHtml(u.email) : '<span class="text-muted fst-italic">ยังไม่ระบุ</span>';
             tbody += '<tr>' +
                 '<td class="fw-bold">' + escapeHtml(u.locCode) + '</td>' +
+                '<td>' + emailDisplay + '</td>' +
                 '<td>' + escapeHtml(u.lastPasswordChangedDate) + '</td>' +
                 '<td>' + statusBadge + '</td>' +
                 '<td>' + roleBadge + '</td>' +
                 '<td>' +
                     '<button type="button" class="btn btn-sm btn-outline-primary btn-reset-user" data-loccode="' + escapeHtml(u.locCode) + '">รีเซ็ตรหัสผ่าน</button> ' +
+                    '<button type="button" class="btn btn-sm btn-outline-secondary btn-edit-email" data-loccode="' + escapeHtml(u.locCode) + '" data-email="' + escapeHtml(u.email) + '">แก้ไขอีเมล</button> ' +
                     '<button type="button" class="btn btn-sm ' + toggleClass + ' btn-toggle-user" data-loccode="' + escapeHtml(u.locCode) + '" data-active="' + u.active + '">' + toggleLabel + '</button> ' +
                     '<button type="button" class="btn btn-sm btn-outline-info btn-toggle-role" data-loccode="' + escapeHtml(u.locCode) + '" data-role="' + escapeHtml(u.role) + '">' + roleToggleLabel + '</button>' +
                 '</td>' +
@@ -3130,6 +3153,7 @@
             title: 'เพิ่มบัญชีสาขาใหม่',
             html: '<input id="swalNewLocCode" class="swal2-input" placeholder="LocCode เช่น BKK01">' +
                   '<input id="swalNewUserPassword" type="password" class="swal2-input" placeholder="รหัสผ่านเริ่มต้น">' +
+                  '<input id="swalNewUserEmail" type="email" class="swal2-input" placeholder="อีเมล (สำหรับลืมรหัสผ่าน, ไม่บังคับ)">' +
                   '<select id="swalNewUserRole" class="swal2-input">' +
                       '<option value="ทั่วไป">ทั่วไป (คีย์ข้อมูลได้)</option>' +
                       '<option value="พิเศษ">พิเศษ (ดูอย่างเดียว)</option>' +
@@ -3139,15 +3163,17 @@
             preConfirm: function() {
                 var loc = document.getElementById('swalNewLocCode').value.trim();
                 var pw = document.getElementById('swalNewUserPassword').value;
+                var email = document.getElementById('swalNewUserEmail').value.trim();
                 var role = document.getElementById('swalNewUserRole').value;
                 if (!loc || !pw) { Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน'); return false; }
-                return { loc: loc, pw: pw, role: role };
+                if (email && email.indexOf('@') === -1) { Swal.showValidationMessage('รูปแบบอีเมลไม่ถูกต้อง'); return false; }
+                return { loc: loc, pw: pw, role: role, email: email };
             }
         }).then(function(result) {
             if (!result.isConfirmed) return;
             google.script.run.withFailureHandler(handleAdminAuthFailure).withSuccessHandler(function(res) {
                 if (res.success) { Swal.fire('สำเร็จ', res.message, 'success'); refreshSettingsUsers(); } else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-            }).adminUpsertUser(adminToken, result.value.loc, result.value.pw, result.value.role);
+            }).adminUpsertUser(adminToken, result.value.loc, result.value.pw, result.value.role, result.value.email);
         });
     }
 
