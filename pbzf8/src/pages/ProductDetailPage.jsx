@@ -16,9 +16,19 @@ export default function ProductDetailPage({ product, onAddToCart, onBuyNow, onBa
   const [selectedColor, setSelectedColor] = useState(product.variants[0]?.color || product.colors[0]);
   const [selectedVariant, setSelectedVariant] = useState(product.variants[0]);
   const [qty, setQty] = useState(1);
+  const [selectedGifts, setSelectedGifts] = useState({});
+
+  const toggleGift = (choiceId, giftId, maxLimit) => {
+    setSelectedGifts(prev => {
+      const current = prev[choiceId] || [];
+      if (current.includes(giftId)) return { ...prev, [choiceId]: current.filter(id => id !== giftId) };
+      if (current.length >= maxLimit) return { ...prev, [choiceId]: [...current.slice(current.length - maxLimit + 1), giftId] };
+      return { ...prev, [choiceId]: [...current, giftId] };
+    });
+  };
 
   const brandStyle = BRAND_COLORS[product.brand] || { bg: "#000", text: "white" };
-  const variantInStock = selectedVariant.inStock !== false;
+  const variantInStock = product.inStock !== false && selectedVariant.inStock !== false;
   const memoryOptions = variantsForColor(product, selectedColor);
 
   const pickColor = (color) => {
@@ -161,7 +171,7 @@ export default function ProductDetailPage({ product, onAddToCart, onBuyNow, onBa
 
           {product.freeGiftItems?.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-sm font-bold text-gray-900 mb-3">สินค้าพรีเมียมในโปรโมชั่น</h3>
+              <h3 className="text-sm font-bold text-gray-900 mb-3">ของแถมพรีเมียม (ได้รับอัตโนมัติ)</h3>
               <div className="flex flex-wrap gap-3">
                 {product.freeGiftItems.map((g, idx) => (
                   <div key={idx} className="w-24 flex flex-col items-center text-center">
@@ -169,12 +179,53 @@ export default function ProductDetailPage({ product, onAddToCart, onBuyNow, onBa
                       <Gift className="w-6 h-6 text-gray-300" />
                     </div>
                     <span className="text-[11px] text-gray-600 leading-tight">{g.name}</span>
-                    <span className="text-[10px] text-gray-400">{g.type === "store" ? "ของแถมทางร้าน" : "ของแถมแบรนด์"}</span>
                     {g.inStock === false && <span className="text-[10px] text-red-500 font-medium">ของแถมหมด</span>}
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mt-2">* ของแถมคละแบบ ไม่สามารถเลือกได้</p>
+            </div>
+          )}
+
+          {product.resolvedGiftChoices?.length > 0 && (
+            <div className="mb-6 space-y-4">
+              {product.resolvedGiftChoices.map((choice) => (
+                <div key={choice.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50/50">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-bold text-gray-900">{choice.title}</h3>
+                    <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                      เลือกได้ {choice.maxLimit} ชิ้น
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {choice.options.map((g) => {
+                      const isSelected = (selectedGifts[choice.id] || []).includes(g.id);
+                      return (
+                        <div 
+                          key={g.id} 
+                          onClick={() => g.inStock !== false && toggleGift(choice.id, g.id, choice.maxLimit)}
+                          className={`w-28 flex flex-col items-center text-center p-2 rounded-lg border-2 cursor-pointer transition-all
+                            ${isSelected ? 'border-[#FFD700] bg-[#FFD700]/5' : 'border-transparent hover:bg-white'}
+                            ${g.inStock === false ? 'opacity-50 cursor-not-allowed' : ''}
+                          `}
+                        >
+                          <div className={`relative w-full aspect-square bg-white border border-gray-100 rounded-md flex items-center justify-center mb-2 shadow-sm
+                            ${isSelected ? 'ring-2 ring-[#FFD700] ring-offset-1' : ''}
+                          `}>
+                            <Gift className={`w-8 h-8 ${isSelected ? 'text-[#FFD700]' : 'text-gray-300'}`} />
+                            {isSelected && (
+                              <div className="absolute -top-2 -right-2 bg-[#FFD700] text-black w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-gray-700 leading-tight font-medium">{g.name}</span>
+                          {g.inStock === false && <span className="text-[10px] text-red-500 font-medium mt-1">หมด</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -235,14 +286,14 @@ export default function ProductDetailPage({ product, onAddToCart, onBuyNow, onBa
 
           <div className="flex flex-col sm:flex-row gap-3 mb-8">
             <button
-              onClick={() => onBuyNow(product, qty, selectedColor, selectedVariant)}
+              onClick={() => onBuyNow(product, qty, selectedColor, selectedVariant, selectedGifts)}
               disabled={!variantInStock}
               className="flex-1 bg-[#1a1a1a] text-white font-bold py-3.5 px-6 rounded-md hover:bg-black transition-colors flex justify-center items-center gap-2 disabled:opacity-40"
             >
               <Wallet className="w-5 h-5" /> ผ่อนสินค้า
             </button>
             <button
-              onClick={() => onAddToCart(product, qty, selectedColor, selectedVariant)}
+              onClick={() => onAddToCart(product, qty, selectedColor, selectedVariant, selectedGifts)}
               className="flex-1 bg-[#FFD700] text-black font-bold py-3.5 px-6 rounded-md hover:bg-[#E6C200] transition-colors flex justify-center items-center gap-2"
               disabled={!variantInStock}
             >

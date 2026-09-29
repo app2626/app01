@@ -185,9 +185,16 @@ function giftStockItemsLocal_(items, channel) {
   const result = [];
   (items || []).forEach(item => {
     const product = products.find(p => p.id === item.productId);
-    resolveGiftsLocal_(product?.giftIds).forEach(g => {
+    let allGifts = resolveGiftsLocal_(product?.giftIds);
+    
+    if (item.selectedGifts) {
+      Object.values(item.selectedGifts).forEach(arr => {
+        allGifts = allGifts.concat(resolveGiftsLocal_(arr));
+      });
+    }
+
+    allGifts.forEach(g => {
       if (!g.sku) return;
-      // ของแถมที่ไม่มีสิทธิ์ในช่องทางที่เลือกจะถูกกรองออกเงียบๆ (ไม่ reject ทั้งออเดอร์) — mirror ของ Code.js
       const giftChannels = g.channels || [];
       if (channel && giftChannels.length && !giftChannels.includes(channel)) return;
       result.push({ sku: g.sku, qty: item.qty });
@@ -204,6 +211,15 @@ export function placeOrderLocal(data) {
         success: true, orderId: existing.orderId, pointsBalance: null,
         depositAmount: existing.depositAmount, remainingAmount: existing.remainingAmount, duplicate: true
       };
+    }
+  }
+  if (reservationSettings.reserveStart || reservationSettings.reserveEnd) {
+    const now = new Date();
+    if (reservationSettings.reserveStart && now < new Date(reservationSettings.reserveStart)) {
+      return { success: false, message: "ยังไม่ถึงช่วงเวลาเปิดรับจองสินค้า" };
+    }
+    if (reservationSettings.reserveEnd && now > new Date(reservationSettings.reserveEnd)) {
+      return { success: false, message: "หมดเขตช่วงเวลารับจองสินค้าแล้ว" };
     }
   }
 
@@ -542,7 +558,9 @@ export function getReservationSettingsLocal() {
 export function saveReservationSettingsLocal(settings, token) {
   if (!requireAdminLocal_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
   reservationSettings = {
-    depositAmount: Math.max(0, Number(settings.depositAmount) || 0)
+    depositAmount: Math.max(0, Number(settings.depositAmount) || 0),
+    reserveStart: settings.reserveStart || "",
+    reserveEnd: settings.reserveEnd || ""
   };
   return { success: true };
 }

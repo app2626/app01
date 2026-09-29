@@ -15,10 +15,13 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
     phone: "",
     email: member?.email || "",
     nationalId: "",
+    preOrderNo: "",
     registrationCode: "",
     customerInterests: [],
     channel: "",
+    branch: "",
     reservationType: "T",
+    pickupDate: "",
     staffName: "",
     staffPhone: "",
     depositStatus: "unpaid",
@@ -128,6 +131,34 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
       setError("กรุณาเลือกความสนใจและพฤติกรรมลูกค้าอย่างน้อย 1 อย่าง");
       return;
     }
+    if (reservationSettings?.reserveStart || reservationSettings?.reserveEnd) {
+      const now = new Date();
+      if (reservationSettings.reserveStart && now < new Date(reservationSettings.reserveStart)) {
+        setError("ยังไม่ถึงช่วงเวลาเปิดรับจองสินค้า");
+        return;
+      }
+      if (reservationSettings.reserveEnd && now > new Date(reservationSettings.reserveEnd)) {
+        setError("หมดเขตช่วงเวลารับจองสินค้าแล้ว");
+        return;
+      }
+    }
+    
+    if (reservationSettings?.branches?.length > 0 && !form.branch) {
+      setError("กรุณาเลือกสาขาที่รับเครื่อง");
+      return;
+    }
+    
+    if (form.reservationType === "T") {
+      if (!form.receiptNumber || form.receiptNumber.trim() === "") {
+        setError("จอง T ต้องระบุเลขที่ใบเสร็จรับเงิน");
+        return;
+      }
+      if (depositAmount <= 0) {
+        setError("จอง T ต้องระบุจำนวนเงินมัดจำมากกว่า 0");
+        return;
+      }
+    }
+
     setSubmitting(true);
     setError("");
     try {
@@ -136,6 +167,7 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
         phone: form.phone,
         email: form.email.trim(),
         nationalId: form.nationalId.trim(),
+        preOrderNo: form.preOrderNo.trim(),
         registrationCode: form.registrationCode.trim(),
         customerInterests: form.customerInterests,
         items: cart.map(item => ({
@@ -145,7 +177,8 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
           color: item.selectedColor,
           variant: item.selectedVariant.label,
           qty: item.qty,
-          price: item.selectedVariant.price
+          price: item.selectedVariant.price,
+          selectedGifts: item.selectedGifts
         })),
         subtotal,
         discount: discount + pointsDiscount,
@@ -155,7 +188,9 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
         promotionIds: appliedPromotions.map(p => p.id),
         memberToken: member?.token || "",
         channel: form.channel,
+        branch: form.branch,
         reservationType: form.reservationType,
+        pickupDate: form.pickupDate.trim(),
         staffName: form.staffName,
         staffPhone: form.staffPhone,
         depositStatus: form.depositStatus,
@@ -232,6 +267,7 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
               <input required placeholder="เบอร์โทรศัพท์" value={form.phone} onChange={update("phone")} className={inputClass} />
               <input required type="email" placeholder="อีเมล" value={form.email} onChange={update("email")} className={inputClass} />
               <input required placeholder="บัตรประชาชน" maxLength={13} value={form.nationalId} onChange={update("nationalId")} className={inputClass} />
+              <input placeholder="เลขที่ Pre Order" value={form.preOrderNo} onChange={update("preOrderNo")} className={inputClass} />
               <input placeholder="รหัสลงทะเบียน (Code Handraiser)" value={form.registrationCode} onChange={update("registrationCode")} className={inputClass} />
             </div>
           </div>
@@ -256,6 +292,12 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
                 <option value="" disabled>-- เลือกช่องทางการรับจอง --</option>
                 {RESERVATION_CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+              {reservationSettings?.branches?.length > 0 && (
+                <select required value={form.branch} onChange={update("branch")} className={`${inputClass} bg-white`}>
+                  <option value="" disabled>-- เลือกสาขาที่รับเครื่อง --</option>
+                  {reservationSettings.branches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              )}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 border border-gray-200 rounded-md px-3 py-2.5 cursor-pointer has-[:checked]:border-[#FFD700] has-[:checked]:bg-[#FFFBE6]">
                   <input type="radio" name="reservationType" checked={form.reservationType === "T"} onChange={() => setForm(p => ({ ...p, reservationType: "T" }))} />
@@ -266,6 +308,7 @@ export default function CheckoutPage({ cart, member, coupons, promotions, collec
                   <span className="text-sm">จอง F (สวมสิทธิ์แคมเปญ)</span>
                 </label>
               </div>
+              <input placeholder="รอบรับเครื่องลูกค้าวันที่ (เช่น 1-5)" value={form.pickupDate} onChange={update("pickupDate")} className={inputClass} />
               <input required placeholder="พนักงานรับจอง" value={form.staffName} onChange={update("staffName")} className={inputClass} />
               <input required placeholder="เบอร์พนักงาน" value={form.staffPhone} onChange={update("staffPhone")} className={inputClass} />
             </div>

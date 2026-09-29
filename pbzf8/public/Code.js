@@ -628,7 +628,15 @@ function resolveGiftStockItems_(items, channel) {
 
   const result = [];
   (items || []).forEach(item => {
-    (giftIdsByProductId[item.productId] || []).forEach(gid => {
+    let gids = giftIdsByProductId[item.productId] || [];
+    if (item.selectedGifts) {
+      Object.keys(item.selectedGifts).forEach(k => {
+        const arr = item.selectedGifts[k];
+        if (Array.isArray(arr)) gids = gids.concat(arr);
+      });
+    }
+    
+    gids.forEach(gid => {
       const gift = giftById[gid];
       if (!gift || !gift.sku) return;
       // ของแถมที่ไม่มีสิทธิ์ในช่องทางที่เลือกจะถูกกรองออกเงียบๆ (ไม่ reject ทั้งออเดอร์) — สินค้าตัวเดียวกันจองได้ทุกช่องทาง
@@ -872,7 +880,8 @@ function placeOrder(data) {
       depositStatus: data.depositStatus === "paid" ? "paid" : "unpaid", receiptNumber: data.receiptNumber || "", notes: data.notes || "",
       trackingNumber: "",
       depositAmount: depositAmount, remainingAmount: remainingAmount, remainingPaid: false, remainingPaidAt: "",
-      clientRequestId: data.requestId || "", channel: data.channel || ""
+      clientRequestId: data.requestId || "", channel: data.channel || "",
+      branch: data.branch || "", pickupDate: data.pickupDate || ""
     };
     orderHeaderList.forEach(h => {
       sheet.getRange(orderRowNum, orderColIndex[h]).setValue(orderFields[h]);
@@ -983,6 +992,8 @@ function getMyOrders(token) {
       total: obj.total,
       status: obj.status,
       createdAt: obj.createdAt instanceof Date ? obj.createdAt.toISOString() : obj.createdAt,
+      branch: obj.branch || "",
+      pickupDate: obj.pickupDate || "",
       trackingNumber: obj.trackingNumber || "",
       depositAmount: Number(obj.depositAmount) || 0,
       remainingAmount: Number(obj.remainingAmount) || 0,
@@ -1446,6 +1457,8 @@ function getAdminOrders(token) {
       memberEmail: obj.memberEmail,
       reservationType: obj.reservationType === "F" ? "F" : "T",
       channel: obj.channel || "",
+      branch: obj.branch || "",
+      pickupDate: obj.pickupDate || "",
       staffName: obj.staffName || "",
       staffPhone: obj.staffPhone || "",
       depositStatus: obj.depositStatus === "paid" ? "paid" : "unpaid",
@@ -1501,11 +1514,15 @@ function setOrderStatus_(orderId, status) {
 
 function updateOrderStatus(orderId, status, token) {
   if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  const adminEmail = resolveEmailByToken_(token);
+  logAudit_(adminEmail, "UPDATE_ORDER_STATUS", `อัปเดตสถานะออเดอร์ ${orderId} เป็น ${status}`);
   return setOrderStatus_(orderId, status);
 }
 
 function updateOrderTracking(orderId, trackingNumber, token) {
   if (!requireAdmin_(token)) return { success: false, message: "ไม่มีสิทธิ์เข้าถึง" };
+  const adminEmail = resolveEmailByToken_(token);
+  logAudit_(adminEmail, "UPDATE_TRACKING", `บันทึกเลขพัสดุ ${orderId} เป็น ${trackingNumber}`);
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Orders");
   if (!sheet) return { success: false, message: "ไม่พบข้อมูลการจอง" };
@@ -2249,4 +2266,12 @@ function setupSampleDatabase() {
     // getUi() ใช้ไม่ได้เมื่อรันจาก Apps Script editor โดยตรง (ใช้ได้เฉพาะรันจากเมนูใน Sheet)
     Logger.log("ฐานข้อมูลสินค้าตัวอย่างสร้างเสร็จเรียบร้อยแล้ว!");
   }
+}
+
+const AUDIT_HEADERS_ = ['timestamp', 'email', 'action', 'details'];
+function logAudit_(email, action, details) {
+  try {
+    const sheet = getOrCreateSheet_('AuditLogs', AUDIT_HEADERS_);
+    sheet.appendRow([new Date(), email || 'System', action, details]);
+  } catch (e) {}
 }

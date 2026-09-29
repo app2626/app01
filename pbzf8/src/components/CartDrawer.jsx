@@ -38,7 +38,12 @@ export default function CartDrawer({ show, cart, onClose, onUpdateQty, onRemove,
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight mb-1">{item.product.name}</h4>
-                    <p className="text-xs text-gray-500 mb-2">สี: {item.selectedColor}, {item.selectedVariant.label}</p>
+                    <p className="text-xs text-gray-500 mb-1">สี: {item.selectedColor}, {item.selectedVariant.label}</p>
+                    {item.selectedGifts && Object.keys(item.selectedGifts).length > 0 && (
+                      <p className="text-[10px] text-emerald-600 mb-2 leading-tight">
+                        + เลือกของแถม {Object.values(item.selectedGifts).flat().length} ชิ้น
+                      </p>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-bold text-[#FF6B00]">
                         {formatTHB(item.selectedVariant.price)}

@@ -56,6 +56,37 @@ export default function AdminReservationSettingsTab({ member }) {
           />
         </div>
 
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">วันเริ่มรับจอง (เว้นว่าง = เปิดตลอด)</label>
+          <input
+            type="datetime-local"
+            value={form.reserveStart || ""}
+            onChange={(e) => setForm(prev => ({ ...prev, reserveStart: e.target.value }))}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700]"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">วันสิ้นสุดรับจอง (เว้นว่าง = เปิดตลอด)</label>
+          <input
+            type="datetime-local"
+            value={form.reserveEnd || ""}
+            onChange={(e) => setForm(prev => ({ ...prev, reserveEnd: e.target.value }))}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700]"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">สาขาที่รับเครื่อง (คั่นด้วยลูกน้ำ)</label>
+          <textarea
+            value={(form.branches || []).join(", ")}
+            onChange={(e) => setForm(prev => ({ ...prev, branches: e.target.value.split(",").map(s => s.trim()).filter(Boolean) }))}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFD700] resize-y"
+            rows={3}
+            placeholder="สาขา A, สาขา B, สาขา C"
+          />
+        </div>
+
         <div className="flex items-center gap-3 pt-2">
           <button
             onClick={handleSave}

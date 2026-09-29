@@ -17,9 +17,15 @@ export default function AdminOrdersTab({ member }) {
   }, [member.token]);
 
   const handleStatusChange = async (orderId, status) => {
+    const order = orders.find(o => o.orderId === orderId);
+    if (!order) return;
+    const previousStatus = order.status;
     setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status } : o));
     const res = await callGas("updateOrderStatus", [orderId, status, member.token], updateOrderStatusLocal);
-    if (!res.success) alert(res.message || "อัปเดตสถานะไม่สำเร็จ");
+    if (!res.success) {
+      alert(res.message || "อัปเดตสถานะไม่สำเร็จ");
+      setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: previousStatus } : o));
+    }
   };
 
   const handleMarkRemainingPaid = async (orderId) => {
@@ -31,7 +37,7 @@ export default function AdminOrdersTab({ member }) {
     }
   };
 
-  const handleTrackingSave = async (orderId, trackingNumber) => {
+  const handleTrackingSave = async (orderId, trackingNumber, inputElement) => {
     const res = await callGas(
       "updateOrderTracking",
       [orderId, trackingNumber, member.token],
@@ -41,6 +47,7 @@ export default function AdminOrdersTab({ member }) {
       setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, trackingNumber } : o));
     } else {
       alert(res.message || "บันทึกเลขพัสดุไม่สำเร็จ");
+      if (inputElement) inputElement.value = orders.find(o => o.orderId === orderId)?.trackingNumber || "";
     }
   };
 
@@ -76,6 +83,7 @@ export default function AdminOrdersTab({ member }) {
                       <div className="text-xs text-gray-400">{o.memberEmail || o.email}</div>
                     )}
                     {o.nationalId && <div className="text-xs text-gray-400">บัตรประชาชน: {o.nationalId}</div>}
+                    {o.preOrderNo && <div className="text-xs text-gray-400">เลขที่ Pre Order: {o.preOrderNo}</div>}
                     {o.customerInterests?.length > 0 && (
                       <div className="text-xs text-gray-400">ความสนใจ: {o.customerInterests.join(", ")}</div>
                     )}
@@ -91,9 +99,11 @@ export default function AdminOrdersTab({ member }) {
                       {o.reservationType === "F" ? "F (สวมสิทธิ์แคมเปญ)" : "T (มัดจำจองจริง)"}
                     </span>
                     {o.channel && <div className="text-xs text-gray-600 mt-1">ช่องทาง: {o.channel}</div>}
+                    {o.branch && <div className="text-xs text-gray-600 mt-1">สาขา: {o.branch}</div>}
                     <div className="text-xs text-gray-600 mt-1">{o.staffName}</div>
                     <div className="text-xs text-gray-400">{o.staffPhone}</div>
-                    {o.registrationCode && <div className="text-xs text-gray-400">รหัส: {o.registrationCode}</div>}
+                    {o.registrationCode && <div className="text-xs text-gray-400">รหัสลงทะเบียน: {o.registrationCode}</div>}
+                    {o.pickupDate && <div className="text-xs text-gray-400">รอบรับเครื่อง: {o.pickupDate}</div>}
                   </td>
                   <td className="p-3 font-medium">{formatTHB(o.total)}</td>
                   <td className="p-3">
@@ -128,7 +138,7 @@ export default function AdminOrdersTab({ member }) {
                       type="text"
                       defaultValue={o.trackingNumber}
                       placeholder="ระบุเลขพัสดุ"
-                      onBlur={(e) => handleTrackingSave(o.orderId, e.target.value.trim())}
+                      onBlur={(e) => handleTrackingSave(o.orderId, e.target.value.trim(), e.target)}
                       className="border border-gray-300 rounded-md px-2 py-1 text-xs outline-none focus:border-[#FFD700] w-32"
                     />
                   </td>

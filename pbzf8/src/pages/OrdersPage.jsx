@@ -93,12 +93,25 @@ export default function OrdersPage({ member, onGoHome }) {
 
               <div className="space-y-1 mb-3">
                 {order.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-sm text-gray-600">
-                    <span className="line-clamp-1 flex-1">{item.name} x{item.qty}</span>
-                    <span className="flex-shrink-0 ml-2">{formatTHB(item.price * item.qty)}</span>
+                  <div key={idx} className="flex flex-col text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span className="line-clamp-1 flex-1">{item.name} x{item.qty}</span>
+                      <span className="flex-shrink-0 ml-2">{formatTHB(item.price * item.qty)}</span>
+                    </div>
+                    {item.selectedGifts && Object.keys(item.selectedGifts).length > 0 && (
+                      <span className="text-[11px] text-emerald-600">
+                        + เลือกของแถม {Object.values(item.selectedGifts).flat().length} ชิ้น
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
+
+              {order.branch && (
+                <p className="text-sm text-gray-600 mb-1">
+                  สาขาที่รับ: <span className="font-medium text-gray-900">{order.branch}</span>
+                </p>
+              )}
 
               {order.trackingNumber && (
                 <p className="text-sm text-gray-600 mb-2">

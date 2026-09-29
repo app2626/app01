@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import CartDrawer from "./components/CartDrawer";
@@ -25,7 +25,11 @@ import { getPromoPopupLocal, getHeroBannersLocal, getCouponsLocal, getPromotions
 function resolveLocalGifts(products) {
   return products.map(p => ({
     ...p,
-    freeGiftItems: (p.giftIds || []).map(gid => GIFTS.find(g => g.id === gid)).filter(Boolean)
+    freeGiftItems: (p.giftIds || []).map(gid => GIFTS.find(g => g.id === gid)).filter(Boolean),
+    resolvedGiftChoices: (p.giftChoices || []).map(choice => ({
+      ...choice,
+      options: choice.options.map(gid => GIFTS.find(g => g.id === gid)).filter(Boolean)
+    }))
   }));
 }
 
@@ -97,7 +101,10 @@ export default function App() {
 
   useEffect(() => {
     if (!member || !cartSynced) return;
-    callGas("saveCart", [member.token, cart], saveCartLocal).catch(() => {});
+    const timer = setTimeout(() => {
+      callGas("saveCart", [member.token, cart], saveCartLocal).catch(() => {});
+    }, 500);
+    return () => clearTimeout(timer);
   }, [cart, member, cartSynced]);
 
   useEffect(() => {
@@ -153,18 +160,22 @@ export default function App() {
     else clearState("member");
   }, [member]);
 
+  const toastTimeout = useRef(null);
+
   const showSuccessToast = (message) => {
     setToastMessage(message);
     setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setShowToast(false), 2000);
   };
 
-  const addToCart = useCallback((product, qty, color, variant) => {
+  const addToCart = useCallback((product, qty, color, variant, selectedGifts = {}) => {
     setCart(prev => {
       const existingIdx = prev.findIndex(item =>
         item.product.id === product.id &&
         item.selectedColor === color &&
-        item.selectedVariant.label === variant.label
+        item.selectedVariant.label === variant.label &&
+        JSON.stringify(item.selectedGifts || {}) === JSON.stringify(selectedGifts)
       );
 
       if (existingIdx >= 0) {
@@ -178,7 +189,8 @@ export default function App() {
         product,
         qty,
         selectedColor: color,
-        selectedVariant: variant
+        selectedVariant: variant,
+        selectedGifts
       }];
     });
     showSuccessToast("เพิ่มสินค้าลงตะกร้าแล้ว");
@@ -222,8 +234,8 @@ export default function App() {
     window.scrollTo(0, 0);
   };
 
-  const handleBuyNow = (product, qty, color, variant) => {
-    addToCart(product, qty, color, variant);
+  const handleBuyNow = (product, qty, color, variant, selectedGifts = {}) => {
+    addToCart(product, qty, color, variant, selectedGifts);
     setShowCart(true);
   };
 

@@ -86,6 +86,14 @@ export const MOCK_PRODUCTS = [
     inStock: true,
     pointsRate: 0.01,
     giftIds: ["gift-iqoo-watchz1"],
+    giftChoices: [
+      {
+        id: "choice-1",
+        title: "เลือกของแถมพิเศษ 1 ชิ้น",
+        maxLimit: 1,
+        options: ["gift-case-silicone", "gift-bag-notebook", "gift-plug-smart"]
+      }
+    ],
     promotions: [
       "รับโบนัส ฿3,000 เมื่อซื้อครบ ฿10,000",
       "รับส่วนลดเพิ่ม ฿1,500 เมื่อแลกซื้อ"
