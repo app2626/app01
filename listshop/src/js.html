@@ -1,0 +1,156 @@
+<script>
+let id = "";
+let allBranchData = [];
+let isDataLoaded = false;
+let dataTableInstance = null;
+
+    function showLoading(text) {
+      if (text) {
+        $('#loading-text').text(text);
+      }
+      $('#loading-overlay').removeClass('is-hidden');
+    }
+
+    function hideLoading() {
+      $('#loading-overlay').addClass('is-hidden');
+    }
+
+    function initData(dataArray) {
+      allBranchData = Array.isArray(dataArray) ? dataArray : [];
+      isDataLoaded = true;
+      showTable(allBranchData);
+    }
+
+   $(document).ready(()=>{
+      showLoading('กำลังโหลดข้อมูลสาขา');
+      google.script.run.withSuccessHandler(initData).withFailureHandler(handleDataError).getData()
+      if (typeof setFooter === 'function') setFooter()
+    });
+        
+    function getAllData(filterId){
+        console.log(filterId);
+        if (!isDataLoaded) {
+          showLoading('กำลังโหลดข้อมูลสาขา');
+          google.script.run.withSuccessHandler(function(dataArray) {
+            initData(dataArray);
+            if (filterId && filterId !== 'ทั้งหมด') {
+              getAllData(filterId);
+            }
+          }).withFailureHandler(handleDataError).getData();
+          return;
+        }
+
+        const filterKey = (filterId || '').toString().trim();
+        if (!filterKey || filterKey === 'ทั้งหมด') {
+          showTable(allBranchData);
+          return;
+        }
+
+        const filtered = allBranchData.filter(row => {
+          const area = (row[0] || '').toString().trim();
+          const support = (row[1] || '').toString().trim();
+          return (
+            area === filterKey ||
+            area.indexOf(filterKey) !== -1 ||
+            support === filterKey ||
+            support.indexOf(filterKey) !== -1
+          );
+        });
+        showTable(filtered);
+      }
+
+    function handleDataError(err) {
+      console.error(err);
+      hideLoading();
+      showTable([]);
+      if (typeof Swal !== 'undefined') {
+        Swal.fire({
+          icon: 'error',
+          title: 'ไม่สามารถดึงข้อมูลจากชีตต้นทางได้',
+          html: (err && err.message ? err.message : err) + '<br><br><small>กรุณาตรวจสอบว่าได้แชร์สิทธิ์เข้าถึงไฟล์ต้นทาง (<code>1g7rOP29go7LNkv8Mpsk9VS8d7tLV9iugIN9mbShFuus</code>) ให้กับบัญชีที่ผูกกับสคริปต์ (<code>mahalala123@gmail.com</code>) หรือกด "อนุญาตการเข้าถึง" (Allow access) สูตร IMPORTRANGE ในชีต <b>สาขา</b> แล้ว</small>'
+        });
+      }
+    }
+
+        //แสดงตาราง
+    function showTable(dataArray) {
+               hideLoading();
+               if (dataTableInstance && $.fn.DataTable.isDataTable('#datatable')) {
+                 dataTableInstance.clear().rows.add(dataArray).draw();
+                 if (dataTableInstance.responsive) {
+                   dataTableInstance.columns.adjust().responsive.recalc();
+                 }
+                 return;
+               }
+               dataTableInstance = $('#datatable').DataTable({
+                 data:dataArray,
+
+                 columns:[
+                   { title: 'แอเรีย'},
+                   { title: 'ซัพพอต'},
+                   { title: 'Location'},
+                   { title: 'Location Odoo'},
+                   { title: 'Location name'},                   
+                   { title: 'รายชื่อหัวหน้าสาขา/ผู้ดูแล'},
+                   { title: 'เบอร์โทรสาขา'},
+                   { title: 'เบอร์โทรส่วนตัว'},
+                   { title: 'e-mail'},
+                   { title: 'รอบเบิก'},
+                   { title: 'ภาค'},
+                   { title: 'Status'},
+                 ],
+         
+      dom: 'Bfrtip',
+        buttons: [
+           // 'pageLength',
+             {text: 'ทั้งหมด',action: function ( e, dt, node, config ) {getAllData('ทั้งหมด')}},
+             {text: 'ชญานัส(เอ)',action: function ( e, dt, node, config ) {getAllData('ชญานัส')}},
+             {text: 'ณัฐวิภา(ปาล์ม)',action: function ( e, dt, node, config ) {getAllData('ณัฐวิภา')}},
+             {text: 'ดวงพร(อุ้ย)',action: function ( e, dt, node, config ) {getAllData('ดวงพร')}},
+             {text: 'ธนกร(เฟิร์ส)',action: function ( e, dt, node, config ) {getAllData('ธนกร')}},
+             {text: 'นภาพร(พี่นิ่ม)',action: function ( e, dt, node, config ) {getAllData('นภาพร')}},
+             {text: 'นิกร(โอ๊ต)',action: function ( e, dt, node, config ) {getAllData('นิกร')}},
+             {text: 'ปิยศักดิ์(แป้ง)',action: function ( e, dt, node, config ) {getAllData('ปิยศักดิ์')}},
+             {text: 'วราภรณ์ (ก้อย)',action: function ( e, dt, node, config ) {getAllData('วราภรณ์')}},
+             {text: 'พิบูลย์(เบิร์ด)',action: function ( e, dt, node, config ) {getAllData('พิบูลย์')}},
+            //  {text: 'วรวุฒิ(ต๊อป)',action: function ( e, dt, node, config ) {getAllData('วรวุฒิ')}},
+             {text: 'สุวรีย์(ไก่)',action: function ( e, dt, node, config ) {getAllData('สุวรีย์')}},
+             {text: 'อดิเรก(วีวี่)',action: function ( e, dt, node, config ) {getAllData('อดิเรก')}},
+             {text: 'อนุชา(ต้อง)',action: function ( e, dt, node, config ) {getAllData('อนุชา')}},
+             {text: 'อระนุช(อ๋อม)',action: function ( e, dt, node, config ) {getAllData('อระนุช')}},
+             {text: 'ดนุลดา(จิ๊น)',action: function ( e, dt, node, config ) {getAllData('ดนุลดา')}},
+             {text: 'ภูบดินทร์ (ดิน)',action: function ( e, dt, node, config ) {getAllData('ภูบดินทร์')}},
+            ],   
+         
+
+         lengthMenu: [
+          [-1, 10, 25, 50, 100],
+          ['ทั้งหมด', '10', '25', '50','100']
+          ],
+         
+  columnDefs: [
+          {targets: [1,-1],className: 'all',},    
+       ],
+           destroy:true,
+           order: [[0, 'asc']],
+      language: {
+      sProcessing: "กำลังดำเนินการ...",
+      sLengthMenu: "_MENU_ ",
+      sZeroRecords: "ไม่พบข้อมูล",
+      sInfo: '<i class="fas fa-angle-double-left"></i> _START_ ถึง _END_ จาก _TOTAL_ <i class="fas fa-angle-double-right"></i>',
+      sInfoEmpty: "แสดง 0 ถึง 0 จาก 0 แถว",
+      sInfoFiltered: "(กรองข้อมูล _MAX_ ทุกแถว)",
+      sInfoPostFix: "",
+      sSearch: '<i class="fas fa-search" fa-2x></i> ค้นหา:',
+      sUrl: "",
+      oPaginate: {
+        sFirst: "หน้าแรก",
+        sPrevious: '<i class="fas fa-chevron-left fa-lg" ></i>',
+        sNext: '<i class="fas fa-chevron-right fa-lg"></i>',
+        sLast: "หน้าสุดท้าย"
+      }
+    },        
+   });
+ } 
+
+</script>
