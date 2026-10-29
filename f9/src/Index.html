@@ -1032,11 +1032,11 @@
 
               <div>
                 <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">ข้อมูลร่วมของสินค้า (กรอกครั้งเดียว)</h4>
-                <p class="text-[11px] text-slate-400 mb-3">ชื่อสินค้า (Product Name) ของแต่ละ SKU จะถูกสร้างอัตโนมัติจาก Model + ความจุ + สี ของแถวนั้นๆ — ไม่ต้องกรอกเอง</p>
+                <p class="text-[11px] text-slate-400 mb-3">ชื่อสินค้า (Product Name) ของแต่ละ SKU จะถูกสร้างอัตโนมัติจาก Model + สี ของแถวนั้นๆ — ไม่ต้องกรอกเอง</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div><label class="block text-xs font-bold text-slate-500 mb-1">Model *</label><input type="text" id="pgModel" class="pg-input" placeholder="เช่น SAMSUNG GALAXY Z FLIP 8 12/256GB" oninput="window.app.productGroup.onModelInput()"></div>
                   <div><label class="block text-xs font-bold text-slate-500 mb-1">Marketing Model *</label><input type="text" id="pgMarketingModel" class="pg-input pgSharedField" required placeholder="เช่น SAMSUNG GALAXY Z FLIP 8"></div>
-                  <div><label class="block text-xs font-bold text-slate-500 mb-1">ความจุ *</label><input type="text" id="pgCapacity" class="pg-input pgSharedField" required placeholder="เช่น 512GB" oninput="window.app.productGroup.updateAllNamePreviews()"></div>
+                  <div><label class="block text-xs font-bold text-slate-500 mb-1">ความจุ *</label><input type="text" id="pgCapacity" class="pg-input pgSharedField" required placeholder="เช่น 512GB"></div>
                   <div><label class="block text-xs font-bold text-slate-500 mb-1">Product Group</label><input type="text" id="pgProductGroup" class="pg-input pgSharedField" placeholder="เช่น FLIP8 Series (เว้นว่างได้)"></div>
                   <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">หมวดหมู่</label>

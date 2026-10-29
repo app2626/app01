@@ -5118,18 +5118,17 @@ window.app = {
       window.app.showModal('productGroupModal');
     },
 
-    // ชื่อสินค้า (Product Name) ไม่ให้กรอกเองอีกต่อไป — สร้างอัตโนมัติจาก Model + ความจุ + สี ของแต่ละแถว (ตัดส่วนที่ว่างทิ้ง)
-    computeProductName: function(model, capacity, color) {
-      return [model, capacity, color].map(s => (s || '').toString().trim()).filter(Boolean).join(' ');
+    // ชื่อสินค้า (Product Name) ไม่ให้กรอกเองอีกต่อไป — สร้างอัตโนมัติจาก Model + สี ของแต่ละแถว (ตัดส่วนที่ว่างทิ้ง)
+    computeProductName: function(model, color) {
+      return [model, color].map(s => (s || '').toString().trim()).filter(Boolean).join(' ');
     },
     updateRowNamePreview: function(id) {
       const rowEl = document.getElementById('pgRow-' + id);
       if (!rowEl) return;
       const model = document.getElementById('pgModel').value;
-      const capacity = document.getElementById('pgCapacity').value;
       const color = rowEl.querySelector('.pgColor').value;
       const preview = rowEl.querySelector('.pgNamePreview');
-      if (preview) preview.textContent = this.computeProductName(model, capacity, color) || 'กรอก Model เพื่อสร้างชื่อสินค้า';
+      if (preview) preview.textContent = this.computeProductName(model, color) || 'กรอก Model เพื่อสร้างชื่อสินค้า';
     },
     updateAllNamePreviews: function() {
       this.variantRows.forEach(id => this.updateRowNamePreview(id));
@@ -5272,7 +5271,7 @@ window.app = {
           '<button type="button" class="px-2.5 py-2 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap flex-shrink-0" onclick="document.getElementById(\'pgImgFile_' + id + '\').click()"><i class="fas fa-upload"></i></button>' +
           '<input type="file" id="pgImgFile_' + id + '" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, \'' + stateKey + '\', function(localUrl){ const pv=document.getElementById(\'pgImgPreview_' + id + '\'); const tx=document.querySelector(\'#pgRow-' + id + ' .pgImage\'); if(pv){ pv.src=localUrl; pv.classList.remove(\'hidden\'); } if(tx) tx.value=\'\'; window.app.toast(\'เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก\'); })">' +
           '<button type="button" class="text-rose-400 hover:text-rose-600 px-1 flex-shrink-0" onclick="window.app.productGroup.removeVariantRow(' + id + ')"><i class="fas fa-trash"></i></button>' +
-          '<span class="pgNamePreview text-[10px] text-slate-400 italic truncate max-w-[220px]" title="ชื่อสินค้าที่จะบันทึก (Model + ความจุ + สี)"></span>' +
+          '<span class="pgNamePreview text-[10px] text-slate-400 italic truncate max-w-[220px]" title="ชื่อสินค้าที่จะบันทึก (Model + สี)"></span>' +
         '</div>';
       wrap.appendChild(row);
       this.updateRowNamePreview(id);
@@ -5354,6 +5353,7 @@ window.app = {
             : (res.appended
               ? 'เพิ่ม SKU ใหม่ ' + res.skuCount + ' รายการเข้าสินค้า "' + shared['Model'] + '" สำเร็จ'
               : 'เพิ่มสินค้า "' + shared['Model'] + '" (' + res.skuCount + ' SKU) สำเร็จ'));
+          await window.app.refreshGlobalData();
           window.app.grid.loadData();
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ', 'error');

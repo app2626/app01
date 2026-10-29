@@ -34,7 +34,7 @@ function setupDatabase(userToken) {
   }
   const tables = {
     // 6C.1 — Original Price ต่อท้ายเสมอ (display-only: ป้าย "ประหยัด/เดิม" บนการ์ด POS — ราคาคิดเงินจริงคือ Price)
-    "Products": ["SKU", "Product Name", "Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Stock", "Unit", "Category", "Status", "Channel", "Original Price"],
+    "Products": ["SKU", "Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Stock", "Unit", "Category", "Status", "Channel", "Original Price"],
     "Members": ["Username", "Password", "Role", "Name", "Branch Code", "Accessible Menus"],
     "Branches": ["Channel", "Branch Code", "Branch Name", "Area", "Mall", "Region", "Province", "Type Name"],
     "Channels": ["Channel ID", "Channel Name", "Description"],
@@ -74,12 +74,12 @@ function setupDatabase(userToken) {
       ["B-008", "popupbanner", "https://via.placeholder.com/800x800/10b981/ffffff?text=Popup+Banner+1", "Active"]
     ],
     "Products": [
-      ["SKU-S24U", "Samsung Galaxy S24 Ultra", "S24 Ultra", "S24-Series", "512GB", "Titanium Black", "https://images.samsung.com/is/image/samsung/p6pim/th/2401/gallery/th-galaxy-s24-s928-sm-s928bzththl-thumb-539325419", 46900, 50, "เครื่อง", "โมบาย", "เปิด", "ALL"],
-      ["SKU-IP15P", "iPhone 15 Pro Max", "15 Pro Max", "IP15-Series", "256GB", "Natural", "https://store.storeimages.cdn-apple.com/8756/as-images.apple.com/is/iphone-15-pro-max-natural-titanium-select", 48900, 20, "เครื่อง", "โมบาย", "เปิด", "ALL"],
-      ["GF-SAM-ADPT", "Samsung Adapter 25W (Black)", "Adapter", "-", "-", "Black", "https://images.samsung.com/is/image/samsung/p6pim/th/ep-ta800nbegww/gallery/th-25w-pd-adapter-ta800-ep-ta800nbegww-thumb-536852431", 490, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL"],
-      ["GF-SAM-CASE", "Samsung Clear Case S24U", "Case", "-", "-", "Clear", "https://images.samsung.com/is/image/samsung/p6pim/th/ef-qs928ctegww/gallery/th-clear-case-for-galaxy-s24-ultra-ef-qs928-ef-qs928ctegww-thumb-539326442", 590, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL"],
-      ["GF-TG-PB10K", "TG Powerbank 10000mAh", "PB", "-", "10000", "White", "https://via.placeholder.com/150/ffffff/000000?text=Powerbank", 990, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL"],
-      ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL"]
+      ["SKU-S24U", "Samsung Galaxy S24 Ultra", "S24 Ultra", "Samsung Galaxy S24 Ultra", "S24-Series", "512GB", "Titanium Black", "https://images.samsung.com/is/image/samsung/p6pim/th/2401/gallery/th-galaxy-s24-s928-sm-s928bzththl-thumb-539325419", 46900, 50, "เครื่อง", "โมบาย", "เปิด", "ALL", ""],
+      ["SKU-IP15P", "iPhone 15 Pro Max", "15 Pro Max", "iPhone 15 Pro Max", "IP15-Series", "256GB", "Natural", "https://store.storeimages.cdn-apple.com/8756/as-images.apple.com/is/iphone-15-pro-max-natural-titanium-select", 48900, 20, "เครื่อง", "โมบาย", "เปิด", "ALL", ""],
+      ["GF-SAM-ADPT", "Samsung Adapter 25W (Black)", "Adapter", "Adapter", "-", "-", "Black", "https://images.samsung.com/is/image/samsung/p6pim/th/ep-ta800nbegww/gallery/th-25w-pd-adapter-ta800-ep-ta800nbegww-thumb-536852431", 490, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL", ""],
+      ["GF-SAM-CASE", "Samsung Clear Case S24U", "Case", "Case", "-", "-", "Clear", "https://images.samsung.com/is/image/samsung/p6pim/th/ef-qs928ctegww/gallery/th-clear-case-for-galaxy-s24-ultra-ef-qs928-ef-qs928ctegww-thumb-539326442", 590, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL", ""],
+      ["GF-TG-PB10K", "TG Powerbank 10000mAh", "PB", "PB", "-", "10000", "White", "https://via.placeholder.com/150/ffffff/000000?text=Powerbank", 990, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", ""],
+      ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "Bag", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", ""]
     ],
     "GiftMappings": [
       ["GM-001", "S24-Series", "Retail", "adapter, case", "bag", "เปิด"],
@@ -1231,8 +1231,10 @@ function updateFullOrder(dataObj, secureUser, ss) {
     // แต่ก็ต้อง whitelist-validate ฝั่ง server เพราะ API รับ payload ดิบได้โดยไม่ผ่าน <select> ของ UI — ไม่งั้นเขียนสตริงใดๆ (รวมถึง formula) ลงคอลัมน์นี้ได้ตรงๆ
     if (dataObj["Order Status"] !== undefined) {
       const statusSheet = ss.getSheetByName("OrderStatus");
-      const validStatuses = statusSheet ? statusSheet.getDataRange().getValues().slice(1).map(r => (r[1] || '').toString().trim()).filter(Boolean) : [];
-      validStatuses.push('Cancelled');
+      const rawStatuses = statusSheet ? statusSheet.getDataRange().getValues().slice(1).map(r => (r[1] || '').toString().trim()).filter(Boolean) : [];
+      // ต้องใช้ fallback ชุดเดียวกับ window.app.getOrderStatusFlow() ฝั่ง client เมื่อชีต OrderStatus มีไม่ถึง 2 แถว — ไม่งั้นสถานะมาตรฐาน (Pending/Confirmed/Paid/Delivered) จะถูกบล็อกตอนบันทึกแก้ไขออเดอร์
+      const validStatuses = rawStatuses.length >= 2 ? rawStatuses.slice() : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
+      if (!validStatuses.includes('Cancelled')) validStatuses.push('Cancelled');
       if (!validStatuses.includes(newStatus.toString().trim())) throw new Error("สถานะออเดอร์ไม่ถูกต้อง: " + newStatus);
     }
     if (dataObj["Reservation Status"] !== undefined) {
@@ -1466,8 +1468,8 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
 // และไม่แตะ Category options ของ f9 (6 หมวด รวม สมาร์ทวอทช์/หูฟัง ซึ่ง f8 ยังไม่มี) — ฟังก์ชันนี้ไม่ hardcode รายการหมวดหมู่อยู่แล้ว จึงใช้ได้ตรงๆ
 const PRODUCT_GROUP_FREE_TEXT_FIELDS_ = ['Model', 'Marketing Model', 'Product Group', 'Capacity', 'Unit', 'Image URL'];
 
-function buildAutoProductName_(model, capacity, color) {
-  return [model, capacity, color].map(s => (s || '').toString().trim()).filter(Boolean).join(' ');
+function buildAutoProductName_(model, color) {
+  return [model, color].map(s => (s || '').toString().trim()).filter(Boolean).join(' ');
 }
 
 function saveProductGroup(payload, secureUser, ss) {
@@ -1544,7 +1546,7 @@ function saveProductGroup(payload, secureUser, ss) {
         'SKU': sku,
         'Color': color,
         'Stock': stock,
-        'Product Name': sanitizeSheetText_(buildAutoProductName_(model, sharedCapacity, color))
+        'Product Name': sanitizeSheetText_(buildAutoProductName_(model, color))
       });
       // รูปเฉพาะ SKU นี้ (ถ้ามี) แทนที่รูปเริ่มต้นของสินค้าเฉพาะแถวนี้แถวเดียว
       const perSkuImage = (v.image || '').toString().trim();
@@ -1634,7 +1636,7 @@ function updateProductGroup(payload, secureUser, ss) {
         'SKU': sku,
         'Color': color,
         'Stock': stock,
-        'Product Name': sanitizeSheetText_(buildAutoProductName_(originalModel, sharedCapacity, color))
+        'Product Name': sanitizeSheetText_(buildAutoProductName_(originalModel, color))
       });
       const perSkuImage = (v.image || '').toString().trim();
       if (perSkuImage) rowObj['Image URL'] = sanitizeSheetText_(perSkuImage);
