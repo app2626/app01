@@ -556,11 +556,15 @@
                             <th data-priority="2">ราคาป้าย (RRP)</th>
                             <th data-priority="2">ส่วนลด (Discount)</th>
                             <th data-priority="2">ราคาโปร (Promo Price)</th>
+                            <th data-priority="2">Start</th>
+                            <th data-priority="2">End</th>
+                            <th data-priority="2">โปรโมชั่นร่วม SF+</th>
+                            <th data-priority="2">โปรโมชั่นร่วมเทรด</th>
+                            <th data-priority="2">ตัดบาร์ส่วนลด</th>
+                            <th data-priority="2">ราคาแนะนำขาย</th>
                             <th data-priority="3">Loc. Code</th>
                             <th data-priority="3">สถานที่ตั้งสาขา</th>
                             <th data-priority="3">Area</th>
-                            <th data-priority="4">ตัดบาร์ส่วนลด</th>
-                            <th data-priority="4">ราคาแนะนำขาย</th>
                             <th class="desktop">ประทับตราวันที่</th>
                             <th data-priority="3">พนักงานผู้บันทึก</th>
                             <th data-priority="3">วันที่ ACT</th>
@@ -1214,8 +1218,12 @@
                         adminToken = savedToken;
                         $('#settingsTabLi').show();
                     }
-                    hideLoginScreen();
-                    bootstrapApp();
+                    if (res.passwordExpired) {
+                        promptForcedPasswordChange();
+                    } else {
+                        hideLoginScreen();
+                        bootstrapApp();
+                    }
                 } else {
                     try { localStorage.removeItem('actssToken'); } catch(e) {}
                     showLoginScreen();
@@ -1257,7 +1265,12 @@
                                 resolve(false);
                             } else {
                                 currentToken = res.token;
-                                try { localStorage.setItem('actssToken', res.token); } catch(e) {}
+                                try {
+                                    localStorage.setItem('actssToken', res.token);
+                                    if (localStorage.getItem('actssRememberedLocCode') === currentLocCode && localStorage.getItem('actssRememberedPassword')) {
+                                        localStorage.setItem('actssRememberedPassword', newPw);
+                                    }
+                                } catch(e) {}
                                 if (currentLocCode === '__ADMIN__') adminToken = res.token;
                                 resolve(true);
                             }
@@ -1277,13 +1290,26 @@
     }
 
     function promptForgotPassword() {
+        var initialLocCode = ($('#loginLocCode').val() || '').trim();
         Swal.fire({
             title: 'ลืมรหัสผ่าน',
             html: 'กรอกรหัสสาขาเพื่อรับรหัส OTP ทางอีเมลที่ลงทะเบียนไว้<br><br>' +
-                  '<input type="text" id="swalForgotLocCode" class="swal2-input" placeholder="รหัสสาขา (Location Code)">',
+                  '<input type="text" id="swalForgotLocCode" class="swal2-input" placeholder="รหัสสาขา (Location Code)" value="' + escapeHtml(initialLocCode) + '">',
             confirmButtonText: 'ส่งรหัส OTP',
+            showDenyButton: true,
+            denyButtonText: 'มีรหัส OTP แล้ว',
+            denyButtonColor: '#6c757d',
             showCancelButton: true,
             cancelButtonText: 'ยกเลิก',
+            allowOutsideClick: false,
+            preDeny: function() {
+                var locCode = document.getElementById('swalForgotLocCode').value.trim();
+                if (!locCode) {
+                    Swal.showValidationMessage('กรุณากรอกรหัสสาขา');
+                    return false;
+                }
+                return { locCode: locCode };
+            },
             preConfirm: function() {
                 var locCode = document.getElementById('swalForgotLocCode').value.trim();
                 if (!locCode) {
@@ -1301,16 +1327,24 @@
                                 Swal.showValidationMessage(res.message);
                                 resolve(false);
                             } else {
-                                resolve({ locCode: locCode, message: res.message });
+                                resolve({ locCode: res.locCode || locCode, message: res.message });
                             }
                         }).requestPasswordReset(locCode);
                 });
             }
         }).then(function(result) {
             if (result.isConfirmed && result.value) {
-                Swal.fire('ส่งรหัส OTP แล้ว', result.value.message, 'success').then(function() {
+                Swal.fire({
+                    title: 'ส่งรหัส OTP แล้ว',
+                    text: result.value.message,
+                    icon: 'success',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                }).then(function() {
                     promptResetPasswordWithOtp(result.value.locCode);
                 });
+            } else if (result.isDenied && result.value) {
+                promptResetPasswordWithOtp(result.value.locCode);
             }
         });
     }
@@ -1318,17 +1352,23 @@
     function promptResetPasswordWithOtp(locCode) {
         Swal.fire({
             title: 'ตั้งรหัสผ่านใหม่',
-            html: 'รหัสสาขา: <b>' + locCode + '</b><br><br>' +
-                  '<input type="text" id="swalResetOtp" class="swal2-input" placeholder="รหัส OTP 6 หลัก" maxlength="6">' +
-                  '<input type="password" id="swalResetNewPassword" class="swal2-input" placeholder="รหัสผ่านใหม่">',
+            html: 'รหัสสาขา: <b>' + escapeHtml(locCode) + '</b><br><br>' +
+                  '<input type="text" id="swalResetOtp" class="swal2-input" placeholder="รหัส OTP 6 หลัก" maxlength="6" inputmode="numeric" autocomplete="one-time-code">' +
+                  '<input type="password" id="swalResetNewPassword" class="swal2-input" placeholder="รหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)">',
             confirmButtonText: 'ยืนยันตั้งรหัสผ่านใหม่',
             showCancelButton: true,
             cancelButtonText: 'ยกเลิก',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
             preConfirm: function() {
                 var otp = document.getElementById('swalResetOtp').value.trim();
                 var newPw = document.getElementById('swalResetNewPassword').value;
                 if (!otp || !newPw) {
                     Swal.showValidationMessage('กรุณากรอกให้ครบถ้วน');
+                    return false;
+                }
+                if (newPw.length < 4) {
+                    Swal.showValidationMessage('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร');
                     return false;
                 }
                 return new Promise(function(resolve) {
@@ -1342,6 +1382,12 @@
                                 Swal.showValidationMessage(res.message);
                                 resolve(false);
                             } else {
+                                try {
+                                    if (localStorage.getItem('actssRememberedPassword')) {
+                                        localStorage.removeItem('actssRememberedPassword');
+                                    }
+                                    $('#loginPassword').val('');
+                                } catch(e) {}
                                 resolve(true);
                             }
                         }).resetPasswordWithOtp(locCode, otp, newPw);
@@ -1625,13 +1671,13 @@
 
             var selectedModels = $('#filterModel').val() || [];
             if (selectedModels.length > 0) {
-                var modelCol = data[17] ? data[17].toString() : "";
+                var modelCol = data[22] ? data[22].toString() : "";
                 if (selectedModels.indexOf(modelCol) === -1) return false;
             }
 
             var minDateStr = $('#filterStartDate').val();
             var maxDateStr = $('#filterEndDate').val();
-            var dateCol = data[11]; 
+            var dateCol = data[15]; 
 
             if (!minDateStr && !maxDateStr) return true;
             if (!dateCol) return false;
@@ -1661,10 +1707,10 @@
             if(dataTableInstance) dataTableInstance.draw();
         });
 
-        $('#filterArea').on('change', function() { if(dataTableInstance) dataTableInstance.column(8).search(this.value).draw(); });
-        $('#filterLoc').on('change', function() { if(dataTableInstance) dataTableInstance.column(6).search(this.value).draw(); });
+        $('#filterArea').on('change', function() { if(dataTableInstance) dataTableInstance.column(14).search(this.value).draw(); });
+        $('#filterLoc').on('change', function() { if(dataTableInstance) dataTableInstance.column(12).search(this.value).draw(); });
         $('#filterImei').on('keyup', function() { if(dataTableInstance) dataTableInstance.column(2).search(this.value).draw(); });
-        $('#filterStatus').on('change', function() { if(dataTableInstance) dataTableInstance.column(16).search(this.value).draw(); });
+        $('#filterStatus').on('change', function() { if(dataTableInstance) dataTableInstance.column(20).search(this.value).draw(); });
         $('#filterProduct').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
         $('#filterModel').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
 
@@ -2324,14 +2370,17 @@
         }
 
         if(data.promotions && data.promotions.length > 0) {
-            var promoArray = data.promotions.map(function(p) { return '📢 ข่าวสารการตลาด: ' + p.title + ' <a href="' + p.link + '" target="_blank" class="text-danger fw-bold">คลิกดูรายละเอียด</a>'; });
+            var promoArray = data.promotions.map(function(p) {
+                var safeLink = (p.link && /^https?:\/\//i.test(p.link.trim())) ? escapeHtml(p.link.trim()) : '#';
+                return '📢 ข่าวสารการตลาด: ' + escapeHtml(p.title) + ' <a href="' + safeLink + '" target="_blank" rel="noopener noreferrer" class="text-danger fw-bold">คลิกดูรายละเอียด</a>';
+            });
             $('#promoMarquee').html(promoArray.join(' &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp; '));
         }
 
         // 💡 3. เช็คว่ามี "ประกาศ" หรือไม่ ถ้ามีให้โชว์ก่อนโหลดตาราง
         if(data.announcement && data.announcement.title && data.announcement.title !== "") {
             Swal.fire({
-                title: '<div class="text-start border-bottom pb-2 text-primary fw-bold"><i class="fas fa-bullhorn"></i> ' + data.announcement.title + '</div>',
+                title: '<div class="text-start border-bottom pb-2 text-primary fw-bold"><i class="fas fa-bullhorn"></i> ' + escapeHtml(data.announcement.title) + '</div>',
                 text: data.announcement.detail,
                 icon: 'info',
                 confirmButtonText: '<i class="fas fa-check-circle"></i> รับทราบและตกลง',
@@ -2404,11 +2453,15 @@
                     '<td>' + (r.rrp ? '<span class="price-rrp">' + escapeHtml(r.rrp) + '</span>' : '') + '</td>' +
                     '<td>' + (r.discount ? '<span class="price-discount">' + escapeHtml(r.discount) + '</span>' : '') + '</td>' +
                     '<td>' + (r.promoPrice ? '<span class="price-promo">' + escapeHtml(r.promoPrice) + '</span>' : '') + '</td>' +
+                    '<td>' + escapeHtml(r.promoStart) + '</td>' +
+                    '<td>' + escapeHtml(r.promoEnd) + '</td>' +
+                    '<td>' + escapeHtml(r.promoSfPlus) + '</td>' +
+                    '<td>' + escapeHtml(r.promoTrade) + '</td>' +
+                    '<td>' + escapeHtml(r.cutBarcode) + '</td>' +
+                    '<td>' + escapeHtml(r.suggestPrice) + '</td>' +
                     '<td>' + escapeHtml(r.locCode) + '</td>' +
                     '<td>' + escapeHtml(r.locName) + '</td>' +
                     '<td class="fw-bold text-dark">' + escapeHtml(r.area) + '</td>' +
-                    '<td>' + escapeHtml(r.cutBarcode) + '</td>' +
-                    '<td>' + escapeHtml(r.suggestPrice) + '</td>' +
                     '<td>' + escapeHtml(displayTimestamp) + '</td>' +
                     '<td>' + escapeHtml(r.empName) + '</td>' +
                     '<td>' + escapeHtml(displayActDate) + '</td>' +
@@ -2420,7 +2473,7 @@
                 '</tr>';
             });
         } else {
-            tbody = '<tr><td colspan="19" class="text-center text-muted py-4">ยังไม่มีบันทึกข้อมูลในฐานระบบ</td></tr>';
+            tbody = '<tr><td colspan="23" class="text-center text-muted py-4">ยังไม่มีบันทึกข้อมูลในฐานระบบ</td></tr>';
         }
         
         $('#dataTable tbody').html(tbody);
@@ -2442,8 +2495,8 @@
 
         dataTableInstance = $('#dataTable').DataTable({
             "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[11, "desc"]],
-            "columnDefs": [{ targets: 18, visible: false, searchable: true }],
+            "order": [[15, "desc"]],
+            "columnDefs": [{ targets: 22, visible: false, searchable: true }],
             "responsive": {
                 details: {
                     display: function (row, update, render) {
@@ -2975,6 +3028,17 @@
                 renderIncomingTransfers(res.incoming);
                 renderOutgoingTransfers(res.outgoing);
             }).getMyTransfers(currentToken);
+
+        if (currentLocCode && currentLocCode !== '__ADMIN__') {
+            google.script.run
+                .withFailureHandler(handleAuthFailure)
+                .withSuccessHandler(function(stock) {
+                    branchStock = stock || [];
+                    $('.select-sku').each(function() { populateSkuDropdown($(this)); });
+                    transferSourceStock = branchStock.filter(function(item) { return item.originalLoc === currentLocCode; });
+                    $('.transfer-select-sku').each(function() { populateTransferSkuDropdown($(this)); });
+                }).getStockByBranch(currentToken, currentLocCode);
+        }
     }
 
     function renderIncomingTransfers(list) {
@@ -3049,6 +3113,15 @@
                 renderIncomingActTransfers(res.incoming);
                 renderOutgoingActTransfers(res.outgoing);
             }).getMyActTransfers(currentToken);
+
+        if (currentLocCode && currentLocCode !== '__ADMIN__') {
+            google.script.run
+                .withFailureHandler(handleAuthFailure)
+                .withSuccessHandler(function(records) {
+                    actTransferSourceRecords = records || [];
+                    $('.act-transfer-select-sku').each(function() { populateActTransferSkuDropdown($(this)); });
+                }).getActRecordsByBranch(currentToken, currentLocCode);
+        }
     }
 
     function renderIncomingActTransfers(list) {
@@ -3291,6 +3364,22 @@
                             '<input type="text" id="editPromoPrice" class="form-control form-control-sm" value="' + escapeHtml(record.promoPrice) + '">' +
                         '</div>' +
                         '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">Start</label>' +
+                            '<input type="text" id="editPromoStart" class="form-control form-control-sm" value="' + escapeHtml(record.promoStart) + '">' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">End</label>' +
+                            '<input type="text" id="editPromoEnd" class="form-control form-control-sm" value="' + escapeHtml(record.promoEnd) + '">' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">โปรโมชั่นร่วม SF+</label>' +
+                            '<input type="text" id="editPromoSfPlus" class="form-control form-control-sm" value="' + escapeHtml(record.promoSfPlus) + '">' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
+                            '<label class="form-label fw-bold small text-secondary mb-1">โปรโมชั่นร่วมเทรด</label>' +
+                            '<input type="text" id="editPromoTrade" class="form-control form-control-sm" value="' + escapeHtml(record.promoTrade) + '">' +
+                        '</div>' +
+                        '<div class="col-md-6">' +
                             '<label class="form-label fw-bold small text-secondary mb-1">ตัดบาร์ส่วนลด</label>' +
                             '<input type="text" id="editCutBarcode" class="form-control form-control-sm" value="' + escapeHtml(record.cutBarcode) + '">' +
                         '</div>' +
@@ -3315,6 +3404,10 @@
                     rrp: document.getElementById('editRrp').value,
                     discount: document.getElementById('editDiscount').value,
                     promoPrice: document.getElementById('editPromoPrice').value,
+                    promoStart: document.getElementById('editPromoStart').value,
+                    promoEnd: document.getElementById('editPromoEnd').value,
+                    promoSfPlus: document.getElementById('editPromoSfPlus').value,
+                    promoTrade: document.getElementById('editPromoTrade').value,
                     cutBarcode: document.getElementById('editCutBarcode').value,
                     suggestPrice: document.getElementById('editSuggestPrice').value
                 };
@@ -3343,12 +3436,13 @@
                 }
                 google.script.run
                     .withFailureHandler(function(err) {
+                        if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
                         Swal.fire('ผิดพลาด', 'ส่งออกข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
                     })
                     .withSuccessHandler(function(res) {
                         if(res.success) { downloadCSV(res.csvData, "ACT_SAMSUNG_Data_Master.csv"); Swal.fire('สำเร็จ', 'ดาวน์โหลดไฟล์เรียบร้อย', 'success'); }
                         else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-                    }).verifyAdminAndExport(result.value, filteredRowIds);
+                    }).verifyAdminAndExport(result.value, filteredRowIds, currentToken);
             }
         });
     }

@@ -79,7 +79,7 @@ function logAccess_(ss, locCode, locName, role, action, detail) {
 }
 
 function parseDdMmYyyy_(str) {
-  const parts = (str || "").toString().trim().split(/[-/]/);
+  const parts = (str || "").toString().replace(/^'/, "").trim().split(/[-/]/);
   if (parts.length !== 3) return null;
   const d = new Date(parts[2], parts[1] - 1, parts[0]);
   return isNaN(d.getTime()) ? null : d;
@@ -88,7 +88,7 @@ function parseDdMmYyyy_(str) {
 // แปลง timestamp รูปแบบ "dd/MM/yyyy HH:mm:ss" (ตามที่บันทึกไว้ตอนสร้าง session ด้วย Utilities.formatDate ... "Asia/Bangkok")
 // กลับเป็น Date — ใช้เช็คอายุ session (SESSION_EXPIRY_HOURS)
 function parseSessionTimestamp_(str) {
-  const trimmed = (str || "").toString().trim();
+  const trimmed = (str || "").toString().replace(/^'/, "").trim();
   const spaceIdx = trimmed.indexOf(" ");
   const datePart = spaceIdx === -1 ? trimmed : trimmed.substring(0, spaceIdx);
   const timePart = spaceIdx === -1 ? "00:00:00" : trimmed.substring(spaceIdx + 1);
@@ -138,19 +138,39 @@ function getUsersLocCodes_(ss) {
   return codes;
 }
 
-// อ่าน Role ของสาขาสดจากชีต Users ทุกครั้ง (ไม่ cache ไว้ใน Sessions) เพื่อให้ admin เปลี่ยนสิทธิ์
-// แล้วมีผลทันทีกับ session ที่ล็อกอินค้างอยู่ โดยไม่ต้องรอให้ผู้ใช้ login ใหม่
-function getUserRole_(ss, locCode) {
-  if (locCode === ADMIN_SESSION_LOCCODE) return "admin";
+// อ่านสถานะ Active, Role และวันเปลี่ยนรหัสผ่านของสาขาสดจากชีต Users ทุกครั้ง (ไม่ cache ไว้ใน Sessions)
+// เพื่อให้เมื่อ Admin ระงับบัญชีหรือเปลี่ยนสิทธิ์ จะมีผลทันทีกับ session ที่ล็อกอินค้างอยู่
+function getUserStatus_(ss, locCode) {
+  if (locCode === ADMIN_SESSION_LOCCODE) {
+    return { active: true, role: "admin", passwordExpired: false };
+  }
   const usersSheet = getUsersSheet_(ss);
-  if (!usersSheet || usersSheet.getLastRow() <= 1) return ROLE_NORMAL;
+  if (!usersSheet || usersSheet.getLastRow() <= 1) {
+    return { active: false, role: ROLE_NORMAL, passwordExpired: false };
+  }
   const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 6).getDisplayValues();
   for (let i = 0; i < data.length; i++) {
     if ((data[i][0] || "").toString().trim() === locCode) {
-      return (data[i][5] || "").toString().trim() || ROLE_NORMAL;
+      const lastChanged = data[i][3];
+      const activeStr = (data[i][4] || "").toString().trim().toUpperCase();
+      const active = (activeStr === "TRUE" || activeStr === "Y");
+      const role = (data[i][5] || "").toString().trim() || ROLE_NORMAL;
+      let passwordExpired = false;
+      if (lastChanged) {
+        const changedDate = parseDdMmYyyy_(lastChanged);
+        if (changedDate) {
+          const daysSince = Math.floor((new Date().getTime() - changedDate.getTime()) / (1000 * 60 * 60 * 24));
+          passwordExpired = daysSince >= PASSWORD_EXPIRY_DAYS;
+        }
+      }
+      return { active: active, role: role, passwordExpired: passwordExpired };
     }
   }
-  return ROLE_NORMAL;
+  return { active: false, role: ROLE_NORMAL, passwordExpired: false };
+}
+
+function getUserRole_(ss, locCode) {
+  return getUserStatus_(ss, locCode).role;
 }
 
 function resolveSession_(token) {
@@ -166,7 +186,12 @@ function resolveSession_(token) {
         return null;
       }
       const locCode = (data[i][1] || "").toString().trim();
-      return { locCode: locCode, role: getUserRole_(ss, locCode) };
+      const userStatus = getUserStatus_(ss, locCode);
+      if (!userStatus.active) {
+        sheet.deleteRow(i + 2);
+        return null;
+      }
+      return { locCode: locCode, role: userStatus.role, passwordExpired: userStatus.passwordExpired };
     }
   }
   return null;
@@ -279,7 +304,7 @@ function login(locCode, password) {
       const token = Utilities.getUuid();
       const sessionsSheet = getSessionsSheet_(ss);
       if (sessionsSheet) {
-        sessionsSheet.appendRow([token, locCode, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")]);
+        sessionsSheet.appendRow([token, locCode, "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")]);
       }
 
       const branchLocName = getLocNameByCode_(ss, locCode);
@@ -321,7 +346,7 @@ function tryAdminLoginAsSession_(username, password) {
     if (hashPassword_(password, salt) !== storedHash) return null;
 
     const token = Utilities.getUuid();
-    const now = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+    const now = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
 
     const sessionsSheet = getSessionsSheet_(ss);
     if (sessionsSheet) sessionsSheet.appendRow([token, ADMIN_SESSION_LOCCODE, now]);
@@ -389,7 +414,8 @@ function requestPasswordReset(locCode) {
 
   const data = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 7).getDisplayValues();
   for (let i = 0; i < data.length; i++) {
-    if ((data[i][0] || "").toString().trim() !== locCode) continue;
+    const rowLocCode = (data[i][0] || "").toString().trim();
+    if (rowLocCode.toLowerCase() !== locCode.toLowerCase()) continue;
 
     const active = (data[i][4] || "").toString().trim().toUpperCase();
     if (active !== "TRUE" && active !== "Y") {
@@ -401,13 +427,19 @@ function requestPasswordReset(locCode) {
       return { success: false, message: "บัญชีนี้ยังไม่ได้ลงทะเบียนอีเมลไว้ กรุณาติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน" };
     }
 
-    const resetsSheet = getPasswordResetsSheet_(ss);
-    if (!resetsSheet) return { success: false, message: "ระบบยังไม่พร้อมใช้งานฟีเจอร์นี้ กรุณาติดต่อผู้ดูแลระบบ" };
+    let resetsSheet = getPasswordResetsSheet_(ss);
+    if (!resetsSheet) {
+      resetsSheet = ss.insertSheet("PasswordResets");
+      resetsSheet.getRange(1, 1, 1, 5).setValues([["LocCode", "OtpHash", "Salt", "ExpiresAt", "CreatedAt"]]);
+      resetsSheet.setFrozenRows(1);
+    }
 
     if (resetsSheet.getLastRow() > 1) {
       const resetData = resetsSheet.getRange(2, 1, resetsSheet.getLastRow() - 1, 1).getDisplayValues();
       for (let r = resetData.length - 1; r >= 0; r--) {
-        if ((resetData[r][0] || "").toString().trim() === locCode) resetsSheet.deleteRow(r + 2);
+        if ((resetData[r][0] || "").toString().trim().toLowerCase() === rowLocCode.toLowerCase()) {
+          resetsSheet.deleteRow(r + 2);
+        }
       }
     }
 
@@ -416,27 +448,32 @@ function requestPasswordReset(locCode) {
     const otpHash = hashPassword_(otp, salt);
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
     resetsSheet.appendRow([
-      locCode, otpHash, salt,
-      Utilities.formatDate(expiresAt, "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss"),
-      Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")
+      rowLocCode, otpHash, salt,
+      "'" + Utilities.formatDate(expiresAt, "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss"),
+      "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")
     ]);
 
-    const locName = getLocNameByCode_(ss, locCode);
+    const locName = getLocNameByCode_(ss, rowLocCode);
     try {
       MailApp.sendEmail({
         to: email,
         subject: "รหัส OTP สำหรับรีเซ็ตรหัสผ่าน — ACT SAMSUNG System",
-        body: "รหัสสาขา: " + locCode + (locName ? " (" + locName + ")" : "") + "\n\n" +
+        body: "รหัสสาขา: " + rowLocCode + (locName ? " (" + locName + ")" : "") + "\n\n" +
               "รหัส OTP สำหรับตั้งรหัสผ่านใหม่ของคุณคือ: " + otp + "\n" +
               "รหัสนี้จะหมดอายุภายใน " + OTP_EXPIRY_MINUTES + " นาที\n\n" +
               "หากคุณไม่ได้เป็นผู้ขอรีเซ็ตรหัสผ่าน กรุณาละเว้นอีเมลนี้"
       });
     } catch (err) {
+      resetsSheet.deleteRow(resetsSheet.getLastRow());
       return { success: false, message: "ส่งอีเมลไม่สำเร็จ: " + err.message };
     }
 
-    logAccess_(ss, locCode, locName, ROLE_NORMAL, "REQUEST_PASSWORD_RESET", "");
-    return { success: true, message: "ส่งรหัส OTP ไปที่อีเมล " + maskEmail_(email) + " แล้ว กรุณาตรวจสอบกล่องขาเข้า" };
+    logAccess_(ss, rowLocCode, locName, ROLE_NORMAL, "REQUEST_PASSWORD_RESET", "");
+    return {
+      success: true,
+      locCode: rowLocCode,
+      message: "ส่งรหัส OTP ไปที่อีเมล " + maskEmail_(email) + " แล้ว กรุณาตรวจสอบกล่องขาเข้า"
+    };
   }
 
   return { success: false, message: "ไม่พบรหัสสาขานี้ในระบบ" };
@@ -456,7 +493,8 @@ function resetPasswordWithOtp(locCode, otp, newPassword) {
 
   const data = resetsSheet.getRange(2, 1, resetsSheet.getLastRow() - 1, 5).getDisplayValues();
   for (let i = 0; i < data.length; i++) {
-    if ((data[i][0] || "").toString().trim() !== locCode) continue;
+    const rowLocCode = (data[i][0] || "").toString().trim();
+    if (rowLocCode.toLowerCase() !== locCode.toLowerCase()) continue;
 
     const storedHash = data[i][1];
     const salt = data[i][2];
@@ -474,14 +512,20 @@ function resetPasswordWithOtp(locCode, otp, newPassword) {
     if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
     const usersLocCodes = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues();
     let userRow = -1;
+    let canonicalLocCode = rowLocCode;
     for (let u = 0; u < usersLocCodes.length; u++) {
-      if ((usersLocCodes[u][0] || "").toString().trim() === locCode) { userRow = u + 2; break; }
+      const uLoc = (usersLocCodes[u][0] || "").toString().trim();
+      if (uLoc.toLowerCase() === rowLocCode.toLowerCase()) {
+        userRow = u + 2;
+        canonicalLocCode = uLoc;
+        break;
+      }
     }
     if (userRow === -1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
 
     const newSalt = Utilities.getUuid();
     const newHash = hashPassword_(newPassword, newSalt);
-    usersSheet.getRange(userRow, 2, 1, 3).setValues([[newHash, newSalt, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy")]]);
+    usersSheet.getRange(userRow, 2, 1, 3).setValues([[newHash, newSalt, "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy")]]);
 
     resetsSheet.deleteRow(i + 2);
 
@@ -489,12 +533,14 @@ function resetPasswordWithOtp(locCode, otp, newPassword) {
     if (sessionsSheet && sessionsSheet.getLastRow() > 1) {
       const sessData = sessionsSheet.getRange(2, 1, sessionsSheet.getLastRow() - 1, 2).getDisplayValues();
       for (let r = sessData.length - 1; r >= 0; r--) {
-        if ((sessData[r][1] || "").toString().trim() === locCode) sessionsSheet.deleteRow(r + 2);
+        if ((sessData[r][1] || "").toString().trim().toLowerCase() === canonicalLocCode.toLowerCase()) {
+          sessionsSheet.deleteRow(r + 2);
+        }
       }
     }
 
-    const locName = getLocNameByCode_(ss, locCode);
-    logAccess_(ss, locCode, locName, ROLE_NORMAL, "RESET_PASSWORD_OTP", "");
+    const locName = getLocNameByCode_(ss, canonicalLocCode);
+    logAccess_(ss, canonicalLocCode, locName, ROLE_NORMAL, "RESET_PASSWORD_OTP", "");
 
     return { success: true, message: "ตั้งรหัสผ่านใหม่สำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่" };
   }
@@ -512,7 +558,8 @@ function validateSessionToken(token) {
     locCode: session.locCode,
     locName: isAdmin ? "Admin" : getLocNameByCode_(ss, session.locCode),
     isAdmin: isAdmin,
-    role: session.role
+    role: session.role,
+    passwordExpired: !!session.passwordExpired
   };
 }
 
@@ -543,7 +590,7 @@ function changePassword(token, oldPassword, newPassword) {
 
     const newSalt = Utilities.getUuid();
     const newHash = hashPassword_(newPassword, newSalt);
-    usersSheet.getRange(i + 2, 2, 1, 3).setValues([[newHash, newSalt, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy")]]);
+    usersSheet.getRange(i + 2, 2, 1, 3).setValues([[newHash, newSalt, "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy")]]);
 
     // เปลี่ยนรหัสผ่านแล้วเพิกถอนทุก session เดิมของสาขานี้ บังคับอุปกรณ์อื่นให้ login ใหม่
     const sessionsSheet = getSessionsSheet_(ss);
@@ -557,7 +604,7 @@ function changePassword(token, oldPassword, newPassword) {
       }
     }
     if (sessionsSheet) {
-      sessionsSheet.appendRow([newToken, session.locCode, Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")]);
+      sessionsSheet.appendRow([newToken, session.locCode, "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss")]);
     }
 
     return { success: true, token: newToken, message: "เปลี่ยนรหัสผ่านสำเร็จ" };
@@ -611,7 +658,7 @@ function changeAdminPassword_(token, oldPassword, newPassword) {
     }
 
     const newToken = Utilities.getUuid();
-    const now = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+    const now = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
     if (sessionsSheet) sessionsSheet.appendRow([newToken, ADMIN_SESSION_LOCCODE, now]);
     if (authSheet) authSheet.appendRow([newToken, adminSession.username, now]);
 
@@ -678,6 +725,9 @@ function setupAuthSheets() {
     sheet.getRange(1, 1, 1, 6).setValues([["Timestamp", "LocCode", "LocName", "Role", "Action", "Detail"]]);
     sheet.setFrozenRows(1);
   }
+
+  // เรียก MailApp เพื่อบังคับให้ Apps Script ตรวจสอบและเด้งหน้าต่างขอสิทธิ์ส่งอีเมล (script.send_mail) ทันทีที่กด Run ฟังก์ชันนี้
+  MailApp.getRemainingDailyQuota();
 }
 
 // รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — สร้างชีต TransferRequests
@@ -738,7 +788,7 @@ function adminSetupUsers() {
   const existing = usersSheet.getLastRow() > 1
     ? usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, 1).getDisplayValues().map(function(r) { return (r[0] || "").toString().trim(); })
     : [];
-  const today = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy");
+  const today = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy");
 
   setupData.forEach(function(row) {
     const locCode = (row[0] || "").toString().trim();
@@ -848,6 +898,22 @@ function getUsedImeis_(ss) {
   return usedImeis;
 }
 
+// IMEI ที่กำลังมีคำขอโอนย้ายสต๊อกสถานะ "รอรับเข้า" ค้างอยู่ในชีต TransferRequests
+// ห้ามนำมาเลือกคีย์ ACT หรือขอโอนย้ายซ้ำจนกว่าปลายทางจะกดรับเข้าหรือยกเลิกคำขอ
+function getPendingTransferImeis_(ss) {
+  const transferSheet = getTransferSheet_(ss);
+  const pendingImeis = new Set();
+  if (transferSheet && transferSheet.getLastRow() > 1) {
+    const existing = transferSheet.getRange(2, 1, transferSheet.getLastRow() - 1, 10).getDisplayValues();
+    existing.forEach(function(r) {
+      const eImei = (r[3] || "").toString().trim();
+      const eStatus = (r[9] || "").toString().trim();
+      if (eImei !== "" && eStatus === TRANSFER_STATUS_PENDING) pendingImeis.add(eImei);
+    });
+  }
+  return pendingImeis;
+}
+
 function getStockByBranch(token, locCode) {
   const session = requireSession_(token);
   // ห้ามเชื่อ locCode ที่ client ส่งมาเฉยๆ (เรียกผ่าน google.script.run ตรงๆ ได้ ข้าม UI ที่ล็อกไว้) ต้องตรงกับสาขาของ session เท่านั้น กันสาขาอื่นแอบดูสต๊อกข้ามสาขา
@@ -857,6 +923,7 @@ function getStockByBranch(token, locCode) {
   if(!stockSheet) return [];
 
   const usedImeis = getUsedImeis_(ss);
+  const pendingTransferImeis = getPendingTransferImeis_(ss);
 
   const data = stockSheet.getDataRange().getDisplayValues();
   let result = [];
@@ -865,7 +932,7 @@ function getStockByBranch(token, locCode) {
     let sLoc = data[i][0] ? data[i][0].toString().trim() : "";
     if(sLoc == locCode || sLoc == "Warehouse Transfer") {
       let imei = data[i][4] ? data[i][4].toString().trim() : "";
-      if(imei !== "" && !usedImeis.has(imei)) {
+      if(imei !== "" && !usedImeis.has(imei) && !pendingTransferImeis.has(imei)) {
         result.push({
           sku: data[i][2].toString().trim(),
           desc: data[i][3].toString().trim(),
@@ -917,6 +984,28 @@ function checkIsTimeValid(startStr, endStr) {
 
 // ================= CONTROLLER / BUSINESS LOGIC =================
 
+// จับคู่คอลัมน์ O–S (index 14–18) ของชีต "อยู่ระหว่างดำเนินการ" ตามชื่อหัวตาราง (Start, End, โปรโมชั่นร่วม SF+, โปรโมชั่นร่วมเทรด)
+// หากหัวตารางไม่ตรงกับคีย์เวิร์ด จะ fallback เรียงตามลำดับคอลัมน์ที่เหลือใน O–S อัตโนมัติ
+function resolvePromoExtraCols_(hdrs) {
+  let startIdx = -1, endIdx = -1, sfIdx = -1, tradeIdx = -1;
+  const maxCol = Math.min((hdrs || []).length, 19);
+  for (let i = 14; i < maxCol; i++) {
+    const h = (hdrs[i] || "").toString().trim();
+    const lower = h.toLowerCase();
+    if (startIdx === -1 && lower.indexOf("start") !== -1) startIdx = i;
+    else if (endIdx === -1 && lower.indexOf("end") !== -1) endIdx = i;
+    else if (sfIdx === -1 && lower.indexOf("sf") !== -1) sfIdx = i;
+    else if (tradeIdx === -1 && (h.indexOf("เทรด") !== -1 || lower.indexOf("trade") !== -1)) tradeIdx = i;
+  }
+  const used = new Set([startIdx, endIdx, sfIdx, tradeIdx].filter(function(idx) { return idx !== -1; }));
+  const fallback = [14, 15, 16, 17, 18].filter(function(idx) { return !used.has(idx); });
+  if (startIdx === -1) startIdx = fallback.shift();
+  if (endIdx === -1) endIdx = fallback.shift();
+  if (sfIdx === -1) sfIdx = fallback.shift();
+  if (tradeIdx === -1) tradeIdx = fallback.shift();
+  return { startIdx: startIdx, endIdx: endIdx, sfIdx: sfIdx, tradeIdx: tradeIdx };
+}
+
 function getRecords(token) {
   requireSession_(token);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -945,7 +1034,11 @@ function getRecords(token) {
     });
   }
 
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 14).getDisplayValues();
+  const colsToRead = Math.min(19, sheet.getMaxColumns());
+  const allRows = sheet.getRange(1, 1, sheet.getLastRow(), colsToRead).getDisplayValues();
+  const hdrs = allRows[0] || [];
+  const promoCols = resolvePromoExtraCols_(hdrs);
+  const data = allRows.slice(1);
   
   let validData = [];
   data.forEach(function(r, index) {
@@ -970,6 +1063,10 @@ function getRecords(token) {
         promoPrice: r[11] || "",
         cutBarcode: r[12] || "",
         suggestPrice: r[13] || "",
+        promoStart: r[promoCols.startIdx] || "",
+        promoEnd: r[promoCols.endIdx] || "",
+        promoSfPlus: r[promoCols.sfIdx] || "",
+        promoTrade: r[promoCols.tradeIdx] || "",
         area: mappedArea,
         fotaDate: fotaMap[imeiKey] || ""
       });
@@ -1036,6 +1133,7 @@ function saveBatchRecords(token, payload) {
         if(uImei !== "") usedImeis.add(uImei);
       }
     }
+    const pendingTransferImeis = getPendingTransferImeis_(ss);
 
     const timestamp = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
     let actD = payload.actDate.split('-');
@@ -1053,6 +1151,8 @@ function saveBatchRecords(token, payload) {
       let itemStatus = allowedStatus.indexOf(item.status) !== -1 ? item.status : "ยังไม่ขาย";
       if(usedImeis.has(item.imei)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ถูกทำรายการแอคไปแล้ว`);
+      } else if(pendingTransferImeis.has(item.imei)) {
+        errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) อยู่ระหว่างรอรับเข้าโอนย้ายสต๊อก ไม่สามารถบันทึก ACT ได้`);
       } else if(!validStockKeys.has(checkKey) && !validStockKeys.has(transferKey)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ไม่มีในสต๊อกของสาขานี้ (หรือ Warehouse Transfer)`);
       } else {
@@ -1131,14 +1231,34 @@ function adminEditRecord(adminToken, rowId, fields) {
   if (actD.length === 3) { formattedActDate = "'" + actD[2] + "/" + actD[1] + "/" + actD[0]; }
 
   sheet.getRange(rowId, 2, 1, 2).setValues([[formattedActDate, (fields.empName || "").toString()]]); // ActDate, EmpName
-  sheet.getRange(rowId, 9, 1, 6).setValues([[
-    newStatus,
-    (fields.rrp || "").toString(),
-    (fields.discount || "").toString(),
-    (fields.promoPrice || "").toString(),
-    (fields.cutBarcode || "").toString(),
-    (fields.suggestPrice || "").toString()
-  ]]); // Status, RRP, Discount, PromoPrice, CutBarcode, SuggestPrice
+  sheet.getRange(rowId, 9).setValue(newStatus); // Status
+
+  // เขียนเฉพาะคอลัมน์ราคา/โปรโมชั่น (J–S) ที่มีการเปลี่ยนแปลงค่าจริง เพื่อไม่ให้ทับสูตร (เช่น VLOOKUP/ARRAYFORMULA) ในคอลัมน์ที่ไม่ได้แก้ไข
+  const maxCol = Math.min(19, sheet.getMaxColumns());
+  const hdrs = sheet.getRange(1, 1, 1, maxCol).getDisplayValues()[0] || [];
+  const curRow = sheet.getRange(rowId, 1, 1, maxCol).getDisplayValues()[0] || [];
+  const promoCols = resolvePromoExtraCols_(hdrs);
+
+  const editableCols = [
+    { idx: 9, val: fields.rrp },
+    { idx: 10, val: fields.discount },
+    { idx: 11, val: fields.promoPrice },
+    { idx: 12, val: fields.cutBarcode },
+    { idx: 13, val: fields.suggestPrice },
+    { idx: promoCols.startIdx, val: fields.promoStart },
+    { idx: promoCols.endIdx, val: fields.promoEnd },
+    { idx: promoCols.sfIdx, val: fields.promoSfPlus },
+    { idx: promoCols.tradeIdx, val: fields.promoTrade }
+  ];
+
+  editableCols.forEach(function(item) {
+    if (item.idx === undefined || item.idx < 0 || item.idx >= maxCol || item.val === undefined) return;
+    const newStr = (item.val || "").toString();
+    const curStr = (curRow[item.idx] || "").toString();
+    if (newStr !== curStr) {
+      sheet.getRange(rowId, item.idx + 1).setValue(newStr);
+    }
+  });
 
   logAccess_(ss, ADMIN_SESSION_LOCCODE, "Admin (" + admin.username + ")", "admin", "EDIT_RECORD", "แถว " + rowId);
 
@@ -1639,12 +1759,24 @@ function getActRecordsByBranch(token, locCode) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
   if (!sheet || sheet.getLastRow() <= 1) return [];
+
+  const pendingActTransferImeis = new Set();
+  const actTransferSheet = getActTransferSheet_(ss);
+  if (actTransferSheet && actTransferSheet.getLastRow() > 1) {
+    const existing = actTransferSheet.getRange(2, 1, actTransferSheet.getLastRow() - 1, 10).getDisplayValues();
+    existing.forEach(function(r) {
+      const eImei = (r[3] || "").toString().trim();
+      const eStatus = (r[9] || "").toString().trim();
+      if (eImei !== "" && eStatus === TRANSFER_STATUS_PENDING) pendingActTransferImeis.add(eImei);
+    });
+  }
+
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).getDisplayValues();
   const result = [];
   for (let i = 0; i < data.length; i++) {
     const rLoc = data[i][3] ? data[i][3].toString().trim() : "";
     const rImei = data[i][7] ? data[i][7].toString().trim() : "";
-    if (rLoc === locCode && rImei !== "") {
+    if (rLoc === locCode && rImei !== "" && !pendingActTransferImeis.has(rImei)) {
       result.push({ sku: data[i][5], desc: data[i][6], imei: rImei, status: data[i][8] || "" });
     }
   }
@@ -2088,7 +2220,7 @@ function adminUpsertUser(adminToken, locCode, newPassword, role, email) {
 
   const salt = Utilities.getUuid();
   const hash = hashPassword_(newPassword, salt);
-  const today = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy");
+  const today = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy");
   const newAccountRole = (role === ROLE_VIEWER) ? ROLE_VIEWER : ROLE_NORMAL;
 
   const existing = usersSheet.getLastRow() > 1
@@ -2223,12 +2355,14 @@ function adminSaveTimeWindow(adminToken, startStr, endStr) {
   return { success: true, message: "บันทึกช่วงเวลาทำการสำเร็จ" };
 }
 
-function verifyAdminAndExport(pin, rowIds) {
+function verifyAdminAndExport(pin, rowIds, token) {
+  requireSession_(token);
   if(pin === ADMIN_PIN) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
     if (!sheet || sheet.getLastRow() < 1) return { success: false, message: "ไม่พบข้อมูลสำหรับส่งออก" };
-    const allData = sheet.getRange(1, 1, sheet.getLastRow(), 14).getDisplayValues();
+    const colsToExport = Math.min(19, sheet.getMaxColumns());
+    const allData = sheet.getRange(1, 1, sheet.getLastRow(), colsToExport).getDisplayValues();
     const idSet = (rowIds && rowIds.length) ? new Set(rowIds.map(Number)) : null;
     // แถวที่ 1 (header) เก็บไว้เสมอ, ที่เหลือกรองตามชุดแถวที่ถูกกรองไว้ในตาราง (rowId = เลขแถวจริงในชีต)
     const data = idSet ? allData.filter((row, idx) => idx === 0 || idSet.has(idx + 1)) : allData;
