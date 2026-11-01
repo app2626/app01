@@ -501,6 +501,9 @@
                 <button type="button" onclick="window.app.pos.openOrderTrackModal()" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-[10px] font-bold text-white flex items-center gap-1 transition-colors shrink-0" title="ค้นหาสถานะใบจอง / รับ QR รับเครื่อง">
                    <i class="fas fa-qrcode text-[#FFD100]"></i> <span>เช็คใบจอง</span>
                 </button>
+                <button type="button" onclick="window.app.pos.openWishlistDrawer()" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-400/40 text-[10px] font-extrabold text-rose-300 flex items-center gap-1.5 transition-colors shrink-0" title="รายการสินค้าที่สนใจ (Wishlist)">
+                   <i class="fas fa-heart text-rose-400"></i> <span>รายการโปรด</span> <span id="posWishlistCountBadge" class="px-1.5 py-0.2 bg-rose-600 text-white rounded-full text-[9px] font-black">0</span>
+                </button>
                 <button type="button" id="btnTogglePosPromo" onclick="window.app.pos.togglePromoZone()" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white flex items-center gap-1 transition-colors shrink-0" title="ซ่อน/แสดงแบนเนอร์และคูปอง">
                    <i class="fas fa-ticket-alt text-[#FFD100]"></i> <span id="lblTogglePosPromo" class="hidden md:inline">คูปอง & โปรฯ</span> <i id="icoTogglePosPromo" class="fas fa-chevron-up text-[8px]"></i>
                 </button>
@@ -593,6 +596,46 @@
                   <i class="fas fa-file-invoice text-indigo-600 text-sm"></i>
                   <span class="truncate">ออกใบจอง/ใบเสร็จ PDF อัตโนมัติ</span>
                 </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- Off-canvas Wishlist Overlay -->
+      <div id="wishlistOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[55] hidden transition-opacity opacity-0" onclick="window.app.pos.toggleWishlistDrawer()"></div>
+
+      <!-- Off-canvas Wishlist Drawer -->
+      <div id="wishlistDrawer" role="dialog" aria-modal="true" aria-label="รายการโปรด" class="fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[400px] lg:w-[440px] max-w-full h-[100dvh] flex flex-col bg-white shadow-2xl transform translate-x-full transition-transform duration-300">
+          <div class="bg-[#141416] text-white px-5 py-4 flex justify-between items-center relative overflow-hidden border-b-2 border-rose-500">
+              <div class="flex items-center relative z-10">
+                  <div class="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center mr-3 shadow-sm">
+                    <i class="fas fa-heart text-sm animate-pulse"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-black text-base tracking-tight text-white flex items-center gap-1.5">รายการที่สนใจ (Wishlist)</h3>
+                    <p class="text-[10px] text-slate-300 font-medium">บันทึกรุ่นโปรดไว้เพื่อเปรียบเทียบหรือสั่งจอง</p>
+                  </div>
+                  <span class="ml-3 bg-rose-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm" id="wishlistDrawerCount">0</span>
+              </div>
+              <button onclick="window.app.pos.toggleWishlistDrawer()" aria-label="ปิดรายการโปรด" class="relative z-10 w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition"><i class="fas fa-times text-sm"></i></button>
+          </div>
+
+          <div id="wishlistDrawerItems" class="flex-1 p-4 bg-slate-50 overflow-y-auto custom-scrollbar space-y-3">
+              <!-- Dynamically populated -->
+          </div>
+
+          <!-- Wishlist Drawer Footer with Add all to Cart -->
+          <div class="p-4 bg-white border-t border-slate-200/90 shadow-lg space-y-2">
+              <button type="button" onclick="window.app.pos.addAllWishlistToCart()" class="w-full py-3 bg-[#141416] hover:bg-black text-[#FFD100] font-black text-xs md:text-sm rounded-xl shadow-md flex items-center justify-center gap-2 transition-all">
+                <i class="fas fa-cart-plus text-[#E11D48]"></i>
+                <span>ย้ายทั้งหมดเข้าตะกร้า (Add all to Cart)</span>
+              </button>
+              <div class="flex justify-between items-center pt-1 text-[11px]">
+                <button type="button" onclick="window.app.pos.clearWishlist()" class="text-slate-400 hover:text-rose-600 font-bold transition-colors">
+                  <i class="fas fa-trash-alt mr-1"></i>ล้างรายการโปรด
+                </button>
+                <button type="button" onclick="window.app.pos.toggleWishlistDrawer()" class="text-slate-500 hover:text-slate-900 font-bold transition-colors">
+                  เลือกสินค้าต่อ
+                </button>
               </div>
           </div>
       </div>

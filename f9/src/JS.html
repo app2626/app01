@@ -4067,6 +4067,7 @@ window.app = {
 
   pos: {
     cartData: [],
+    wishlist: [],
     cartAutoDiscount: 0,
     currentImages: [],
     currentImageIndex: 0,
@@ -4260,7 +4261,7 @@ window.app = {
       }
       try { const r = localStorage.getItem('bnn_recent_skus'); if(r) this.recentSkus = JSON.parse(r) || []; }
       catch(e) { this.recentSkus = []; localStorage.removeItem('bnn_recent_skus'); }
-      this.populateSelects(); this.renderPosHeroAndVouchers(); this.renderStoreHeader(); this.renderRecentlyViewed(); this.renderCompareBar(); this.filter(); this.renderCart(); this.checkCriteria();
+      this.initWishlist(); this.populateSelects(); this.renderPosHeroAndVouchers(); this.renderStoreHeader(); this.renderRecentlyViewed(); this.renderCompareBar(); this.filter(); this.renderCart(); this.checkCriteria();
       this.startCountdown();
     },
     populateSelects: function() {
@@ -5684,6 +5685,7 @@ window.app = {
       card += '    <div class="relative h-[145px] md:h-[160px] p-3 pt-8 flex items-center justify-center bg-white border-b border-slate-100/80 overflow-hidden">';
       card +=        soldOutOverlay;
       card +=        compareBtnHtml;
+      card +=        wishlistBtnHtml;
       card += '      <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https:\/\/via.placeholder.com/150?text=No+Image\';" alt="' + esc(pName) + '" class="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105' + (outOfStock ? ' grayscale opacity-60' : '') + '">';
       card += '    </div>';
       card += '    <div class="p-3 flex flex-col flex-1 gap-1.5">';
@@ -6922,10 +6924,216 @@ window.app = {
       } catch (e) {
         resWrap.innerHTML = `<div class="p-6 text-center text-rose-600 text-xs font-bold">${window.app.esc(e.message || 'เกิดข้อผิดพลาด')}</div>`;
       }
+    },
+
+
+
+    // =========================================================================
+    // 5. ระบบบันทึกรุ่นที่สนใจ (Wishlist / Favorites)
+    // =========================================================================
+    initWishlist: function() {
+      try {
+        const w = localStorage.getItem('mpos_wishlist');
+        this.wishlist = w ? (JSON.parse(w) || []) : [];
+      } catch (e) {
+        this.wishlist = [];
+      }
+      this.updateWishlistBadges();
+    },
+
+    toggleWishlist: function(sku, event) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      if (!sku) return;
+      const idx = this.wishlist.indexOf(sku);
+      let isAdded = false;
+      if (idx > -1) {
+        this.wishlist.splice(idx, 1);
+        isAdded = false;
+        window.app.toast('นำออกจากรายการโปรดแล้ว');
+      } else {
+        this.wishlist.push(sku);
+        isAdded = true;
+        window.app.toast('❤️ บันทึกเข้ารายการโปรดแล้ว');
+      }
+      try {
+        localStorage.setItem('mpos_wishlist', JSON.stringify(this.wishlist));
+      } catch (e) {}
+
+      this.updateWishlistBadges();
+
+      const skuClean = sku.replace(/[^a-zA-Z0-9_-]/g, '');
+      const btns = document.querySelectorAll('.btn-wishlist-' + skuClean);
+      btns.forEach(btn => {
+        if (isAdded) {
+          btn.className = btn.className.replace('text-slate-400 hover:text-rose-500', 'text-rose-500 border-rose-300 bg-rose-50/80');
+          btn.innerHTML = '<i class="fas fa-heart text-rose-500 animate-pulse"></i>';
+          btn.title = 'ลบออกจากรายการโปรด';
+        } else {
+          btn.className = btn.className.replace('text-rose-500 border-rose-300 bg-rose-50/80', 'text-slate-400 hover:text-rose-500');
+          btn.innerHTML = '<i class="far fa-heart"></i>';
+          btn.title = 'บันทึกเป็นรายการโปรด';
+        }
+      });
+
+      const drawer = document.getElementById('wishlistDrawer');
+      if (drawer && !drawer.classList.contains('translate-x-full')) {
+        this.renderWishlistDrawer();
+      }
+    },
+
+    updateWishlistBadges: function() {
+      const count = (this.wishlist || []).length;
+      const b1 = document.getElementById('posWishlistCountBadge');
+      const b2 = document.getElementById('wishlistDrawerCount');
+      if (b1) b1.textContent = count;
+      if (b2) b2.textContent = count;
+    },
+
+    toggleWishlistDrawer: function() {
+      const drawer = document.getElementById('wishlistDrawer');
+      const overlay = document.getElementById('wishlistOverlay');
+      if (!drawer || !overlay) return;
+      const isOpen = !drawer.classList.contains('translate-x-full');
+      if (isOpen) {
+        drawer.classList.add('translate-x-full');
+        overlay.classList.add('opacity-0');
+        setTimeout(() => overlay.classList.add('hidden'), 300);
+      } else {
+        this.renderWishlistDrawer();
+        overlay.classList.remove('hidden');
+        setTimeout(() => {
+          overlay.classList.remove('opacity-0');
+          drawer.classList.remove('translate-x-full');
+        }, 10);
+      }
+    },
+
+    openWishlistDrawer: function() {
+      this.toggleWishlistDrawer();
+    },
+
+    renderWishlistDrawer: function() {
+      const listContainer = document.getElementById('wishlistDrawerItems');
+      if (!listContainer) return;
+      this.updateWishlistBadges();
+
+      const skus = this.wishlist || [];
+      const prods = (window.app.globalData.products || []).filter(p => skus.includes(p.SKU));
+
+      if (prods.length === 0) {
+        listContainer.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center py-16 text-center text-slate-400">
+             <div class="w-16 h-16 rounded-full bg-rose-50 text-rose-300 flex items-center justify-center text-2xl mb-3 shadow-2xs">
+               <i class="far fa-heart"></i>
+             </div>
+             <div class="text-sm font-black text-slate-700 mb-1">ยังไม่มีรายการที่บันทึกไว้</div>
+             <p class="text-xs text-slate-400 max-w-xs">กดไอคอนรูปหัวใจ ❤️ ที่การ์ดสินค้าในหน้าแรก เพื่อเก็บรุ่นที่สนใจไว้ดูเปรียบเทียบหรือสั่งจองภายหลัง</p>
+          </div>
+        `;
+        return;
+      }
+
+      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      listContainer.innerHTML = prods.map(p => {
+        const stock = parseInt(String(p.Stock || '0').replace(/[^\d.\-]/g, ''), 10) || 0;
+        const outOfStock = stock <= 0;
+        const price = parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
+        const origPrice = parseFloat(String(p['Original Price'] || '0').replace(/[^\d.\-]/g, '')) || 0;
+        const img = p['Image URL'] || 'https:\/\/via.placeholder.com/100?text=No+Image';
+
+        return `
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex gap-3 items-center group transition-all hover:border-slate-300">
+             <img src="${esc(img)}" alt="${esc(p['Product Name'])}" onerror="this.src='https:\/\/via.placeholder.com/100?text=No+Image'" class="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1 shrink-0 ${outOfStock ? 'grayscale opacity-50' : ''}">
+             <div class="flex-1 min-w-0">
+                <div class="text-xs font-black text-slate-900 line-clamp-1">${esc(p['Product Name'])}</div>
+                <div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-2">
+                   <span>${esc(p.Capacity || '-')}</span> • <span>${esc(p.Color || '-')}</span>
+                </div>
+                <div class="flex items-baseline gap-1.5 mt-1">
+                   <span class="text-xs font-black text-[#E11D48] tabular-nums">฿${price.toLocaleString()}</span>
+                   ${origPrice > price ? `<span class="text-[10px] text-slate-400 line-through tabular-nums">฿${origPrice.toLocaleString()}</span>` : ''}
+                </div>
+                <div class="text-[9px] font-bold mt-0.5 ${outOfStock ? 'text-rose-500' : 'text-emerald-600'}">
+                   ${outOfStock ? '<i class="fas fa-times-circle mr-0.5"></i>สินค้าหมด' : '<i class="fas fa-check-circle mr-0.5"></i>พร้อมจอง (' + stock + ')'}
+                </div>
+             </div>
+             <div class="flex flex-col gap-1 shrink-0">
+                ${!outOfStock ? `
+                  <button type="button" onclick="window.app.pos.openAddToCartModal('${escJs(p.SKU)}')" class="px-2.5 py-1.5 bg-[#FFD100] hover:bg-[#f5c400] text-[#141416] rounded-xl text-[10px] font-black shadow-2xs flex items-center gap-1 transition-all" title="ใส่ตะกร้า">
+                     <i class="fas fa-cart-plus text-[#E11D48]"></i><span>จอง</span>
+                  </button>
+                ` : ''}
+                <button type="button" onclick="window.app.pos.toggleWishlist('${escJs(p.SKU)}')" class="px-2 py-1 text-slate-400 hover:text-rose-600 rounded-lg text-[10px] font-bold transition-colors" title="ลบออกจากรายการโปรด">
+                   <i class="fas fa-trash-alt mr-0.5"></i>ลบ
+                </button>
+             </div>
+          </div>
+        `;
+      }).join('');
+    },
+
+    addAllWishlistToCart: function() {
+      const skus = this.wishlist || [];
+      if (skus.length === 0) return Swal.fire('ไม่มีสินค้า', 'ยังไม่มีรายการสินค้าในรายการโปรด', 'info');
+
+      const prods = (window.app.globalData.products || []).filter(p => skus.includes(p.SKU));
+      const inStockProds = prods.filter(p => {
+        const stock = parseInt(String(p.Stock || '0').replace(/[^\d.\-]/g, ''), 10) || 0;
+        return stock > 0;
+      });
+
+      if (inStockProds.length === 0) {
+        return Swal.fire('สินค้าหมด', 'รายการสินค้าในรายการโปรดไม่มีสต๊อกพร้อมจอง ณ ขณะนี้', 'warning');
+      }
+
+      const currentMobileQty = this.cartData.filter(i => i.Category === 'โมบาย').reduce((sum, i) => sum + i.qty, 0);
+      let addedCount = 0;
+      let mobileAdded = currentMobileQty >= 1;
+
+      inStockProds.forEach(p => {
+        if (p.Category === 'โมบาย') {
+          if (mobileAdded) return;
+          mobileAdded = true;
+        }
+        const ex = this.cartData.find(i => i.SKU === p.SKU);
+        if (ex) {
+          if (p.Category !== 'โมบาย') {
+            ex.qty += 1;
+            addedCount++;
+          }
+        } else {
+          this.cartData.push({ ...p, qty: 1, brandGifts: [], channelGifts: [] });
+          addedCount++;
+        }
+      });
+
+      if (addedCount > 0) {
+        this.saveAndRender();
+        this.toggleWishlistDrawer();
+        this.toggleCart();
+        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 }).fire({ 
+          icon: 'success', 
+          title: 'เพิ่มสินค้า ' + addedCount + ' รายการลงตะกร้าแล้ว' 
+        });
+      } else {
+        Swal.fire('ข้อจำกัดการจอง', 'ไม่สามารถเพิ่มสินค้าประเภทโมบายเกิน 1 เครื่องต่อออเดอร์ได้', 'warning');
+      }
+    },
+
+    clearWishlist: function() {
+      if ((this.wishlist || []).length === 0) return;
+      this.wishlist = [];
+      try { localStorage.setItem('mpos_wishlist', '[]'); } catch (e) {}
+      this.updateWishlistBadges();
+      this.renderWishlistDrawer();
+      window.app.toast('ล้างรายการโปรดทั้งหมดแล้ว');
     }
   },
 
-  // พอร์ตมาจากโปรเจกต์ f8 (ฟีเจอร์ "เพิ่ม/แก้ไขสินค้าแบบหลาย SKU", 2026-09-19) — ตรงกับฟังก์ชันฝั่ง server saveProductGroup/updateProductGroup ใน Code.js
+    // พอร์ตมาจากโปรเจกต์ f8 (ฟีเจอร์ "เพิ่ม/แก้ไขสินค้าแบบหลาย SKU", 2026-09-19) — ตรงกับฟังก์ชันฝั่ง server saveProductGroup/updateProductGroup ใน Code.js
   // ใช้ Category options ของ f9 เอง (6 หมวด รวม สมาร์ทวอทช์/หูฟัง) ไม่ใช้ 4 หมวดของ f8 ต้นทาง
   productGroup: {
     variantRows: [],
