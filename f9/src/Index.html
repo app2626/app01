@@ -104,6 +104,13 @@
             <i class="fas fa-sign-in-alt mr-2"></i>เข้าสู่ระบบ
           </button>
         </form>
+
+        <div class="mt-4 pt-4 border-t border-slate-100/60 text-center">
+          <button type="button" onclick="window.app.openPublicTrackModal()" class="w-full py-3 px-4 bg-amber-50 hover:bg-amber-100/90 text-amber-900 border border-amber-200/80 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-2xs">
+            <i class="fas fa-qrcode text-[#E11D48] text-sm"></i>
+            <span>ตรวจสอบสถานะการจอง & บัตรรับเครื่อง (QR Pass)</span>
+          </button>
+        </div>
         
         <div class="mt-6 pt-5 border-t border-slate-100/60 text-center">
           <p class="text-[10px] text-slate-400 font-medium flex items-center justify-center gap-1.5">
@@ -1555,6 +1562,68 @@
        </div>
     </div>
   </template>
+
+    <!-- Modal ติดตามสถานะการจอง & บัตรรับเครื่องดิจิทัล (Public Digital Booking Pass) -->
+  <div id="publicOrderTrackModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true" aria-label="ตรวจสอบสถานะการจอง">
+    <div class="fixed inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('publicOrderTrackModal')"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto p-3 sm:p-4 md:p-6">
+      <div class="flex min-h-full items-center justify-center text-center">
+        <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border border-slate-200 flex flex-col max-h-[92vh]">
+          
+          <!-- Modal Header -->
+          <div class="px-5 py-4 border-b-2 border-[#FFD100] flex justify-between items-center bg-[#141416] text-white">
+             <div class="flex items-center gap-2.5">
+               <span class="w-8 h-8 rounded-xl bg-[#FFD100] text-[#141416] flex items-center justify-center text-sm font-black shadow-sm">
+                 <i class="fas fa-ticket-alt text-[#E11D48]"></i>
+               </span>
+               <div>
+                 <h3 class="text-sm sm:text-base font-black text-white leading-tight">ตรวจสอบสถานะใบจอง & บัตรรับเครื่อง (Digital Pass)</h3>
+                 <p class="text-[10px] text-slate-300">ระบบติดตามการจองและแสดง QR Code รับสินค้าหน้าร้าน</p>
+               </div>
+             </div>
+             <button type="button" class="text-slate-300 hover:text-[#FFD100] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors" onclick="window.app.hideModal('publicOrderTrackModal')">
+               <i class="fas fa-times text-base"></i>
+             </button>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50 space-y-4">
+             <!-- Search Controls -->
+             <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                   <div class="sm:col-span-7">
+                      <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">เลขที่ใบจอง (Order ID)</label>
+                      <div class="relative">
+                         <i class="fas fa-hashtag absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                         <input type="text" id="publicTrackOrderIdInput" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-black text-slate-800 uppercase focus:bg-white focus:ring-2 focus:ring-amber-300 outline-none" placeholder="เช่น ORD-2026-0001" onkeydown="if(event.key==='Enter') window.app.searchPublicOrderTrack()">
+                      </div>
+                   </div>
+                   <div class="sm:col-span-5">
+                      <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">เบอร์โทร 4 ตัวท้าย (ยืนยันสิทธิ์)</label>
+                      <div class="relative">
+                         <i class="fas fa-phone absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                         <input type="tel" id="publicTrackPhoneInput" maxlength="10" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-300 outline-none" placeholder="เบอร์ 4 ตัวท้าย" onkeydown="if(event.key==='Enter') window.app.searchPublicOrderTrack()">
+                      </div>
+                   </div>
+                </div>
+                <button type="button" onclick="window.app.searchPublicOrderTrack()" class="w-full py-2.5 bg-[#141416] hover:bg-slate-800 text-[#FFD100] text-xs sm:text-sm font-black rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all">
+                   <i class="fas fa-search text-[#E11D48]"></i>
+                   <span>ค้นหาข้อมูลใบจอง & บัตรรับเครื่อง</span>
+                </button>
+             </div>
+
+             <!-- Result Container -->
+             <div id="publicTrackResultsContainer">
+                <div class="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-semibold">
+                   <i class="fas fa-ticket-alt text-3xl text-slate-200 mb-2 block"></i>
+                   กรอกเลขที่ใบจอง และเบอร์โทรศัพท์ 4 ตัวท้าย เพื่อแสดงบัตรรับเครื่องดิจิทัล (QR Pass)
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     window.tailwind = {

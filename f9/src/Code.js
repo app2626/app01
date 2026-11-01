@@ -446,7 +446,7 @@ function apiHandler(action, payload, userToken) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let secureUser = null;
-    if (action !== 'LOGIN') {
+    if (action !== 'LOGIN' && action !== 'PUBLIC_TRACK_ORDER') {
       if (!userToken || !userToken.Token) throw new Error("Unauthorized Access: No Token");
       const payloadObj = verifyToken(userToken.Token);
       if (!payloadObj) throw new Error("Invalid or Expired Token. Please login again.");
@@ -525,6 +525,7 @@ function apiHandler(action, payload, userToken) {
       case 'APPROVE_INVOICE': return approveInvoice(payload, secureUser, ss);
       case 'DELETE_INVOICE': return deleteInvoice(payload, secureUser, ss);
       case 'TRACK_ORDER': return trackOrderLookup(payload, secureUser, ss);
+      case 'PUBLIC_TRACK_ORDER': return publicTrackOrderLookup(payload, ss);
       case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts(payload, secureUser, ss);
       case 'VALIDATE_COUPON': return validateCouponApi_(payload, ss);
       case 'CLEAR_CACHE':
@@ -1545,6 +1546,117 @@ function trackOrderLookup(payload, secureUser, ss) {
   }
 
   return { status: 'success', orders: Object.values(orderMap).reverse() };
+}
+
+// 4.1 ระบบติดตามสถานะคำสั่งจอง & บัตรรับเครื่องดิจิทัลสำหรับลูกค้า (Public Booking Tracking & Digital Pass)
+// ปลอดภัยตามมาตรฐาน PDPA: ค้นหาด้วย Order ID + ตรวจสอบเบอร์โทร 4 ตัวท้าย (หรือเบอร์เต็ม) และ Mask ข้อมูลส่วนตัว
+function publicTrackOrderLookup(payload, ss) {
+  const orderId = ((payload && payload.orderId) ? payload.orderId : '').toString().trim();
+  const phone = ((payload && payload.phone) ? payload.phone : '').toString().trim();
+  if (!orderId) throw new Error("กรุณาระบุเลขที่ใบจอง (Order ID)");
+
+  const sheet = ss.getSheetByName("Orders");
+  if (!sheet) return { status: 'error', message: "ไม่พบข้อมูลใบจองในระบบ" };
+  const data = sheet.getDataRange().getDisplayValues();
+  if (data.length <= 1) return { status: 'error', message: "ยังไม่มีข้อมูลใบจองในระบบ" };
+
+  const headers = data[0].map(h => h.toString().trim());
+  const idx = (name) => headers.indexOf(name);
+  const oIdIdx = idx("Order ID"), tsIdx = idx("Timestamp"), chIdx = idx("Channel"), brIdx = idx("Branch Code");
+  const cNameIdx = idx("Customer Name"), phoneIdx = idx("Contact Number"), skuIdx = idx("SKU");
+  const prodIdx = idx("Product Name"), qtyIdx = idx("Qty"), priceIdx = idx("Unit Price");
+  const netIdx = idx("Net Price"), stIdx = idx("Order Status"), remIdx = idx("Remark");
+  const depIdx = idx("Deposit Amount"), pickDateIdx = idx("Pickup Date");
+
+  const qOrderUpper = orderId.toUpperCase();
+  const phoneDigits = phone.replace(/\D/g, '');
+
+  let matched = false;
+  let orderData = null;
+  let storedPhoneDigits = '';
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const oid = (row[oIdIdx] || '').toString().trim();
+    if (oid.toUpperCase() !== qOrderUpper) continue;
+
+    const rawPhone = phoneIdx > -1 ? deobfuscate((row[phoneIdx] || '').toString().trim()) : '';
+    storedPhoneDigits = rawPhone.replace(/\D/g, '');
+
+    // หากมีการระบุเบอร์โทรมาด้วย ต้องตรงกันอย่างน้อย 4 ตัวท้าย
+    if (phoneDigits) {
+      const matchPhone = storedPhoneDigits.endsWith(phoneDigits) || storedPhoneDigits === phoneDigits;
+      if (!matchPhone) {
+        return { status: 'error', message: "เบอร์โทรศัพท์ไม่ตรงกับข้อมูลใบจองนี้ กรุณาตรวจสอบเบอร์ 4 ตัวท้าย" };
+      }
+    }
+
+    if (!orderData) {
+      matched = true;
+      let rawCust = cNameIdx > -1 ? (row[cNameIdx] || '').toString().trim() : '';
+      let maskedName = '-';
+      if (rawCust) {
+        const parts = rawCust.split(' ');
+        if (parts.length > 1) {
+          maskedName = parts[0] + ' ' + (parts[1].length > 1 ? parts[1].slice(0, 1) + '***' : '*');
+        } else {
+          maskedName = rawCust.length > 3 ? rawCust.slice(0, 3) + '***' : rawCust;
+        }
+      }
+      const maskedPhone = storedPhoneDigits.length >= 7 
+        ? (storedPhoneDigits.slice(0, 3) + '-XXX-' + storedPhoneDigits.slice(-4)) 
+        : (storedPhoneDigits ? '***' + storedPhoneDigits.slice(-4) : '-');
+
+      orderData = {
+        orderId: oid,
+        timestamp: tsIdx > -1 ? row[tsIdx] : '',
+        channel: chIdx > -1 ? row[chIdx] : '',
+        branch: brIdx > -1 ? row[brIdx] : '',
+        pickupDate: pickDateIdx > -1 ? row[pickDateIdx] : '',
+        customerName: maskedName,
+        maskedPhone: maskedPhone,
+        status: stIdx > -1 ? (row[stIdx] || 'Pending') : 'Pending',
+        deposit: depIdx > -1 ? (parseFloat(String(row[depIdx] || '0').replace(/,/g, '')) || 0) : 0,
+        remark: remIdx > -1 ? row[remIdx] : '',
+        netTotal: 0,
+        items: [],
+        gifts: [],
+        discounts: []
+      };
+    }
+
+    const sku = skuIdx > -1 ? (row[skuIdx] || '').toString().trim() : '';
+    const pName = prodIdx > -1 ? (row[prodIdx] || '').toString().trim() : '';
+    const qty = qtyIdx > -1 ? (parseInt(row[qtyIdx] || '1', 10) || 1) : 1;
+    const unitPrice = priceIdx > -1 ? (parseFloat(String(row[priceIdx] || '0').replace(/,/g, '')) || 0) : 0;
+    const netPrice = netIdx > -1 ? (parseFloat(String(row[netIdx] || '0').replace(/,/g, '')) || 0) : 0;
+    orderData.netTotal += netPrice;
+    if (sku === 'DISCOUNT' || netPrice < 0) {
+      orderData.discounts.push({ name: pName, amount: Math.abs(netPrice) });
+    } else if (unitPrice === 0 && netPrice === 0) {
+      orderData.gifts.push({ sku: sku, name: pName, qty: qty });
+    } else {
+      orderData.items.push({ sku: sku, name: pName, qty: qty, price: unitPrice, net: netPrice });
+    }
+  }
+
+  if (!matched || !orderData) {
+    return { status: 'error', message: "ไม่พบข้อมูลใบจองตามเลขที่ \"" + orderId + "\" กรุณาตรวจสอบความถูกต้อง" };
+  }
+
+  // หากไม่ได้ระบุเบอร์โทรมา และในออเดอร์มีเบอร์โทร ให้แจ้งเตือนให้ระบุเบอร์ 4 ตัวท้ายเพื่อความปลอดภัย
+  if (!phoneDigits && storedPhoneDigits && storedPhoneDigits.length >= 4) {
+    return { 
+      status: 'require_phone', 
+      orderId: orderData.orderId, 
+      message: "เพื่อความปลอดภัยของข้อมูล กรุณาระบุเบอร์โทรศัพท์ 4 ตัวท้ายที่ใช้สั่งจอง" 
+    };
+  }
+
+  // คำนวณยอดคงเหลือชำระหน้าร้าน
+  orderData.balanceDue = Math.max(0, orderData.netTotal - orderData.deposit);
+
+  return { status: 'success', order: orderData };
 }
 
 // 6. ระบบแก้ไขราคา/ราคาเดิม/สต๊อกแบบกลุ่มด่วน (Bulk Quick Price & Stock Editor สำหรับ Admin)
