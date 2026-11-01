@@ -1,3 +1,6 @@
+// คอลัมน์สเปคสินค้าในชีต Products (9 คอลัมน์มาตรฐานสำหรับตารางเปรียบเทียบสเปคและหน้ารายละเอียดสินค้า)
+var PRODUCT_SPEC_COLS_ = ["Display", "Processor", "RAM", "Rear Camera", "Front Camera", "Battery", "OS", "Connectivity", "Warranty"];
+
 function doGet(e) {
   // ชื่อเว็บแอปตั้งค่าได้จากเมนู "ตั้งค่าระบบ" (Settings sheet, key SystemName) — เพื่อให้สำเนาโปรเจกต์ไปใช้ที่อื่น
   // เปลี่ยนชื่อได้จากหน้าเว็บล้วนๆ โดยไม่ต้องแก้โค้ด/deploy ใหม่
@@ -34,7 +37,8 @@ function setupDatabase(userToken) {
   }
   const tables = {
     // 6C.1 — Original Price ต่อท้ายเสมอ (display-only: ป้าย "ประหยัด/เดิม" บนการ์ด POS — ราคาคิดเงินจริงคือ Price)
-    "Products": ["SKU", "Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Stock", "Unit", "Category", "Status", "Channel", "Original Price"],
+    // เพิ่มคอลัมน์สเปคสินค้า 9 คอลัมน์ต่อท้ายชีต Products สำหรับตารางเปรียบเทียบสเปคและหน้ารายละเอียดสินค้า
+    "Products": ["SKU", "Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Stock", "Unit", "Category", "Status", "Channel", "Original Price"].concat(PRODUCT_SPEC_COLS_),
     "Members": ["Username", "Password", "Role", "Name", "Branch Code", "Accessible Menus"],
     "Branches": ["Channel", "Branch Code", "Branch Name", "Area", "Mall", "Region", "Province", "Type Name"],
     "Channels": ["Channel ID", "Channel Name", "Description"],
@@ -74,12 +78,12 @@ function setupDatabase(userToken) {
       ["B-008", "popupbanner", "https://via.placeholder.com/800x800/10b981/ffffff?text=Popup+Banner+1", "Active"]
     ],
     "Products": [
-      ["SKU-S24U", "Samsung Galaxy S24 Ultra", "S24 Ultra", "Samsung Galaxy S24 Ultra", "S24-Series", "512GB", "Titanium Black", "https://images.samsung.com/is/image/samsung/p6pim/th/2401/gallery/th-galaxy-s24-s928-sm-s928bzththl-thumb-539325419", 46900, 50, "เครื่อง", "โมบาย", "เปิด", "ALL", ""],
-      ["SKU-IP15P", "iPhone 15 Pro Max", "15 Pro Max", "iPhone 15 Pro Max", "IP15-Series", "256GB", "Natural", "https://store.storeimages.cdn-apple.com/8756/as-images.apple.com/is/iphone-15-pro-max-natural-titanium-select", 48900, 20, "เครื่อง", "โมบาย", "เปิด", "ALL", ""],
-      ["GF-SAM-ADPT", "Samsung Adapter 25W (Black)", "Adapter", "Adapter", "-", "-", "Black", "https://images.samsung.com/is/image/samsung/p6pim/th/ep-ta800nbegww/gallery/th-25w-pd-adapter-ta800-ep-ta800nbegww-thumb-536852431", 490, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL", ""],
-      ["GF-SAM-CASE", "Samsung Clear Case S24U", "Case", "Case", "-", "-", "Clear", "https://images.samsung.com/is/image/samsung/p6pim/th/ef-qs928ctegww/gallery/th-clear-case-for-galaxy-s24-ultra-ef-qs928-ef-qs928ctegww-thumb-539326442", 590, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL", ""],
-      ["GF-TG-PB10K", "TG Powerbank 10000mAh", "PB", "PB", "-", "10000", "White", "https://via.placeholder.com/150/ffffff/000000?text=Powerbank", 990, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", ""],
-      ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "Bag", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", ""]
+      ["SKU-S24U", "Samsung Galaxy S24 Ultra", "S24 Ultra", "Samsung Galaxy S24 Ultra", "S24-Series", "512GB", "Titanium Black", "https://images.samsung.com/is/image/samsung/p6pim/th/2401/gallery/th-galaxy-s24-s928-sm-s928bzththl-thumb-539325419", 46900, 50, "เครื่อง", "โมบาย", "เปิด", "ALL", "", "6.8\" Dynamic AMOLED 2X 120Hz (QHD+)", "Snapdragon 8 Gen 3 for Galaxy", "12GB LPDDR5X", "200MP + 50MP (5x) + 10MP (3x) + 12MP", "12MP Dual Pixel AF", "5,000 mAh (ชาร์จไว 45W)", "Android 14 (One UI 6.1 + Galaxy AI)", "5G / Wi-Fi 7 / Bluetooth 5.3 / S-Pen", "ศูนย์ไทย 1 ปี"],
+      ["SKU-IP15P", "iPhone 15 Pro Max", "15 Pro Max", "iPhone 15 Pro Max", "IP15-Series", "256GB", "Natural", "https://store.storeimages.cdn-apple.com/8756/as-images.apple.com/is/iphone-15-pro-max-natural-titanium-select", 48900, 20, "เครื่อง", "โมบาย", "เปิด", "ALL", "", "6.7\" Super Retina XDR ProMotion 120Hz", "Apple A17 Pro (3nm)", "8GB", "48MP Main + 12MP Ultra Wide + 12MP 5x Telephoto", "12MP TrueDepth Camera", "4,422 mAh (USB-C PD 27W / MagSafe 15W)", "iOS 17", "5G / Wi-Fi 6E / Bluetooth 5.3 / USB-C 3.0", "ศูนย์ไทย 1 ปี (Apple ประเทศไทย)"],
+      ["GF-SAM-ADPT", "Samsung Adapter 25W (Black)", "Adapter", "Adapter", "-", "-", "Black", "https://images.samsung.com/is/image/samsung/p6pim/th/ep-ta800nbegww/gallery/th-25w-pd-adapter-ta800-ep-ta800nbegww-thumb-536852431", 490, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL", "", "", "", "", "", "", "", "", "", ""],
+      ["GF-SAM-CASE", "Samsung Clear Case S24U", "Case", "Case", "-", "-", "Clear", "https://images.samsung.com/is/image/samsung/p6pim/th/ef-qs928ctegww/gallery/th-clear-case-for-galaxy-s24-ultra-ef-qs928-ef-qs928ctegww-thumb-539326442", 590, 100, "ชิ้น", "ของแถมแบรนด์", "เปิด", "ALL", "", "", "", "", "", "", "", "", "", ""],
+      ["GF-TG-PB10K", "TG Powerbank 10000mAh", "PB", "PB", "-", "10000", "White", "https://via.placeholder.com/150/ffffff/000000?text=Powerbank", 990, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", "", "", "", "", "", "", "", "", "", ""],
+      ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "Bag", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", "", "", "", "", "", "", "", "", "", ""]
     ],
     "GiftMappings": [
       ["GM-001", "S24-Series", "Retail", "adapter, case", "bag", "เปิด"],
@@ -474,6 +478,9 @@ function apiHandler(action, payload, userToken) {
         if (payload.tableName === 'Target' && !['Admin', 'Manager'].includes(secureUser.Role)) {
           throw new Error("Permission Denied: Admin/Manager only");
         }
+        if (payload.tableName === 'Products') {
+          ensureProductSpecColumns_(ss);
+        }
         let tableData = getTableDataAsJson(ss.getSheetByName(payload.tableName), secureUser.Role === 'Admin');
         if ((payload.tableName === 'Orders' || payload.tableName === 'InventoryLog') && secureUser.Role === 'Sales') {
           tableData = tableData.filter(row => row['Branch Code'] === secureUser['Branch Code']);
@@ -512,6 +519,8 @@ function apiHandler(action, payload, userToken) {
       case 'SAVE_INVOICE': return saveInvoice(payload, secureUser, ss);
       case 'APPROVE_INVOICE': return approveInvoice(payload, secureUser, ss);
       case 'DELETE_INVOICE': return deleteInvoice(payload, secureUser, ss);
+      case 'TRACK_ORDER': return trackOrderLookup(payload, secureUser, ss);
+      case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts(payload, secureUser, ss);
       default: throw new Error("Invalid API Action");
     }
   } catch (error) {
@@ -732,8 +741,208 @@ function ensureBannerColumns_(sheet) {
   } catch(e) {}
 }
 
+// ดึงสเปคเริ่มต้นอัตโนมัติตามชื่อรุ่น/หมวดหมู่ สำหรับเติมลงชีต Products กรณีแถวเดิมยังไม่มีข้อมูลสเปค
+function inferDefaultProductSpecs_(rowObj) {
+  const m = [rowObj['Marketing Model'], rowObj['Model'], rowObj['Product Name'], rowObj['Product Group']].filter(Boolean).join(' ');
+  const ml = m.toLowerCase();
+  const cat = (rowObj['Category'] || 'โมบาย').toString().trim();
+
+  if (cat === 'ของแถมแบรนด์' || cat === 'ของแถมช่องทาง') {
+    return {
+      "Display": "", "Processor": "", "RAM": "", "Rear Camera": "", "Front Camera": "",
+      "Battery": "", "OS": "", "Connectivity": "", "Warranty": ""
+    };
+  }
+
+  let spec = {
+    "Display": "6.7\" FHD+ AMOLED 120Hz",
+    "Processor": "Octa-Core 5G Flagship Processor (4nm)",
+    "RAM": "8GB / 12GB LPDDR5X",
+    "Rear Camera": "50MP OIS Main + 12MP Ultra-Wide + Telephoto",
+    "Front Camera": "12MP Auto-Focus",
+    "Battery": "5,000 mAh (รองรับ Fast Charge)",
+    "OS": "Android 14 / iOS",
+    "Connectivity": "5G / Wi-Fi 6E / Bluetooth 5.3 / NFC",
+    "Warranty": "ประกันศูนย์ไทย 1 ปี"
+  };
+
+  if (ml.indexOf('s25 ultra') !== -1 || ml.indexOf('s24 ultra') !== -1) {
+    spec["Display"] = "6.8\" Dynamic AMOLED 2X 120Hz (QHD+ 2600 nits)";
+    spec["Processor"] = ml.indexOf('s25') !== -1 ? "Snapdragon 8 Elite for Galaxy (3nm)" : "Snapdragon 8 Gen 3 for Galaxy (4nm)";
+    spec["RAM"] = "12GB LPDDR5X";
+    spec["Rear Camera"] = "200MP OIS + 50MP Periscope (5x) + 10MP (3x) + 12MP UW";
+    spec["Front Camera"] = "12MP Dual Pixel AF (4K 60fps)";
+    spec["Battery"] = "5,000 mAh (Super Fast Charging 2.0 45W / Wireless 15W)";
+    spec["OS"] = "Android 14 (One UI 6.1 พร้อม Galaxy AI)";
+    spec["Connectivity"] = "5G / Wi-Fi 7 / Bluetooth 5.3 / UWB / S-Pen ในตัว";
+    spec["Warranty"] = "ศูนย์ไทย 1 ปี + Samsung Care+ (ตามเงื่อนไขโปรฯ)";
+  } else if (ml.indexOf('s24+') !== -1 || ml.indexOf('s24 plus') !== -1) {
+    spec["Display"] = "6.7\" Dynamic AMOLED 2X 120Hz (QHD+)";
+    spec["Processor"] = "Exynos 2400 for Galaxy (4nm)";
+    spec["RAM"] = "12GB LPDDR5X";
+    spec["Rear Camera"] = "50MP OIS + 10MP Telephoto (3x) + 12MP Ultra-Wide";
+    spec["Front Camera"] = "12MP Dual Pixel AF";
+    spec["Battery"] = "4,900 mAh (Fast Charge 45W)";
+    spec["OS"] = "Android 14 (One UI 6.1 พร้อม Galaxy AI)";
+    spec["Connectivity"] = "5G / Wi-Fi 6E / Bluetooth 5.3 / NFC";
+  } else if (ml.indexOf('s24') !== -1) {
+    spec["Display"] = "6.2\" Dynamic AMOLED 2X 120Hz (FHD+)";
+    spec["Processor"] = "Exynos 2400 for Galaxy (4nm)";
+    spec["RAM"] = "8GB LPDDR5X";
+    spec["Rear Camera"] = "50MP OIS + 10MP Telephoto (3x) + 12MP Ultra-Wide";
+    spec["Front Camera"] = "12MP Dual Pixel AF";
+    spec["Battery"] = "4,000 mAh (Fast Charge 25W)";
+    spec["OS"] = "Android 14 (One UI 6.1 พร้อม Galaxy AI)";
+    spec["Connectivity"] = "5G / Wi-Fi 6E / Bluetooth 5.3 / NFC";
+  } else if (ml.indexOf('z fold') !== -1 || ml.indexOf('fold 6') !== -1 || ml.indexOf('fold6') !== -1) {
+    spec["Display"] = "7.6\" QXGA+ Dynamic AMOLED 2X 120Hz + จอนอก 6.3\"";
+    spec["Processor"] = "Snapdragon 8 Gen 3 for Galaxy (4nm)";
+    spec["RAM"] = "12GB LPDDR5X";
+    spec["Rear Camera"] = "50MP OIS + 10MP Telephoto (3x) + 12MP Ultra-Wide";
+    spec["Front Camera"] = "10MP (Cover) + 4MP Under Display (Main)";
+    spec["Battery"] = "4,400 mAh (Fast Charge 25W / Wireless 15W)";
+    spec["OS"] = "Android 14 (One UI 6.1.1 พร้อม Galaxy AI)";
+    spec["Connectivity"] = "5G / Wi-Fi 6E / Bluetooth 5.3 / รองรับ S-Pen Fold Edition";
+  } else if (ml.indexOf('z flip') !== -1 || ml.indexOf('flip 6') !== -1 || ml.indexOf('flip6') !== -1) {
+    spec["Display"] = "6.7\" FHD+ Dynamic AMOLED 2X 120Hz + จอนอก FlexWindow 3.4\"";
+    spec["Processor"] = "Snapdragon 8 Gen 3 for Galaxy (4nm)";
+    spec["RAM"] = "12GB LPDDR5X";
+    spec["Rear Camera"] = "50MP Dual Pixel OIS + 12MP Ultra-Wide";
+    spec["Front Camera"] = "10MP FlexCam Auto-Zoom";
+    spec["Battery"] = "4,000 mAh (Fast Charge 25W / Wireless 15W)";
+    spec["OS"] = "Android 14 (One UI 6.1.1 พร้อม Galaxy AI)";
+    spec["Connectivity"] = "5G / Wi-Fi 6E / Bluetooth 5.3 / NFC";
+  } else if (ml.indexOf('16 pro max') !== -1 || ml.indexOf('15 pro max') !== -1) {
+    const is16 = ml.indexOf('16') !== -1;
+    spec["Display"] = (is16 ? "6.9\"" : "6.7\"") + " Super Retina XDR OLED ProMotion 120Hz";
+    spec["Processor"] = is16 ? "Apple A18 Pro (3nm รุ่นที่ 2)" : "Apple A17 Pro (3nm)";
+    spec["RAM"] = "8GB Unified Memory (รองรับ Apple Intelligence)";
+    spec["Rear Camera"] = is16 ? "48MP Fusion + 48MP Ultra-Wide + 12MP 5x Tetraprism" : "48MP Main OIS + 12MP Ultra-Wide + 12MP 5x Telephoto";
+    spec["Front Camera"] = "12MP TrueDepth Camera (4K Dolby Vision)";
+    spec["Battery"] = (is16 ? "4,685 mAh" : "4,422 mAh") + " (USB-C PD Fast Charge / MagSafe 25W)";
+    spec["OS"] = is16 ? "iOS 18 (รองรับ Apple Intelligence)" : "iOS 17 (อัปเกรด iOS 18 ได้)";
+    spec["Connectivity"] = "5G / Wi-Fi 7 / Bluetooth 5.3 / USB-C 3.2 (10Gbps)";
+    spec["Warranty"] = "ศูนย์ไทย 1 ปี (Apple ประเทศไทย)";
+  } else if (ml.indexOf('16 pro') !== -1 || ml.indexOf('15 pro') !== -1) {
+    const is16p = ml.indexOf('16') !== -1;
+    spec["Display"] = (is16p ? "6.3\"" : "6.1\"") + " Super Retina XDR OLED ProMotion 120Hz";
+    spec["Processor"] = is16p ? "Apple A18 Pro (3nm)" : "Apple A17 Pro (3nm)";
+    spec["RAM"] = "8GB Unified Memory";
+    spec["Rear Camera"] = "48MP Main + Ultra-Wide + Telephoto Optical Zoom";
+    spec["Front Camera"] = "12MP TrueDepth Camera";
+    spec["Battery"] = "แบตเตอรี่ใช้งานตลอดวัน (รองรับ MagSafe / USB-C PD)";
+    spec["OS"] = is16p ? "iOS 18" : "iOS 17 / iOS 18";
+    spec["Connectivity"] = "5G / Wi-Fi 6E-7 / Bluetooth 5.3 / USB-C 3.2";
+    spec["Warranty"] = "ศูนย์ไทย 1 ปี (Apple ประเทศไทย)";
+  } else if (ml.indexOf('iphone 16') !== -1 || ml.indexOf('iphone 15') !== -1 || ml.indexOf('15 plus') !== -1 || ml.indexOf('16 plus') !== -1) {
+    const isPlus = ml.indexOf('plus') !== -1;
+    const is16b = ml.indexOf('16') !== -1;
+    spec["Display"] = (isPlus ? "6.7\"" : "6.1\"") + " Super Retina XDR OLED (Dynamic Island)";
+    spec["Processor"] = is16b ? "Apple A18 (3nm)" : "Apple A16 Bionic (4nm)";
+    spec["RAM"] = is16b ? "8GB" : "6GB";
+    spec["Rear Camera"] = "48MP Main (2x Optical-Quality Telephoto) + 12MP Ultra-Wide";
+    spec["Front Camera"] = "12MP TrueDepth Camera";
+    spec["Battery"] = (isPlus ? "4,383 mAh" : "3,349 mAh") + " (USB-C Fast Charge / MagSafe 15W)";
+    spec["OS"] = is16b ? "iOS 18" : "iOS 17";
+    spec["Connectivity"] = "5G / Wi-Fi 6E / Bluetooth 5.3 / USB-C";
+    spec["Warranty"] = "ศูนย์ไทย 1 ปี (Apple ประเทศไทย)";
+  } else if (cat === 'แท็บเล็ต' || ml.indexOf('ipad') !== -1 || ml.indexOf('tab') !== -1) {
+    const isIpad = ml.indexOf('ipad') !== -1;
+    spec["Display"] = isIpad ? "11\" / 13\" Liquid Retina XDR / Tandem OLED" : "11\" / 12.4\" Dynamic AMOLED 2X 120Hz (พร้อม S-Pen)";
+    spec["Processor"] = isIpad ? "Apple M-Series / A-Series Chip" : "Snapdragon 8 Series for Galaxy";
+    spec["RAM"] = "8GB / 12GB";
+    spec["Rear Camera"] = "12MP Smart HDR + สแกนเอกสาร 4K";
+    spec["Front Camera"] = "12MP Ultra-Wide Landscape (Center Stage)";
+    spec["Battery"] = "8,000 - 10,090 mAh (ใช้งานต่อเนื่องสูงสุด 10-14 ชม.)";
+    spec["OS"] = isIpad ? "iPadOS 17 / 18" : "Android 14 (One UI for Tab + DeX Mode)";
+    spec["Connectivity"] = "Wi-Fi 6E / 5G (รุ่น Cellular) / Bluetooth 5.3 / USB-C";
+  } else if (cat === 'สมาร์ทวอทช์' || ml.indexOf('watch') !== -1) {
+    spec["Display"] = "1.5\" Super AMOLED / Retina LTPO OLED (Sapphire Crystal)";
+    spec["Processor"] = "Dual-Core / Penta-Core Wearable Processor";
+    spec["RAM"] = "2GB RAM + 32GB/64GB Storage";
+    spec["Rear Camera"] = "เซนเซอร์ BioActive / วัดหัวใจ ECG / SpO2 / อุณหภูมิผิว";
+    spec["Front Camera"] = "ติดตามการนอนหลับ + วิเคราะห์องค์ประกอบร่างกาย (BIA)";
+    spec["Battery"] = "ใช้งานสูงสุด 36 - 72 ชม. (รองรับแท่นชาร์จไร้สายแม่เหล็ก)";
+    spec["OS"] = ml.indexOf('apple') !== -1 ? "watchOS 11" : "Wear OS Powered by Samsung";
+    spec["Connectivity"] = "Bluetooth 5.3 / Wi-Fi / GPS Dual-Frequency / NFC / กันน้ำ 5ATM+IP68";
+  } else if (cat === 'หูฟัง' || ml.indexOf('buds') !== -1 || ml.indexOf('airpods') !== -1) {
+    spec["Display"] = "เคสชาร์จไร้สาย พร้อมไฟสถานะ LED แจ้งแบตเตอรี่";
+    spec["Processor"] = ml.indexOf('airpods') !== -1 ? "Apple H2 Headphone Chip" : "ชิปประมวลผลเสียง Hi-Fi 24-bit + AI ANC";
+    spec["RAM"] = "ระบบตัดเสียงรบกวน Active Noise Cancelling (ANC) อัจฉริยะ";
+    spec["Rear Camera"] = "ไดรเวอร์เสียง 2-Way Dynamic + Planar Tweeter";
+    spec["Front Camera"] = "ไมโครโฟน 6 ตัว พร้อม AI Voice Pickup ตัดเสียงลมขณะคุยสาย";
+    spec["Battery"] = "ฟังต่อเนื่อง 6-8 ชม. (รวมเคสชาร์จสูงสุด 30 ชม.)";
+    spec["OS"] = "รองรับทั้ง iOS / Android / Windows / macOS";
+    spec["Connectivity"] = "Bluetooth 5.3 / Auto-Switch / Spatial Audio 360° / กันน้ำ IP57";
+  }
+
+  return spec;
+}
+
+// Retrofit คอลัมน์สเปค 9 คอลัมน์ลงชีต Products อัตโนมัติ + เติมข้อมูลสเปคเริ่มต้นลงแถวเดิมที่ยังว่างอยู่
+function ensureProductSpecColumns_(ss) {
+  try {
+    const sheet = ss.getSheetByName("Products");
+    if (!sheet) return;
+    let lastCol = sheet.getLastColumn();
+    if (lastCol < 1) return;
+    let headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
+    const missingCols = PRODUCT_SPEC_COLS_.filter(col => headers.indexOf(col) === -1);
+    let schemaChanged = false;
+
+    if (missingCols.length > 0) {
+      const startCol = lastCol + 1;
+      sheet.getRange(1, startCol, 1, missingCols.length)
+        .setValues([missingCols])
+        .setFontWeight("bold")
+        .setBackground("#4F46E5")
+        .setFontColor("#FFFFFF");
+      headers = headers.concat(missingCols);
+      lastCol = headers.length;
+      schemaChanged = true;
+    }
+
+    // ตรวจสอบแถวสินค้าที่มีอยู่ ถ้าคอลัมน์สเปคทั้ง 9 ช่องยังว่างเปล่าทั้งหมด (และไม่ใช่ของแถม) ให้เติมสเปคเริ่มต้นลงชีตทันที
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const allData = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+      const specColIndices = PRODUCT_SPEC_COLS_.map(col => headers.indexOf(col));
+      const catIdx = headers.indexOf("Category");
+      let rowsUpdated = false;
+
+      for (let r = 0; r < allData.length; r++) {
+        const row = allData[r];
+        const cat = catIdx !== -1 ? (row[catIdx] || '').toString().trim() : '';
+        if (cat === 'ของแถมแบรนด์' || cat === 'ของแถมช่องทาง') continue;
+
+        const hasAnySpec = specColIndices.some(idx => idx !== -1 && row[idx] !== undefined && row[idx].toString().trim() !== '');
+        if (!hasAnySpec) {
+          const rowObj = {};
+          headers.forEach((h, i) => { rowObj[h] = row[i]; });
+          const defaultSpecs = inferDefaultProductSpecs_(rowObj);
+          specColIndices.forEach((colIdx, sIdx) => {
+            if (colIdx !== -1) {
+              const colName = PRODUCT_SPEC_COLS_[sIdx];
+              row[colIdx] = defaultSpecs[colName] || '';
+            }
+          });
+          rowsUpdated = true;
+        }
+      }
+
+      if (rowsUpdated) {
+        sheet.getRange(2, 1, allData.length, lastCol).setValues(allData);
+      }
+      if (schemaChanged || rowsUpdated) {
+        CacheService.getScriptCache().remove("TABLE_Products");
+      }
+    }
+  } catch (e) {}
+}
+
 function getAllInitialData(ss, isAdmin) {
   initAutoPromotionsSheet(ss);
+  ensureProductSpecColumns_(ss);
   CacheService.getScriptCache().remove("TABLE_AutoPromotions");
   CacheService.getScriptCache().remove("TABLE_Branches");
 
@@ -1164,8 +1373,218 @@ function processCheckout(payload, secureUser, ss) {
     }
     
     logAudit(secureUser.Username, "CHECKOUT", "Created Order: " + orderId);
+    try {
+      sendCheckoutWebhookNotification_(ss, orderId, actualChannel, actualBranch, payload, orderRows, prodData, skuIdx, nameIdx, stockIdx);
+    } catch (whErr) {}
     return { status: 'success', orderId: orderId };
   } catch(e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 5. ระบบส่งแจ้งเตือนออเดอร์ใหม่ + แจ้งเตือนสต๊อกใกล้หมด (Low Stock Alert) ผ่าน Webhook / LINE Messaging / Discord / Google Chat
+function sendCheckoutWebhookNotification_(ss, orderId, channel, branch, payload, orderRows, prodData, skuIdx, nameIdx, stockIdx) {
+  const settings = getKeyValueSettings(ss);
+  const webhookUrl = (settings.WebhookUrl || settings.LineWebhookUrl || '').toString().trim();
+  if (!webhookUrl || !/^https:\/\//i.test(webhookUrl)) return;
+
+  const lowThreshold = parseInt(settings.LowStockThreshold || '5', 10) || 5;
+  const custName = (payload.customer && payload.customer.name) ? payload.customer.name : '-';
+  let netTotal = 0;
+  const mainItems = [];
+  const lowStockItems = [];
+
+  orderRows.forEach(r => {
+    const net = parseFloat(r[19]) || 0;
+    netTotal += net;
+    const sku = (r[9] || '').toString();
+    const pName = (r[10] || '').toString();
+    const qty = parseInt(r[11] || 0, 10);
+    if (sku && sku !== 'DISCOUNT' && net > 0) {
+      mainItems.push(pName + ' x' + qty);
+      for (let i = 1; i < prodData.length; i++) {
+        if (prodData[i][skuIdx] == sku) {
+          const rem = parseInt(prodData[i][stockIdx] || 0, 10);
+          if (rem <= lowThreshold) {
+            lowStockItems.push(prodData[i][nameIdx] + ' (เหลือ ' + rem + ' ชิ้น)');
+          }
+          break;
+        }
+      }
+    }
+  });
+
+  const msgText = "⚡ [FLASH SALE ORDER] ใบจองใหม่: " + orderId +
+    "\nสาขา: " + branch + " (" + channel + ")" +
+    "\nลูกค้า: " + custName +
+    "\nรายการ: " + (mainItems.join(', ') || '-') +
+    "\nยอดสุทธิ: ฿" + netTotal.toLocaleString() +
+    (lowStockItems.length > 0 ? "\n⚠️ แจ้งเตือนสต๊อกใกล้หมด: " + lowStockItems.join(', ') : "");
+
+  UrlFetchApp.fetch(webhookUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      text: msgText,
+      content: msgText,
+      orderId: orderId,
+      branch: branch,
+      channel: channel,
+      netTotal: netTotal,
+      lowStockAlerts: lowStockItems
+    }),
+    muteHttpExceptions: true
+  });
+}
+
+// 4. ระบบค้นหาและติดตามสถานะใบจอง (Order Tracking & Digital Booking Pass)
+function trackOrderLookup(payload, secureUser, ss) {
+  const qRaw = ((payload && payload.query) ? payload.query : '').toString().trim();
+  if (!qRaw || qRaw.length < 3) throw new Error("กรุณากรอกเลขที่ใบจอง (เช่น ORD-...) หรือเบอร์โทรศัพท์อย่างน้อย 4 หลัก");
+  const sheet = ss.getSheetByName("Orders");
+  if (!sheet) return { status: 'success', orders: [] };
+  const data = sheet.getDataRange().getDisplayValues();
+  if (data.length <= 1) return { status: 'success', orders: [] };
+
+  const headers = data[0].map(h => h.toString().trim());
+  const idx = (name) => headers.indexOf(name);
+  const oIdIdx = idx("Order ID"), tsIdx = idx("Timestamp"), chIdx = idx("Channel"), brIdx = idx("Branch Code");
+  const cNameIdx = idx("Customer Name"), phoneIdx = idx("Contact Number"), skuIdx = idx("SKU");
+  const prodIdx = idx("Product Name"), qtyIdx = idx("Qty"), priceIdx = idx("Unit Price");
+  const netIdx = idx("Net Price"), stIdx = idx("Order Status"), remIdx = idx("Remark");
+  const depIdx = idx("Deposit Amount");
+
+  const qLower = qRaw.toLowerCase();
+  const qDigits = qRaw.replace(/\D/g, '');
+  const matchedOrderIds = {};
+
+  for (let i = data.length - 1; i >= 1; i--) {
+    const row = data[i];
+    const oid = (row[oIdIdx] || '').toString().trim();
+    if (!oid) continue;
+    if (secureUser.Role === 'Sales' && brIdx > -1 && row[brIdx] !== secureUser['Branch Code']) continue;
+
+    const rawPhone = phoneIdx > -1 ? deobfuscate((row[phoneIdx] || '').toString().trim()) : '';
+    const phoneDigits = rawPhone.replace(/\D/g, '');
+    const cName = cNameIdx > -1 ? (row[cNameIdx] || '').toString().trim().toLowerCase() : '';
+
+    const matchOid = oid.toLowerCase().indexOf(qLower) !== -1;
+    const matchPhone = qDigits.length >= 4 && phoneDigits.indexOf(qDigits) !== -1;
+    const matchName = qLower.length >= 3 && cName.indexOf(qLower) !== -1;
+
+    if (matchOid || matchPhone || matchName) {
+      matchedOrderIds[oid] = true;
+      if (Object.keys(matchedOrderIds).length >= 10) break;
+    }
+  }
+
+  const orderMap = {};
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const oid = (row[oIdIdx] || '').toString().trim();
+    if (!matchedOrderIds[oid]) continue;
+    if (!orderMap[oid]) {
+      const rawPhone = phoneIdx > -1 ? deobfuscate((row[phoneIdx] || '').toString().trim()) : '';
+      const maskedPhone = rawPhone.length >= 7 ? (rawPhone.slice(0, 3) + '-XXX-' + rawPhone.slice(-4)) : rawPhone;
+      orderMap[oid] = {
+        orderId: oid,
+        timestamp: tsIdx > -1 ? row[tsIdx] : '',
+        channel: chIdx > -1 ? row[chIdx] : '',
+        branch: brIdx > -1 ? row[brIdx] : '',
+        customerName: cNameIdx > -1 ? row[cNameIdx] : '',
+        maskedPhone: maskedPhone,
+        status: stIdx > -1 ? (row[stIdx] || 'Pending') : 'Pending',
+        deposit: depIdx > -1 ? (parseFloat(String(row[depIdx] || '0').replace(/,/g, '')) || 0) : 0,
+        remark: remIdx > -1 ? row[remIdx] : '',
+        netTotal: 0,
+        items: [],
+        gifts: [],
+        discounts: []
+      };
+    }
+    const o = orderMap[oid];
+    if (!o.customerName && cNameIdx > -1 && row[cNameIdx]) o.customerName = row[cNameIdx];
+    if (stIdx > -1 && row[stIdx]) o.status = row[stIdx];
+    const sku = skuIdx > -1 ? (row[skuIdx] || '').toString().trim() : '';
+    const pName = prodIdx > -1 ? (row[prodIdx] || '').toString().trim() : '';
+    const qty = qtyIdx > -1 ? (parseInt(row[qtyIdx] || '1', 10) || 1) : 1;
+    const unitPrice = priceIdx > -1 ? (parseFloat(String(row[priceIdx] || '0').replace(/,/g, '')) || 0) : 0;
+    const netPrice = netIdx > -1 ? (parseFloat(String(row[netIdx] || '0').replace(/,/g, '')) || 0) : 0;
+    o.netTotal += netPrice;
+    if (sku === 'DISCOUNT' || netPrice < 0) {
+      o.discounts.push({ name: pName, amount: Math.abs(netPrice) });
+    } else if (unitPrice === 0 && netPrice === 0) {
+      o.gifts.push({ sku: sku, name: pName, qty: qty });
+    } else {
+      o.items.push({ sku: sku, name: pName, qty: qty, price: unitPrice, net: netPrice });
+    }
+  }
+
+  return { status: 'success', orders: Object.values(orderMap).reverse() };
+}
+
+// 6. ระบบแก้ไขราคา/ราคาเดิม/สต๊อกแบบกลุ่มด่วน (Bulk Quick Price & Stock Editor สำหรับ Admin)
+function bulkUpdateProducts(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
+    const updates = Array.isArray(payload && payload.updates) ? payload.updates : [];
+    if (updates.length === 0) throw new Error("ไม่มีรายการที่เปลี่ยนแปลง");
+
+    ensureProductSpecColumns_(ss);
+    const sheet = ss.getSheetByName("Products");
+    if (!sheet) throw new Error("ไม่พบชีต Products");
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) throw new Error("ไม่มีข้อมูลสินค้าในชีต");
+    const headers = data[0].map(h => h.toString().trim());
+    const skuIdx = headers.indexOf("SKU");
+    const priceIdx = headers.indexOf("Price");
+    const origPriceIdx = headers.indexOf("Original Price");
+    const stockIdx = headers.indexOf("Stock");
+    const statusIdx = headers.indexOf("Status");
+
+    const updMap = {};
+    updates.forEach(u => {
+      const s = (u.sku || '').toString().trim();
+      if (s) updMap[s] = u;
+    });
+
+    let updatedCount = 0;
+    for (let i = 1; i < data.length; i++) {
+      const sku = (data[i][skuIdx] || '').toString().trim();
+      const u = updMap[sku];
+      if (!u) continue;
+      if (priceIdx > -1 && u.price !== undefined && u.price !== '') {
+        const p = parseFloat(u.price);
+        if (!isNaN(p) && p >= 0) data[i][priceIdx] = p;
+      }
+      if (origPriceIdx > -1 && u.originalPrice !== undefined) {
+        if (u.originalPrice === '' || u.originalPrice === null) data[i][origPriceIdx] = '';
+        else {
+          const op = parseFloat(u.originalPrice);
+          if (!isNaN(op) && op >= 0) data[i][origPriceIdx] = op;
+        }
+      }
+      if (stockIdx > -1 && u.stock !== undefined && u.stock !== '') {
+        const st = parseInt(u.stock, 10);
+        if (Number.isInteger(st) && st >= 0) data[i][stockIdx] = st;
+      }
+      if (statusIdx > -1 && (u.status === 'เปิด' || u.status === 'ปิด')) {
+        data[i][statusIdx] = u.status;
+      }
+      updatedCount++;
+    }
+
+    if (updatedCount > 0) {
+      sheet.getRange(2, 1, data.length - 1, headers.length).setValues(data.slice(1));
+      CacheService.getScriptCache().remove("TABLE_Products");
+      logAudit(secureUser.Username, "BULK_UPDATE_PRODUCTS", "Updated " + updatedCount + " SKU(s)");
+    }
+    return { status: 'success', updatedCount: updatedCount };
+  } catch (e) {
     return { status: 'error', message: e.toString() };
   } finally {
     lock.releaseLock();
@@ -1411,6 +1830,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     // Orders ต้องผ่าน UPDATE_FULL_ORDER เท่านั้น — สายนี้ไม่ obfuscate PII, ไม่ปรับสต๊อก และไม่มีข้อจำกัด per-field ของ Manager
     if (tableName === 'Orders') throw new Error("Permission Denied: Orders แก้ไขได้ผ่านหน้าจัดการออเดอร์เท่านั้น");
     if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
+    if (tableName === 'Products') ensureProductSpecColumns_(ss);
     const sheet = ss.getSheetByName(tableName); const data = sheet.getDataRange().getDisplayValues(); const headers = data[0].map(h => h.toString().trim()); let idIndex = headers.indexOf(idField); let rowIndex = -1;
     // แก้ไข: ใช้ _rowIndex ที่ client ส่งมา (มาจากแถวจริงที่โหลดไว้ตอนเปิดฟอร์มแก้ไข) เป็นตัวชี้แถวหลัก แม่นยำกว่าไล่เทียบค่า ID เฉยๆ
     // สร้างใหม่ (ไม่มี _rowIndex ส่งมา): ถ้า ID ที่พิมพ์ตรงกับแถวที่มีอยู่แล้ว ต้อง "บล็อก" ไม่ใช่อัปเดตทับเงียบๆ — เดิมมีแค่เช็คฝั่ง client (saveForm, JS.html) ซึ่งข้ามได้ผ่านการยิง API ตรงๆ
@@ -1443,7 +1863,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     // ไม่เคยผ่าน sanitizeSheetText_ เลยสักคอลัมน์ ทั้งที่เป็นจุดที่ Admin พิมพ์ข้อความอิสระบ่อยที่สุดในระบบ — ห้ามครอบคอลัมน์ตัวเลข/select/ID
     // (เช่น Value ที่ตั้งใจติดลบ) จึงต้องระบุเฉพาะคอลัมน์ข้อความอิสระจริงๆ ต่อชีต ไม่ blanket-apply ทั้งแถว
     const SAVE_RECORD_FREE_TEXT_COLS_ = {
-      "Products": ["Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Unit"],
+      "Products": ["Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Unit"].concat(PRODUCT_SPEC_COLS_),
       "Branches": ["Channel", "Branch Name", "Area", "Mall", "Region", "Province", "Type Name"],
       "Channels": ["Channel Name", "Description"],
       "Promotions": ["Promo Name"],
@@ -1466,7 +1886,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
 // พอร์ตมาจากโปรเจกต์ f8 (ฟีเจอร์ "เพิ่ม/แก้ไขสินค้าแบบหลาย SKU", 2026-09-19) — ปรับให้เข้ากับ f9:
 // ผ่าน sanitizeSheetText_ ทุกฟิลด์ข้อความอิสระ (f8 ต้นทางยังไม่มีจุดนี้ ตามคอนเวนชัน SAVE_RECORD_FREE_TEXT_COLS_ ของ f9 เอง)
 // และไม่แตะ Category options ของ f9 (6 หมวด รวม สมาร์ทวอทช์/หูฟัง ซึ่ง f8 ยังไม่มี) — ฟังก์ชันนี้ไม่ hardcode รายการหมวดหมู่อยู่แล้ว จึงใช้ได้ตรงๆ
-const PRODUCT_GROUP_FREE_TEXT_FIELDS_ = ['Model', 'Marketing Model', 'Product Group', 'Capacity', 'Unit', 'Image URL'];
+const PRODUCT_GROUP_FREE_TEXT_FIELDS_ = ['Model', 'Marketing Model', 'Product Group', 'Capacity', 'Unit', 'Image URL'].concat(PRODUCT_SPEC_COLS_);
 
 function buildAutoProductName_(model, color) {
   return [model, color].map(s => (s || '').toString().trim()).filter(Boolean).join(' ');
@@ -1485,6 +1905,7 @@ function saveProductGroup(payload, secureUser, ss) {
     const variantsIn = Array.isArray(payload.variants) ? payload.variants : [];
     if (variantsIn.length === 0) throw new Error("กรุณาเพิ่มอย่างน้อย 1 SKU");
 
+    ensureProductSpecColumns_(ss);
     const sheet = ss.getSheetByName("Products");
     if (!sheet) throw new Error("ไม่พบชีต Products กรุณากด Auto Setup ก่อน");
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
@@ -1509,6 +1930,11 @@ function saveProductGroup(payload, secureUser, ss) {
     } else {
       sharedForRows = shared;
       sharedForRows['Model'] = model;
+      const hasSubmittedSpecs = PRODUCT_SPEC_COLS_.some(col => (sharedForRows[col] || '').toString().trim() !== '');
+      if (!hasSubmittedSpecs) {
+        const autoSpecs = inferDefaultProductSpecs_(sharedForRows);
+        PRODUCT_SPEC_COLS_.forEach(col => { sharedForRows[col] = autoSpecs[col] || ''; });
+      }
       PRODUCT_GROUP_FREE_TEXT_FIELDS_.forEach(f => { sharedForRows[f] = sanitizeSheetText_((sharedForRows[f] || '').toString().trim()); });
     }
 
@@ -1584,6 +2010,11 @@ function updateProductGroup(payload, secureUser, ss) {
     const submittedModel = (shared['Model'] || '').toString().trim();
     if (submittedModel && submittedModel !== originalModel) throw new Error("ไม่สามารถเปลี่ยนชื่อ Model ผ่านฟอร์มแก้ไขนี้ได้");
 
+    const hasSubmittedSpecsUpd = PRODUCT_SPEC_COLS_.some(col => (shared[col] || '').toString().trim() !== '');
+    if (!hasSubmittedSpecsUpd) {
+      const autoSpecsUpd = inferDefaultProductSpecs_(Object.assign({}, shared, { 'Model': originalModel }));
+      PRODUCT_SPEC_COLS_.forEach(col => { shared[col] = autoSpecsUpd[col] || ''; });
+    }
     PRODUCT_GROUP_FREE_TEXT_FIELDS_.forEach(f => { shared[f] = sanitizeSheetText_((shared[f] || '').toString().trim()); });
 
     const variantsIn = Array.isArray(payload.variants) ? payload.variants : [];
@@ -1600,6 +2031,7 @@ function updateProductGroup(payload, secureUser, ss) {
     if (!shared['Marketing Model']) throw new Error("กรุณาระบุ Marketing Model");
     if (!sharedCapacity) throw new Error("กรุณาระบุความจุ");
 
+    ensureProductSpecColumns_(ss);
     const sheet = ss.getSheetByName("Products");
     if (!sheet) throw new Error("ไม่พบชีต Products");
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
@@ -1834,7 +2266,7 @@ function saveSettingsItem(payload, secureUser, ss) {
         if (!found) {
           const newRow = sheet.getLastRow() + 1;
           // Remark map ตาม key — path นี้เป็น key-value generic ไม่ได้มีแค่ค่าจองแล้ว (รอบ 11 เพิ่ม DriveFolderId)
-          const remarkMap = { ReserveStart: 'วันเริ่มจองสินค้า', ReserveEnd: 'วันสิ้นสุดจองสินค้า', DriveFolderId: 'โฟลเดอร์ Drive เก็บรูปอัปโหลด', SystemName: 'ชื่อเว็บแอป (แสดงบนแท็บเบราว์เซอร์/หน้า login/เมนู — ใช้ตอนนำไปสำเนาใช้กับร้าน/แบรนด์อื่น)', LogoUrl: 'โลโก้เว็บแอป (แสดงหน้า login/แถบเมนู/ส่วนท้าย)', InvoiceCompanyName: 'ชื่อบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyAddress: 'ที่อยู่บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyEmail: 'อีเมลติดต่อ (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceLogoUrl: 'โลโก้บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', ApproverSignatureUrl: 'รูปลายเซ็นผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)', ApproverName: 'ชื่อผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)' };
+          const remarkMap = { ReserveStart: 'วันเริ่มจองสินค้า', ReserveEnd: 'วันสิ้นสุดจองสินค้า', FlashCampaignTitle: 'ข้อความแคมเปญบนแถบ Flash Sale หน้า POS', LowStockThreshold: 'เกณฑ์แจ้งเตือนสต๊อกใกล้หมด (ชิ้น)', WebhookUrl: 'Webhook URL แจ้งเตือนเมื่อมีใบจองใหม่หรือสต๊อกใกล้หมด', DriveFolderId: 'โฟลเดอร์ Drive เก็บรูปอัปโหลด', SystemName: 'ชื่อเว็บแอป (แสดงบนแท็บเบราว์เซอร์/หน้า login/เมนู — ใช้ตอนนำไปสำเนาใช้กับร้าน/แบรนด์อื่น)', LogoUrl: 'โลโก้เว็บแอป (แสดงหน้า login/แถบเมนู/ส่วนท้าย)', InvoiceCompanyName: 'ชื่อบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyAddress: 'ที่อยู่บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyEmail: 'อีเมลติดต่อ (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceLogoUrl: 'โลโก้บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', ApproverSignatureUrl: 'รูปลายเซ็นผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)', ApproverName: 'ชื่อผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)' };
           sheet.getRange(newRow, 2).setNumberFormat('@');
           sheet.getRange(newRow, 1, 1, 3).setValues([[key, val, remarkMap[key] || key]]);
         }

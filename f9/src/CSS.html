@@ -641,13 +641,217 @@
     border-radius: inherit;
   }
 
-  /* === 6A POS storefront — scoped ด้วย .pos-storefront เท่านั้น ห้ามรั่วไปหน้าอื่น === */
+  /* === 6A POS storefront & BNN Flash Sale Theme — scoped ด้วย .pos-storefront / .bnn-flash-shell เท่านั้น ห้ามรั่วไปหน้าอื่น === */
+  .bnn-flash-shell {
+    --bnn-yellow: #FFD100;
+    --bnn-yellow-hover: #F5C400;
+    --bnn-dark: #141416;
+    --bnn-dark-soft: #1F2026;
+    --bnn-red: #E11D48;
+    --bnn-orange: #FF5722;
+  }
+
+  /* แถบแบนเนอร์หัวหน้า BNN Flash Sale พร้อมไฟวิ่ง + ลายเฉียงสปอร์ต */
+  .bnn-flash-banner {
+    background: linear-gradient(135deg, #111216 0%, #1c1d24 55%, #2b131b 100%);
+    border: 1px solid rgba(255, 209, 0, 0.28);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 25px -6px rgba(17, 18, 22, 0.25);
+  }
+  .bnn-flash-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #FFD100 0%, #FF6B00 50%, #E11D48 100%);
+    z-index: 2;
+  }
+  .bnn-flash-banner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 209, 0, 0.03) 0px,
+      rgba(255, 209, 0, 0.03) 10px,
+      transparent 10px,
+      transparent 20px
+    );
+    pointer-events: none;
+  }
+
+  .bnn-flash-emblem {
+    background: linear-gradient(135deg, #FFD100 0%, #FFAE00 100%);
+    color: #111216;
+    transform: skewX(-8deg);
+    box-shadow: 0 4px 14px rgba(255, 209, 0, 0.35);
+  }
+  .bnn-flash-emblem > * {
+    transform: skewX(8deg);
+  }
+
+  .bnn-timer-box {
+    background: #ffffff;
+    color: #111216;
+    border-bottom: 2px solid #FFD100;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+  .bnn-timer-box.bnn-timer-sec {
+    background: #E11D48;
+    color: #ffffff;
+    border-bottom-color: #ff8fa3;
+  }
+
+  /* แถบ Category Pills สไตล์ BNN */
+  .pos-storefront .bnn-cat-pill {
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .pos-storefront .bnn-cat-pill:hover {
+    border-color: #141416;
+    transform: translateY(-1px);
+  }
+  .pos-storefront .bnn-cat-pill.active {
+    background: #141416 !important;
+    color: #FFD100 !important;
+    border-color: #141416 !important;
+    box-shadow: 0 4px 12px rgba(20, 20, 22, 0.18);
+  }
+
+  /* การ์ดสินค้า BNN Flash Sale */
   .pos-storefront .pos-card {
-    transition: box-shadow .2s ease, transform .2s ease;
+    transition: box-shadow 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease;
+    border: 1px solid #e2e8f0;
   }
   .pos-storefront .pos-card:hover {
-    box-shadow: 0 8px 24px rgba(15, 23, 42, .08);
+    transform: translateY(-4px);
+    border-color: #FFD100;
+    box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(255, 209, 0, 0.55);
   }
+
+  /* ป้ายลดราคา BNN มุมซ้ายบน */
+  .pos-storefront .bnn-discount-badge {
+    background: linear-gradient(135deg, #E11D48 0%, #FF4D2D 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);
+  }
+  .pos-storefront .bnn-deal-badge {
+    background: #FFD100;
+    color: #141416;
+    box-shadow: 0 2px 6px rgba(255, 209, 0, 0.35);
+  }
+
+  /* หลอดสต๊อก Flash Sale Progress Bar (Sold / Remaining Meter) */
+  .pos-storefront .bnn-stock-bar {
+    height: 18px;
+    border-radius: 9999px;
+    background: #fee2e2;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(225, 29, 72, 0.16);
+  }
+  .pos-storefront .bnn-stock-bar-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #FF7A00 0%, #E11D48 100%);
+    transition: width 0.4s ease;
+  }
+  .pos-storefront .bnn-stock-bar-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.18) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.18) 50%,
+      rgba(255, 255, 255, 0.18) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 16px 16px;
+  }
+  .pos-storefront .bnn-stock-bar-label {
+    position: relative;
+    z-index: 2;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 16px;
+    text-align: center;
+    color: #881337;
+    letter-spacing: 0.01em;
+    text-shadow: 0 0 6px rgba(255, 255, 255, 0.85);
+  }
+  .pos-storefront .bnn-stock-bar.hot .bnn-stock-bar-label {
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+  .pos-storefront .bnn-stock-bar.oos {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+  }
+  .pos-storefront .bnn-stock-bar.oos .bnn-stock-bar-label {
+    color: #64748b;
+    text-shadow: none;
+  }
+
+  /* ปุ่มสั่งจอง BNN Yellow + Black */
+  .pos-storefront .bnn-buy-btn {
+    background: #FFD100;
+    color: #141416;
+    border: 1px solid #f2c200;
+    box-shadow: 0 2px 6px rgba(255, 209, 0, 0.28);
+    transition: all 0.18s ease;
+  }
+  .pos-storefront .bnn-buy-btn:hover {
+    background: #141416;
+    color: #FFD100;
+    border-color: #141416;
+    box-shadow: 0 4px 12px rgba(20, 20, 22, 0.22);
+    transform: translateY(-1px);
+  }
+  .pos-storefront .bnn-buy-btn:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  /* คูปองส่วนลด BNN Voucher Card (รอยปรุตั๋วด้านข้าง) */
+  .bnn-voucher-card {
+    position: relative;
+    background: linear-gradient(135deg, #fffdf5 0%, #fffbeb 100%);
+    border: 1px solid #fde68a;
+    border-left: 4px solid #E11D48;
+    border-radius: 12px;
+    transition: all 0.18s ease;
+  }
+  .bnn-voucher-card:hover {
+    border-color: #f59e0b;
+    border-left-color: #E11D48;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px -3px rgba(225, 29, 72, 0.12);
+  }
+  .bnn-voucher-card.applied {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border-color: #6ee7b7;
+    border-left-color: #059669;
+  }
+
+  /* ปุ่มเปรียบเทียบสินค้าบนการ์ด */
+  .pos-storefront .bnn-compare-btn {
+    transition: all 0.15s ease;
+  }
+  .pos-storefront .bnn-compare-btn.active {
+    background: #141416 !important;
+    color: #FFD100 !important;
+    border-color: #FFD100 !important;
+  }
+
   .pos-storefront .color-dot {
     position: relative;
   }
@@ -871,5 +1075,54 @@
     html.dark .shadow, html.dark .shadow-md { box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45) !important; }
     html.dark .shadow-lg { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important; }
     html.dark .shadow-xl { box-shadow: 0 20px 40px rgba(0, 0, 0, 0.55) !important; }
+
+    /* BNN Flash Sale Storefront Dark Mode Overrides */
+    html.dark .pos-storefront .pos-card {
+      border-color: #334155;
+      background-color: #1e293b !important;
+    }
+    html.dark .pos-storefront .pos-card:hover {
+      border-color: #FFD100;
+      box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 209, 0, 0.6);
+    }
+    html.dark .pos-storefront .bnn-cat-pill.active {
+      background: #FFD100 !important;
+      color: #141416 !important;
+      border-color: #FFD100 !important;
+    }
+    html.dark .pos-storefront .bnn-cat-pill.active span {
+      color: #141416 !important;
+    }
+    html.dark .pos-storefront .bnn-stock-bar {
+      background: rgba(225, 29, 72, 0.2);
+      border-color: rgba(225, 29, 72, 0.35);
+    }
+    html.dark .pos-storefront .bnn-stock-bar-label {
+      color: #fecdd3;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    }
+    html.dark .pos-storefront .bnn-stock-bar.oos {
+      background: #334155;
+      border-color: #475569;
+    }
+    html.dark .pos-storefront .bnn-stock-bar.oos .bnn-stock-bar-label {
+      color: #94a3b8;
+      text-shadow: none;
+    }
+    html.dark .pos-storefront .bnn-buy-btn:hover {
+      background: #ffffff;
+      color: #141416;
+      border-color: #ffffff;
+    }
+    html.dark .bnn-voucher-card {
+      background: linear-gradient(135deg, #1e293b 0%, #263449 100%);
+      border-color: #475569;
+      border-left-color: #E11D48;
+    }
+    html.dark .bnn-voucher-card.applied {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.16) 0%, rgba(16, 185, 129, 0.24) 100%);
+      border-color: rgba(52, 211, 153, 0.45);
+      border-left-color: #34d399;
+    }
   }
 </style>
