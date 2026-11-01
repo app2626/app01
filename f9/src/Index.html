@@ -615,6 +615,11 @@
                   <div id="cartPromosContainer" class="space-y-2 mb-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                      <!-- Dropdowns populated dynamically -->
                   </div>
+                  <div class="flex items-center gap-2 mb-2">
+                     <input type="text" id="cartCouponInput" maxlength="40" autocomplete="off" placeholder="กรอกโค้ดคูปอง เช่น NEWYEAR500" onkeydown="if(event.key==='Enter'){event.preventDefault();window.app.pos.applyCouponCode();}" class="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                     <button type="button" onclick="window.app.pos.applyCouponCode()" class="shrink-0 px-3 py-2 bg-[#141416] text-[#FFD100] hover:bg-slate-800 rounded-xl text-xs font-black shadow-sm transition-all">ใช้โค้ด</button>
+                  </div>
+                  <div id="cartCouponChips" class="flex flex-wrap gap-1.5 mb-2 empty:hidden"></div>
                   <button type="button" onclick="window.app.pos.addPromoRow()" class="w-full py-2 border border-dashed border-slate-300 text-slate-700 hover:text-black hover:bg-amber-50/60 hover:border-amber-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 mb-3 shadow-sm">
                      <i class="fas fa-tag text-[#E11D48]"></i> เพิ่มโค้ด/ส่วนลดท้ายบิล
                   </button>

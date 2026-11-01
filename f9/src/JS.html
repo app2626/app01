@@ -33,6 +33,7 @@ window.app = {
           { id: 'giftmappings', icon: 'fa-project-diagram', label: 'Set Premium', roles: ['Admin', 'Manager'] },
           { id: 'autopromotions', icon: 'fa-magic', label: 'Auto Promotions', roles: ['Admin', 'Manager'] },
           { id: 'promotions', icon: 'fa-tags', label: 'Promotions', roles: ['Admin'] },
+          { id: 'coupons', icon: 'fa-ticket-alt', label: 'Coupons (โค้ดส่วนลด)', roles: ['Admin'] },
           { id: 'interests', icon: 'fa-heart', label: 'Interests', roles: ['Admin'] },
           { label: 'ตั้งค่าระบบ', isCategory: true, roles: ['Admin'] },
           { id: 'systemsettings', icon: 'fa-sliders-h', label: 'ตั้งค่าระบบ', roles: ['Admin'] },
@@ -239,20 +240,20 @@ window.app = {
   },
 
   formatImageUrl: function(url, size='w500') {
-    if (!url || url.trim() === '-' || url.trim() === '') return "https://via.placeholder.com/150?text=No+Image";
+    if (!url || url.trim() === '-' || url.trim() === '') return "https:\/\/via.placeholder.com/150?text=No+Image";
     if (url.includes(',')) url = url.split(',')[0].trim();
     const driveRegex = /(?:drive\.google\.com\/.*[?&]id=|drive\.google\.com\/file\/d\/)([^/?&]+)/;
     const match = url.match(driveRegex);
-    if (match && match[1]) return 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=' + size;
+    if (match && match[1]) return 'https:\/\/drive.google.com/thumbnail?id=' + match[1] + '&sz=' + size;
     return url;
   },
   parseImageUrls: function(urlsStr) {
-    if (!urlsStr || urlsStr.trim() === '-' || urlsStr.trim() === '') return ["https://via.placeholder.com/150?text=No+Image"];
+    if (!urlsStr || urlsStr.trim() === '-' || urlsStr.trim() === '') return ["https:\/\/via.placeholder.com/150?text=No+Image"];
     return urlsStr.split(',').map(u => {
         let trimmed = u.trim();
         if (!trimmed) return null;
         const match = trimmed.match(/(?:drive\.google\.com\/.*[?&]id=|drive\.google\.com\/file\/d\/)([^/?&]+)/);
-        return (match && match[1]) ? 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=w1000' : trimmed;
+        return (match && match[1]) ? 'https:\/\/drive.google.com/thumbnail?id=' + match[1] + '&sz=w1000' : trimmed;
     }).filter(u => u);
   },
   // แทนที่ไอคอนโลโก้เริ่มต้น (fa-layer-group) ด้วยรูปโลโก้เว็บแอปที่ตั้งค่าไว้ (Settings key "LogoUrl") — ไม่ตั้งค่า = ปล่อยไอคอนเดิมไว้เฉยๆ ไม่ยุ่ง
@@ -469,7 +470,7 @@ window.app = {
      
      // แยก style/เนื้อหาใบจองออกจาก wrapper เอกสารเต็ม — ใช้ร่วมกันทั้ง 2 เส้นทางด้านล่าง (popup+print บนจอใหญ่, สร้างไฟล์ PDF บนมือถือ/แท็บเลต)
      const styleBlock = `
-         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+         @import url('https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
          body { font-family: 'Sarabun', 'Helvetica', sans-serif; margin: 0; padding: 20px; color: #1e293b; background: #fff; }
          .receipt-container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e293b; padding-bottom: 15px; }
@@ -1530,6 +1531,7 @@ window.app = {
             { key: 'Accessible Menus', label: 'สิทธิ์การเข้าถึงเมนู (* = ให้ทั้งหมด)', type: 'multi_select_menu' }
         ]); break;
         case 'promotions': window.app.grid.init('Promotions', 'Promo ID', [{ key: 'Promo ID', label: 'ID (สร้างอัตโนมัติ เช่น P-001)', type: 'text' }, { key: 'Promo Name', label: 'Name', type: 'text' }, { key: 'Discount Type', label: 'Type', type: 'select', options: ['Fixed', 'Percent'] }, { key: 'Value', label: 'Value', type: 'number' }, { key: 'Status', label: 'Status', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
+        case 'coupons': window.app.grid.init('Coupons', 'Code', [{ key: 'Code', label: 'โค้ดคูปอง (เช่น NEWYEAR500)', type: 'text' }, { key: 'Description', label: 'รายละเอียด', type: 'text' }, { key: 'Discount Type', label: 'Type', type: 'select', options: ['Fixed', 'Percent'] }, { key: 'Value', label: 'Value (บาท หรือ %)', type: 'number' }, { key: 'Min Spend', label: 'ยอดซื้อขั้นต่ำ', type: 'number' }, { key: 'Max Uses', label: 'ใช้ได้สูงสุด (0 = ไม่จำกัด)', type: 'number' }, { key: 'Used Count', label: 'ใช้ไปแล้ว', type: 'number' }, { key: 'Start Date', label: 'เริ่ม (yyyy-mm-dd)', type: 'text' }, { key: 'Expiry Date', label: 'หมดอายุ (yyyy-mm-dd)', type: 'text' }, { key: 'Status', label: 'Status', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
         case 'inventorylog': window.app.grid.init('InventoryLog', 'Log ID', [{ key: 'Log ID', label: 'Log ID', type: 'readonly' }, { key: 'Timestamp', label: 'Date', type: 'readonly' }, { key: 'SKU', label: 'SKU', type: 'readonly' }, { key: 'Action', label: 'Action', type: 'readonly' }, { key: 'Qty', label: 'Qty', type: 'readonly' }, { key: 'Branch', label: 'Branch', type: 'readonly' }, { key: 'User', label: 'User', type: 'readonly' }], true); break;
         case 'auditlog': window.app.grid.init('AuditLog', 'Log ID', [{ key: 'Log ID', label: 'Log ID', type: 'readonly' }, { key: 'Timestamp', label: 'Date', type: 'readonly' }, { key: 'User', label: 'User', type: 'readonly' }, { key: 'Action', label: 'Action', type: 'readonly' }, { key: 'Details', label: 'Details', type: 'readonly' }], true); break;
         case 'invoice': 
@@ -4030,9 +4032,9 @@ window.app = {
       
       let optionsHtml = '<option value="">-- ไม่ใช้ส่วนลด --</option>';
       window.app.globalData.promotions.forEach(p => {
-        if(p.Status === 'เปิด') {
+        if(['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase())) {
           // โปร Percent เก็บชนิดไว้ใน data attribute — มูลค่าส่วนลดจริงคำนวณจาก subtotal ใน getPromoDiscounts
-          const dType = (p['Discount Type'] || 'Fixed').toString().trim();
+          const dType = /percent|%/i.test((p['Discount Type'] || '').toString()) ? 'Percent' : 'Fixed';
           const dVal = parseFloat((p.Value || 0).toString().replace(/[^\d.\-]/g, '')) || 0;
           const label = dType === 'Percent' ? p['Promo Name'] + ' (' + dVal + '%)' : p['Promo Name'];
           optionsHtml += `<option value="${dVal}" data-dtype="${window.app.esc(dType)}" data-name="${window.app.esc(p['Promo Name'])}">${window.app.esc(label)}</option>`;
@@ -4060,7 +4062,67 @@ window.app = {
     },
     // แหล่งความจริงเดียวของส่วนลดจาก dropdown (ใช้ทั้ง updateTotal และ submitCheckout)
     // Fixed = จำนวนบาทตรงๆ / Percent = pct% ของยอดรวมสินค้าในตะกร้า ณ ขณะนั้น
+    // โค้ดคูปองที่ตรวจผ่านแล้วในตะกร้า — เก็บ {code, type, value, minSpend} มูลค่าส่วนลดคำนวณใหม่จากยอดตะกร้าเสมอ (server ตรวจซ้ำตอนจอง)
+    appliedCoupons: [],
+    getCartSubtotal: function() {
+      let subtotal = 0;
+      this.cartData.forEach(i => { let pr = parseFloat((i.Price||'0').toString().replace(/[^\d.\-]/g,'')); subtotal += (isNaN(pr)?0:pr) * i.qty; });
+      return subtotal;
+    },
+    getCouponDiscounts: function() {
+      const subtotal = this.getCartSubtotal();
+      const list = [];
+      (this.appliedCoupons || []).forEach(c => {
+        if (c.minSpend > 0 && subtotal < c.minSpend) return;
+        let v = c.type === 'Percent' ? (subtotal * c.value / 100) : c.value;
+        v = Math.min(Math.round(v * 100) / 100, subtotal);
+        if (v > 0) list.push({ name: 'COUPON:' + c.code, value: v });
+      });
+      return list;
+    },
     getPromoDiscounts: function() {
+      return this.getSelectPromoDiscounts().concat(this.getCouponDiscounts());
+    },
+    applyCouponCode: async function() {
+      const inp = document.getElementById('cartCouponInput');
+      if (!inp) return;
+      const code = inp.value.trim().toUpperCase();
+      if (!code) return;
+      if ((this.appliedCoupons || []).some(c => c.code.toUpperCase() === code)) {
+        return Swal.fire('แจ้งเตือน', 'ใช้โค้ดนี้ในตะกร้าแล้ว', 'info');
+      }
+      const subtotal = this.getCartSubtotal();
+      if (subtotal <= 0) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกสินค้าลงตะกร้าก่อนใช้โค้ดคูปอง', 'info');
+      try {
+        const res = await window.app.api('VALIDATE_COUPON', { code: code, subtotal: subtotal });
+        if (!res || res.status !== 'success') {
+          return Swal.fire('ใช้โค้ดไม่ได้', (res && res.message) ? res.message : 'ตรวจสอบโค้ดไม่สำเร็จ', 'warning');
+        }
+        this.appliedCoupons.push({ code: res.coupon.code, type: res.coupon.type, value: res.coupon.value, minSpend: res.coupon.minSpend || 0 });
+        inp.value = '';
+        this.renderCouponChips();
+        this.updateTotal();
+        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200 }).fire({ icon: 'success', title: 'ใช้โค้ด ' + res.coupon.code + ' ลด ฿' + Number(res.coupon.discount).toLocaleString() });
+      } catch (e) {
+        Swal.fire('ระบบขัดข้อง', 'ตรวจสอบโค้ดไม่สำเร็จ กรุณาลองใหม่', 'error');
+      }
+    },
+    removeCoupon: function(code) {
+      this.appliedCoupons = (this.appliedCoupons || []).filter(c => c.code !== code);
+      this.renderCouponChips();
+      this.updateTotal();
+    },
+    renderCouponChips: function() {
+      const box = document.getElementById('cartCouponChips');
+      if (!box) return;
+      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      box.innerHTML = (this.appliedCoupons || []).map(c =>
+        '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-black text-emerald-700"><i class="fas fa-ticket-alt"></i>' + esc(c.code) +
+        ' <span class="font-bold text-emerald-600">(' + (c.type === 'Percent' ? c.value + '%' : '฿' + Number(c.value).toLocaleString()) + ')</span>' +
+        '<button type="button" onclick="window.app.pos.removeCoupon(\'' + escJs(c.code) + '\')" class="ml-0.5 text-rose-500 hover:text-rose-700" title="ยกเลิกโค้ด"><i class="fas fa-times"></i></button></span>'
+      ).join('');
+    },
+    getSelectPromoDiscounts: function() {
       let subtotal = 0;
       this.cartData.forEach(i => { let pr = parseFloat((i.Price||'0').toString().replace(/[^\d.\-]/g,'')); subtotal += (isNaN(pr)?0:pr) * i.qty; });
       const list = [];
@@ -4202,7 +4264,7 @@ window.app = {
       const vWrap = document.getElementById('posVoucherStripWrap');
       if (!vWrap) return;
       const esc = window.app.esc, escJs = window.app.escAttrJs;
-      const promos = (window.app.globalData.promotions || []).filter(p => p.Status === 'เปิด');
+      const promos = (window.app.globalData.promotions || []).filter(p => ['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase()));
 
       // ตรวจสอบว่ามีโปรโมชั่นใดถูกเลือกอยู่ในตะกร้าแล้วบ้าง
       const selectedNames = [];
@@ -4223,7 +4285,7 @@ window.app = {
       if (promos.length > 0) {
         promos.forEach(p => {
           const name = (p['Promo Name'] || '').toString().trim();
-          const dType = (p['Discount Type'] || 'Fixed').toString().trim();
+          const dType = /percent|%/i.test((p['Discount Type'] || '').toString()) ? 'Percent' : 'Fixed';
           const dVal = parseFloat((p.Value || 0).toString().replace(/[^\d.\-]/g, '')) || 0;
           const isApplied = selectedNames.includes(name);
           const badgeVal = dType === 'Percent' ? ('ลด ' + dVal + '%') : ('ลด ฿' + dVal.toLocaleString());
@@ -4376,7 +4438,7 @@ window.app = {
       const el = document.getElementById('posRecentlyViewed');
       if (!el) return;
       const esc = window.app.esc, escJs = window.app.escAttrJs;
-      const prods = (window.app.globalData.products || []).filter(p => p.Status === 'เปิด');
+      const prods = (window.app.globalData.products || []).filter(p => ['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase()));
       const items = (this.recentSkus || []).map(sku => prods.find(p => p.SKU == sku)).filter(Boolean);
 
       if (items.length === 0) {
@@ -4664,7 +4726,7 @@ window.app = {
     },
 
     resolveCardKeyProduct: function(cardKey) {
-      const prods = (window.app.globalData.products || []).filter(p => p.Status === 'เปิด');
+      const prods = (window.app.globalData.products || []).filter(p => ['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase()));
       if (cardKey.startsWith('SKU:')) {
         const sku = cardKey.substring(4);
         const p = prods.find(x => x.SKU == sku);
@@ -4930,7 +4992,7 @@ window.app = {
       if (!area) return;
       const win = window.open('', '_blank', 'width=960,height=720');
       if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์ตารางเปรียบเทียบ', 'info');
-      win.document.write('<html><head><title>ตารางเปรียบเทียบสเปคสินค้า Flash Sale</title><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:20px;}</style></head><body><h2 class="text-lg font-black mb-3">⚡ ตารางเปรียบเทียบสเปค ราคา และของแถม Flash Sale</h2>' + area.outerHTML + '<script>setTimeout(()=>window.print(),600);<\/script></body></html>');
+      win.document.write('<html><head><title>ตารางเปรียบเทียบสเปคสินค้า Flash Sale</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:20px;}</style></head><body><h2 class="text-lg font-black mb-3">⚡ ตารางเปรียบเทียบสเปค ราคา และของแถม Flash Sale</h2>' + area.outerHTML + '<script>setTimeout(()=>window.print(),600);<\/script></body></html>');
       win.document.close();
     },
     filterTimer: null,
@@ -4987,7 +5049,7 @@ window.app = {
       this.openPopover = null;
       const esc = window.app.esc, escJs = window.app.escAttrJs;
       const f = this.storeFilters;
-      const prods = (window.app.globalData.products || []).filter(p => p.Status === 'เปิด');
+      const prods = (window.app.globalData.products || []).filter(p => ['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase()));
 
       // --- แถว 1: BNN Flash Sale Category Pills (ทั้งหมด ซ้ายสุด + รูปสินค้าตัวแทนของหมวด) ---
       const cats = [...new Set(prods.map(p => (p.Category || '').trim()).filter(Boolean))];
@@ -5369,7 +5431,7 @@ window.app = {
       card += '    <div class="relative h-[145px] md:h-[160px] p-3 pt-8 flex items-center justify-center bg-white border-b border-slate-100/80 overflow-hidden">';
       card +=        soldOutOverlay;
       card +=        compareBtnHtml;
-      card += '      <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://via.placeholder.com/150?text=No+Image\';" alt="' + esc(pName) + '" class="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105' + (outOfStock ? ' grayscale opacity-60' : '') + '">';
+      card += '      <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https:\/\/via.placeholder.com/150?text=No+Image\';" alt="' + esc(pName) + '" class="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105' + (outOfStock ? ' grayscale opacity-60' : '') + '">';
       card += '    </div>';
       card += '    <div class="p-3 flex flex-col flex-1 gap-1.5">';
       card += '      <div class="font-extrabold text-slate-900 text-xs md:text-[14px] line-clamp-2 leading-snug min-h-[2.25rem]" title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
@@ -6133,6 +6195,7 @@ window.app = {
                   document.getElementsByName('resStatus').forEach(r => r.checked = false);
                   
                   const pContainer = document.getElementById('cartPromosContainer');
+                  window.app.pos.appliedCoupons = []; window.app.pos.renderCouponChips();
                   if(pContainer) {
                     pContainer.innerHTML = '';
                     window.app.pos.addPromoRow();
@@ -6510,7 +6573,8 @@ window.app = {
       if (!card) return;
       const win = window.open('', '_blank', 'width=800,height=700');
       if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์ใบเสนอราคา', 'info');
-      win.document.write('<html><head><title>ใบเสนอราคา Flash Sale</title><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:24px;}</style></head><body>' + card.outerHTML + '<script>setTimeout(()=>window.print(),600);<\/script></body></html>');
+      const html = '<html><head><title>ใบเสนอราคา Flash Sale</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:24px;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
+      win.document.write(html);
       win.document.close();
     },
 
@@ -6551,7 +6615,7 @@ window.app = {
           const stepIdx = (stLower.includes('complete') || stLower.includes('สำเร็จ') || stLower.includes('รับเครื่องแล้ว')) ? 4
                         : (stLower.includes('ready') || stLower.includes('พร้อมรับ')) ? 3
                         : (stLower.includes('confirm') || stLower.includes('ยืนยัน') || o.deposit > 0) ? 2 : 1;
-          const qrUrl = 'https://quickchart.io/qr?size=160&margin=1&text=' + encodeURIComponent(o.orderId + '|' + o.branch + '|NET:' + o.netTotal);
+          const qrUrl = 'https:\/\/quickchart.io/qr?size=160&margin=1&text=' + encodeURIComponent(o.orderId + '|' + o.branch + '|NET:' + o.netTotal);
           const steps = ['รับคำสั่งจอง', 'ล็อกสิทธิ์/มัดจำ', 'พร้อมรับที่สาขา', 'ส่งมอบสำเร็จ'];
 
           return `
@@ -7860,7 +7924,7 @@ window.app = {
             <div class="p-8 space-y-4">
               <div class="space-y-2">
                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Drive Folder ID หรือลิงก์โฟลเดอร์</label>
-                <input type="text" id="driveFolderIdInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.DriveFolderId) || '')}" placeholder="เช่น 1AbCdEfGhIjKlMnOpQrStUvWxYz หรือ https://drive.google.com/drive/folders/...">
+                <input type="text" id="driveFolderIdInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.DriveFolderId) || '')}" placeholder="เช่น 1AbCdEfGhIjKlMnOpQrStUvWxYz หรือ https:\/\/drive.google.com/drive/folders/...">
                 <p class="text-[11px] text-slate-400 leading-relaxed">เปิดโฟลเดอร์ใน Google Drive แล้วคัดลอกลิงก์มาวางได้เลย ระบบจะดึง ID ให้อัตโนมัติ — เว้นว่างเพื่อใช้โฟลเดอร์อัตโนมัติ (MPOS Product Images)</p>
               </div>
               <div class="flex justify-end pt-2 border-t border-slate-100">
@@ -7973,10 +8037,18 @@ window.app = {
                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
                   <i class="fas fa-bell text-emerald-600 mr-1.5 text-xs"></i> Webhook URL แจ้งเตือนออเดอร์ใหม่ & สต๊อกใกล้หมด (Discord / Slack / Google Chat / Make)
                 </label>
-                <input type="url" id="webhookUrlInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${webhookUrl}" placeholder="https://discord.com/api/webhooks/... หรือ Webhook URL อื่นๆ (เว้นว่างหากไม่ใช้งาน)">
+                <input type="url" id="webhookUrlInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${webhookUrl}" placeholder="https:\/\/discord.com/api/webhooks/... หรือ Webhook URL อื่นๆ (เว้นว่างหากไม่ใช้งาน)">
                 <p class="text-[11px] text-slate-400">เมื่อมีการจองสำเร็จ ระบบจะยิง JSON (text, content, orderId, netTotal, lowStockWarnings) ไปยัง URL นี้อัตโนมัติ</p>
               </div>
               
+              <div class="bg-amber-50/60 border border-amber-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <h4 class="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center"><i class="fas fa-broom mr-1.5"></i> ล้างแคชข้อมูล</h4>
+                  <p class="text-[11px] text-slate-500 mt-1">ใช้หลังแก้ไขชีต Products / Promotions / Coupons ตรงๆ ใน Google Sheets เพื่อให้หน้า POS เห็นข้อมูลล่าสุดทันที (ปกติแคชค้าง 6 ชั่วโมง)</p>
+                </div>
+                <button type="button" onclick="window.app.settingsManager.clearCache()" class="shrink-0 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center"><i class="fas fa-sync-alt mr-2"></i> ล้างแคชตอนนี้</button>
+              </div>
+
               <div class="bg-indigo-50/50 border border-indigo-100/50 rounded-2xl p-5 space-y-3">
                 <h4 class="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center"><i class="fas fa-info-circle mr-1.5"></i> คำแนะนำการทำงานของระบบ</h4>
                 <ul class="text-xs text-slate-600 space-y-2 pl-5 list-disc leading-relaxed">
@@ -8004,7 +8076,7 @@ window.app = {
             </div>
             <div class="p-8 space-y-6">
               <div class="h-[240px] w-full rounded-2xl border border-slate-200 bg-slate-100 flex items-center justify-center overflow-hidden relative group">
-                <img id="loginBgPreview" src="${previewUrl}" class="max-h-full max-w-full object-cover w-full h-full transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/600x300?text=No+Preview+Available'">
+                <img id="loginBgPreview" src="${previewUrl}" class="max-h-full max-w-full object-cover w-full h-full transition-transform duration-300 group-hover:scale-105" onerror="this.src='https:\/\/via.placeholder.com/600x300?text=No+Preview+Available'">
                 <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <span class="text-white text-xs font-bold bg-slate-900/80 px-3 py-1.5 rounded-full"><i class="fas fa-search-plus mr-1"></i> ภาพตัวอย่าง</span>
                 </div>
@@ -8013,7 +8085,7 @@ window.app = {
               <div class="space-y-2">
                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">ลิงก์รูปภาพ (Image URL)</label>
                 <div class="flex gap-2">
-                  <input type="text" id="loginBgUrlInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${bgUrl}" placeholder="วาง URL ของรูปภาพ เช่น https://images.unsplash.com/... หรือ Google Drive link" oninput="document.getElementById('loginBgPreview').src = window.app.formatImageUrl(this.value)">
+                  <input type="text" id="loginBgUrlInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${bgUrl}" placeholder="วาง URL ของรูปภาพ เช่น https:\/\/images.unsplash.com/... หรือ Google Drive link" oninput="document.getElementById('loginBgPreview').src = window.app.formatImageUrl(this.value)">
                   <button type="button" id="loginBgUpBtn" class="px-4 py-3 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('loginBgFile').click()"><i class="fas fa-upload mr-1"></i> อัปโหลด</button>
                   <input type="file" id="loginBgFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'loginBg', function(localUrl){ const p=document.getElementById('loginBgPreview'); if(p) p.src=localUrl; window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึกข้อมูล'); })">
                 </div>
@@ -8062,7 +8134,7 @@ window.app = {
             <div class="space-y-1.5">
               <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide"><i class="fas fa-image text-indigo-400 w-3 text-center"></i> รูปภาพ (Image URL) *</label>
               <div class="flex gap-2">
-                <input type="text" id="newBannerUrl" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="https://...">
+                <input type="text" id="newBannerUrl" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="https:\/\/...">
                 <button type="button" id="newBannerUpBtn" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('newBannerFile').click()"><i class="fas fa-upload"></i></button>
                 <input type="file" id="newBannerFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'newBanner', function(localUrl){ const pv=document.getElementById('newBannerPreview'); if(pv){ pv.src=localUrl; pv.classList.remove('hidden'); } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
               </div>
@@ -8119,7 +8191,7 @@ window.app = {
             cardsHtml += `
               <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-all duration-300">
                 <div class="h-[160px] bg-slate-100 overflow-hidden relative group">
-                  <img id="bannerImg-${item.rowIndex}" src="${previewUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://via.placeholder.com/300x150?text=Invalid+Image+URL'">
+                  <img id="bannerImg-${item.rowIndex}" src="${previewUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https:\/\/via.placeholder.com/300x150?text=Invalid+Image+URL'">
                   <div class="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/70 text-white text-[10px] font-bold rounded-lg pointer-events-none">#${item.rowIndex}</div>
                   ${hasLink ? '<div class="absolute top-2 right-2 w-6 h-6 bg-white/90 text-indigo-600 rounded-lg flex items-center justify-center shadow-sm pointer-events-none" title="มีลิงก์ปลายทาง"><i class="fas fa-link text-[10px]"></i></div>' : ''}
                 </div>
@@ -8336,6 +8408,19 @@ window.app = {
       }
     },
     
+    clearCache: async function() {
+      try {
+        const res = await window.app.api('CLEAR_CACHE', {});
+        if (!res || res.status !== 'success') return Swal.fire('ล้างแคชไม่สำเร็จ', (res && res.message) ? res.message : 'เกิดข้อผิดพลาด', 'error');
+        try {
+          const fresh = await window.app.api('GET_ALL_DATA', {});
+          if (fresh && fresh.status === 'success') window.app.globalData = fresh;
+        } catch (e2) { /* โหลดใหม่ไม่ได้ก็ไม่เป็นไร รีเฟรชหน้าเองได้ */ }
+        Swal.fire('สำเร็จ', 'ล้างแคชเรียบร้อย หน้า POS จะใช้ข้อมูลล่าสุดจากชีต', 'success');
+      } catch (e) {
+        Swal.fire('ระบบขัดข้อง', 'ล้างแคชไม่สำเร็จ กรุณาลองใหม่', 'error');
+      }
+    },
     saveBookingSettings: async function() {
       const start = document.getElementById('reserveStartInput').value;
       const end = document.getElementById('reserveEndInput').value;

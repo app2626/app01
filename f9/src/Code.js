@@ -478,6 +478,11 @@ function apiHandler(action, payload, userToken) {
         if (payload.tableName === 'Target' && !['Admin', 'Manager'].includes(secureUser.Role)) {
           throw new Error("Permission Denied: Admin/Manager only");
         }
+        // Coupons: โค้ดส่วนลดเป็นความลับ — อ่านได้เฉพาะ Admin (ฝั่ง POS ตรวจโค้ดผ่าน VALIDATE_COUPON เท่านั้น)
+        if (payload.tableName === 'Coupons') {
+          if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
+          ensureCouponsSheet_(ss);
+        }
         if (payload.tableName === 'Products') {
           ensureProductSpecColumns_(ss);
         }
@@ -521,6 +526,10 @@ function apiHandler(action, payload, userToken) {
       case 'DELETE_INVOICE': return deleteInvoice(payload, secureUser, ss);
       case 'TRACK_ORDER': return trackOrderLookup(payload, secureUser, ss);
       case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts(payload, secureUser, ss);
+      case 'VALIDATE_COUPON': return validateCouponApi_(payload, ss);
+      case 'CLEAR_CACHE':
+        if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
+        return clearAllCaches_(secureUser);
       default: throw new Error("Invalid API Action");
     }
   } catch (error) {
@@ -1322,6 +1331,9 @@ function processCheckout(payload, secureUser, ss) {
       let autoBundleUsed = 0;
       // สะสมยอดใช้ต่อชื่อโปรโมชั่น — กัน client ส่งชื่อโปรเดิมซ้ำหลายแถวแล้วแต่ละแถวผ่านเพดานแยกกันเป็นเอกเทศ (เพดานจริงต้องนับรวมต่อโปรหนึ่งชื่อ)
       const promoUsed = {};
+      // โค้ดคูปอง (ชื่อส่วนลดขึ้นต้นด้วย COUPON:) — ตรวจกับชีต Coupons ฝั่ง server ทุกครั้ง และนับการใช้งานหลังบันทึกออเดอร์สำเร็จ
+      const couponRows = getTableDataAsJson(ss.getSheetByName("Coupons"), true);
+      var couponCodesUsed = [];
       discountsList.forEach(d => {
         let val = parseFloat(d.value || 0);
         if (!(val > 0)) return;
@@ -1329,12 +1341,21 @@ function processCheckout(payload, secureUser, ss) {
         if (dName.indexOf('Auto Bundle') > -1) {
           autoBundleUsed += val;
           if (autoBundleUsed > maxAutoTotal + 0.01) throw new Error("ส่วนลด Auto Bundle ไม่ตรงกับเงื่อนไขโปรโมชั่นของระบบ");
+        } else if (dName.indexOf('COUPON:') === 0) {
+          const cCode = dName.substring(7).trim();
+          if (couponCodesUsed.indexOf(cCode.toUpperCase()) > -1) throw new Error("ใช้โค้ดคูปองซ้ำในออเดอร์เดียวกันไม่ได้: " + cCode);
+          const goodsTotalC = Object.keys(catTotals).reduce((s, k) => s + catTotals[k], 0);
+          const ev = evaluateCoupon_(couponRows, cCode, goodsTotalC);
+          if (!ev.ok) throw new Error(ev.message);
+          if (val > ev.discount + 0.01) throw new Error("มูลค่าส่วนลดเกินที่คูปองกำหนด: " + cCode);
+          couponCodesUsed.push(cCode.toUpperCase());
         } else {
-          const promo = promoList.find(p => (p['Promo Name'] || '').toString().trim() === dName && (p.Status || '').toString().trim() === 'เปิด');
+          const promo = promoList.find(p => (p['Promo Name'] || '').toString().trim() === dName && ['เปิด', 'open', 'active', 'on', 'true'].includes((p.Status || '').toString().trim().toLowerCase()));
           if (!promo) throw new Error("ไม่พบโปรโมชั่นส่วนลด หรือโปรโมชั่นถูกปิดใช้งาน: " + dName);
-          const promoVal = parseFloat((promo.Value || 0).toString().replace(/,/g, '')) || 0;
+          // รองรับค่าที่มีสัญลักษณ์ เช่น "฿500", "10%", "1,000 บาท" ให้ตรงกับที่หน้า POS อ่านได้
+          const promoVal = parseFloat((promo.Value || 0).toString().replace(/[^\d.\-]/g, '')) || 0;
           // โปร Percent: เพดานส่วนลด = pct% ของยอดสินค้ารวมในออเดอร์ (ราคาจากชีต) — Fixed: เพดาน = Value ตรงๆ
-          const promoType = (promo['Discount Type'] || 'Fixed').toString().trim();
+          const promoType = /percent|%/i.test((promo['Discount Type'] || '').toString()) ? 'Percent' : 'Fixed';
           const goodsTotal = Object.keys(catTotals).reduce((s, k) => s + catTotals[k], 0);
           const maxVal = promoType === 'Percent' ? (goodsTotal * promoVal) / 100 : promoVal;
           promoUsed[dName] = (promoUsed[dName] || 0) + val;
@@ -1373,6 +1394,7 @@ function processCheckout(payload, secureUser, ss) {
     }
     
     logAudit(secureUser.Username, "CHECKOUT", "Created Order: " + orderId);
+    try { bumpCouponUsage_(ss, couponCodesUsed || []); } catch (cuErr) {}
     try {
       sendCheckoutWebhookNotification_(ss, orderId, actualChannel, actualBranch, payload, orderRows, prodData, skuIdx, nameIdx, stockIdx);
     } catch (whErr) {}
@@ -1831,6 +1853,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     if (tableName === 'Orders') throw new Error("Permission Denied: Orders แก้ไขได้ผ่านหน้าจัดการออเดอร์เท่านั้น");
     if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
     if (tableName === 'Products') ensureProductSpecColumns_(ss);
+    if (tableName === 'Coupons') ensureCouponsSheet_(ss);
     const sheet = ss.getSheetByName(tableName); const data = sheet.getDataRange().getDisplayValues(); const headers = data[0].map(h => h.toString().trim()); let idIndex = headers.indexOf(idField); let rowIndex = -1;
     // แก้ไข: ใช้ _rowIndex ที่ client ส่งมา (มาจากแถวจริงที่โหลดไว้ตอนเปิดฟอร์มแก้ไข) เป็นตัวชี้แถวหลัก แม่นยำกว่าไล่เทียบค่า ID เฉยๆ
     // สร้างใหม่ (ไม่มี _rowIndex ส่งมา): ถ้า ID ที่พิมพ์ตรงกับแถวที่มีอยู่แล้ว ต้อง "บล็อก" ไม่ใช่อัปเดตทับเงียบๆ — เดิมมีแค่เช็คฝั่ง client (saveForm, JS.html) ซึ่งข้ามได้ผ่านการยิง API ตรงๆ
@@ -1870,6 +1893,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
       "Interests": ["Interest Name"],
       "GiftMappings": ["Target Mobile (SKU or Group)", "Brand Gifts", "Channel Gifts"],
       "AutoPromotions": ["Message Suggest", "Message Apply"],
+      "Coupons": ["Code", "Description"],
       "Members": ["Name"]
     };
     const freeTextCols = SAVE_RECORD_FREE_TEXT_COLS_[tableName] || [];
