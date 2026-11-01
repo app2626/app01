@@ -200,7 +200,7 @@ window.app = {
       showConfirmButton: false, 
       width: 'auto',
       padding: '0',
-      html: '<div class="flex items-center space-x-2.5 px-4 h-full w-full"><svg class="animate-spin h-4 w-4 text-indigo-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-[13px] font-black text-indigo-900 tracking-wide whitespace-nowrap">' + (text || 'กำลังโหลดข้อมูล...') + '</span></div>',
+      html: '<div class="flex items-center space-x-2.5 px-4 h-full w-full"><svg class="animate-spin h-4 w-4 text-indigo-600 shrink-0" xmlns="http:\/\/www.w3.org\/2000\/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-[13px] font-black text-indigo-900 tracking-wide whitespace-nowrap">' + (text || 'กำลังโหลดข้อมูล...') + '</span></div>',
       customClass: { 
         popup: '!bg-white !shadow-[0_5px_20px_rgba(0,0,0,0.15)] !rounded-lg !border !border-slate-200 !h-[38px] !min-h-[38px] !max-h-[38px] !p-0 !flex !items-center !justify-center !mb-5 !mr-5',
         htmlContainer: '!m-0 !p-0 !h-full !flex !items-center'
@@ -4426,6 +4426,7 @@ window.app = {
       } else {
         zone.classList.remove('hidden');
         if (ico) ico.className = 'fas fa-chevron-up text-[9px]';
+        this.renderPosHeroAndVouchers();
       }
     },
 
@@ -4437,9 +4438,24 @@ window.app = {
       const vWrap = document.getElementById('posVoucherStripWrap');
       const esc = window.app.esc, escJs = window.app.escAttrJs;
 
-      let banners = (window.app.globalData.heroBanners || []).filter(b => b.Status === 'เปิด' && b['Image URL']);
+      const parseBannerObj = (b) => {
+        if (!b) return null;
+        if (typeof b === 'string') return { url: b.trim(), title: '', sub: '', link: '' };
+        const u = (b.url || b['Image URL'] || b.URL || '').toString().trim();
+        if (!u) return null;
+        const st = (b.status || b.Status || 'เปิด').toString().trim().toLowerCase();
+        if (st === 'deleted' || st === 'ปิด' || st === 'inactive') return null;
+        return {
+          url: u,
+          title: (b.title || b.Title || '').toString().trim(),
+          sub: (b.details || b.Subtitle || b.Details || '').toString().trim(),
+          link: (b.link || b.targetLink || b['Link URL'] || '').toString().trim()
+        };
+      };
+
+      let banners = (window.app.globalData.heroBanners || []).map(parseBannerObj).filter(Boolean);
       if (banners.length === 0) {
-        banners = (window.app.globalData.gridBanners || []).filter(b => b.Status === 'เปิด' && b['Image URL']);
+        banners = (window.app.globalData.gridBanners || []).map(parseBannerObj).filter(Boolean);
       }
 
       if (wrap && track && dots) {
@@ -4450,10 +4466,10 @@ window.app = {
           let slidesHtml = '';
           let dotsHtml = '';
           banners.forEach((b, idx) => {
-            const img = window.app.formatImageUrl(b['Image URL']);
-            const title = (b.Title || '').toString().trim();
-            const sub = (b.Subtitle || '').toString().trim();
-            const link = (b['Link URL'] || '').toString().trim();
+            const img = window.app.formatImageUrl(b.url);
+            const title = b.title || '';
+            const sub = b.sub || '';
+            const link = b.link || '';
             const clickAttr = link
               ? (link.startsWith('http') ? 'onclick="window.open(\'' + escJs(link) + '\',\'_blank\')"' : 'onclick="window.app.pos.applyBannerSearch(\'' + escJs(link) + '\')"')
               : (title ? 'onclick="window.app.pos.applyBannerSearch(\'' + escJs(title) + '\')"' : '');
@@ -4579,6 +4595,7 @@ window.app = {
 
       html += '</div></div>';
       vWrap.innerHTML = html;
+      vWrap.classList.remove('hidden');
     },
 
     applyVoucher: function(promoName) {
