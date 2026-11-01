@@ -5654,6 +5654,11 @@ window.app = {
       const compareBtnHtml = !isGift
         ? '<button type="button" class="bnn-compare-btn' + (isCompared ? ' active' : '') + ' absolute bottom-2 right-2 z-20 px-2 py-0.5 rounded-lg bg-white/95 border border-slate-200 text-[9px] font-extrabold text-slate-600 shadow-sm flex items-center gap-1 transition-all hover:border-slate-400" onclick="window.app.pos.toggleCompare(\'' + escJs(cardKey) + '\', event)" title="เปรียบเทียบสเปค"><i class="fas ' + (isCompared ? 'fa-check text-[#FFD100]' : 'fa-scale-balanced text-slate-400') + '"></i><span>' + (isCompared ? 'เทียบอยู่' : 'เทียบสเปค') + '</span></button>'
         : '';
+      const isFavorited = (this.wishlist || []).includes(variant.SKU);
+      const skuClean = (variant.SKU || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      const wishlistBtnHtml = !isGift
+        ? '<button type="button" class="btn-wishlist-' + skuClean + ' absolute bottom-2 left-2 z-20 w-7 h-7 rounded-lg bg-white/95 border border-slate-200 text-xs shadow-sm flex items-center justify-center transition-all hover:scale-110 ' + (isFavorited ? 'text-rose-500 border-rose-300 bg-rose-50/80' : 'text-slate-400 hover:text-rose-500') + '" onclick="window.app.pos.toggleWishlist(\'' + escJs(variant.SKU) + '\', event)" title="' + (isFavorited ? 'ลบออกจากรายการโปรด' : 'บันทึกเป็นรายการโปรด') + '"><i class="' + (isFavorited ? 'fas fa-heart text-rose-500 animate-pulse' : 'far fa-heart') + '"></i></button>'
+        : '';
 
       // หลอดไฟแสดงสถานะสต๊อก (BNN Flash Sale Stock Progress Bar)
       let stockBarHtml = '';
