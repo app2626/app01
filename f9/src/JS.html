@@ -1126,10 +1126,10 @@ window.app = {
 
       container.innerHTML = `
         <div id="publicPrintablePass" class="bg-white border-2 border-slate-900 rounded-3xl overflow-hidden shadow-lg animate-fade-in-up">
-          <div class="bg-[#141416] text-white p-5 border-b-4 border-[#FFD100]">
+          <div class="bg-[#141416] text-white p-5 border-b-4 border-[#FF6B00]">
              <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                   <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFD100] text-[#141416] text-[10px] font-black uppercase tracking-wider mb-1">
+                   <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF6B00] text-white text-[10px] font-black uppercase tracking-wider mb-1">
                      <i class="fas fa-bolt text-[#E11D48]"></i> DIGITAL BOOKING PASS
                    </div>
                    <h2 class="text-lg font-black text-white font-mono tracking-wide">${esc(o.orderId)}</h2>
@@ -1246,7 +1246,7 @@ window.app = {
                 </div>
 
                 <div class="w-full space-y-2 mt-4 pt-4 border-t border-amber-200/80">
-                   <button type="button" onclick="window.app.printPublicBookingPass()" class="w-full py-2.5 bg-[#141416] hover:bg-slate-800 text-[#FFD100] text-xs font-black rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all">
+                   <button type="button" onclick="window.app.printPublicBookingPass()" class="w-full py-2.5 bg-[#141416] hover:bg-slate-800 text-[#FF6B00] text-xs font-black rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all">
                      <i class="fas fa-print"></i> พิมพ์ / บันทึกบัตรรับเครื่อง
                    </button>
                    <button type="button" onclick="window.app.copyPublicTrackLink('${escJs(o.orderId)}')" class="w-full py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-black rounded-xl shadow-2xs flex items-center justify-center gap-2 transition-all">
@@ -2525,7 +2525,7 @@ window.app = {
             ${topPromos.length ? topPromos.map(([name, st], idx) => `
               <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                 <div class="flex items-center gap-2 min-w-0">
-                  <span class="w-5 h-5 rounded-md bg-slate-900 text-[#FFD100] text-[10px] font-black flex items-center justify-center shrink-0">${idx + 1}</span>
+                  <span class="w-5 h-5 rounded-md bg-slate-900 text-[#FF6B00] text-[10px] font-black flex items-center justify-center shrink-0">${idx + 1}</span>
                   <div class="min-w-0">
                     <div class="text-xs font-bold text-slate-800 truncate" title="${esc(name)}">${esc(name)}</div>
                     <div class="text-[10px] text-slate-500">${st.count} ออเดอร์</div>
@@ -4121,10 +4121,10 @@ window.app = {
         if (periodText) periodText.innerText = 'ดีลราคาพิเศษประจำวัน • สินค้าของแท้ประกันศูนย์ 100%';
         if (timerBadge) {
           timerBadge.innerText = 'สถานะแคมเปญ';
-          timerBadge.className = 'text-[10px] font-extrabold text-[#FFD100] mr-1.5 uppercase tracking-wider';
+          timerBadge.className = 'text-[10px] font-extrabold text-[#FF6B00] mr-1.5 uppercase tracking-wider';
         }
         timerDisplay.innerHTML = `
-          <div class="px-3 py-1 rounded-lg bg-[#FFD100] text-[#141416] font-black text-[11px] flex items-center gap-1.5 shadow-sm">
+          <div class="px-3 py-1 rounded-lg bg-[#FF6B00] text-white font-black text-[11px] flex items-center gap-1.5 shadow-sm">
             <i class="fas fa-bolt text-[#E11D48]"></i> เปิดรับจองดีลพิเศษ
           </div>
         `;
@@ -4168,7 +4168,7 @@ window.app = {
         } else {
           if (timerBadge) {
             timerBadge.innerText = 'จบดีลในอีก';
-            timerBadge.className = 'text-[10px] font-extrabold text-[#FFD100] mr-1.5 uppercase tracking-wider';
+            timerBadge.className = 'text-[10px] font-extrabold text-[#FF6B00] mr-1.5 uppercase tracking-wider';
           }
           
           const diff = endDate - now;
@@ -4183,17 +4183,17 @@ window.app = {
                 <span class="text-xs font-black leading-tight">${String(days).padStart(2, '0')}</span>
                 <span class="text-[7px] text-slate-500 font-extrabold uppercase -mt-0.5">วัน</span>
               </div>
-              <div class="text-[#FFD100] font-black text-xs">:</div>
+              <div class="text-[#FF6B00] font-black text-xs">:</div>
               <div class="bnn-timer-box flex flex-col items-center px-2 py-0.5 rounded-lg min-w-[34px]">
                 <span class="text-xs font-black leading-tight">${String(hours).padStart(2, '0')}</span>
                 <span class="text-[7px] text-slate-500 font-extrabold uppercase -mt-0.5">ชม.</span>
               </div>
-              <div class="text-[#FFD100] font-black text-xs">:</div>
+              <div class="text-[#FF6B00] font-black text-xs">:</div>
               <div class="bnn-timer-box flex flex-col items-center px-2 py-0.5 rounded-lg min-w-[34px]">
                 <span class="text-xs font-black leading-tight">${String(mins).padStart(2, '0')}</span>
                 <span class="text-[7px] text-slate-500 font-extrabold uppercase -mt-0.5">นาที</span>
               </div>
-              <div class="text-[#FFD100] font-black text-xs">:</div>
+              <div class="text-[#FF6B00] font-black text-xs">:</div>
               <div class="bnn-timer-box bnn-timer-sec flex flex-col items-center px-2 py-0.5 rounded-lg min-w-[34px]">
                 <span class="text-xs font-black leading-tight">${String(secs).padStart(2, '0')}</span>
                 <span class="text-[7px] text-rose-100 font-extrabold uppercase -mt-0.5">วิ</span>
@@ -4233,7 +4233,7 @@ window.app = {
           checkoutBtn.className = 'w-full h-full bg-slate-200 text-slate-400 text-sm font-bold rounded-xl cursor-not-allowed transition-all flex items-center justify-center';
         } else {
           checkoutBtn.disabled = false;
-          checkoutBtn.className = 'w-full h-full bg-[#FFD100] hover:bg-[#f5c400] text-[#141416] text-sm font-black rounded-xl shadow-sm transition-all flex items-center justify-center group';
+          checkoutBtn.className = 'w-full h-full bg-[#FF6B00] hover:bg-[#E05300] text-white text-sm font-black rounded-xl shadow-sm transition-all flex items-center justify-center group';
         }
       }
     },
@@ -4478,14 +4478,14 @@ window.app = {
               + ((title || sub)
                   ? '<div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 pt-6 flex items-end justify-between">'
                     + '<div>'
-                    + (title ? '<div class="text-xs md:text-sm font-black text-[#FFD100] leading-tight drop-shadow">' + esc(title) + '</div>' : '')
+                    + (title ? '<div class="text-xs md:text-sm font-black text-[#FF6B00] leading-tight drop-shadow">' + esc(title) + '</div>' : '')
                     + (sub ? '<div class="text-[10px] text-white/90 font-medium line-clamp-1">' + esc(sub) + '</div>' : '')
                     + '</div>'
-                    + '<span class="px-2 py-0.5 rounded-full bg-[#FFD100] text-[#141416] text-[9px] font-black shrink-0">ช้อปเลย <i class="fas fa-arrow-right ml-0.5"></i></span>'
+                    + '<span class="px-2 py-0.5 rounded-full bg-[#FF6B00] text-white text-[9px] font-black shrink-0">ช้อปเลย <i class="fas fa-arrow-right ml-0.5"></i></span>'
                     + '</div>'
                   : '')
               + '</div>';
-            dotsHtml += '<button type="button" onclick="window.app.pos.goToHero(' + idx + ')" class="h-1.5 rounded-full transition-all ' + (idx === 0 ? 'w-5 bg-[#FFD100]' : 'w-1.5 bg-white/60 hover:bg-white') + '" aria-label="สไลด์ ' + (idx + 1) + '"></button>';
+            dotsHtml += '<button type="button" onclick="window.app.pos.goToHero(' + idx + ')" class="h-1.5 rounded-full transition-all ' + (idx === 0 ? 'w-5 bg-[#FF6B00]' : 'w-1.5 bg-white/60 hover:bg-white') + '" aria-label="สไลด์ ' + (idx + 1) + '"></button>';
           });
           track.innerHTML = slidesHtml;
           track.style.transform = 'translateX(0%)';
@@ -4525,7 +4525,7 @@ window.app = {
       track.style.transform = 'translateX(-' + (this.heroIndex * 100) + '%)';
       if (dots && dots.children.length === count) {
         Array.from(dots.children).forEach((d, i) => {
-          d.className = 'h-1.5 rounded-full transition-all ' + (i === this.heroIndex ? 'w-5 bg-[#FFD100]' : 'w-1.5 bg-white/60 hover:bg-white');
+          d.className = 'h-1.5 rounded-full transition-all ' + (i === this.heroIndex ? 'w-5 bg-[#FF6B00]' : 'w-1.5 bg-white/60 hover:bg-white');
         });
       }
     },
@@ -4567,7 +4567,7 @@ window.app = {
           html += '    <div class="text-[9px] font-bold text-slate-400 mt-0.5">คูปองส่วนลดท้ายบิล</div>';
           html += '  </div>';
           html += '  <button type="button" class="shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-all '
-            + (isApplied ? 'bg-emerald-600 text-white shadow-sm' : 'bg-[#141416] text-[#FFD100] hover:bg-slate-800') + '">'
+            + (isApplied ? 'bg-emerald-600 text-white shadow-sm' : 'bg-[#141416] text-[#FF6B00] hover:bg-slate-800') + '">'
             + (isApplied ? '<i class="fas fa-check mr-0.5"></i>ใช้อยู่' : 'เก็บใช้')
             + '</button>';
           html += '</div>';
@@ -5035,7 +5035,7 @@ window.app = {
           + '<img src="' + esc(img) + '" alt="" onerror="this.remove()" class="w-7 h-7 object-contain bg-white rounded-md p-0.5 shrink-0">'
           + '<div class="min-w-0 flex-1">'
           + '  <div class="text-[10px] font-bold text-white truncate">' + esc(item.dispName) + '</div>'
-          + '  <div class="text-[9px] font-black text-[#FFD100]">฿' + pr + '</div>'
+          + '  <div class="text-[9px] font-black text-[#FF6B00]">฿' + pr + '</div>'
           + '</div>'
           + '<button type="button" onclick="window.app.pos.toggleCompare(\'' + escJs(item.cardKey) + '\', event)" class="text-slate-400 hover:text-rose-400 text-xs px-1" aria-label="นำออก"><i class="fas fa-times"></i></button>'
           + '</div>';
@@ -5082,7 +5082,7 @@ window.app = {
       // แถบเลือกเพิ่มรุ่นเปรียบเทียบด้านบน (กรณีเลือกไว้ 1 หรือ 2 รุ่น สามารถกดเลือกรุ่นที่ 2-3 จากใน Modal ได้ทันที)
       if (canAddMore) {
         html += '<div class="mb-4 p-3 rounded-2xl bg-amber-50/90 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">';
-        html += '  <div class="text-xs font-extrabold text-slate-800 flex items-center gap-2"><span class="w-6 h-6 rounded-lg bg-[#141416] text-[#FFD100] flex items-center justify-center text-[11px] shrink-0"><i class="fas fa-plus"></i></span><span>เลือกเทียบอยู่ <strong class="text-[#E11D48]">' + resolved.length + '/3 รุ่น</strong> — เลือกรุ่นอื่นมาเทียบสเปคคู่กันได้ทันที:</span></div>';
+        html += '  <div class="text-xs font-extrabold text-slate-800 flex items-center gap-2"><span class="w-6 h-6 rounded-lg bg-[#141416] text-[#FF6B00] flex items-center justify-center text-[11px] shrink-0"><i class="fas fa-plus"></i></span><span>เลือกเทียบอยู่ <strong class="text-[#E11D48]">' + resolved.length + '/3 รุ่น</strong> — เลือกรุ่นอื่นมาเทียบสเปคคู่กันได้ทันที:</span></div>';
         html += '  <select onchange="window.app.pos.addCompareFromSelect(this.value)" class="bg-white border-2 border-[#141416] rounded-xl px-3 py-1.5 text-xs font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 sm:min-w-[260px] cursor-pointer shadow-2xs">';
         html += '    <option value="">+ เลือกรุ่นสินค้าเพื่อเปรียบเทียบคู่กัน...</option>';
         candidateKeys.forEach(c => {
@@ -5101,8 +5101,8 @@ window.app = {
         const pr = prices[idx];
         let recBadge = '';
         if (resolved.length >= 2 && minPrice !== maxPrice) {
-          if (pr === minPrice) recBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-black mb-1.5 shadow-2xs"><i class="fas fa-crown text-[#FFD100]"></i> คุ้มค่าที่สุด (Best Value)</span> ';
-          else if (pr === maxPrice) recBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#141416] text-[#FFD100] text-[9px] font-black mb-1.5 shadow-2xs"><i class="fas fa-rocket text-[#E11D48]"></i> สเปคเรือธง (Top Spec)</span> ';
+          if (pr === minPrice) recBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-black mb-1.5 shadow-2xs"><i class="fas fa-crown text-[#FF6B00]"></i> คุ้มค่าที่สุด (Best Value)</span> ';
+          else if (pr === maxPrice) recBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#141416] text-[#FF6B00] text-[9px] font-black mb-1.5 shadow-2xs"><i class="fas fa-rocket text-[#E11D48]"></i> สเปคเรือธง (Top Spec)</span> ';
         }
         html += '<th class="p-3.5 align-top min-w-[210px] border-l border-slate-200/80 relative bg-white">'
           + '<button type="button" onclick="window.app.pos.toggleCompare(\'' + escJs(item.cardKey) + '\', event); window.app.pos.openCompareModal();" class="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 text-[10px] flex items-center justify-center transition-colors" title="เอาออก"><i class="fas fa-times"></i></button>'
@@ -5115,7 +5115,7 @@ window.app = {
       html += '</tr></thead><tbody class="divide-y divide-slate-200 text-xs">';
 
       // ส่วนที่ 1: ราคา & โปรโมชั่น
-      html += '<tr class="bg-slate-900 text-white"><td colspan="' + (resolved.length + 1) + '" class="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#FFD100]"><i class="fas fa-tags mr-1.5"></i>1. ราคาโปรโมชั่น & สิทธิพิเศษ Flash Sale</td></tr>';
+      html += '<tr class="bg-slate-900 text-white"><td colspan="' + (resolved.length + 1) + '" class="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#FF6B00]"><i class="fas fa-tags mr-1.5"></i>1. ราคาโปรโมชั่น & สิทธิพิเศษ Flash Sale</td></tr>';
 
       // ราคา Flash Sale & ส่วนลด
       html += '<tr><td class="p-3 font-extrabold text-slate-600 bg-slate-50/70">ราคา Flash Sale</td>';
@@ -5160,7 +5160,7 @@ window.app = {
       html += '</tr>';
 
       // ส่วนที่ 2: ข้อมูลสเปคทางเทคนิค (Hardware & Technical Specifications)
-      html += '<tr class="bg-slate-900 text-white"><td colspan="' + (resolved.length + 1) + '" class="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#FFD100]"><i class="fas fa-Sliders mr-1.5"></i>2. สเปคเครื่องและคุณสมบัติทางเทคนิค (Technical Specs)</td></tr>';
+      html += '<tr class="bg-slate-900 text-white"><td colspan="' + (resolved.length + 1) + '" class="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#FF6B00]"><i class="fas fa-Sliders mr-1.5"></i>2. สเปคเครื่องและคุณสมบัติทางเทคนิค (Technical Specs)</td></tr>';
 
       const specRows = [
         { key: 'display', icon: 'fa-mobile-screen', label: 'หน้าจอแสดงผล' },
@@ -5335,8 +5335,8 @@ window.app = {
         return '<button type="button" class="bnn-cat-pill flex items-center gap-2 px-3.5 py-2 rounded-xl border bg-white shrink-0 '
           + (sel ? 'active border-[#141416]' : 'border-slate-200 hover:border-slate-400 text-slate-700')
           + '" onclick="window.app.pos.setStoreCategory(\'' + escJs(val) + '\')" aria-label="หมวด ' + esc(label) + '">'
-          + (isAll ? '<i class="fas fa-bolt text-xs ' + (sel ? 'text-[#FFD100]' : 'text-[#E11D48]') + '"></i>' : '')
-          + '<span class="text-[11px] md:text-xs font-extrabold ' + (sel ? 'text-[#FFD100]' : 'text-slate-700') + '">' + esc(label) + '</span>'
+          + (isAll ? '<i class="fas fa-bolt text-xs ' + (sel ? 'text-[#FF6B00]' : 'text-[#E11D48]') + '"></i>' : '')
+          + '<span class="text-[11px] md:text-xs font-extrabold ' + (sel ? 'text-[#FF6B00]' : 'text-slate-700') + '">' + esc(label) + '</span>'
           + (img ? '<img src="' + esc(img) + '" loading="lazy" alt="" aria-hidden="true" onerror="this.remove()" class="w-7 h-7 object-contain pointer-events-none bg-white rounded-md p-0.5">' : '')
           + '</button>';
       };
@@ -5382,9 +5382,9 @@ window.app = {
         const curLabel = active ? (opts.find(o => o.val === current) || {}).label || current : baseLabel;
         let h = '<span class="store-pop-wrap relative inline-block">';
         h += '<button type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-bold transition-all '
-          + (active ? 'bg-[#141416] border-[#141416] text-[#FFD100] shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400')
+          + (active ? 'bg-[#141416] border-[#141416] text-[#FF6B00] shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400')
           + '" onclick="window.app.pos.toggleFilterPopover(\'' + name + '\')" aria-label="ตัวกรอง' + esc(baseLabel) + '" aria-haspopup="true">'
-          + (iconCls ? '<i class="fas ' + iconCls + ' text-[10px] ' + (active ? 'text-[#FFD100]' : 'text-slate-400') + '"></i>' : '')
+          + (iconCls ? '<i class="fas ' + iconCls + ' text-[10px] ' + (active ? 'text-[#FF6B00]' : 'text-slate-400') + '"></i>' : '')
           + esc(curLabel) + '<i class="fas fa-chevron-down text-[8px] opacity-75"></i></button>';
         h += '<div id="storePop_' + name + '" class="store-pop hidden absolute left-0 top-full mt-2 z-30 min-w-[175px] bg-white border border-slate-200 rounded-xl shadow-xl p-1.5">';
         opts.forEach(o => {
@@ -5593,7 +5593,7 @@ window.app = {
           const existsInColor = vars.some(v => v.Color === st.color && v.Capacity === cap);
           const sel = cap === st.cap;
           chipsHtml += '<button type="button" class="px-2 py-0.5 rounded-md border text-[10px] transition-all '
-            + (sel ? 'bg-[#141416] border-[#141416] font-extrabold text-[#FFD100] shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400 font-semibold')
+            + (sel ? 'bg-[#141416] border-[#141416] font-extrabold text-[#FF6B00] shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400 font-semibold')
             + (existsInColor ? '' : ' opacity-40')
             + '" onclick="window.app.pos.selectCardVariant(\'' + escJs(p.Model) + '\',\'' + escJs(cap) + '\',\'\')">' + esc(cap) + '</button>';
         });
@@ -5620,7 +5620,7 @@ window.app = {
       if (isGift) {
         topLeftBadge = '<div class="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 bg-slate-800 text-white text-[10px] font-bold rounded-md shadow-sm pointer-events-none"><i class="fas fa-gift text-amber-400 mr-1"></i>ของแถม</div>';
       } else if (hasSave && savePct > 0) {
-        topLeftBadge = '<div class="bnn-discount-badge absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 pointer-events-none"><i class="fas fa-bolt text-[#FFD100]"></i> -' + savePct + '%</div>';
+        topLeftBadge = '<div class="bnn-discount-badge absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 pointer-events-none"><i class="fas fa-bolt text-[#FF6B00]"></i> -' + savePct + '%</div>';
       } else {
         topLeftBadge = '<div class="bnn-deal-badge absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 pointer-events-none"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH</div>';
       }
@@ -5669,7 +5669,7 @@ window.app = {
       }
       const isCompared = (this.compareList || []).includes(cardKey);
       const compareBtnHtml = !isGift
-        ? '<button type="button" class="bnn-compare-btn' + (isCompared ? ' active' : '') + ' absolute bottom-2 right-2 z-20 px-2 py-0.5 rounded-lg bg-white/95 border border-slate-200 text-[9px] font-extrabold text-slate-600 shadow-sm flex items-center gap-1 transition-all hover:border-slate-400" onclick="window.app.pos.toggleCompare(\'' + escJs(cardKey) + '\', event)" title="เปรียบเทียบสเปค"><i class="fas ' + (isCompared ? 'fa-check text-[#FFD100]' : 'fa-scale-balanced text-slate-400') + '"></i><span>' + (isCompared ? 'เทียบอยู่' : 'เทียบสเปค') + '</span></button>'
+        ? '<button type="button" class="bnn-compare-btn' + (isCompared ? ' active' : '') + ' absolute bottom-2 right-2 z-20 px-2 py-0.5 rounded-lg bg-white/95 border border-slate-200 text-[9px] font-extrabold text-slate-600 shadow-sm flex items-center gap-1 transition-all hover:border-slate-400" onclick="window.app.pos.toggleCompare(\'' + escJs(cardKey) + '\', event)" title="เปรียบเทียบสเปค"><i class="fas ' + (isCompared ? 'fa-check text-[#FF6B00]' : 'fa-scale-balanced text-slate-400') + '"></i><span>' + (isCompared ? 'เทียบอยู่' : 'เทียบสเปค') + '</span></button>'
         : '';
       const isFavorited = (this.wishlist || []).includes(variant.SKU);
       const skuClean = (variant.SKU || '').replace(/[^a-zA-Z0-9_-]/g, '');
@@ -5683,9 +5683,9 @@ window.app = {
         if (outOfStock) {
           stockBarHtml = '<div class="bnn-stock-bar oos mb-2.5"><div class="bnn-stock-bar-fill" style="width:100%; background:#cbd5e1;"></div><div class="bnn-stock-bar-label">สินค้าหมดชั่วคราว</div></div>';
         } else if (stockNum <= 5) {
-          stockBarHtml = '<div class="bnn-stock-bar hot mb-2.5"><div class="bnn-stock-bar-fill" style="width:86%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-fire mr-1 text-[#FFD100]"></i>ขายดีมาก! เหลือ ' + stockNum + ' ชิ้น</div></div>';
+          stockBarHtml = '<div class="bnn-stock-bar hot mb-2.5"><div class="bnn-stock-bar-fill" style="width:86%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-fire mr-1 text-[#FF6B00]"></i>ขายดีมาก! เหลือ ' + stockNum + ' ชิ้น</div></div>';
         } else if (stockNum <= 20) {
-          stockBarHtml = '<div class="bnn-stock-bar hot mb-2.5"><div class="bnn-stock-bar-fill" style="width:62%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-bolt mr-1 text-[#FFD100]"></i>จองด่วน • เหลือ ' + stockNum + ' ชิ้น</div></div>';
+          stockBarHtml = '<div class="bnn-stock-bar hot mb-2.5"><div class="bnn-stock-bar-fill" style="width:62%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-bolt mr-1 text-[#FF6B00]"></i>จองด่วน • เหลือ ' + stockNum + ' ชิ้น</div></div>';
         } else {
           stockBarHtml = '<div class="bnn-stock-bar mb-2.5"><div class="bnn-stock-bar-fill" style="width:36%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-check-circle mr-1 text-[#E11D48]"></i>มีสินค้าพร้อมจอง (' + stockNum + ')</div></div>';
         }
@@ -5922,7 +5922,7 @@ window.app = {
                   <span class="text-[10px] md:text-[11px] font-black text-slate-800 flex items-center gap-1.5"><i class="fas fa-microchip text-[#E11D48]"></i> ข้อมูลสเปคเด่น (Key Specifications)</span>
                   <div class="flex items-center gap-1.5">
                     <button type="button" onclick="window.app.pos.openTradeInStandalone('${escJs(prod.SKU)}');" class="px-2.5 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-black flex items-center gap-1 hover:bg-amber-200 transition-colors shadow-2xs"><i class="fas fa-retweet text-[#E11D48]"></i> คำนวณเก่าแลกใหม่</button>
-                    <button type="button" onclick="window.app.hideModal('addToCartModal'); window.app.pos.addCompareFromSelect('${escJs(cKey)}');" class="px-2.5 py-1 rounded-lg bg-[#141416] text-[#FFD100] text-[10px] font-black flex items-center gap-1 hover:bg-slate-800 transition-colors shadow-2xs"><i class="fas fa-scale-balanced text-[#E11D48]"></i> เทียบสเปคกับรุ่นอื่น</button>
+                    <button type="button" onclick="window.app.hideModal('addToCartModal'); window.app.pos.addCompareFromSelect('${escJs(cKey)}');" class="px-2.5 py-1 rounded-lg bg-[#141416] text-[#FF6B00] text-[10px] font-black flex items-center gap-1 hover:bg-slate-800 transition-colors shadow-2xs"><i class="fas fa-scale-balanced text-[#E11D48]"></i> เทียบสเปคกับรุ่นอื่น</button>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10px] text-slate-700">
@@ -6243,7 +6243,7 @@ window.app = {
         let pPrice = i.Price ? (parseFloat(i.Price.toString().replace(/[^\d.\-]/g,'')) || 0).toLocaleString() : '0';
         
         html+='<div class="bg-white border border-slate-200/90 p-3.5 rounded-2xl shadow-sm mb-3 relative group hover:border-amber-400 transition-all">';
-        html+='  <div class="pr-7"><span class="inline-block px-1.5 py-0.5 rounded bg-[#FFD100] text-[#141416] text-[9px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH DEAL</span><h6 class="text-xs md:text-sm font-extrabold text-slate-900 leading-snug mb-1">' + window.app.esc(i['Product Name']) + '</h6></div>';
+        html+='  <div class="pr-7"><span class="inline-block px-1.5 py-0.5 rounded bg-[#FF6B00] text-white text-[9px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH DEAL</span><h6 class="text-xs md:text-sm font-extrabold text-slate-900 leading-snug mb-1">' + window.app.esc(i['Product Name']) + '</h6></div>';
         html+=   gHtml;
         html+='  <div class="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">';
         html+='    <div class="text-[#E11D48] font-black text-base md:text-lg tabular-nums">฿' + pPrice + '</div>';
@@ -6587,7 +6587,7 @@ window.app = {
             </div>
           </div>
 
-          <div id="tiResultCard" class="rounded-2xl bg-[#141416] text-white p-4 border-2 border-[#FFD100] shadow-lg"></div>
+          <div id="tiResultCard" class="rounded-2xl bg-[#141416] text-white p-4 border-2 border-[#FF6B00] shadow-lg"></div>
 
           <div class="flex flex-wrap justify-between items-center gap-2 pt-2">
             <button type="button" onclick="window.app.pos.applyTradeInNote()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-sm">
@@ -6650,13 +6650,13 @@ window.app = {
             <div class="text-[10px] text-slate-300">ประเมินเครื่องเก่า ฿${estOldVal.toLocaleString()} + โบนัส Top-up ฿${topupVal.toLocaleString()}</div>
           </div>
           <div class="space-y-1 border-b md:border-b-0 md:border-r border-white/15 pb-3 md:pb-0 md:pr-3">
-            <div class="text-[10px] font-bold text-[#FFD100] uppercase">ยอดจ่ายสุทธิหลังหักเทรดอิน</div>
-            <div class="text-2xl font-black text-[#FFD100] tabular-nums">฿${netPayable.toLocaleString()}</div>
+            <div class="text-[10px] font-bold text-[#FF6B00] uppercase">ยอดจ่ายสุทธิหลังหักเทรดอิน</div>
+            <div class="text-2xl font-black text-[#FF6B00] tabular-nums">฿${netPayable.toLocaleString()}</div>
             <div class="text-[10px] text-slate-300">จากราคาเครื่องใหม่ ฿${newPrice.toLocaleString()}</div>
           </div>
           <div class="space-y-1">
-            <div class="text-[10px] font-bold text-slate-300 uppercase"><i class="fas fa-credit-card text-[#FFD100] mr-1"></i>ผ่อน 0% หลังหักเทรดอิน</div>
-            <div class="text-sm font-black text-white">10 เดือน: <span class="text-[#FFD100]">฿${Math.ceil(netPayable / 10).toLocaleString()}</span>/ด.</div>
+            <div class="text-[10px] font-bold text-slate-300 uppercase"><i class="fas fa-credit-card text-[#FF6B00] mr-1"></i>ผ่อน 0% หลังหักเทรดอิน</div>
+            <div class="text-sm font-black text-white">10 เดือน: <span class="text-[#FF6B00]">฿${Math.ceil(netPayable / 10).toLocaleString()}</span>/ด.</div>
             <div class="text-[10px] text-slate-300">6 เดือน: ฿${Math.ceil(netPayable / 6).toLocaleString()}/ด. • 24 เดือน: ฿${Math.ceil(netPayable / 24).toLocaleString()}/ด.</div>
           </div>
         </div>
@@ -6763,15 +6763,15 @@ window.app = {
 
       body.innerHTML = `
         <div id="quotePrintableCard" class="bg-white border-2 border-slate-900 rounded-2xl overflow-hidden shadow-md">
-          <div class="bg-[#141416] text-white px-5 py-4 border-b-2 border-[#FFD100] flex justify-between items-center">
+          <div class="bg-[#141416] text-white px-5 py-4 border-b-2 border-[#FF6B00] flex justify-between items-center">
             <div>
-              <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFD100] text-[#141416] text-[10px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH SALE QUOTATION</div>
+              <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FF6B00] text-white text-[10px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH SALE QUOTATION</div>
               <h4 class="text-base font-black text-white">ใบสรุปราคาพิเศษ ของแถม และตารางผ่อนชำระ</h4>
               <p class="text-[11px] text-slate-300">สาขา: ${esc(br)} (${esc(ch)}) • วันที่ออกใบเสนอราคา: ${esc(nowStr)}</p>
             </div>
             <div class="text-right">
               <div class="text-[10px] text-slate-400 font-bold">REF NO.</div>
-              <div class="text-xs font-black text-[#FFD100] font-mono">${esc(quoteRef)}</div>
+              <div class="text-xs font-black text-[#FF6B00] font-mono">${esc(quoteRef)}</div>
             </div>
           </div>
 
@@ -6821,8 +6821,8 @@ window.app = {
                     <div class="text-[10px] font-bold text-slate-500">ผ่อน 6 เดือน</div>
                     <div class="text-xs font-black text-slate-900">฿${Math.ceil(netTotal / 6).toLocaleString()}/ด.</div>
                   </div>
-                  <div class="bg-[#141416] text-white rounded-lg p-2 border border-[#FFD100]">
-                    <div class="text-[10px] font-bold text-[#FFD100]">ผ่อน 10 เดือน (0%)</div>
+                  <div class="bg-[#141416] text-white rounded-lg p-2 border border-[#FF6B00]">
+                    <div class="text-[10px] font-bold text-[#FF6B00]">ผ่อน 10 เดือน (0%)</div>
                     <div class="text-xs font-black text-white">฿${Math.ceil(netTotal / 10).toLocaleString()}/ด.</div>
                   </div>
                   <div class="bg-white rounded-lg p-2 border border-amber-200">
@@ -6899,10 +6899,10 @@ window.app = {
             <div class="border-2 border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
               <div class="bg-slate-900 text-white px-4 py-3 flex flex-wrap justify-between items-center gap-2">
                 <div>
-                  <span class="px-2 py-0.5 rounded bg-[#FFD100] text-[#141416] text-[10px] font-black mr-2">${esc(o.orderId)}</span>
+                  <span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-[10px] font-black mr-2">${esc(o.orderId)}</span>
                   <span class="text-xs font-bold text-slate-200">ลูกค้า: ${esc(o.customerName || '-')} (${esc(o.maskedPhone || '-')})</span>
                 </div>
-                <span class="px-2.5 py-0.5 rounded-full bg-white/15 text-[#FFD100] text-[11px] font-extrabold">สถานะ: ${esc(st)}</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-white/15 text-[#FF6B00] text-[11px] font-extrabold">สถานะ: ${esc(st)}</span>
               </div>
 
               <div class="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
@@ -7084,7 +7084,7 @@ window.app = {
              </div>
              <div class="flex flex-col gap-1 shrink-0">
                 ${!outOfStock ? `
-                  <button type="button" onclick="window.app.pos.openAddToCartModal('${escJs(p.SKU)}')" class="px-2.5 py-1.5 bg-[#FFD100] hover:bg-[#f5c400] text-[#141416] rounded-xl text-[10px] font-black shadow-2xs flex items-center gap-1 transition-all" title="ใส่ตะกร้า">
+                  <button type="button" onclick="window.app.pos.openAddToCartModal('${escJs(p.SKU)}')" class="px-2.5 py-1.5 bg-[#FF6B00] hover:bg-[#E05300] text-white rounded-xl text-[10px] font-black shadow-2xs flex items-center gap-1 transition-all" title="ใส่ตะกร้า">
                      <i class="fas fa-cart-plus text-[#E11D48]"></i><span>จอง</span>
                   </button>
                 ` : ''}

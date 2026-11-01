@@ -643,18 +643,20 @@
 
   /* === 6A POS storefront & BNN Flash Sale Theme — scoped ด้วย .pos-storefront / .bnn-flash-shell เท่านั้น ห้ามรั่วไปหน้าอื่น === */
   .bnn-flash-shell {
-    --bnn-yellow: #FFD100;
-    --bnn-yellow-hover: #F5C400;
+    --bnn-yellow: #FF6B00;
+    --bnn-yellow-hover: #E05300;
+    --bnn-orange-theme: #FF6B00;
+    --bnn-orange-hover: #E05300;
     --bnn-dark: #141416;
     --bnn-dark-soft: #1F2026;
     --bnn-red: #E11D48;
-    --bnn-orange: #FF5722;
+    --bnn-orange: #FF6B00;
   }
 
   /* แถบแบนเนอร์หัวหน้า BNN Flash Sale พร้อมไฟวิ่ง + ลายเฉียงสปอร์ต */
   .bnn-flash-banner {
     background: linear-gradient(135deg, #111216 0%, #1c1d24 55%, #2b131b 100%);
-    border: 1px solid rgba(255, 209, 0, 0.28);
+    border: 1px solid rgba(255, 107, 0, 0.32);
     position: relative;
     overflow: hidden;
     box-shadow: 0 10px 25px -6px rgba(17, 18, 22, 0.25);
@@ -666,7 +668,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, #FFD100 0%, #FF6B00 50%, #E11D48 100%);
+    background: linear-gradient(90deg, #FF6B00 0%, #FF8C00 50%, #E11D48 100%);
     z-index: 2;
   }
   .bnn-flash-banner::after {
@@ -675,8 +677,8 @@
     inset: 0;
     background-image: repeating-linear-gradient(
       -45deg,
-      rgba(255, 209, 0, 0.03) 0px,
-      rgba(255, 209, 0, 0.03) 10px,
+      rgba(255, 107, 0, 0.04) 0px,
+      rgba(255, 107, 0, 0.04) 10px,
       transparent 10px,
       transparent 20px
     );
@@ -684,10 +686,10 @@
   }
 
   .bnn-flash-emblem {
-    background: linear-gradient(135deg, #FFD100 0%, #FFAE00 100%);
-    color: #111216;
+    background: linear-gradient(135deg, #FF6B00 0%, #FF8C00 100%);
+    color: #ffffff;
     transform: skewX(-8deg);
-    box-shadow: 0 4px 14px rgba(255, 209, 0, 0.35);
+    box-shadow: 0 4px 14px rgba(255, 107, 0, 0.35);
   }
   .bnn-flash-emblem > * {
     transform: skewX(8deg);
@@ -696,7 +698,7 @@
   .bnn-timer-box {
     background: #ffffff;
     color: #111216;
-    border-bottom: 2px solid #FFD100;
+    border-bottom: 2px solid #FF6B00;
     font-variant-numeric: tabular-nums;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   }
@@ -716,7 +718,7 @@
   }
   .pos-storefront .bnn-cat-pill.active {
     background: #141416 !important;
-    color: #FFD100 !important;
+    color: #FF6B00 !important;
     border-color: #141416 !important;
     box-shadow: 0 4px 12px rgba(20, 20, 22, 0.18);
   }
@@ -728,8 +730,8 @@
   }
   .pos-storefront .pos-card:hover {
     transform: translateY(-4px);
-    border-color: #FFD100;
-    box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(255, 209, 0, 0.55);
+    border-color: #FF6B00;
+    box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(255, 107, 0, 0.55);
   }
 
   /* ป้ายลดราคา BNN มุมซ้ายบน */
@@ -739,9 +741,9 @@
     box-shadow: 0 2px 8px rgba(225, 29, 72, 0.3);
   }
   .pos-storefront .bnn-deal-badge {
-    background: #FFD100;
-    color: #141416;
-    box-shadow: 0 2px 6px rgba(255, 209, 0, 0.35);
+    background: #FF6B00;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(255, 107, 0, 0.35);
   }
 
   /* หลอดสต๊อก Flash Sale Progress Bar (Sold / Remaining Meter) */
@@ -802,17 +804,17 @@
     text-shadow: none;
   }
 
-  /* ปุ่มสั่งจอง BNN Yellow + Black */
+  /* ปุ่มสั่งจอง BNN Orange + Black */
   .pos-storefront .bnn-buy-btn {
-    background: #FFD100;
-    color: #141416;
-    border: 1px solid #f2c200;
-    box-shadow: 0 2px 6px rgba(255, 209, 0, 0.28);
+    background: #FF6B00;
+    color: #ffffff;
+    border: 1px solid #e05300;
+    box-shadow: 0 2px 6px rgba(255, 107, 0, 0.28);
     transition: all 0.18s ease;
   }
   .pos-storefront .bnn-buy-btn:hover {
     background: #141416;
-    color: #FFD100;
+    color: #FF6B00;
     border-color: #141416;
     box-shadow: 0 4px 12px rgba(20, 20, 22, 0.22);
     transform: translateY(-1px);
@@ -824,14 +826,14 @@
   /* คูปองส่วนลด BNN Voucher Card (รอยปรุตั๋วด้านข้าง) */
   .bnn-voucher-card {
     position: relative;
-    background: linear-gradient(135deg, #fffdf5 0%, #fffbeb 100%);
-    border: 1px solid #fde68a;
+    background: linear-gradient(135deg, #fffaf5 0%, #fff7ed 100%);
+    border: 1px solid #fed7aa;
     border-left: 4px solid #E11D48;
     border-radius: 12px;
     transition: all 0.18s ease;
   }
   .bnn-voucher-card:hover {
-    border-color: #f59e0b;
+    border-color: #f97316;
     border-left-color: #E11D48;
     transform: translateY(-1px);
     box-shadow: 0 6px 14px -3px rgba(225, 29, 72, 0.12);
@@ -848,8 +850,8 @@
   }
   .pos-storefront .bnn-compare-btn.active {
     background: #141416 !important;
-    color: #FFD100 !important;
-    border-color: #FFD100 !important;
+    color: #FF6B00 !important;
+    border-color: #FF6B00 !important;
   }
 
   .pos-storefront .color-dot {
@@ -1082,16 +1084,16 @@
       background-color: #1e293b !important;
     }
     html.dark .pos-storefront .pos-card:hover {
-      border-color: #FFD100;
-      box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 209, 0, 0.6);
+      border-color: #FF6B00;
+      box-shadow: 0 14px 28px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 107, 0, 0.6);
     }
     html.dark .pos-storefront .bnn-cat-pill.active {
-      background: #FFD100 !important;
-      color: #141416 !important;
-      border-color: #FFD100 !important;
+      background: #FF6B00 !important;
+      color: #ffffff !important;
+      border-color: #FF6B00 !important;
     }
     html.dark .pos-storefront .bnn-cat-pill.active span {
-      color: #141416 !important;
+      color: #ffffff !important;
     }
     html.dark .pos-storefront .bnn-stock-bar {
       background: rgba(225, 29, 72, 0.2);
