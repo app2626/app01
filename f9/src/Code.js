@@ -8,6 +8,9 @@ function doGet(e) {
   const appName = (getKeyValueSettings(ss).SystemName || '').toString().trim() || 'Mobile Pre Order System';
   const template = HtmlService.createTemplateFromFile('Index');
   template.appName = appName;
+  // เลขใบจองจากลิงก์ ?track= / ?orderId= — กรองเหลือเฉพาะอักขระปลอดภัยก่อนฝังลงสคริปต์ (กัน script injection)
+  const rawTrack = (e && e.parameter && (e.parameter.track || e.parameter.orderId)) || '';
+  template.trackParam = /^[A-Za-z0-9_\-]{1,64}$/.test(String(rawTrack)) ? String(rawTrack) : '';
   return template.evaluate()
     .setTitle(appName)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -1153,7 +1156,7 @@ function processCheckout(payload, secureUser, ss) {
     const giftMappings = getTableDataAsJson(ss.getSheetByName("GiftMappings"));
     payload.cart.forEach(item => {
       // จำนวนต้องเป็นจำนวนเต็ม >= 1 — กันค่าติดลบ/ทศนิยมจาก client ทำสต๊อกเพิ่มเอง
-      const qty = parseInt(item.qty, 10);
+      const qty = Number(item.qty);
       if (!Number.isInteger(qty) || qty < 1) throw new Error("จำนวนสินค้าไม่ถูกต้อง: " + (item['Product Name'] || item.SKU));
 
       // ราคา/ชื่อสินค้า/หมวด อ่านจากชีต Products เท่านั้น — ห้ามเชื่อค่าที่ client ส่งมา
@@ -1249,7 +1252,7 @@ function processCheckout(payload, secureUser, ss) {
             allowedGifts.brand.some(v => v !== '*' && giftNameLower.includes(v)) ||
             allowedGifts.channel.some(v => v !== '*' && giftNameLower.includes(v));
           if (!giftAllowed) throw new Error("Gift is not allowed for this product/channel: " + giftName);
-          const gQty = parseInt(giftObj.qty, 10);
+          const gQty = Number(giftObj.qty);
           if (!Number.isInteger(gQty) || gQty < 1) throw new Error("จำนวนของแถมไม่ถูกต้อง: " + giftName);
           let giftSku = "GIFT";
           let giftHasStock = false;
@@ -1439,7 +1442,7 @@ function sendCheckoutWebhookNotification_(ss, orderId, channel, branch, payload,
     }
   });
 
-  const msgText = "⚡ [FLASH SALE ORDER] ใบจองใหม่: " + orderId +
+  const msgText = "⚡ [Pre Booking ORDER] ใบจองใหม่: " + orderId +
     "\nสาขา: " + branch + " (" + channel + ")" +
     "\nลูกค้า: " + custName +
     "\nรายการ: " + (mainItems.join(', ') || '-') +
@@ -1473,11 +1476,11 @@ function trackOrderLookup(payload, secureUser, ss) {
 
   const headers = data[0].map(h => h.toString().trim());
   const idx = (name) => headers.indexOf(name);
-  const oIdIdx = idx("Order ID"), tsIdx = idx("Timestamp"), chIdx = idx("Channel"), brIdx = idx("Branch Code");
+  const oIdIdx = idx("OrderID"), tsIdx = idx("Timestamp"), chIdx = idx("Channel"), brIdx = idx("Branch Code");
   const cNameIdx = idx("Customer Name"), phoneIdx = idx("Contact Number"), skuIdx = idx("SKU");
   const prodIdx = idx("Product Name"), qtyIdx = idx("Qty"), priceIdx = idx("Unit Price");
-  const netIdx = idx("Net Price"), stIdx = idx("Order Status"), remIdx = idx("Remark");
-  const depIdx = idx("Deposit Amount");
+  const netIdx = idx("Row Total"), stIdx = idx("Order Status"), remIdx = idx("Remark");
+  const depIdx = idx("Deposit");
 
   const qLower = qRaw.toLowerCase();
   const qDigits = qRaw.replace(/\D/g, '');
@@ -1562,11 +1565,11 @@ function publicTrackOrderLookup(payload, ss) {
 
   const headers = data[0].map(h => h.toString().trim());
   const idx = (name) => headers.indexOf(name);
-  const oIdIdx = idx("Order ID"), tsIdx = idx("Timestamp"), chIdx = idx("Channel"), brIdx = idx("Branch Code");
+  const oIdIdx = idx("OrderID"), tsIdx = idx("Timestamp"), chIdx = idx("Channel"), brIdx = idx("Branch Code");
   const cNameIdx = idx("Customer Name"), phoneIdx = idx("Contact Number"), skuIdx = idx("SKU");
   const prodIdx = idx("Product Name"), qtyIdx = idx("Qty"), priceIdx = idx("Unit Price");
-  const netIdx = idx("Net Price"), stIdx = idx("Order Status"), remIdx = idx("Remark");
-  const depIdx = idx("Deposit Amount"), pickDateIdx = idx("Pickup Date");
+  const netIdx = idx("Row Total"), stIdx = idx("Order Status"), remIdx = idx("Remark");
+  const depIdx = idx("Deposit"), pickDateIdx = idx("Pickup Date");
 
   const qOrderUpper = orderId.toUpperCase();
   const phoneDigits = phone.replace(/\D/g, '');
@@ -2402,7 +2405,7 @@ function saveSettingsItem(payload, secureUser, ss) {
         if (!found) {
           const newRow = sheet.getLastRow() + 1;
           // Remark map ตาม key — path นี้เป็น key-value generic ไม่ได้มีแค่ค่าจองแล้ว (รอบ 11 เพิ่ม DriveFolderId)
-          const remarkMap = { ReserveStart: 'วันเริ่มจองสินค้า', ReserveEnd: 'วันสิ้นสุดจองสินค้า', FlashCampaignTitle: 'ข้อความแคมเปญบนแถบ Flash Sale หน้า POS', LowStockThreshold: 'เกณฑ์แจ้งเตือนสต๊อกใกล้หมด (ชิ้น)', WebhookUrl: 'Webhook URL แจ้งเตือนเมื่อมีใบจองใหม่หรือสต๊อกใกล้หมด', DriveFolderId: 'โฟลเดอร์ Drive เก็บรูปอัปโหลด', SystemName: 'ชื่อเว็บแอป (แสดงบนแท็บเบราว์เซอร์/หน้า login/เมนู — ใช้ตอนนำไปสำเนาใช้กับร้าน/แบรนด์อื่น)', LogoUrl: 'โลโก้เว็บแอป (แสดงหน้า login/แถบเมนู/ส่วนท้าย)', InvoiceCompanyName: 'ชื่อบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyAddress: 'ที่อยู่บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyEmail: 'อีเมลติดต่อ (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceLogoUrl: 'โลโก้บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', ApproverSignatureUrl: 'รูปลายเซ็นผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)', ApproverName: 'ชื่อผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)' };
+          const remarkMap = { ReserveStart: 'วันเริ่มจองสินค้า', ReserveEnd: 'วันสิ้นสุดจองสินค้า', FlashCampaignTitle: 'ข้อความแคมเปญบนแถบ Pre Booking หน้า POS', LowStockThreshold: 'เกณฑ์แจ้งเตือนสต๊อกใกล้หมด (ชิ้น)', WebhookUrl: 'Webhook URL แจ้งเตือนเมื่อมีใบจองใหม่หรือสต๊อกใกล้หมด', DriveFolderId: 'โฟลเดอร์ Drive เก็บรูปอัปโหลด', SystemName: 'ชื่อเว็บแอป (แสดงบนแท็บเบราว์เซอร์/หน้า login/เมนู — ใช้ตอนนำไปสำเนาใช้กับร้าน/แบรนด์อื่น)', LogoUrl: 'โลโก้เว็บแอป (แสดงหน้า login/แถบเมนู/ส่วนท้าย)', InvoiceCompanyName: 'ชื่อบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyAddress: 'ที่อยู่บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyEmail: 'อีเมลติดต่อ (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceLogoUrl: 'โลโก้บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', ApproverSignatureUrl: 'รูปลายเซ็นผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)', ApproverName: 'ชื่อผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)' };
           sheet.getRange(newRow, 2).setNumberFormat('@');
           sheet.getRange(newRow, 1, 1, 3).setValues([[key, val, remarkMap[key] || key]]);
         }

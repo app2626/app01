@@ -47,7 +47,7 @@
 
   /* === Base Styles === */
   body {
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     /* รอบ "แบนราบ": พื้นหลังเดิมเป็น gradient พาสเทลไล่สี ทำให้การ์ดแบบทึบ (ไม่ blur แล้ว) ดูขัดกัน — เปลี่ยนเป็นพื้นเรียบสีเดียว */
@@ -1127,4 +1127,212 @@
       border-left-color: #34d399;
     }
   }
+
+  /* === หน้ารายการสินค้าสไตล์หน้าหมวด BNN: แถบกรองซ้าย / หัวข้อ+จำนวน / แถบเรียงตาม / เลขหน้า — scoped ด้วย .pos-storefront === */
+  .pos-storefront .sf-panel { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; padding: 14px; }
+  .pos-storefront .sf-title { font-weight: 900; font-size: 14px; color: #141416; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .pos-storefront .sf-title i { color: #FF6B00; }
+  .pos-storefront .sf-switch { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0 12px; font-size: 12px; font-weight: 700; color: #334155; border-bottom: 1px solid #f1f5f9; }
+  .pos-storefront .sf-knob { width: 34px; height: 18px; border-radius: 9999px; background: #cbd5e1; position: relative; transition: background .18s; flex-shrink: 0; }
+  .pos-storefront .sf-knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .18s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .pos-storefront .sf-switch.on .sf-knob { background: #FF6B00; }
+  .pos-storefront .sf-switch.on .sf-knob::after { transform: translateX(16px); }
+  .pos-storefront .sf-group { border-bottom: 1px solid #f1f5f9; padding: 4px 0; }
+  .pos-storefront .sf-group summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 8px 0; font-size: 13px; font-weight: 800; color: #141416; }
+  .pos-storefront .sf-group summary::-webkit-details-marker { display: none; }
+  .pos-storefront .sf-group summary i { font-size: 10px; color: #94a3b8; transition: transform .18s; }
+  .pos-storefront .sf-group:not([open]) summary i { transform: rotate(-90deg); }
+  .pos-storefront .sf-body { padding-bottom: 8px; display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
+  .pos-storefront .sf-opt { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 12px; color: #475569; text-align: left; font-weight: 500; }
+  .pos-storefront .sf-opt:hover { color: #141416; }
+  .pos-storefront .sf-opt.on { color: #141416; font-weight: 800; }
+  .pos-storefront .sf-box { width: 16px; height: 16px; border: 1.5px solid #cbd5e1; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 9px; color: #fff; background: #fff; }
+  .pos-storefront .sf-opt.on .sf-box { background: #FF6B00; border-color: #FF6B00; }
+  .pos-storefront .sf-clear { width: 100%; margin-top: 12px; padding: 8px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 12px; font-weight: 700; color: #E11D48; background: #fff; }
+  .pos-storefront .sf-clear:disabled { color: #94a3b8; cursor: not-allowed; }
+  .pos-storefront .sf-clear:not(:disabled):hover { background: #fff1f2; border-color: #fecdd3; }
+  .pos-storefront .sf-crumb { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #94a3b8; margin-bottom: 6px; flex-wrap: wrap; }
+  .pos-storefront .sf-crumb i { font-size: 8px; }
+  .pos-storefront .sf-crumb .cur { color: #141416; font-weight: 700; }
+  .pos-storefront .sf-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pos-storefront .sf-h1 { font-size: 22px; font-weight: 900; color: #141416; line-height: 1.2; }
+  .pos-storefront .sf-count { font-size: 13px; color: #64748b; font-weight: 600; }
+  .pos-storefront .sf-sortbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0 12px; border-bottom: 1px solid #e2e8f0; margin-bottom: 14px; }
+  .pos-storefront .sf-sort { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; font-weight: 600; }
+  .pos-storefront .sf-sort select { border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700; color: #141416; background: #fff; }
+  .pos-storefront .sf-filter-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 12px; font-weight: 700; color: #141416; background: #fff; position: relative; }
+  .pos-storefront .sf-dot { width: 7px; height: 7px; border-radius: 50%; background: #FF6B00; display: inline-block; }
+  .pos-storefront .sf-brand { font-size: 10px; font-weight: 800; letter-spacing: .06em; color: #94a3b8; }
+  .pos-storefront .sf-save { font-size: 11px; font-weight: 700; color: #059669; }
+  .pos-storefront .sf-save i { margin-right: 4px; }
+  .pos-storefront .sf-stock { font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+  .pos-storefront .sf-stock.ok { color: #059669; }
+  .pos-storefront .sf-stock.low { color: #ea580c; }
+  .pos-storefront .sf-stock.out { color: #94a3b8; }
+  .pos-storefront .sf-pager, .sf-pager { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 0 24px; }
+  .sf-pager .sf-pg { min-width: 34px; height: 34px; padding: 0 8px; border-radius: 9px; border: 1px solid #e2e8f0; background: #fff; font-size: 13px; font-weight: 700; color: #475569; display: inline-flex; align-items: center; justify-content: center; }
+  .sf-pager .sf-pg:hover:not(:disabled):not(.on) { border-color: #141416; color: #141416; }
+  .sf-pager .sf-pg.on { background: #141416; border-color: #141416; color: #FF6B00; }
+  .sf-pager .sf-pg:disabled { opacity: .35; cursor: not-allowed; }
+  .sf-pager .sf-pg-gap { color: #94a3b8; padding: 0 2px; }
+  .pos-storefront .pos-card { border-color: #eef0f3; }
+  .pos-storefront .pos-card:hover { transform: none; border-color: #cbd5e1; box-shadow: 0 10px 24px -8px rgba(15, 23, 42, 0.16); }
+  html.dark .pos-storefront .sf-panel, html.dark .pos-storefront .sf-sort select, html.dark .pos-storefront .sf-filter-btn, html.dark .pos-storefront .sf-clear { background: #1e293b; border-color: #334155; }
+  html.dark .pos-storefront .sf-title, html.dark .pos-storefront .sf-h1, html.dark .pos-storefront .sf-group summary, html.dark .pos-storefront .sf-opt.on, html.dark .pos-storefront .sf-crumb .cur, html.dark .pos-storefront .sf-sort select, html.dark .pos-storefront .sf-filter-btn { color: #f1f5f9; }
+  html.dark .pos-storefront .sf-opt, html.dark .pos-storefront .sf-switch { color: #cbd5e1; }
+  html.dark .pos-storefront .sf-group, html.dark .pos-storefront .sf-switch, html.dark .pos-storefront .sf-sortbar { border-color: #334155; }
+  html.dark .sf-pager .sf-pg { background: #1e293b; border-color: #334155; color: #cbd5e1; }
+  html.dark .sf-pager .sf-pg.on { background: #0f172a; color: #FF6B00; }
+  @media (min-width: 1024px) { .pos-storefront .sf-filter-btn { display: none; } }
+  /* ให้ z-index ของปุ่มบนการ์ด (เทียบสเปค/รายการโปรด/ป้าย) อยู่ภายในการ์ดเอง ไม่ลอยทะลุ overlay เลือกช่องทาง/สาขา */
+  .pos-storefront .pos-card { isolation: isolate; }
+  /* ช่องช่วงราคาที่พิมพ์เอง / สวอตช์สี / บรรทัดราคารุ่นที่เลือก */
+  .pos-storefront .sf-price { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .pos-storefront .sf-price input { width: 0; flex: 1; min-width: 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 8px; font-size: 12px; font-weight: 600; color: #141416; background: #fff; }
+  .pos-storefront .sf-price input:focus { outline: none; border-color: #FF6B00; box-shadow: 0 0 0 2px rgba(255,107,0,.2); }
+  .pos-storefront .sf-price span { color: #94a3b8; }
+  .pos-storefront .sf-price-go { padding: 6px 10px; border-radius: 8px; background: #141416; color: #FF6B00; font-size: 11px; font-weight: 800; }
+  .pos-storefront .sf-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #cbd5e1; flex-shrink: 0; }
+  .pos-storefront .sf-selprice { font-size: 11px; color: #64748b; font-weight: 600; }
+  .pos-storefront .sf-selprice b { color: #141416; font-weight: 800; font-size: 12px; }
+  html.dark .pos-storefront .sf-price input { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+  html.dark .pos-storefront .sf-selprice b, html.dark .pos-storefront .sf-range { color: #f1f5f9; }
+  /* แนะนำซื้อคู่ (ตะกร้า + กล่องเด้งหลังเพิ่มสินค้าหลัก) — ใช้คลาสของตัวเองแทน utility ของ Tailwind เพื่อให้โหมดมืดไม่เพี้ยน */
+  .sf-comp-panel { border: 1px solid #fde68a; background: #fffbeb; border-radius: 16px; padding: 12px; }
+  .sf-comp-h { color: #141416; }
+  html.dark .sf-comp-panel { background: #1b2536; border-color: #6b5314; }
+  html.dark .sf-comp-h { color: #f1f5f9; }
+  html.dark .sf-comp { background: #1e293b; border-color: #334155; }
+  /* ===================================================
+     DESIGN POLISH — โทนเดียวทั้งระบบ: กรมท่า (โครงสร้าง) + ส้ม (ปุ่มหลัก/จุดเน้น)
+     =================================================== */
+  :root {
+    --brand-navy: #0f2a43;
+    --brand-navy-2: #1b3a59;
+    --brand-orange: #FF6B00;
+    --brand-orange-2: #ff8a3d;
+    --ring-brand: 0 0 0 3px rgba(255, 107, 0, 0.28);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  body, .swal2-popup { font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif; }
+  .swal2-popup { font-family: 'Plus Jakarta Sans', 'Sarabun', sans-serif !important; }
+  h1, h2, h3 { letter-spacing: -0.01em; }
+  .tabular-nums, [class*="price"], .sf-range, .sf-selprice { font-variant-numeric: tabular-nums; }
+  html { scroll-behavior: smooth; }
+
+  /* พื้นหลังหน้าหลัก: แสงโทนกรมท่า/ส้มจางๆ แทนพื้นเรียบ */
+  html:not(.dark) body {
+    background:
+      radial-gradient(1100px 520px at 88% -8%, rgba(255, 107, 0, 0.06), transparent 62%),
+      radial-gradient(900px 520px at -8% 0%, rgba(37, 77, 113, 0.08), transparent 58%),
+      #f5f7fa;
+    background-attachment: fixed;
+  }
+
+  /* โฟกัสคีย์บอร์ดที่มองเห็นชัด (เดิมมีแค่บางจุด) */
+  button:focus-visible, a:focus-visible, select:focus-visible, [role="button"]:focus-visible,
+  input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible {
+    outline: none;
+    box-shadow: var(--ring-brand);
+  }
+  button:not(:disabled):active { transform: translateY(1px) scale(0.985); }
+  button { transition-property: background-color, border-color, color, box-shadow, transform, opacity; transition-duration: 180ms; }
+
+  /* ---------- หน้าเข้าสู่ระบบ ---------- */
+  .login-shade {
+    background:
+      radial-gradient(700px 420px at 15% 10%, rgba(255, 107, 0, 0.16), transparent 60%),
+      linear-gradient(135deg, rgba(8, 22, 36, 0.93), rgba(20, 50, 78, 0.84) 55%, rgba(8, 22, 36, 0.93)) !important;
+  }
+  .login-card {
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow: 0 40px 90px -24px rgba(2, 12, 27, 0.65), 0 2px 0 rgba(255, 255, 255, 0.6) inset !important;
+  }
+  #loginLogoBox:not(:has(.app-logo-img)), #sidebarLogoBox:not(:has(.app-logo-img)) {
+    background: linear-gradient(145deg, #1f4466 0%, #0f2a43 100%) !important;
+    box-shadow: 0 10px 22px -8px rgba(15, 42, 67, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+  #loginLogoBox:not(:has(.app-logo-img)) i, #sidebarLogoBox:not(:has(.app-logo-img)) i { color: var(--brand-orange-2); }
+  .login-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
+  .login-chips span {
+    font-size: 11px; font-weight: 600; color: #475569; padding: 4px 10px; border-radius: 999px;
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+  }
+  .login-chips i { color: var(--brand-orange); margin-right: 4px; font-size: 10px; }
+  .btn-brand {
+    background: linear-gradient(180deg, #2a5782 0%, #1b3a59 100%) !important;
+    box-shadow: 0 10px 22px -10px rgba(15, 42, 67, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+  }
+  .btn-brand:hover { background: linear-gradient(180deg, #31648f 0%, #214568 100%) !important; transform: translateY(-1px); }
+  .btn-brand:active { transform: translateY(1px) scale(0.99); }
+
+  /* ---------- แถบเมนูด้านข้าง ---------- */
+  #desktopSidebar { box-shadow: 1px 0 0 rgba(15, 42, 67, 0.04), 12px 0 32px -24px rgba(15, 42, 67, 0.25); }
+
+  /* ---------- การ์ดสินค้าหน้าร้าน ---------- */
+  .pos-storefront .pos-card {
+    border-radius: 18px;
+    border: 1px solid #e8edf3;
+    box-shadow: 0 1px 2px rgba(15, 42, 67, 0.04), 0 8px 20px -14px rgba(15, 42, 67, 0.18);
+    animation: sfCardIn 0.45s var(--ease-out) both;
+  }
+  .pos-storefront .pos-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255, 107, 0, 0.55);
+    box-shadow: 0 22px 36px -16px rgba(15, 42, 67, 0.28), 0 0 0 1px rgba(255, 107, 0, 0.35);
+  }
+  .pos-storefront .pos-card > div:first-of-type + div,
+  .pos-storefront .pos-card .relative.flex.items-center.justify-center {
+    background: radial-gradient(120% 90% at 50% 0%, #ffffff 0%, #f3f6fa 100%);
+  }
+  .pos-storefront .pos-card:hover img { transform: scale(1.05); }
+  .pos-storefront .pos-card img { transition: transform 0.45s var(--ease-out); }
+  .pos-storefront .pos-card:nth-child(2) { animation-delay: 40ms; }
+  .pos-storefront .pos-card:nth-child(3) { animation-delay: 80ms; }
+  .pos-storefront .pos-card:nth-child(4) { animation-delay: 120ms; }
+  .pos-storefront .pos-card:nth-child(5) { animation-delay: 160ms; }
+  .pos-storefront .pos-card:nth-child(6) { animation-delay: 200ms; }
+  .pos-storefront .pos-card:nth-child(n+7) { animation-delay: 240ms; }
+  @keyframes sfCardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ปุ่มหลักในการ์ด (จองด่วน): ส้มไล่เฉด มีมิติ */
+  .pos-storefront .pos-card .bnn-buy-btn:not(:disabled) {
+    background: linear-gradient(180deg, #ff8333 0%, #ff6b00 100%);
+    box-shadow: 0 10px 18px -10px rgba(255, 107, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pos-storefront .pos-card { animation: none; }
+    html { scroll-behavior: auto; }
+    * { transition-duration: 0.01ms !important; }
+  }
+
+  /* ---------- โหมดมืด: คู่กับกฎด้านบน ---------- */
+  html.dark .login-chips span { background: #1e293b; border-color: #334155; color: #cbd5e1; }
+  html.dark .pos-storefront .pos-card { border-color: #2b3a4f; box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 24px -14px rgba(0,0,0,0.6); }
+  html.dark .pos-storefront .pos-card .relative.flex.items-center.justify-center { background: radial-gradient(120% 90% at 50% 0%, #243449 0%, #182436 100%); }
+  /* โลโก้เริ่มต้นทุกตำแหน่งใช้โทนเดียวกัน */
+  #mobileLogoBox:not(:has(.app-logo-img)), #footerLogoBox:not(:has(.app-logo-img)) {
+    background: linear-gradient(145deg, #1f4466 0%, #0f2a43 100%) !important;
+  }
+  #mobileLogoBox:not(:has(.app-logo-img)) i, #footerLogoBox:not(:has(.app-logo-img)) i { color: var(--brand-orange-2); }
+
+  /* ---------- มือถือ: ย่อส่วนหัวหน้าร้านให้เห็นสินค้าเร็วขึ้น ---------- */
+  @media (max-width: 640px) {
+    #posTimerBanner { padding: 10px 12px; gap: 8px; margin-bottom: 10px; }
+    #posTimerPeriodText { display: none; }
+    #posTimerBanner > div:last-child {
+      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+      padding-top: 8px; gap: 8px;
+    }
+    #posTimerBanner > div:last-child::-webkit-scrollbar { display: none; }
+    #posTimerBanner > div:last-child > * { flex-shrink: 0; }
+    .pos-storefront .pos-card { border-radius: 16px; }
+  }
+  /* ---------- โหมดมืด: จุดที่ยังสว่าง/อ่านยาก ---------- */
+  html.dark [class*="bg-slate-50/"] { background-color: rgba(30, 41, 59, 0.72) !important; border-color: #334155 !important; }
+  html.dark .login-card { border-color: rgba(255, 255, 255, 0.12) !important; box-shadow: 0 40px 90px -24px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.08) inset !important; }
+  html.dark .login-card .bg-amber-50 { background: rgba(245, 158, 11, 0.14) !important; border-color: rgba(245, 158, 11, 0.4) !important; color: #fde68a !important; }
+  html.dark .login-card .bg-amber-50 span { color: #fde68a !important; }
+  html.dark .pos-storefront .pos-card img[src^="data:image/svg"] { filter: brightness(0.5) saturate(0.85); }
 </style>

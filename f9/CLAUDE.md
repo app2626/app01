@@ -8,7 +8,15 @@ f9 is a Google Apps Script (GAS) web app — a Mobile Pre-Order/POS/invoice syst
 
 ## Commands
 
-There is no build step, bundler, or test suite — `package.json`'s `test` script is a placeholder. Development is edit-the-file-directly, then:
+There is no build step or bundler. Development is edit-the-file-directly, then run the local test harness before any push:
+
+```bash
+npm test              # server (Code.js against an in-memory GAS mock) + client (real Index/CSS/JS in headless Chrome)
+npm run test:server  # ~100 checks, no browser needed
+npm run test:client  # ~105 checks; needs Chrome/Edge (set CHROME_PATH if not in a standard location); screenshots land in tests/out/
+```
+
+The harness lives in `tests/` (`gasmock.js` = in-memory SpreadsheetApp/CacheService/LockService/etc., `server.test.js`, `client.test.js`). When changing seeded data or product counts, update the expected counts in `client.test.js`. It is not a substitute for a real deployment check. Deploy flow:
 
 ```bash
 # Push local changes to the Apps Script project (updates @HEAD / the editor's live code only)
@@ -54,4 +62,6 @@ This only catches syntax errors, not logic bugs — there is no automated way to
 
 **Server-side text sanitization** (`sanitizeSheetText_()`, a leading-`=+-@` formula-injection guard) is opt-in per column, via a `*_FREE_TEXT_COLS_`-style allowlist next to each write path (`SAVE_RECORD_FREE_TEXT_COLS_`, `PRODUCT_GROUP_FREE_TEXT_FIELDS_`, the `FREE_TEXT_COLS_` inside `updateFullOrder`) — **numeric/select/ID columns are deliberately excluded** (sanitizing a numeric column would corrupt it), so when adding a new free-text field to an existing table, it must be added to that table's allowlist explicitly or it silently ships unsanitized. This has happened before (`saveInvoice`'s `Invoice Date` field) — grep for `sanitizeSheetText_` near a save function before assuming a new field is covered.
 
-**Dark mode** is a real per-viewer toggle (`html.dark` class), not a separate theme build — it works by overriding Tailwind *utility classes* wholesale in `CSS.html` (`html.dark .bg-indigo-50 { ... !important }`, `html.dark .text-black { ... !important }`, etc.), so any element built from those same utility classes gets dark-mode-correct colors automatically. The one thing this doesn't cover is CSS written as literal hex/ID-selector rules outside the Tailwind-class system (e.g. `#dataTable th`) — those need an explicit `html.dark #dataTable th { ... }` companion rule, easy to forget. The `indigo` and `slate` Tailwind color scales are remapped in `Index.html`'s inline `tailwind.config` (`indigo` → a navy/teal brand palette, not stock purple-indigo) — check that config before assuming a Tailwind color name maps to its default hex.
+**Storefront (`window.app.pos`)** keeps its filter state in `storeFilters` and mirrors it to the URL through `syncUrl`/`applyUrlParams` (`google.script.history`, because the app runs inside the GAS iframe and `window.location.search` never sees the outer URL). Public order tracking works the same way: `doGet` validates `?track=`/`?orderId=` (`^[A-Za-z0-9_-]{1,64}$`) and injects it as `window.__TRACK_PARAM` in `Index.html`. Product channel matching goes through `window.app.channelOk()` (`ALL`/`*`/`ทั้งหมด` = every channel) — but the storefront filter deliberately keeps the old strict match for gift rows, because `setupDatabase` seeds gifts with channel `ALL` and they must not become sellable cards. Cards group SKUs by `Model`, so price sorting uses each model's minimum price. Companion ("ซื้อคู่") suggestions are derived from `AutoPromotions` rules (`recommendCompanions`), with no extra sheet column; `window.app.NO_IMG` is the inline SVG placeholder used instead of external placeholder services.
+
+**Dark mode** is a real per-viewer toggle (`html.dark` class), not a separate theme build — it works by overriding Tailwind *utility classes* wholesale in `CSS.html` (`html.dark .bg-indigo-50 { ... !important }`, `html.dark .text-black { ... !important }`, etc.), so any element built from those same utility classes gets dark-mode-correct colors automatically. The one thing this doesn't cover is CSS written as literal hex/ID-selector rules outside the Tailwind-class system (e.g. `#dataTable th`) — those need an explicit `html.dark #dataTable th { ... }` companion rule, easy to forget. The `indigo` and `slate` Tailwind color scales are remapped in `Index.html`'s `tailwind.config`, which **must be assigned after the CDN `<script>` tag** (assigning `window.tailwind` before it is silently overwritten — that mistake left every `indigo-*` class stock purple for months). Tailwind's own `borderRadius`/`backdropBlur` overrides were intentionally left out. The remap (`indigo` → a navy/teal brand palette, not stock purple-indigo) — check that config before assuming a Tailwind color name maps to its default hex.

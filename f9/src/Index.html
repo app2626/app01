@@ -48,7 +48,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <?!= include('CSS'); ?>
 </head>
@@ -58,7 +58,7 @@
   <template id="tmpl-login">
     <div class="relative flex items-center justify-center min-h-screen bg-slate-900 px-4 overflow-hidden">
       <div id="loginBg" class="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000 opacity-30 pointer-events-none"></div>
-      <div class="absolute inset-0 bg-slate-900/70 z-0 pointer-events-none"></div>
+      <div class="login-shade absolute inset-0 bg-slate-900/70 z-0 pointer-events-none"></div>
 
       <button onclick="window.app.toggleTheme()" aria-label="สลับโหมดมืด/สว่าง" title="สลับโหมดมืด/สว่าง" class="absolute top-5 right-5 z-20 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white flex items-center justify-center transition-all">
         <i class="fas fa-moon theme-toggle-icon"></i>
@@ -79,6 +79,7 @@
           </div>
           <h3 class="text-2xl font-black text-slate-800 tracking-tight leading-tight"><?= appName ?></h3>
           <p class="text-[11px] text-slate-400 mt-2 font-bold uppercase tracking-[0.2em]">Enterprise Management Portal</p>
+          <div class="login-chips"><span><i class="fas fa-check"></i>จองสินค้า</span><span><i class="fas fa-check"></i>ใบเสนอราคา</span><span><i class="fas fa-check"></i>ติดตามสถานะ</span></div>
         </div>
         
         <form id="loginForm" onsubmit="window.app.handleLogin(event)" class="space-y-4">
@@ -100,7 +101,7 @@
             <input type="checkbox" id="loginRemember" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0">
             จดจำ Username และ Password
           </label>
-          <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-sm transition-all text-sm tracking-wide" id="btnLogin">
+          <button type="submit" class="btn-brand w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-sm transition-all text-sm tracking-wide" id="btnLogin">
             <i class="fas fa-sign-in-alt mr-2"></i>เข้าสู่ระบบ
           </button>
         </form>
@@ -483,7 +484,7 @@
              <div class="flex items-center gap-3 relative z-10 flex-wrap">
                 <div class="bnn-flash-emblem px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                    <i class="fas fa-bolt text-[#E11D48] text-sm animate-pulse"></i>
-                   <span class="font-black text-xs md:text-sm tracking-tight uppercase">FLASH SALE</span>
+                   <span class="font-black text-xs md:text-sm tracking-tight uppercase">Pre Booking</span>
                 </div>
                 <div class="flex flex-col">
                    <div class="flex items-center gap-2">
@@ -555,7 +556,7 @@
                       <div class="w-16 h-16 rounded-2xl bg-[#141416] text-[#FF6B00] flex items-center justify-center mx-auto mb-4 shadow-md border-2 border-[#FF6B00]">
                           <i class="fas fa-bolt text-2xl"></i>
                       </div>
-                      <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider mb-2">FLASH SALE STOREFRONT</span>
+                      <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider mb-2">Pre Booking STOREFRONT</span>
                       <h3 class="text-base md:text-lg font-black text-slate-800">กรุณาเลือกช่องทางและสาขาเพื่อเริ่มช้อปดีลพิเศษ</h3>
                       <p class="text-xs text-slate-500 mt-1.5 font-medium">ระบบจะแสดงรายการสินค้า สต๊อกคงเหลือ และโปรโมชั่นของแถมตามสาขาที่เลือก</p>
                   </div>
@@ -575,8 +576,13 @@
               <div id="posRecentlyViewed" class="hidden mb-2 shrink-0"></div>
 
               <!-- 6B — category tiles + sub-chips รุ่น + filter chips (render โดย pos.renderStoreHeader) -->
-              <div id="storeFilterBar" class="pos-storefront shrink-0"></div>
-              <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar pr-1" id="productGrid"></div>
+              <div class="lg:flex-1 lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-6">
+                <aside id="storeSidebar" class="pos-storefront hidden lg:block lg:w-60 xl:w-64 shrink-0 lg:overflow-y-auto custom-scrollbar"></aside>
+                <div class="flex-1 min-w-0 flex flex-col lg:min-h-0">
+                  <div id="storeFilterBar" class="pos-storefront shrink-0"></div>
+                  <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar pr-1" id="productGrid"></div>
+                </div>
+              </div>
 
               <!-- BNN Trust & Guarantee Micro-Bar -->
               <div class="mt-2 pt-2.5 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-600 font-bold shrink-0">
@@ -586,7 +592,7 @@
                 </div>
                 <div class="flex items-center gap-2 bg-slate-50/80 px-3 py-1.5 rounded-xl border border-slate-100">
                   <i class="fas fa-bolt text-amber-500 text-sm"></i>
-                  <span class="truncate">ล็อกราคา Flash Sale ทันที</span>
+                  <span class="truncate">ล็อกราคา Pre Booking ทันที</span>
                 </div>
                 <div class="flex items-center gap-2 bg-slate-50/80 px-3 py-1.5 rounded-xl border border-slate-100">
                   <i class="fas fa-gifts text-[#E11D48] text-sm"></i>
@@ -659,6 +665,7 @@
           <div class="cart-drawer-content p-4 bg-slate-50 custom-scrollbar">
               <div id="cartAutoSuggest" class="mb-3 empty:hidden transition-all"></div>
               <div id="cartItems"></div>
+              <div id="cartCompanions" class="hidden mt-1 mb-3"></div>
               
               <!-- Order Summary (Moved from Footer for Scrollability) -->
               <div class="mt-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80">
@@ -805,7 +812,7 @@
                   <!-- Right side: Details & Variants -->
                   <div class="w-full md:w-8/12 flex flex-col">
                      <div class="mb-4 pb-3 border-b border-slate-100">
-                        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-[#E11D48] text-[10px] font-black mb-1.5 border border-rose-100"><i class="fas fa-bolt"></i> ราคาพิเศษ FLASH SALE</div>
+                        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-[#E11D48] text-[10px] font-black mb-1.5 border border-rose-100"><i class="fas fa-bolt"></i> ราคาพิเศษ Pre Booking</div>
                         <h4 id="modalProdName" class="font-black text-slate-900 mb-1.5 leading-snug text-base md:text-lg"></h4>
                         <div class="text-xl md:text-2xl font-black text-[#E11D48] tabular-nums" id="modalProdPrice"></div>
                         <input type="hidden" id="modalProdSKU">
@@ -858,7 +865,7 @@
                <button type="button" class="px-4 py-2.5 bg-slate-900 hover:bg-black text-[#FF6B00] text-xs md:text-sm font-extrabold rounded-xl transition-colors shadow-sm flex items-center gap-1.5" onclick="window.app.pos.openQuoteModal('product')"><i class="fas fa-file-invoice-dollar text-[#FF6B00]"></i> ออกใบเสนอราคา / ส่ง LINE</button>
                <div class="flex items-center gap-2 ml-auto">
                   <button type="button" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm" onclick="window.app.hideModal('addToCartModal')">ยกเลิก</button>
-                  <button type="button" class="px-6 py-2.5 bg-[#FF6B00] hover:bg-[#E05300] text-white text-sm font-black rounded-xl shadow-md transition-all flex items-center gap-2" onclick="window.app.pos.confirmAddToCart()"><i class="fas fa-cart-plus text-[#E11D48]"></i> เพิ่มลงตะกร้า Flash Sale</button>
+                  <button type="button" class="px-6 py-2.5 bg-[#FF6B00] hover:bg-[#E05300] text-white text-sm font-black rounded-xl shadow-md transition-all flex items-center gap-2" onclick="window.app.pos.confirmAddToCart()"><i class="fas fa-cart-plus text-[#E11D48]"></i> เพิ่มลงตะกร้า Pre Booking</button>
                </div>
             </div>
             
@@ -1401,7 +1408,7 @@
           <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-5xl flex flex-col max-h-[90vh]">
             <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-900 text-white">
                <div>
-                 <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-bolt text-[#E11D48]"></i> QUICK EDIT</span> แก้ไขราคา Flash Sale / ราคาเดิม / สต๊อกแบบกลุ่มด่วน</h3>
+                 <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-bolt text-[#E11D48]"></i> QUICK EDIT</span> แก้ไขราคา Pre Booking / ราคาเดิม / สต๊อกแบบกลุ่มด่วน</h3>
                  <p class="text-[11px] text-slate-300 mt-0.5">ปรับแก้ตัวเลขในตารางได้หลาย SKU พร้อมกัน แล้วกดบันทึกครั้งเดียว</p>
                </div>
                <button type="button" class="text-slate-300 hover:text-white w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10" onclick="window.app.hideModal('bulkQuickEditModal')"><i class="fas fa-times text-lg"></i></button>
@@ -1668,15 +1675,15 @@
     </div>
   </div>
 
+  <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    window.tailwind = {
-      config: {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              // รอบปรับโทน "พรีเมี่ยม" (2026-07-10): เปลี่ยน indigo scale เดิม (bright indigo #6366f1) เป็น slate-navy เข้ม+เรียบหรู
-              // จุดเดียวนี้ไล่สีทั่วแอปอัตโนมัติ เพราะปุ่ม/แถบเมนู/badge ส่วนใหญ่อ้างอิง indigo-* คลาสอยู่แล้ว ไม่ต้องแก้ทีละจุด
+    /* ต้องตั้งหลังโหลด CDN: ถ้าตั้ง window.tailwind ก่อน ตัว CDN จะเขียนทับทั้งก้อน (ชุดสีนี้ไม่เคยถูกใช้จริง ปุ่ม indigo-* จึงเป็นม่วงมาตรฐาน)
+       ไม่เปิดใช้ borderRadius/backdropBlur แบบ "แบนราบ" ที่เคยเขียนไว้ เพราะไม่เคยแสดงผลจริง และจะเปลี่ยนหน้าตาทั้งแอป */
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
               indigo: { 50: '#eef3f8', 100: '#dce7f0', 200: '#b8cee1', 300: '#85abc9', 400: '#5485ad', 500: '#366891', 600: '#254d71', 700: '#1b3a59', 800: '#112840', 900: '#0a1a2a' },
               slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
               emerald: { 50: '#ecfdf5', 100: '#d1fae5', 400: '#34d399', 500: '#10b981', 600: '#059669' },
@@ -1684,42 +1691,27 @@
               rose: { 50: '#fff1f2', 100: '#ffe4e6', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48' },
               cyan: { 50: '#ecfeff', 400: '#22d3ee', 500: '#06b6d4' },
               purple: { 50: '#faf5ff', 400: '#c084fc', 500: '#a855f7' }
-            },
-            fontFamily: {
-              sans: ['Sarabun', 'sans-serif'],
-            },
-            boxShadow: {
-              'enterprise': '0 10px 25px -3px rgba(0, 0, 0, 0.06), 0 4px 10px -4px rgba(0, 0, 0, 0.04)',
-              'enterprise-lg': '0 20px 40px -8px rgba(0, 0, 0, 0.08), 0 8px 16px -6px rgba(0, 0, 0, 0.04)',
-              'glow-indigo': '0 0 20px -5px rgba(37, 77, 113, 0.35)',
-            },
-            // รอบ "แบนราบ" (flatten, สไตล์ pbzf8): จุดเดียวลดความโค้ง/บลัวร์ทั่วแอป — ใช้หลักการเดียวกับ indigo override ด้านบน
-            // ไม่แก้สี ไม่แตะ FontAwesome — ลด rounded-2xl/3xl และปิด backdrop-blur ให้เกือบเป็น 0 โดยไม่ต้องไล่แก้ทีละคลาส
-            borderRadius: {
-              '2xl': '0.5rem',
-              '3xl': '0.625rem',
-            },
-            backdropBlur: {
-              sm: '2px',
-              DEFAULT: '2px',
-              md: '2px',
-              lg: '2px',
-              xl: '2px',
-              '2xl': '2px',
-              '3xl': '2px',
-            }
+          },
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'Sarabun', 'sans-serif'],
+          },
+          boxShadow: {
+            'enterprise': '0 10px 25px -3px rgba(15, 42, 67, 0.08), 0 4px 10px -4px rgba(15, 42, 67, 0.05)',
+            'enterprise-lg': '0 20px 40px -8px rgba(15, 42, 67, 0.12), 0 8px 16px -6px rgba(15, 42, 67, 0.06)',
+            'glow-indigo': '0 0 20px -5px rgba(37, 77, 113, 0.35)',
           }
         }
       }
     };
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script>window.__TRACK_PARAM = <?!= JSON.stringify(trackParam || '') ?>;</script>
   <?!= include('JS'); ?>
 </body>
 </html>

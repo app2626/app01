@@ -1,5 +1,8 @@
 <script>
 window.app = {
+  // ภาพแทนเมื่อไม่มีรูปสินค้า — SVG ในตัว ไม่พึ่งบริการภายนอก (via.placeholder.com ไม่เสถียร) และไม่มีข้อความภาษาอังกฤษ
+  NO_IMG: "data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20200%20200%27%3E%3Cdefs%3E%3ClinearGradient%20id=%27g%27%20x1=%270%27%20y1=%270%27%20x2=%271%27%20y2=%271%27%3E%3Cstop%20offset=%270%27%20stop-color=%27%23f1f5f9%27/%3E%3Cstop%20offset=%271%27%20stop-color=%27%23dce7f0%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width=%27200%27%20height=%27200%27%20rx=%2728%27%20fill=%27url%28%23g%29%27/%3E%3Crect%20x=%2770%27%20y=%2734%27%20width=%2760%27%20height=%27132%27%20rx=%2713%27%20fill=%27none%27%20stroke=%27%2385abc9%27%20stroke-width=%275%27/%3E%3Crect%20x=%2791%27%20y=%2745%27%20width=%2718%27%20height=%274%27%20rx=%272%27%20fill=%27%2385abc9%27/%3E%3Ccircle%20cx=%27100%27%20cy=%27150%27%20r=%274.5%27%20fill=%27%2385abc9%27/%3E%3C/svg%3E",
+
   user: null,
   globalData: { products: [], promotions: [], branches: [], channels: [], interests: [], heroBanners: [], gridBanners: [], popupBanners: [], giftMappings: [] },
   cart: [],
@@ -179,6 +182,16 @@ window.app = {
 
   // Empty/error state มาตรฐานเดียวทั้งระบบ (5A.4) — คืน HTML string
   // opts.onclick ต้องเป็นโค้ดที่เราเขียนเองเท่านั้น (ห้ามมีข้อมูลผู้ใช้) เพราะฝังลง attribute ตรงๆ
+  // สินค้าแสดงในช่องทางนี้ไหม — เว้นว่าง/'*'/'ALL'/'ทั้งหมด' = ทุกช่องทาง (ก่อนหน้านี้ 'ALL' ถูกมองเป็นชื่อช่องทางจริงแล้วสินค้าหายหมด)
+  channelOk: function(prodChannel, current) {
+    const pc = (prodChannel == null ? '' : String(prodChannel)).trim();
+    const cur = (current == null ? '' : String(current)).trim();
+    if (!cur || !pc) return true;
+    const toks = pc.split(/[,;|]/).map(t => t.trim().toLowerCase()).filter(Boolean);
+    if (toks.some(t => t === '*' || t === 'all' || t === 'ทั้งหมด')) return true;
+    return pc.includes(cur);
+  },
+
   emptyState: function(opts) {
     opts = opts || {};
     const icon = opts.icon || 'fa-inbox';
@@ -240,7 +253,7 @@ window.app = {
   },
 
   formatImageUrl: function(url, size='w500') {
-    if (!url || url.trim() === '-' || url.trim() === '') return "https:\/\/via.placeholder.com/150?text=No+Image";
+    if (!url || url.trim() === '-' || url.trim() === '') return window.app.NO_IMG;
     if (url.includes(',')) url = url.split(',')[0].trim();
     const driveRegex = /(?:drive\.google\.com\/.*[?&]id=|drive\.google\.com\/file\/d\/)([^/?&]+)/;
     const match = url.match(driveRegex);
@@ -248,7 +261,7 @@ window.app = {
     return url;
   },
   parseImageUrls: function(urlsStr) {
-    if (!urlsStr || urlsStr.trim() === '-' || urlsStr.trim() === '') return ["https:\/\/via.placeholder.com/150?text=No+Image"];
+    if (!urlsStr || urlsStr.trim() === '-' || urlsStr.trim() === '') return [window.app.NO_IMG];
     return urlsStr.split(',').map(u => {
         let trimmed = u.trim();
         if (!trimmed) return null;
@@ -1440,8 +1453,9 @@ window.app = {
       window.app.renderLogin();
     }
     try {
+      // ใน GAS ลิงก์ ?track= อยู่ที่ URL ชั้นนอก iframe มองไม่เห็นผ่าน window.location — server ส่งค่ามาให้ใน window.__TRACK_PARAM
       const urlParams = new URLSearchParams(window.location.search);
-      const trackParam = urlParams.get('track') || urlParams.get('orderId');
+      const trackParam = window.__TRACK_PARAM || urlParams.get('track') || urlParams.get('orderId');
       if (trackParam) {
         setTimeout(() => {
           window.app.openPublicTrackModal(trackParam);
@@ -2492,7 +2506,7 @@ window.app = {
         const discLines = lines.filter(r => r.SKU === 'DISCOUNT' || (parseFloat(String(r['Row Total'] || 0).replace(/,/g, '')) || 0) < 0);
         const pName = discLines.length > 0
           ? discLines.map(d => d['Product Name']).filter(Boolean).join(' + ')
-          : ((lines[0] && lines[0].Promo && lines[0].Promo !== '-') ? lines[0].Promo : 'ราคาปกติ Flash Sale (ไม่ใช้คูปอง)');
+          : ((lines[0] && lines[0].Promo && lines[0].Promo !== '-') ? lines[0].Promo : 'ราคาปกติ Pre Booking (ไม่ใช้คูปอง)');
         if (!promoStats[pName]) promoStats[pName] = { count: 0, revenue: 0 };
         promoStats[pName].count += 1;
         promoStats[pName].revenue += Math.max(0, net);
@@ -4076,7 +4090,11 @@ window.app = {
     // 6A — group object ล่าสุดของแต่ละ Model จาก renderProducts (ไว้ re-render การ์ดเดี่ยวตอนสลับ variant)
     cardGroups: {},
     // 6B — ตัวกรอง storefront (ทำงานร่วมกับช่องค้นหา + channel เดิมใน filter())
-    storeFilters: { category: '', group: '', capacity: '', priceRange: '', sort: '' },
+    storeFilters: { category: '', groups: [], capacities: [], colors: [], priceRange: '', priceMin: '', priceMax: '', sort: '', inStock: false },
+    storePage: 1,
+    storePageSize: 12,
+    sidebarOpen: false,
+    lastList: [],
     // 6B — ชื่อ popover ที่เปิดอยู่ ('cap'|'price'|'sort'|null) — ปิดด้วยคลิกนอก/Esc
     openPopover: null,
     countdownInterval: null,
@@ -4161,7 +4179,7 @@ window.app = {
           }
           timerDisplay.innerHTML = `
             <div class="px-3 py-1.5 rounded-xl bg-[#E11D48] text-white font-bold text-[11px] flex items-center gap-1.5 shadow-sm">
-              <i class="fas fa-lock"></i> สิ้นสุดเวลา Flash Sale
+              <i class="fas fa-lock"></i> สิ้นสุดเวลา Pre Booking
             </div>
           `;
           this.togglePOSBookingBlock(true, 'สิ้นสุดระยะเวลารับจองสินค้าแล้ว');
@@ -4261,8 +4279,10 @@ window.app = {
       }
       try { const r = localStorage.getItem('bnn_recent_skus'); if(r) this.recentSkus = JSON.parse(r) || []; }
       catch(e) { this.recentSkus = []; localStorage.removeItem('bnn_recent_skus'); }
-      this.initWishlist(); this.populateSelects(); this.renderPosHeroAndVouchers(); this.renderStoreHeader(); this.renderRecentlyViewed(); this.renderCompareBar(); this.filter(); this.renderCart(); this.checkCriteria();
+      this.initWishlist(); this.populateSelects(); this.renderPosHeroAndVouchers(); this.renderStoreHeader(); this.renderRecentlyViewed(); this.renderCompareBar(); this.filter(); this.renderCart(); this.renderCompanions(); this.checkCriteria();
       this.startCountdown();
+      this._lastUrlKey = '{}';
+      this.loadUrlState();
     },
     populateSelects: function() {
       const pContainer = document.getElementById('cartPromosContainer');
@@ -4474,7 +4494,7 @@ window.app = {
               ? (link.startsWith('http') ? 'onclick="window.open(\'' + escJs(link) + '\',\'_blank\')"' : 'onclick="window.app.pos.applyBannerSearch(\'' + escJs(link) + '\')"')
               : (title ? 'onclick="window.app.pos.applyBannerSearch(\'' + escJs(title) + '\')"' : '');
             slidesHtml += '<div class="w-full h-full shrink-0 relative cursor-pointer select-none" ' + clickAttr + '>'
-              + '<img src="' + esc(img) + '" alt="' + esc(title || 'Flash Sale Banner') + '" class="w-full h-full object-cover">'
+              + '<img src="' + esc(img) + '" alt="' + esc(title || 'Pre Booking Banner') + '" class="w-full h-full object-cover">'
               + ((title || sub)
                   ? '<div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 pt-6 flex items-end justify-between">'
                     + '<div>'
@@ -5115,10 +5135,10 @@ window.app = {
       html += '</tr></thead><tbody class="divide-y divide-slate-200 text-xs">';
 
       // ส่วนที่ 1: ราคา & โปรโมชั่น
-      html += '<tr class="bg-slate-900 text-white"><td colspan="' + (resolved.length + 1) + '" class="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#FF6B00]"><i class="fas fa-tags mr-1.5"></i>1. ราคาโปรโมชั่น & สิทธิพิเศษ Flash Sale</td></tr>';
+      html += '<tr class="bg-slate-900 text-white"><td colspan="' + (resolved.length + 1) + '" class="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#FF6B00]"><i class="fas fa-tags mr-1.5"></i>1. ราคาโปรโมชั่น & สิทธิพิเศษ Pre Booking</td></tr>';
 
       // ราคา Flash Sale & ส่วนลด
-      html += '<tr><td class="p-3 font-extrabold text-slate-600 bg-slate-50/70">ราคา Flash Sale</td>';
+      html += '<tr><td class="p-3 font-extrabold text-slate-600 bg-slate-50/70">ราคา Pre Booking</td>';
       resolved.forEach(item => {
         const v = item.variant;
         const priceNum = parseFloat(String(v.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
@@ -5236,7 +5256,7 @@ window.app = {
       const resolved = this.compareList.map(k => this.resolveCardKeyProduct(k)).filter(Boolean);
       if (resolved.length === 0) return;
       const currentChannel = (document.getElementById('posChannelSelect') || {}).value || '';
-      const lines = ['⚡ สรุปเปรียบเทียบสเปค & โปรโมชัน Flash Sale ⚡', '----------------------------------------'];
+      const lines = ['⚡ สรุปเปรียบเทียบสเปค & โปรโมชัน Pre Booking ⚡', '----------------------------------------'];
       resolved.forEach((item, i) => {
         const v = item.variant;
         const sp = this.getDeviceSpecs(item);
@@ -5263,7 +5283,7 @@ window.app = {
       if (!area) return;
       const win = window.open('', '_blank', 'width=960,height=720');
       if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์ตารางเปรียบเทียบ', 'info');
-      win.document.write('<html><head><title>ตารางเปรียบเทียบสเปคสินค้า Flash Sale</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:20px;}</style></head><body><h2 class="text-lg font-black mb-3">⚡ ตารางเปรียบเทียบสเปค ราคา และของแถม Flash Sale</h2>' + area.outerHTML + '<script>setTimeout(()=>window.print(),600);<\/script></body></html>');
+      win.document.write('<html><head><title>ตารางเปรียบเทียบสเปคสินค้า Pre Booking</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:20px;}</style></head><body><h2 class="text-lg font-black mb-3">⚡ ตารางเปรียบเทียบสเปค ราคา และของแถม Pre Booking</h2>' + area.outerHTML + '<script>setTimeout(()=>window.print(),600);<\/script></body></html>');
       win.document.close();
     },
     filterTimer: null,
@@ -5283,85 +5303,63 @@ window.app = {
       // parse ทนต่อเซลล์ที่ format เป็นสกุลเงิน (เช่น "฿49,900.00") — ตัดทุกอย่างที่ไม่ใช่ตัวเลข/จุด/ลบ
       const priceOf = (p) => parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
       const inPrice = (p) => {
-        if (!f.priceRange) return true;
         const v = priceOf(p);
-        if (f.priceRange === 'lt10') return v < 10000;
-        if (f.priceRange === '10-30') return v >= 10000 && v <= 30000;
-        if (f.priceRange === '30-50') return v > 30000 && v <= 50000;
-        if (f.priceRange === 'gt50') return v > 50000;
+        if (f.priceRange === 'lt10' && !(v < 10000)) return false;
+        if (f.priceRange === '10-30' && !(v >= 10000 && v <= 30000)) return false;
+        if (f.priceRange === '30-50' && !(v > 30000 && v <= 50000)) return false;
+        if (f.priceRange === 'gt50' && !(v > 50000)) return false;
+        if (f.priceMin !== '' && v < f.priceMin) return false;
+        if (f.priceMax !== '' && v > f.priceMax) return false;
         return true;
       };
       const list = window.app.globalData.products.filter(p => {
         const matchType = p.Status==='เปิด';
         // ค้นได้ทั้ง ชื่อสินค้า / SKU / รุ่น / กลุ่มสินค้า (case-insensitive)
         const matchSearch = !term || ['Product Name', 'SKU', 'Model', 'Product Group'].some(k => (p[k] || '').toString().toLowerCase().includes(term));
-        const matchChannel = (currentChannel && p.Channel) ? p.Channel.includes(currentChannel) : true;
+        // 'ALL'/'*' = ทุกช่องทาง ใช้กับสินค้าขายปกติเท่านั้น — ของแถมที่ setupDatabase ตั้งเป็น 'ALL' ต้องไม่โผล่เป็นการ์ดขายในหน้าร้าน (พฤติกรรมเดิมของของแถมคงไว้)
+        const isGiftRow = (p.Category || '').toString().includes('ของแถม');
+        const matchChannel = isGiftRow ? ((currentChannel && p.Channel) ? p.Channel.includes(currentChannel) : true) : window.app.channelOk(p.Channel, currentChannel);
+        // ตัวกรองหลายค่า: ค่าในกลุ่มเดียวกันเป็น OR, ต่างกลุ่มเป็น AND
         return matchType && matchSearch && matchChannel
           && (!f.category || (p.Category || '').trim() === f.category)
-          && (!f.group || (p['Product Group'] || '').trim() === f.group)
-          && (!f.capacity || (p.Capacity || '').trim() === f.capacity)
-          && inPrice(p);
+          && (!f.groups.length || f.groups.includes((p['Product Group'] || '').trim()))
+          && (!f.capacities.length || f.capacities.includes((p.Capacity || '').trim()))
+          && (!f.colors.length || f.colors.includes((p.Color || '').trim()))
+          && inPrice(p)
+          && (!f.inStock || this.stockOf(p) > 0);
       });
       // เรียงลำดับ: แนะนำ = ตามลำดับชีต (ไม่แตะ), ราคาต่ำ-สูง / สูง-ต่ำ เรียงก่อน group เพื่อให้ตำแหน่งการ์ดตามราคา variant แรก
-      if (f.sort === 'asc') list.sort((a, b) => priceOf(a) - priceOf(b));
-      else if (f.sort === 'desc') list.sort((a, b) => priceOf(b) - priceOf(a));
+      // การ์ดรวมทุก SKU ของรุ่นเดียวกันและโชว์ราคาต่ำสุดของรุ่น — ต้องเรียงด้วยราคาต่ำสุดของรุ่นเช่นกัน ไม่งั้นลำดับการ์ดสลับเมื่อรุ่นมีหลายราคา
+      if (f.sort === 'asc' || f.sort === 'desc') {
+        const gKey = (p) => (p.Model && p.Model !== '-') ? 'M:' + p.Model : 'S:' + p.SKU;
+        const gMin = {};
+        list.forEach(p => { const k = gKey(p), v = priceOf(p); if (!(k in gMin) || v < gMin[k]) gMin[k] = v; });
+        const dir = f.sort === 'asc' ? 1 : -1;
+        list.sort((a, b) => dir * (gMin[gKey(a)] - gMin[gKey(b)]));
+      }
+      this.storePage = 1; // ทุกครั้งที่ตัวกรอง/คำค้นเปลี่ยน กลับหน้า 1 (การเปลี่ยนหน้าเรียก renderProducts ตรง ไม่ผ่าน filter)
       this.renderProducts(list);
+      this.syncUrl();
     },
     // 6B — มี filter storefront ตัวใดตัวหนึ่ง active อยู่ไหม (ใช้โชว์ปุ่มล้างตัวกรอง + เลือก empty state)
     storeFiltersActive: function() {
       const f = this.storeFilters;
-      return !!(f.category || f.group || f.capacity || f.priceRange || f.sort);
+      return !!(f.category || f.groups.length || f.capacities.length || f.colors.length || f.priceRange || f.priceMin !== '' || f.priceMax !== '' || f.sort || f.inStock);
     },
     // 6B — header ของ storefront: แถว category tiles (BNN Flash Sale Pills) → แถว sub-chips รุ่น (Product Group) → แถว filter chips
     // re-render ทั้งแถบทุกครั้งที่ตัวกรองเปลี่ยน (popover ถูกสร้างใหม่ในสถานะปิดเสมอ)
     renderStoreHeader: function() {
       const bar = document.getElementById('storeFilterBar');
+      const side = document.getElementById('storeSidebar');
       if (!bar) return;
       this.openPopover = null;
       const esc = window.app.esc, escJs = window.app.escAttrJs;
       const f = this.storeFilters;
       const prods = (window.app.globalData.products || []).filter(p => ['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase()));
-
-      // --- แถว 1: BNN Flash Sale Category Pills (ทั้งหมด ซ้ายสุด + รูปสินค้าตัวแทนของหมวด) ---
       const cats = [...new Set(prods.map(p => (p.Category || '').trim()).filter(Boolean))];
-      const repImg = {};
-      prods.forEach(p => {
-        const c = (p.Category || '').trim();
-        if (c && !repImg[c] && p['Image URL']) repImg[c] = window.app.formatImageUrl(p['Image URL']);
-      });
-      const tileHtml = (val, label, img) => {
-        const sel = f.category === val;
-        const isAll = val === '';
-        return '<button type="button" class="bnn-cat-pill flex items-center gap-2 px-3.5 py-2 rounded-xl border bg-white shrink-0 '
-          + (sel ? 'active border-[#141416]' : 'border-slate-200 hover:border-slate-400 text-slate-700')
-          + '" onclick="window.app.pos.setStoreCategory(\'' + escJs(val) + '\')" aria-label="หมวด ' + esc(label) + '">'
-          + (isAll ? '<i class="fas fa-bolt text-xs ' + (sel ? 'text-[#FF6B00]' : 'text-[#E11D48]') + '"></i>' : '')
-          + '<span class="text-[11px] md:text-xs font-extrabold ' + (sel ? 'text-[#FF6B00]' : 'text-slate-700') + '">' + esc(label) + '</span>'
-          + (img ? '<img src="' + esc(img) + '" loading="lazy" alt="" aria-hidden="true" onerror="this.remove()" class="w-7 h-7 object-contain pointer-events-none bg-white rounded-md p-0.5">' : '')
-          + '</button>';
-      };
-      let html = '<div class="flex gap-2 overflow-x-auto custom-scrollbar pb-2 mb-1.5">' + tileHtml('', 'ดีลทั้งหมด', null);
-      cats.forEach(c => { html += tileHtml(c, c, repImg[c] || null); });
-      html += '</div>';
-
-      // --- แถว 2: sub-chips รุ่น (Product Group ของหมวดที่เลือก) — สไตล์แท็บรุ่นสินค้า BNN ---
       const groupSource = f.category ? prods.filter(p => (p.Category || '').trim() === f.category) : prods;
       const groups = [...new Set(groupSource.map(p => (p['Product Group'] || '').trim()).filter(g => g && g !== '-'))];
-      if (groups.length > 0) {
-        const chip = (val, label) => {
-          const sel = f.group === val;
-          return '<button type="button" class="px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-all '
-            + (sel ? 'bg-amber-100 text-slate-900 font-black border border-amber-300 shadow-sm' : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 font-semibold border border-transparent')
-            + '" onclick="window.app.pos.setStoreGroup(\'' + escJs(val) + '\')">' + esc(label) + '</button>';
-        };
-        html += '<div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1.5 mb-2">'
-          + '<span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mr-1 shrink-0"><i class="fas fa-tags text-amber-500 mr-1"></i>ซีรีส์:</span>'
-          + chip('', 'ทุกรุ่น');
-        groups.forEach(g => { html += chip(g, g); });
-        html += '</div>';
-      }
-
-      // --- แถว 3: filter chips แบบ dropdown (ความจุ / ราคา / เรียงลำดับ) + ล้างตัวกรอง + ผลลัพธ์ n รายการ ---
+      const colors = [...new Set(prods.map(p => (p.Color || '').trim()).filter(c => c && c !== '-'))];
       const capVal = (c) => {
         const m = String(c).match(/([\d.]+)\s*(TB|GB|MB)?/i);
         if (!m) return Number.MAX_VALUE;
@@ -5375,65 +5373,181 @@ window.app = {
         { val: '', label: 'ทุกช่วงราคา' }, { val: 'lt10', label: 'ต่ำกว่า ฿10,000' }, { val: '10-30', label: '฿10,000 - ฿30,000' },
         { val: '30-50', label: '฿30,000 - ฿50,000' }, { val: 'gt50', label: 'มากกว่า ฿50,000' }
       ];
-      const sortOpts = [ { val: '', label: 'เรียงตาม: แนะนำ' }, { val: 'asc', label: 'ราคา: ต่ำ → สูง' }, { val: 'desc', label: 'ราคา: สูง → ต่ำ' } ];
-      // ป้ายบน chip = ค่าที่เลือกอยู่ (ถ้ามี) + จุดสีบอกสถานะ active
-      const popChip = (name, key, baseLabel, opts, current, iconCls) => {
-        const active = current !== '';
-        const curLabel = active ? (opts.find(o => o.val === current) || {}).label || current : baseLabel;
-        let h = '<span class="store-pop-wrap relative inline-block">';
-        h += '<button type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-bold transition-all '
-          + (active ? 'bg-[#141416] border-[#141416] text-[#FF6B00] shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400')
-          + '" onclick="window.app.pos.toggleFilterPopover(\'' + name + '\')" aria-label="ตัวกรอง' + esc(baseLabel) + '" aria-haspopup="true">'
-          + (iconCls ? '<i class="fas ' + iconCls + ' text-[10px] ' + (active ? 'text-[#FF6B00]' : 'text-slate-400') + '"></i>' : '')
-          + esc(curLabel) + '<i class="fas fa-chevron-down text-[8px] opacity-75"></i></button>';
-        h += '<div id="storePop_' + name + '" class="store-pop hidden absolute left-0 top-full mt-2 z-30 min-w-[175px] bg-white border border-slate-200 rounded-xl shadow-xl p-1.5">';
-        opts.forEach(o => {
-          const sel = o.val === current;
-          h += '<button type="button" class="w-full flex items-center justify-between gap-3 text-left px-3 py-1.5 text-xs rounded-lg hover:bg-amber-50 '
-            + (sel ? 'font-black text-slate-900 bg-amber-50/70' : 'text-slate-600 font-medium')
-            + '" onclick="window.app.pos.setStoreFilter(\'' + key + '\',\'' + escJs(o.val) + '\')">'
-            + '<span>' + esc(o.label) + '</span>' + (sel ? '<i class="fas fa-check text-[#E11D48] text-[10px]"></i>' : '') + '</button>';
-        });
-        h += '</div></span>';
-        return h;
-      };
-      html += '<div class="flex items-center gap-2 flex-wrap mb-3 pb-2 border-b border-slate-100">';
-      if (caps.length > 0) html += popChip('cap', 'capacity', 'ความจุ', [{ val: '', label: 'ทุกความจุ' }].concat(caps.map(c => ({ val: c, label: c }))), f.capacity, 'fa-microchip');
-      html += popChip('price', 'priceRange', 'ช่วงราคา', priceOpts, f.priceRange, 'fa-baht-sign');
-      html += popChip('sort', 'sort', 'เรียงลำดับ', sortOpts, f.sort, 'fa-arrow-down-wide-short');
-      if (this.storeFiltersActive()) {
-        html += '<button type="button" class="px-3 py-1.5 rounded-full text-[11px] font-bold text-[#E11D48] bg-rose-50 hover:bg-rose-100 border border-rose-200/70 transition-colors" onclick="window.app.pos.clearStoreFilters(false)"><i class="fas fa-rotate-left mr-1"></i>ล้างตัวกรอง</button>';
-      }
-      html += '<span id="storeResultCount" class="ml-auto text-[11px] font-extrabold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full whitespace-nowrap"></span>';
-      html += '</div>';
+      const sortOpts = [ { val: '', label: 'เกี่ยวข้อง' }, { val: 'asc', label: 'ราคา: ต่ำ → สูง' }, { val: 'desc', label: 'ราคา: สูง → ต่ำ' } ];
 
+      // --- แถบกรองด้านซ้าย (สไตล์หน้าหมวด BNN: กลุ่มพับได้ + checkbox เลือกได้หลายค่า) ---
+      const opt = (checked, label, onclick, prefixHtml) => '<button type="button" class="sf-opt' + (checked ? ' on' : '') + '" onclick="' + onclick + '" aria-pressed="' + (checked ? 'true' : 'false') + '">'
+        + '<span class="sf-box">' + (checked ? '<i class="fas fa-check"></i>' : '') + '</span>' + (prefixHtml || '') + '<span class="sf-lbl">' + esc(label) + '</span></button>';
+      const grp = (title, body) => '<details open class="sf-group"><summary><span>' + title + '</span><i class="fas fa-chevron-down"></i></summary><div class="sf-body">' + body + '</div></details>';
+      let sh = '<div class="sf-panel">';
+      sh += '<div class="sf-title"><i class="fas fa-sliders"></i> กรองข้อมูลสินค้า</div>';
+      sh += '<button type="button" class="sf-switch' + (f.inStock ? ' on' : '') + '" onclick="window.app.pos.setStoreFilter(\'inStock\', ' + (f.inStock ? 'false' : 'true') + ')" role="switch" aria-checked="' + (f.inStock ? 'true' : 'false') + '"><span>แสดงสินค้าพร้อมขาย</span><span class="sf-knob"></span></button>';
+      sh += grp('หมวดสินค้า', opt(f.category === '', 'สินค้าทั้งหมด', "window.app.pos.setStoreCategory('')")
+        + cats.map(c => opt(f.category === c, c, "window.app.pos.setStoreCategory('" + escJs(c) + "')")).join(''));
+      if (groups.length > 0) {
+        sh += grp('ซีรีส์ / รุ่น', groups.map(g => opt(f.groups.includes(g), g, "window.app.pos.setStoreGroup('" + escJs(g) + "')")).join(''));
+      }
+      const minV = f.priceMin === '' ? '' : f.priceMin, maxV = f.priceMax === '' ? '' : f.priceMax;
+      sh += grp('ช่วงราคา',
+        '<div class="sf-price"><input type="number" min="0" inputmode="numeric" id="sfPriceMin" placeholder="ต่ำสุด" value="' + esc(minV) + '" onkeydown="if(event.key===\'Enter\')window.app.pos.applyPriceInputs()" aria-label="ราคาต่ำสุด">'
+        + '<span>-</span><input type="number" min="0" inputmode="numeric" id="sfPriceMax" placeholder="สูงสุด" value="' + esc(maxV) + '" onkeydown="if(event.key===\'Enter\')window.app.pos.applyPriceInputs()" aria-label="ราคาสูงสุด">'
+        + '<button type="button" class="sf-price-go" onclick="window.app.pos.applyPriceInputs()">ตกลง</button></div>'
+        + priceOpts.map(o => opt(f.priceRange === o.val && f.priceMin === '' && f.priceMax === '', o.label, "window.app.pos.setStoreFilter('priceRange','" + o.val + "')")).join(''));
+      if (caps.length > 0) {
+        sh += grp('ความจุ', caps.map(c => opt(f.capacities.includes(c), c, "window.app.pos.setStoreFilter('capacity','" + escJs(c) + "')")).join(''));
+      }
+      if (colors.length > 0) {
+        sh += grp('สี', colors.map(c => opt(f.colors.includes(c), c, "window.app.pos.setStoreFilter('color','" + escJs(c) + "')", '<span class="sf-swatch" style="background:' + esc(this.colorHex(c)) + '"></span>')).join(''));
+      }
+      sh += '<button type="button" class="sf-clear" onclick="window.app.pos.clearStoreFilters(false)"' + (this.storeFiltersActive() ? '' : ' disabled') + '>ลบการกรองสินค้าที่เลือก</button>';
+      sh += '</div>';
+      if (side) {
+        side.innerHTML = sh;
+        side.classList.toggle('hidden', !this.sidebarOpen);
+        side.classList.add('lg:block');
+      }
+
+      // --- ส่วนหัวรายการ: breadcrumb + ชื่อหมวด + จำนวน + แถบเรียงตาม ---
+      const title = f.groups.length === 1 ? f.groups[0] : (f.category || 'สินค้าทั้งหมด');
+      let html = '<nav class="sf-crumb" aria-label="breadcrumb"><span>หน้าหลัก</span><i class="fas fa-chevron-right"></i><span' + (f.category ? '' : ' class="cur"') + '>สินค้าทั้งหมด</span>'
+        + (f.category ? '<i class="fas fa-chevron-right"></i><span' + (f.groups.length ? '' : ' class="cur"') + '>' + esc(f.category) + '</span>' : '')
+        + (f.groups.length ? '<i class="fas fa-chevron-right"></i><span class="cur">' + esc(f.groups.join(', ')) + '</span>' : '') + '</nav>';
+      html += '<div class="sf-head"><h2 class="sf-h1">' + esc(title) + '</h2><span id="storeResultCount" class="sf-count"></span></div>';
+      html += '<div class="sf-sortbar">'
+        + '<button type="button" class="sf-filter-btn lg:hidden" onclick="window.app.pos.toggleStoreSidebar()"><i class="fas fa-sliders"></i> ตัวกรอง' + (this.storeFiltersActive() ? ' <span class="sf-dot"></span>' : '') + '</button>'
+        + '<label class="sf-sort"><span>เรียงตาม:</span><select onchange="window.app.pos.setStoreFilter(\'sort\', this.value)" aria-label="เรียงตาม">'
+        + sortOpts.map(o => '<option value="' + o.val + '"' + (f.sort === o.val ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('')
+        + '</select></label></div>';
       bar.innerHTML = html;
+    },
+    toggleStoreSidebar: function() {
+      this.sidebarOpen = !this.sidebarOpen;
+      const side = document.getElementById('storeSidebar');
+      if (side) side.classList.toggle('hidden', !this.sidebarOpen);
+    },
+    goStorePage: function(n) {
+      this.storePage = n;
+      this.renderProducts(this.lastList);
+      this.syncUrl();
+      const row = document.getElementById('productGrid');
+      if (row) { row.scrollTop = 0; if (row.scrollIntoView && window.innerWidth < 1024) row.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+    },
+    emptyStoreFilters: function() {
+      return { category: '', groups: [], capacities: [], colors: [], priceRange: '', priceMin: '', priceMax: '', sort: '', inStock: false };
     },
     setStoreCategory: function(cat) {
       this.storeFilters.category = cat;
-      this.storeFilters.group = ''; // เปลี่ยนหมวด = รายการรุ่นเปลี่ยน — ล้างตัวเลือกรุ่นเดิม
+      this.storeFilters.groups = []; // เปลี่ยนหมวด = รายการรุ่นเปลี่ยน — ล้างตัวเลือกรุ่นเดิม
       this.renderStoreHeader();
       this.filter();
     },
+    // เลือก/ยกเลิกค่าในตัวกรองหลายค่า ('' = ล้างทั้งกลุ่ม)
+    toggleIn_: function(arr, val) {
+      if (val === '') { arr.length = 0; return; }
+      const i = arr.indexOf(val);
+      if (i > -1) arr.splice(i, 1); else arr.push(val);
+    },
     setStoreGroup: function(g) {
-      this.storeFilters.group = g;
+      this.toggleIn_(this.storeFilters.groups, g);
       this.renderStoreHeader();
       this.filter();
     },
     setStoreFilter: function(key, val) {
-      if (!(key in this.storeFilters)) return;
-      this.storeFilters[key] = val;
+      const f = this.storeFilters;
+      if (key === 'capacity') this.toggleIn_(f.capacities, val);
+      else if (key === 'color') this.toggleIn_(f.colors, val);
+      else if (key in f && !Array.isArray(f[key])) {
+        f[key] = val;
+        if (key === 'priceRange') { f.priceMin = ''; f.priceMax = ''; } // เลือกช่วงสำเร็จรูป = ล้างช่วงที่พิมพ์เอง
+      } else return;
       this.renderStoreHeader(); // สร้าง header ใหม่ = popover ปิดไปด้วย
       this.filter();
     },
+    // ช่วงราคาที่ผู้ใช้พิมพ์เอง (ต่ำสุด/สูงสุด) — ค่าว่างหรือไม่ใช่ตัวเลข = ไม่จำกัดด้านนั้น; สลับให้ถ้าใส่กลับด้าน
+    applyPriceInputs: function() {
+      const num = (id) => { const el = document.getElementById(id); const n = el ? parseFloat(el.value) : NaN; return (isNaN(n) || n < 0) ? '' : n; };
+      let lo = num('sfPriceMin'), hi = num('sfPriceMax');
+      if (lo !== '' && hi !== '' && lo > hi) { const t = lo; lo = hi; hi = t; }
+      this.storeFilters.priceMin = lo; this.storeFilters.priceMax = hi; this.storeFilters.priceRange = '';
+      this.renderStoreHeader();
+      this.filter();
+    },
     clearStoreFilters: function(alsoSearch) {
-      this.storeFilters = { category: '', group: '', capacity: '', priceRange: '', sort: '' };
+      this.storeFilters = this.emptyStoreFilters();
       if (alsoSearch) {
         const s = document.getElementById('searchProduct');
         if (s) s.value = '';
       }
       this.renderStoreHeader();
       this.filter();
+    },
+    // ---- ซิงก์ตัวกรองกับ URL (แอปรันใน iframe ของ GAS: ใช้ google.script.url/history ถ้ามี เพื่อให้ลิงก์ชั้นนอกแชร์ได้ + ปุ่มย้อนกลับใช้ได้) ----
+    paramsFromState: function() {
+      const f = this.storeFilters, p = {};
+      if (f.category) p.cat = [f.category];
+      if (f.groups.length) p.grp = f.groups.slice();
+      if (f.capacities.length) p.cap = f.capacities.slice();
+      if (f.colors.length) p.col = f.colors.slice();
+      if (f.priceRange) p.pr = [f.priceRange];
+      if (f.priceMin !== '') p.pmin = [String(f.priceMin)];
+      if (f.priceMax !== '') p.pmax = [String(f.priceMax)];
+      if (f.sort) p.sort = [f.sort];
+      if (f.inStock) p.stock = ['1'];
+      const s = document.getElementById('searchProduct');
+      if (s && s.value.trim()) p.q = [s.value.trim()];
+      if (this.storePage > 1) p.page = [String(this.storePage)];
+      return p;
+    },
+    syncUrl: function() {
+      if (this._applyingUrl) return;
+      const p = this.paramsFromState();
+      const key = JSON.stringify(p);
+      if (key === (this._lastUrlKey || '{}')) return;
+      this._lastUrlKey = key;
+      try { if (window.google && google.script && google.script.history && google.script.history.push) google.script.history.push(null, p, 'pos'); } catch (e) { /* นอก GAS/เบราว์เซอร์ไม่รองรับ — ข้ามเงียบๆ */ }
+    },
+    applyUrlParams: function(params, force) {
+      params = params || {};
+      const g = (k) => (Array.isArray(params[k]) ? params[k] : (params[k] !== undefined ? [String(params[k])] : [])).map(String);
+      const known = ['cat', 'grp', 'cap', 'col', 'pr', 'pmin', 'pmax', 'sort', 'stock', 'q', 'page'];
+      if (!force && !known.some(k => g(k).length)) return; // ไม่มีพารามิเตอร์ของเรา = คงตัวกรองในหน่วยความจำไว้
+      const f = this.emptyStoreFilters();
+      f.category = g('cat')[0] || '';
+      f.groups = g('grp'); f.capacities = g('cap'); f.colors = g('col');
+      const pr = g('pr')[0] || ''; f.priceRange = ['lt10', '10-30', '30-50', 'gt50'].includes(pr) ? pr : '';
+      const mn = parseFloat(g('pmin')[0]), mx = parseFloat(g('pmax')[0]);
+      f.priceMin = (isNaN(mn) || mn < 0) ? '' : mn; f.priceMax = (isNaN(mx) || mx < 0) ? '' : mx;
+      const so = g('sort')[0] || ''; f.sort = ['asc', 'desc'].includes(so) ? so : '';
+      f.inStock = g('stock')[0] === '1';
+      const page = parseInt(g('page')[0], 10) || 1;
+      this._applyingUrl = true;
+      try {
+        this.storeFilters = f;
+        const s = document.getElementById('searchProduct');
+        if (s) s.value = (g('q')[0] || '').slice(0, 100);
+        this.renderStoreHeader();
+        this.filter();
+        if (page > 1) this.goStorePage(page);
+      } finally { this._applyingUrl = false; }
+      this._lastUrlKey = JSON.stringify(this.paramsFromState());
+    },
+    loadUrlState: function() {
+      const self = this;
+      try {
+        if (window.google && google.script && google.script.url && google.script.url.getLocation) {
+          google.script.url.getLocation(function(loc) { self.applyUrlParams((loc && loc.parameters) || {}, false); });
+        } else {
+          const sp = new URLSearchParams(window.location.search), o = {};
+          sp.forEach((v, k) => { (o[k] = o[k] || []).push(v); });
+          this.applyUrlParams(o, false);
+        }
+        if (!this._histBound && window.google && google.script && google.script.history && google.script.history.setChangeHandler) {
+          this._histBound = true;
+          google.script.history.setChangeHandler(function(e) {
+            if (window.app.currentRoute === 'pos') self.applyUrlParams((e && e.location && e.location.parameters) || {}, true);
+          });
+        }
+      } catch (e) { console.warn('loadUrlState:', e); }
     },
     toggleFilterPopover: function(name) {
       const wasOpen = this.openPopover === name;
@@ -5450,6 +5564,7 @@ window.app = {
     renderProducts: function(products) {
       const row = document.getElementById('productGrid');
       if(!row) return;
+      this.lastList = products; // ต้องเก็บก่อน early-return ของ empty state — ไม่งั้นเปลี่ยนหน้า/ซิงก์ URL หลังผลว่างจะใช้ลิสต์เก่า
 
       const searchEl = document.getElementById('searchProduct');
       const resultCountEl = document.getElementById('storeResultCount');
@@ -5457,18 +5572,28 @@ window.app = {
       // กรณีไม่มีทั้งคำค้นและตัวกรอง (กำลังโหลด) คงแสดง skeleton เดิม
       const hasQuery = searchEl && searchEl.value.trim() !== '';
       if(products.length === 0 && (hasQuery || this.storeFiltersActive())) {
-        if (resultCountEl) resultCountEl.textContent = 'พบดีล 0 รายการ';
+        if (resultCountEl) resultCountEl.textContent = '0 รายการ';
         row.innerHTML = window.app.emptyState({
           icon: 'fa-search',
-          title: 'ไม่พบสินค้า Flash Sale ตามเงื่อนไข',
+          title: 'ไม่พบสินค้า Pre Booking ตามเงื่อนไข',
           subtitle: 'ลองเปลี่ยนคำค้นหา หรือกดล้างตัวกรองเพื่อดูโปรโมชั่นสินค้าทั้งหมดของสาขานี้',
           actionLabel: 'ล้างตัวกรองทั้งหมด',
           onclick: "window.app.pos.clearStoreFilters(true)"
         });
         return;
       }
+      // ข้อมูลโหลดเสร็จแล้วแต่ไม่มีสินค้าให้ช่องทาง/สาขานี้ — ต้องบอกผู้ใช้ ไม่ใช่โชว์โครงโหลดค้างตลอดไป
+      if (products.length === 0 && (window.app.globalData.products || []).length > 0) {
+        if (resultCountEl) resultCountEl.textContent = '0 รายการ';
+        row.innerHTML = window.app.emptyState({
+          icon: 'fa-box-open',
+          title: 'ยังไม่มีสินค้าสำหรับช่องทางนี้',
+          subtitle: 'สินค้าที่เปิดขายอยู่ไม่ได้ตั้งไว้สำหรับช่องทางที่เลือก ลองเปลี่ยนช่องทาง หรือแจ้งผู้ดูแลให้ตั้งค่าช่องทางของสินค้า'
+        });
+        return;
+      }
       if(products.length === 0 && searchEl && searchEl.value === '') {
-         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 md:gap-4 pb-4">';
+         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 pb-4">';
          for(let k=0; k<10; k++) { skel += '<div class="bg-white border border-slate-200/80 p-3.5 rounded-2xl shadow-sm"><div class="skeleton mb-3" style="height:135px; width:100%;"></div><div class="skeleton mb-2" style="height:12px; width:85%;"></div><div class="skeleton mb-3" style="height:16px; width:45%;"></div><div class="skeleton" style="height:32px; width:100%; border-radius:0.75rem;"></div></div>'; }
          skel += '</div>'; row.innerHTML = skel; return;
       }
@@ -5512,14 +5637,20 @@ window.app = {
       const searchTerm = searchEl ? searchEl.value.trim() : '';
 
       // 6B — "ผลลัพธ์ n รายการ" นับตามการ์ดที่แสดงจริง (รุ่นเดียวกันหลาย SKU นับเป็น 1 การ์ด)
-      if (resultCountEl) resultCountEl.textContent = '⚡ ดีล ' + renderedList.length + ' รายการ';
+      if (resultCountEl) resultCountEl.textContent = '(' + renderedList.length + ' รายการ)';
 
       // 6A — POS storefront: สไตล์ scoped ด้วย .pos-storefront เท่านั้น ห้ามรั่วไปหน้าอื่น
       // ถ้าสร้างการ์ดใบใดล้มกลางทาง ห้ามทิ้งกริดว่างเงียบๆ (เคยเจอบน iOS) — โชว์ error state มาตรฐาน + ลองใหม่ (rule 12)
       try {
-        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 md:gap-4 pb-6">';
-        renderedList.forEach(p => { html += this.cardHtml(p, searchTerm); });
-        html += '</div>';
+        this.lastList = products;
+        const size = this.storePageSize;
+        const totalPages = Math.max(1, Math.ceil(renderedList.length / size));
+        if (this.storePage > totalPages) this.storePage = totalPages;
+        if (this.storePage < 1) this.storePage = 1;
+        const pageItems = renderedList.slice((this.storePage - 1) * size, this.storePage * size);
+        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 pb-4">';
+        pageItems.forEach(p => { html += this.cardHtml(p, searchTerm); });
+        html += '</div>' + this.paginationHtml(totalPages);
         row.innerHTML = html;
       } catch (e) {
         console.error('renderProducts ล้มเหลว:', e);
@@ -5531,6 +5662,24 @@ window.app = {
           onclick: 'window.app.pos.filter()'
         });
       }
+    },
+    // เลขหน้าสไตล์ BNN: ‹ 1 2 … n ›
+    paginationHtml: function(total) {
+      if (total <= 1) return '';
+      const cur = this.storePage;
+      const pages = [];
+      for (let i = 1; i <= total; i++) {
+        if (i === 1 || i === total || Math.abs(i - cur) <= 1) pages.push(i);
+        else if (pages[pages.length - 1] !== '…') pages.push('…');
+      }
+      let h = '<nav class="sf-pager pos-storefront" aria-label="เลขหน้า">';
+      h += '<button type="button" class="sf-pg" ' + (cur <= 1 ? 'disabled' : 'onclick="window.app.pos.goStorePage(' + (cur - 1) + ')"') + ' aria-label="หน้าก่อนหน้า"><i class="fas fa-chevron-left"></i></button>';
+      pages.forEach(p => {
+        if (p === '…') h += '<span class="sf-pg-gap">…</span>';
+        else h += '<button type="button" class="sf-pg' + (p === cur ? ' on' : '') + '" onclick="window.app.pos.goStorePage(' + p + ')"' + (p === cur ? ' aria-current="page"' : '') + '>' + p + '</button>';
+      });
+      h += '<button type="button" class="sf-pg" ' + (cur >= total ? 'disabled' : 'onclick="window.app.pos.goStorePage(' + (cur + 1) + ')"') + ' aria-label="หน้าถัดไป"><i class="fas fa-chevron-right"></i></button>';
+      return h + '</nav>';
     },
     // 6A — แปลงชื่อสีจากชีตเป็น hex สำหรับจุดสีบนการ์ด (เทียบแบบ includes, ไม่รู้จัก = เทา + title บอกชื่อ)
     colorHex: function(name) {
@@ -5580,9 +5729,12 @@ window.app = {
         shown.forEach(col => {
           const colStock = vars.filter(v => v.Color === col).reduce((s, v) => s + stockOf(v), 0);
           const sel = col === st.color;
+          // tooltip บอกจำนวนคงเหลือของสีนั้น (ความจุที่เลือกอยู่ ถ้าไม่มีความจุนั้นใช้ยอดรวมทุกความจุ)
+          const comboV = vars.find(v => v.Color === col && v.Capacity === st.cap);
+          const colTip = col + ' · ' + ((comboV ? stockOf(comboV) : colStock) > 0 ? 'เหลือ ' + (comboV ? stockOf(comboV) : colStock) + ' ชิ้น' : 'หมด');
           dotsHtml += '<button type="button" class="color-dot' + (colStock <= 0 ? ' oos' : '') + (sel ? ' ring-2 ring-[#141416] ring-offset-1 scale-110' : '')
             + ' w-[18px] h-[18px] rounded-full border border-slate-300 shrink-0 transition-all" style="background:' + esc(this.colorHex(col))
-            + '" title="' + esc(col) + '" aria-label="สี ' + esc(col) + '" onclick="window.app.pos.selectCardVariant(\'' + escJs(p.Model) + '\',\'\',\'' + escJs(col) + '\')"></button>';
+            + '" title="' + esc(colTip) + '" aria-label="สี ' + esc(colTip) + '" onclick="window.app.pos.selectCardVariant(\'' + escJs(p.Model) + '\',\'\',\'' + escJs(col) + '\')"></button>';
         });
         if (colors.length > maxDots + 1) {
           dotsHtml += '<button type="button" class="text-[10px] font-black text-slate-500 hover:text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded-md shrink-0" aria-label="ดูสีทั้งหมด" onclick="window.app.pos.openAddToCartModal(\'MODEL:' + escJs(p.Model) + '\')">+' + (colors.length - maxDots) + '</button>';
@@ -5603,6 +5755,9 @@ window.app = {
       const dispName = p.isGroup ? p.Model : p['Product Name'];
       const dispNameHtml = window.app.highlightEsc(dispName, searchTerm || '');
       const catLabel = esc((variant.Category || 'สินค้า').toString().trim());
+      // แบรนด์: คำแรกของชื่อรุ่นถ้าเป็นตัวอักษรละติน (เช่น Samsung) ไม่งั้นใช้หมวด
+      const firstWord = String(dispName || '').trim().split(/\s+/)[0] || '';
+      const brandLabel = /^[A-Za-z]{2,}$/.test(firstWord) ? esc(firstWord.toUpperCase()) : catLabel.toUpperCase();
       // parse ทนต่อเซลล์ format สกุลเงิน (เช่น "฿49,900.00") — เก็บเฉพาะตัวเลข/จุด/ลบ
       const priceNum = parseFloat(String(variant.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
       const price = priceNum.toLocaleString();
@@ -5621,12 +5776,10 @@ window.app = {
         topLeftBadge = '<div class="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 bg-slate-800 text-white text-[10px] font-bold rounded-md shadow-sm pointer-events-none"><i class="fas fa-gift text-amber-400 mr-1"></i>ของแถม</div>';
       } else if (hasSave && savePct > 0) {
         topLeftBadge = '<div class="bnn-discount-badge absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 pointer-events-none"><i class="fas fa-bolt text-[#FF6B00]"></i> -' + savePct + '%</div>';
-      } else {
-        topLeftBadge = '<div class="bnn-deal-badge absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 pointer-events-none"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH</div>';
       }
 
       // ป้ายหมวดหมู่มุมขวาบน
-      const topRightBadge = '<div class="absolute top-2.5 right-2.5 z-10 px-2 py-0.5 rounded-md bg-slate-100/90 text-slate-600 border border-slate-200/80 text-[9px] font-extrabold pointer-events-none">' + catLabel + '</div>';
+      const topRightBadge = '';
 
       // Watermark ทับกลางภาพเมื่อสินค้าหมด (BNN Sold Out Overlay)
       const soldOutOverlay = outOfStock
@@ -5680,14 +5833,12 @@ window.app = {
       // หลอดไฟแสดงสถานะสต๊อก (BNN Flash Sale Stock Progress Bar)
       let stockBarHtml = '';
       if (!isGift) {
-        if (outOfStock) {
-          stockBarHtml = '<div class="bnn-stock-bar oos mb-2.5"><div class="bnn-stock-bar-fill" style="width:100%; background:#cbd5e1;"></div><div class="bnn-stock-bar-label">สินค้าหมดชั่วคราว</div></div>';
-        } else if (stockNum <= 5) {
-          stockBarHtml = '<div class="bnn-stock-bar hot mb-2.5"><div class="bnn-stock-bar-fill" style="width:86%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-fire mr-1 text-[#FF6B00]"></i>ขายดีมาก! เหลือ ' + stockNum + ' ชิ้น</div></div>';
-        } else if (stockNum <= 20) {
-          stockBarHtml = '<div class="bnn-stock-bar hot mb-2.5"><div class="bnn-stock-bar-fill" style="width:62%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-bolt mr-1 text-[#FF6B00]"></i>จองด่วน • เหลือ ' + stockNum + ' ชิ้น</div></div>';
-        } else {
-          stockBarHtml = '<div class="bnn-stock-bar mb-2.5"><div class="bnn-stock-bar-fill" style="width:36%;"></div><div class="bnn-stock-bar-label"><i class="fas fa-check-circle mr-1 text-[#E11D48]"></i>มีสินค้าพร้อมจอง (' + stockNum + ')</div></div>';
+        if (outOfStock) stockBarHtml = '<div class="sf-stock out">สินค้าหมด</div>';
+        else {
+          // แสดงจำนวนคงเหลือของตัวเลือกที่เลือกอยู่ (สี/ความจุ) เสมอ — กดจุดสีแล้วเห็นของสีนั้นทันที ไม่ใช่เห็นเฉพาะเมื่อเหลือน้อย
+          const colorLbl = (p.isGroup && variant.Color && variant.Color !== '-') ? 'สี' + variant.Color + ' · ' : '';
+          if (stockNum <= 5) stockBarHtml = '<div class="sf-stock low"><i class="fas fa-fire"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น</div>';
+          else stockBarHtml = '<div class="sf-stock ok"><i class="fas fa-check-circle"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น</div>';
         }
       }
 
@@ -5704,14 +5855,15 @@ window.app = {
       let card = '<div class="pos-card group relative flex flex-col h-full bg-white rounded-2xl overflow-hidden' + (isGift ? ' opacity-80' : '') + '" data-card-key="' + esc(cardKey) + '">';
       card +=      topLeftBadge;
       card +=      topRightBadge;
-      card += '    <div class="relative h-[145px] md:h-[160px] p-3 pt-8 flex items-center justify-center bg-white border-b border-slate-100/80 overflow-hidden">';
+      card += '    <div class="relative h-[150px] md:h-[180px] p-4 pt-8 flex items-center justify-center bg-white overflow-hidden">';
       card +=        soldOutOverlay;
       card +=        compareBtnHtml;
       card +=        wishlistBtnHtml;
-      card += '      <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https:\/\/via.placeholder.com/150?text=No+Image\';" alt="' + esc(pName) + '" class="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105' + (outOfStock ? ' grayscale opacity-60' : '') + '">';
+      card += '      <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;" alt="' + esc(pName) + '" class="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105' + (outOfStock ? ' grayscale opacity-60' : '') + '">';
       card += '    </div>';
       card += '    <div class="p-3 flex flex-col flex-1 gap-1.5">';
-      card += '      <div class="font-extrabold text-slate-900 text-xs md:text-[14px] line-clamp-2 leading-snug min-h-[2.25rem]" title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
+      card += '      <div class="sf-brand">' + brandLabel + '</div>';
+      card += '      <div class="font-bold text-slate-900 text-xs md:text-[14px] line-clamp-2 leading-snug min-h-[2.25rem]" title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
       if (p.isGroup) card += '<div class="text-[10px] text-slate-500 font-medium line-clamp-1 -mt-0.5" title="' + esc(pName) + '">' + esc(pName) + '</div>';
       if (bundleBadge || installmentBadge || giftCountBadge) {
         card += '<div class="flex items-center gap-1 flex-wrap">' + bundleBadge + installmentBadge + giftCountBadge + '</div>';
@@ -5719,14 +5871,27 @@ window.app = {
       if (dotsHtml) card += '<div class="flex items-center gap-1.5 flex-wrap pt-0.5">' + dotsHtml + '</div>';
       if (chipsHtml) card += '<div class="flex items-center gap-1 flex-wrap pt-0.5">' + chipsHtml + '</div>';
       card += '      <div class="mt-auto pt-2 border-t border-slate-100/90">';
-      card += '        <div class="flex items-baseline gap-1.5 flex-wrap ' + (hasSave ? 'mb-0.5' : 'mb-2') + '">';
-      card += '          <span class="text-[#E11D48] font-black text-base md:text-lg leading-none tabular-nums">฿' + price + '</span>';
-      if (hasSave) {
-        card += '        <span class="text-[10px] text-slate-400 line-through font-semibold tabular-nums">฿' + origNum.toLocaleString() + '</span>';
+      // ราคาช่วงสไตล์ BNN: รุ่นที่มีหลายราคา (ตามความจุ/สี) แสดง "฿ต่ำสุด - ฿สูงสุด" แล้วบอกราคาของรุ่นที่เลือกอยู่ไว้ใต้ราคา
+      let rMin = priceNum, rMax = priceNum;
+      if (p.isGroup) {
+        p.products.forEach(v => {
+          const n = parseFloat(String(v.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
+          if (n < rMin) rMin = n;
+          if (n > rMax) rMax = n;
+        });
       }
-      card += '        </div>';
+      const hasRange = rMax > rMin;
+      const strikeHtml = hasSave ? '<span class="text-[10px] text-slate-400 line-through font-semibold tabular-nums">฿' + origNum.toLocaleString() + '</span>' : '';
+      if (hasRange) {
+        card += '        <div class="mb-0.5"><span class="sf-range text-slate-900 font-black text-base md:text-[17px] leading-none tabular-nums">฿' + rMin.toLocaleString() + ' - ฿' + rMax.toLocaleString() + '</span></div>';
+        card += '        <div class="sf-selprice flex items-baseline gap-1.5 flex-wrap ' + (hasSave ? 'mb-0.5' : 'mb-2') + '">รุ่นที่เลือก <b class="tabular-nums">฿' + price + '</b>' + strikeHtml + '</div>';
+      } else {
+        card += '        <div class="flex items-baseline gap-1.5 flex-wrap ' + (hasSave ? 'mb-0.5' : 'mb-2') + '">';
+        card += '          <span class="text-slate-900 font-black text-base md:text-lg leading-none tabular-nums">฿' + price + '</span>' + strikeHtml;
+        card += '        </div>';
+      }
       if (hasSave) {
-        card += '      <div class="mb-2"><span class="inline-block text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-extrabold">ประหยัด ฿' + (origNum - priceNum).toLocaleString() + '</span></div>';
+        card += '      <div class="sf-save mb-2"><i class="fas fa-ticket"></i> ประหยัดไป ฿' + (origNum - priceNum).toLocaleString() + '</div>';
       }
       card +=          stockBarHtml;
       card +=          bookBtn;
@@ -5782,7 +5947,7 @@ window.app = {
           let modelName = id.substring(6);
           // Only show variants that are in current channel and active
           const currentChannel = document.getElementById('posChannelSelect').value;
-          groupProducts = window.app.globalData.products.filter(p => p.Model === modelName && p.Status === 'เปิด' && (!currentChannel || !p.Channel || p.Channel.includes(currentChannel)));
+          groupProducts = window.app.globalData.products.filter(p => p.Model === modelName && p.Status === 'เปิด' && window.app.channelOk(p.Channel, currentChannel));
           if (groupProducts.length === 0) return Swal.fire('สินค้าหมด', 'สินค้ารุ่นนี้ไม่มีสต๊อกในระบบสำหรับช่องทางที่เลือก', 'warning');
           
           prod = groupProducts[0]; 
@@ -6092,7 +6257,135 @@ window.app = {
       
       window.app.hideModal('addToCartModal'); 
       this.saveAndRender();
-      Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 }).fire({ icon: 'success', title: 'เพิ่มลงตะกร้าแล้ว' });
+      if (!this.promptCompanions(p)) {
+        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 }).fire({ icon: 'success', title: 'เพิ่มลงตะกร้าแล้ว' });
+      }
+    },
+    // ===== แนะนำสินค้าซื้อคู่ (Frequently Bought Together) =====
+    // กติกาเลือกสินค้า: ใช้โปร Bundle จาก AutoPromotions (Buy Category ในตะกร้า -> Get Discount Category) เป็นตัวบอกว่าหมวดไหนควรซื้อคู่
+    // ไม่มีกติกาในชีต = ใช้ค่าเริ่มต้นเดียวกับ checkAutoPromotions (โมบาย -> อุปกรณ์เสริม 10%) แล้วจัดอันดับตามความเข้ากันได้กับสินค้าหลัก
+    activeAutoRules_: function() {
+      let rules = (window.app.globalData && window.app.globalData.autoPromotions) || [];
+      if (rules.length === 0) rules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'Active' }];
+      const chSelEl = document.getElementById('posChannelSelect');
+      const currentChannel = (chSelEl ? chSelEl.value : '').toString().trim().toLowerCase();
+      return rules.filter(r => {
+        if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return false;
+        const raw = (r['Channel'] || '').toString().trim();
+        const toks = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        return raw === '' || raw === '*' || raw.toLowerCase() === 'all' || toks.includes(currentChannel);
+      });
+    },
+    recommendCompanions: function(limit, forItems) {
+      const items = (forItems || this.cartData || []);
+      if (items.length === 0) return [];
+      const priceOf = (p) => parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
+      const catOf = (p) => (p.Category || '').toString().trim();
+      const rules = this.activeAutoRules_();
+      const want = {}; // หมวดที่ควรเสนอ -> { pct, mains: สินค้าหลักที่ทำให้เกิดกติกา }
+      rules.forEach(r => {
+        const buy = (r['Buy Category'] || '').toString().trim(), get = (r['Get Discount Category'] || '').toString().trim();
+        if (!buy || !get || get.indexOf('ของแถม') > -1) return;
+        const mains = items.filter(i => catOf(i) === buy);
+        if (mains.length === 0) return;
+        const pct = parseFloat(r['Discount Percent']) || 0;
+        if (!want[get]) want[get] = { pct: 0, mains: [] };
+        want[get].pct += pct; // ทุกกติกาที่เข้าเงื่อนไขลดซ้อนกัน (ตรงกับ checkAutoPromotions และเพดานที่ server คำนวณ) ป้ายจึงต้องรวมเปอร์เซ็นต์ด้วย
+        want[get].mains = want[get].mains.concat(mains);
+      });
+      const cats = Object.keys(want);
+      if (cats.length === 0) return [];
+      const inCart = new Set(items.map(i => i.SKU));
+      const chSelEl = document.getElementById('posChannelSelect');
+      const currentChannel = (chSelEl ? chSelEl.value : '').toString().trim();
+      const tok = (s) => String(s || '').toLowerCase().split(/[^a-z0-9ก-๙]+/).filter(t => t.length >= 2);
+      const brandWords = new Set(['samsung', 'galaxy', 'apple', 'iphone', 'oppo', 'vivo', 'xiaomi', 'redmi', 'realme', 'huawei', 'series', 'pro', 'max', 'ultra', 'plus']);
+      const pool = (window.app.globalData.products || []).filter(p => {
+        if ((p.Status || '') !== 'เปิด') return false;
+        if (cats.indexOf(catOf(p)) === -1) return false;
+        if (inCart.has(p.SKU)) return false;
+        if (this.stockOf(p) <= 0 || priceOf(p) <= 0) return false;
+        return window.app.channelOk(p.Channel, currentChannel);
+      });
+      const scored = pool.map(c => {
+        const w = want[catOf(c)];
+        const cTok = new Set(tok([c['Product Name'], c.Model, c['Marketing Model'], c['Product Group']].join(' ')));
+        let score = 0;
+        w.mains.forEach(m => {
+          const g = (m['Product Group'] || '').toString().trim();
+          if (g && g !== '-' && g === (c['Product Group'] || '').toString().trim()) score += 5;
+          tok([m.Model, m['Marketing Model'], m['Product Name']].join(' ')).forEach(t => {
+            if (!cTok.has(t)) return;
+            score += brandWords.has(t) ? 1 : 3;
+          });
+        });
+        return { p: c, score: score, pct: w.pct, price: priceOf(c) };
+      });
+      scored.sort((a, b) => (b.score - a.score) || (a.price - b.price));
+      const seenModel = {}; const out = [];
+      for (let i = 0; i < scored.length && out.length < (limit || 4); i++) {
+        const s = scored[i]; const m = (s.p.Model || '').toString().trim();
+        if (m && m !== '-') { if (seenModel[m]) continue; seenModel[m] = true; }
+        out.push(s);
+      }
+      return out;
+    },
+    companionRowHtml_: function(s, viaPrompt) {
+      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      const p = s.p;
+      const after = s.pct > 0 ? Math.round(s.price * (100 - s.pct) / 100) : s.price;
+      const img = window.app.formatImageUrl(p['Image URL']);
+      return '<div class="sf-comp flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-white text-left" data-sku="' + esc(p.SKU) + '">'
+        + '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.visibility=\'hidden\'" class="w-12 h-12 object-contain rounded-lg bg-slate-50 shrink-0">'
+        + '<div class="min-w-0 flex-1">'
+        + '<div class="text-xs font-bold text-slate-900 leading-snug line-clamp-2">' + esc(p['Product Name']) + '</div>'
+        + '<div class="flex items-baseline gap-1.5 flex-wrap mt-0.5"><span class="text-sm font-black text-slate-900 tabular-nums">฿' + after.toLocaleString() + '</span>'
+        + (s.pct > 0 ? '<span class="text-[10px] text-slate-400 line-through tabular-nums">฿' + s.price.toLocaleString() + '</span><span class="text-[10px] font-extrabold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1">ลด ' + esc(s.pct) + '% เมื่อซื้อคู่</span>' : '')
+        + '</div></div>'
+        + '<button type="button" class="sf-comp-add shrink-0 px-3 py-1.5 rounded-lg bg-[#141416] text-[#FF6B00] text-[11px] font-black hover:bg-black transition" onclick="window.app.pos.addCompanion(\'' + escJs(p.SKU) + '\',' + (viaPrompt ? 'true' : 'false') + ')" aria-label="เพิ่ม ' + esc(p['Product Name']) + ' ลงตะกร้า"><i class="fas fa-plus mr-1"></i>เพิ่ม</button>'
+        + '</div>';
+    },
+    renderCompanions: function() {
+      const box = document.getElementById('cartCompanions');
+      if (!box) return;
+      const list = this.recommendCompanions(4);
+      if (list.length === 0) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+      box.innerHTML = '<div class="sf-comp-panel">'
+        + '<div class="flex items-center gap-2 mb-2"><i class="fas fa-link text-[#FF6B00]"></i><h6 class="sf-comp-h text-xs font-black uppercase tracking-wide">แนะนำซื้อคู่</h6></div>'
+        + '<div class="flex flex-col gap-2">' + list.map(s => this.companionRowHtml_(s, false)).join('') + '</div></div>';
+      box.classList.remove('hidden');
+    },
+    // เด้งแนะนำซื้อคู่หลังเพิ่มสินค้าหลักลงตะกร้า (ครั้งเดียวต่อ SKU ต่อรอบใช้งาน) — คืน true ถ้าแสดงแล้ว
+    promptCompanions: function(mainProd) {
+      if (!mainProd || typeof Swal === 'undefined') return false;
+      this._companionPrompted = this._companionPrompted || {};
+      if (this._companionPrompted[mainProd.SKU]) return false;
+      const list = this.recommendCompanions(4);
+      if (list.length === 0) return false;
+      this._companionPrompted[mainProd.SKU] = true;
+      const esc = window.app.esc;
+      Swal.fire({
+        title: 'เพิ่มลงตะกร้าแล้ว — ซื้อคู่ไหม?',
+        html: '<div class="text-xs text-slate-500 mb-3">สินค้าที่เข้ากับ <b>' + esc(mainProd['Product Name']) + '</b></div><div id="companionPromptList" class="flex flex-col gap-2">' + list.map(s => this.companionRowHtml_(s, true)).join('') + '</div>',
+        showCloseButton: true, showConfirmButton: true, confirmButtonText: 'ไปต่อ', confirmButtonColor: '#141416', width: 520
+      });
+      return true;
+    },
+    addCompanion: function(sku, viaPrompt) {
+      if (this.isBookingBlocked) return Swal.fire('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
+      const p = (window.app.globalData.products || []).find(x => x.SKU == sku);
+      if (!p || (p.Status || '') !== 'เปิด') return;
+      const inCartQty = this.cartData.filter(i => i.SKU == sku).reduce((s, i) => s + i.qty, 0);
+      if (inCartQty + 1 > this.stockOf(p)) { Swal.fire('สต๊อกไม่พอ', '', 'warning'); return; }
+      const ex = this.cartData.find(i => i.SKU == sku && !(i.brandGifts && i.brandGifts.length) && !(i.channelGifts && i.channelGifts.length));
+      if (ex) ex.qty += 1; else this.cartData.push({ ...p, qty: 1, brandGifts: [], channelGifts: [] });
+      this.saveAndRender();
+      if (viaPrompt) {
+        // อัปเดตรายการในกล่องแนะนำ (สินค้าที่เพิ่มแล้วหายไป) — ถ้าไม่เหลือให้ปิด
+        const holder = document.getElementById('companionPromptList');
+        const list = this.recommendCompanions(4);
+        if (!holder || list.length === 0) { Swal.close(); } else { holder.innerHTML = list.map(s => this.companionRowHtml_(s, true)).join(''); }
+      }
     },
     updateQtyInCart: function(idx, c) {
       const itm = this.cartData[idx]; const p = window.app.globalData.products.find(x=>x.SKU==itm.SKU);
@@ -6114,7 +6407,7 @@ window.app = {
     saveAndRender: function() {
       // ตะกร้าเปลี่ยน = ความพยายามคีย์ออเดอร์ใหม่ — ต้องได้ idempotency key ใหม่ ไม่งั้น server จะมองเป็นออเดอร์ซ้ำ
       this.pendingRequestId = null;
-      localStorage.setItem('tg_cart', JSON.stringify(this.cartData)); this.renderCart(); this.updateTotal();
+      localStorage.setItem('tg_cart', JSON.stringify(this.cartData)); this.renderCart(); this.updateTotal(); this.renderCompanions();
     },
     checkAutoPromotions: function() {
         const suggestBox = document.getElementById('cartAutoSuggest');
@@ -6218,7 +6511,7 @@ window.app = {
       const mobCnt = document.getElementById('mobileStickyCount');
       if(!cD) return;
       if(this.cartData.length===0){ 
-          cD.innerHTML='<div class="h-full min-h-[200px] flex flex-col items-center justify-center text-slate-400 opacity-75"><div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-3"><i class="fas fa-shopping-basket text-3xl text-slate-300"></i></div><p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">ยังไม่มีสินค้าในตะกร้า Flash Sale</p><p class="text-[11px] text-slate-400 mt-1">เลือกสินค้าและกดปุ่ม "จองด่วน" เพื่อเพิ่มลงตะกร้า</p></div>'; 
+          cD.innerHTML='<div class="h-full min-h-[200px] flex flex-col items-center justify-center text-slate-400 opacity-75"><div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-3"><i class="fas fa-shopping-basket text-3xl text-slate-300"></i></div><p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">ยังไม่มีสินค้าในตะกร้า Pre Booking</p><p class="text-[11px] text-slate-400 mt-1">เลือกสินค้าและกดปุ่ม "จองด่วน" เพื่อเพิ่มลงตะกร้า</p></div>'; 
           if(cL) cL.innerText='0'; 
           if(flC) flC.innerText='0';
           if(hdC) hdC.innerText='0';
@@ -6741,7 +7034,7 @@ window.app = {
 
       // เก็บข้อความสำหรับคัดลอกส่ง LINE
       const txtLines = [
-        '⚡ ใบสรุปโปรโมชัน & ใบเสนอราคา FLASH SALE ⚡',
+        '⚡ ใบสรุปโปรโมชัน & ใบเสนอราคา Pre Booking ⚡',
         'เลขที่อ้างอิง: ' + quoteRef + ' | วันที่: ' + nowStr,
         'สาขา: ' + br + ' (' + ch + ')',
         '----------------------------------------'
@@ -6765,7 +7058,7 @@ window.app = {
         <div id="quotePrintableCard" class="bg-white border-2 border-slate-900 rounded-2xl overflow-hidden shadow-md">
           <div class="bg-[#141416] text-white px-5 py-4 border-b-2 border-[#FF6B00] flex justify-between items-center">
             <div>
-              <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FF6B00] text-white text-[10px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH SALE QUOTATION</div>
+              <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FF6B00] text-white text-[10px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> Pre Booking QUOTATION</div>
               <h4 class="text-base font-black text-white">ใบสรุปราคาพิเศษ ของแถม และตารางผ่อนชำระ</h4>
               <p class="text-[11px] text-slate-300">สาขา: ${esc(br)} (${esc(ch)}) • วันที่ออกใบเสนอราคา: ${esc(nowStr)}</p>
             </div>
@@ -6850,7 +7143,7 @@ window.app = {
       if (!card) return;
       const win = window.open('', '_blank', 'width=800,height=700');
       if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์ใบเสนอราคา', 'info');
-      const html = '<html><head><title>ใบเสนอราคา Flash Sale</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:24px;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
+      const html = '<html><head><title>ใบเสนอราคา Pre Booking</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:24px;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
       win.document.write(html);
       win.document.close();
     },
@@ -7064,11 +7357,11 @@ window.app = {
         const outOfStock = stock <= 0;
         const price = parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
         const origPrice = parseFloat(String(p['Original Price'] || '0').replace(/[^\d.\-]/g, '')) || 0;
-        const img = p['Image URL'] || 'https:\/\/via.placeholder.com/100?text=No+Image';
+        const img = p['Image URL'] || window.app.NO_IMG;
 
         return `
           <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex gap-3 items-center group transition-all hover:border-slate-300">
-             <img src="${esc(img)}" alt="${esc(p['Product Name'])}" onerror="this.src='https:\/\/via.placeholder.com/100?text=No+Image'" class="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1 shrink-0 ${outOfStock ? 'grayscale opacity-50' : ''}">
+             <img src="${esc(img)}" alt="${esc(p['Product Name'])}" onerror="this.src=window.app.NO_IMG" class="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1 shrink-0 ${outOfStock ? 'grayscale opacity-50' : ''}">
              <div class="flex-1 min-w-0">
                 <div class="text-xs font-black text-slate-900 line-clamp-1">${esc(p['Product Name'])}</div>
                 <div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-2">
@@ -8476,8 +8769,8 @@ window.app = {
           <div class="max-w-2xl mx-auto bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden animate-fade-in-up">
             <div class="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-clock text-indigo-500 mr-2"></i> ตั้งเวลารับจอง & แคมเปญ Flash Sale</h3>
-                <p class="text-xs text-slate-500 mt-1">กำหนดวันเวลาเริ่มต้น-สิ้นสุด ชื่อแคมเปญ Flash Sale เกณฑ์เตือนสต๊อกต่ำ และ Webhook แจ้งเตือนออเดอร์</p>
+                <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-clock text-indigo-500 mr-2"></i> ตั้งเวลารับจอง & แคมเปญ Pre Booking</h3>
+                <p class="text-xs text-slate-500 mt-1">กำหนดวันเวลาเริ่มต้น-สิ้นสุด ชื่อแคมเปญ Pre Booking เกณฑ์เตือนสต๊อกต่ำ และ Webhook แจ้งเตือนออเดอร์</p>
               </div>
               <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
                 <i class="fas fa-bolt mr-1 animate-pulse"></i> แคมเปญ & แจ้งเตือน
@@ -8504,9 +8797,9 @@ window.app = {
               <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2 border-t border-slate-100">
                 <div class="md:col-span-2 space-y-2">
                   <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
-                    <i class="fas fa-bolt text-amber-500 mr-1.5 text-xs"></i> ชื่อแคมเปญบนแถบ Flash Sale (FlashCampaignTitle)
+                    <i class="fas fa-bolt text-amber-500 mr-1.5 text-xs"></i> ชื่อแคมเปญบนแถบ Pre Booking (FlashCampaignTitle)
                   </label>
-                  <input type="text" id="flashCampaignTitleInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${campaignTitle}" placeholder="เช่น FLASH SALE รอบ 12:00 - 18:00 น. • ผ่อน 0% สูงสุด 36 เดือน">
+                  <input type="text" id="flashCampaignTitleInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${campaignTitle}" placeholder="เช่น Pre Booking รอบ 12:00 - 18:00 น. • ผ่อน 0% สูงสุด 36 เดือน">
                 </div>
                 <div class="space-y-2">
                   <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
@@ -8537,7 +8830,7 @@ window.app = {
                 <ul class="text-xs text-slate-600 space-y-2 pl-5 list-disc leading-relaxed">
                   <li>ระบบจะเริ่มเปิดให้จองสินค้าหน้า POS เมื่อเวลาปัจจุบันถึงวันเริ่มจอง</li>
                   <li>หากเวลาปัจจุบันเลยวันสิ้นสุดการจองที่ตั้งค่าไว้ หน้าจอ POS จะ <strong class="text-rose-600 font-bold">ปิดการทำงานทั้งหมด</strong> โดยจะไม่สามารถค้นหา/คลิกเลือกสินค้าเพื่อใส่ตะกร้า และปุ่มดำเนินการข้อมูลลูกค้าจะถูกล็อกทันที</li>
-                  <li>จะมีแถบเวลานับถอยหลัง (Countdown Timer) พร้อมชื่อแคมเปญ Flash Sale แสดงให้เห็นเวลาเหลือจอง ณ ขณะนั้นเพื่อกระตุ้นยอดขาย</li>
+                  <li>จะมีแถบเวลานับถอยหลัง (Countdown Timer) พร้อมชื่อแคมเปญ Pre Booking แสดงให้เห็นเวลาเหลือจอง ณ ขณะนั้นเพื่อกระตุ้นยอดขาย</li>
                 </ul>
               </div>
               
