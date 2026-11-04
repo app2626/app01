@@ -212,6 +212,15 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await P("window.app.globalData.settings=Object.assign({},window.app.globalData.settings,{ContactPhone:'',ContactLine:'',ContactHours:''});window.app.renderFooterContact();true");
     ok(await P("document.getElementById('footerContact').classList.contains('hidden')"));
   });
+  await T('settings: banner edit sends bannerId so the server can detect a shifted row', async () => {
+    const r = JSON.parse(await ev(`(async()=>{ const a=window.app, sm=a.settingsManager; const o={api:a.api,rg:a.refreshGlobalData,init:sm.init,sl:a.showLoading};
+      let sent=null; a.api=async(act,pl)=>{ sent={act:act,pl:pl}; return {status:'success'}; }; a.refreshGlobalData=async()=>{}; sm.init=function(){}; a.showLoading=function(){};
+      const inp=document.createElement('input'); inp.id='bannerUrl-7'; inp.value='https://example.com/x.png'; document.body.appendChild(inp);
+      sm._bannerIds['herobanner:7']='BAN-XYZ'; await sm.saveItem('herobanner',7,'bannerUrl-7');
+      inp.remove(); a.api=o.api; a.refreshGlobalData=o.rg; sm.init=o.init; a.showLoading=o.sl; try{Swal.close();}catch(e){}
+      return JSON.stringify(sent); })()`));
+    ok(r && r.act === 'SAVE_SETTINGS_ITEM' && r.pl.bannerId === 'BAN-XYZ' && r.pl.rowIndex === 7 && r.pl.type === 'herobanner', JSON.stringify(r));
+  });
   await T('URL load: search term + page restored', async () => { await P("window.app.pos.applyUrlParams({q:['Test1'],page:['1']},false);true"); await sleep(300); ok(await P("document.getElementById('searchProduct').value==='Test1'")); await P("window.app.pos.clearStoreFilters(true);true"); await sleep(200); });
   await T('URL load: hostile params are sanitized (no XSS, bad values ignored)', async () => { await P("window.app.pos.applyUrlParams({cat:['<img src=x onerror=window.__xss=1>'],sort:['<script>'],pr:['x'],pmin:['abc'],grp:['\"><svg onload=window.__xss=1>']},true);true"); await sleep(400); ok(!(await P("window.__xss")), 'XSS executed'); ok(await P("!document.querySelector('.sf-h1 img') && !document.querySelector('.sf-crumb img, .sf-crumb svg, #storeSidebar svg[onload]')"), 'injected element'); const f = JSON.parse(await P("JSON.stringify(window.app.pos.storeFilters)")); ok(f.sort === '' && f.priceRange === '' && f.priceMin === '', JSON.stringify(f)); await P("window.app.pos.clearStoreFilters(true);true"); await sleep(200); });
   await T('clear-all resets multi-select arrays', async () => { await P("window.app.pos.setStoreFilter('color','Blue');window.app.pos.setStoreFilter('capacity','128GB');window.app.pos.clearStoreFilters(true);true"); await sleep(200); const f = JSON.parse(await P("JSON.stringify(window.app.pos.storeFilters)")); ok(!f.colors.length && !f.capacities.length && !f.groups.length); });

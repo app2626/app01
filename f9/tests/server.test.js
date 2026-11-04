@@ -136,9 +136,54 @@ t('GET_CUSTOMER_BY_PHONE', () => { const r = api('GET_CUSTOMER_BY_PHONE', { phon
 t('UPDATE_FULL_ORDER (admin) sets status', () => { const r = api('UPDATE_FULL_ORDER', { data: { _rowIndex: 2, 'Order Status': 'Confirmed' } }, admin); ok(r && r.status !== 'error', JSON.stringify(r).slice(0, 200)); });
 t('UPDATE_FULL_ORDER by Sales blocked', () => eq(api('UPDATE_FULL_ORDER', { data: { _rowIndex: 2, 'Order Status': 'Confirmed' } }, sales).status, 'error'));
 console.log('== SETTINGS / COUPON / INVOICE / CACHE');
-t('SAVE_SETTINGS_ITEM', () => ok(api('SAVE_SETTINGS_ITEM', { type: 'setting', key: 'SystemName', value: 'ทดสอบระบบ' }, admin).status !== 'error'));
-t('Sales cannot SAVE/DELETE settings', () => { eq(api('SAVE_SETTINGS_ITEM', { type: 'setting', key: 'x', value: 'y' }, sales).status, 'error'); eq(api('DELETE_SETTINGS_ITEM', { type: 'banner', rowIndex: 2 }, sales).status, 'error'); });
-t('DELETE_SETTINGS_ITEM banner', () => { const n = sheets.UI_Banners.getLastRow(); const id = sheets.UI_Banners._get(n, 1); const r = api('DELETE_SETTINGS_ITEM', { type: 'banner', rowIndex: n, bannerId: id }, admin); eq(r.status, 'success', JSON.stringify(r)); eq(sheets.UI_Banners.getLastRow(), n - 1); });
+console.log('== SETTINGS HARDENING (A: secrets never leave Admin, B: server-side validation)');
+const ksv = () => ctx.getKeyValueSettings(ctx.SpreadsheetApp.getActiveSpreadsheet());
+const saveSet = (settings, u) => api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings }, u || admin);
+const origWindow = { ReserveStart: ksv().ReserveStart, ReserveEnd: ksv().ReserveEnd };
+t('SAVE_SETTINGS_ITEM bookingsettings valid', () => { const r = saveSet({ SystemName: 'ทดสอบระบบ' }); eq(r.status, 'success', JSON.stringify(r)); eq(ksv().SystemName, 'ทดสอบระบบ'); });
+t('Sales cannot SAVE/DELETE settings', () => { eq(saveSet({ SystemName: 'x' }, sales).status, 'error'); eq(api('DELETE_SETTINGS_ITEM', { type: 'herobanner', rowIndex: 2 }, sales).status, 'error'); });
+t('A: save Webhook URL as Admin', () => { const r = saveSet({ WebhookUrl: 'https://discord.com/api/webhooks/123/SECRETTOKEN' }); eq(r.status, 'success', JSON.stringify(r)); });
+t('A: GET_ALL_DATA hides WebhookUrl/DriveFolderId from Sales AND Admin payloads', () => {
+  [sales, admin].forEach(u => { const raw = api('GET_ALL_DATA', {}, u); const d = unwrap(raw); ok(d.settings && d.settings.SystemName, 'settings missing'); ok(!('WebhookUrl' in d.settings) && !('DriveFolderId' in d.settings)); ok(!JSON.stringify(raw).includes('SECRETTOKEN'), 'secret leaked'); });
+});
+t('A: Admin still reads WebhookUrl via GET_SETTINGS_LIST (settings page)', () => { const r = api('GET_SETTINGS_LIST', {}, admin); ok(String(r.data.keyValueSettings.WebhookUrl).includes('SECRETTOKEN')); });
+t('A: AuditLog never contains the webhook secret (redacted)', () => { const log = JSON.stringify(tbl('AuditLog')); ok(!log.includes('SECRETTOKEN'), 'secret in audit log'); ok(log.includes('[redacted]')); });
+t('A: secret-looking keys are hidden by pattern (future-proof)', () => { const o = ctx.publicSettings_({ SystemName: 'a', MyApiKey: 'x', foo_token: 'y', ClientSecret: 'z', DriveFolderId: 'd', LineWebhookUrl: 'w' }); eq(JSON.stringify(Object.keys(o)), JSON.stringify(['SystemName'])); });
+t('B: unknown key rejected and NOTHING is written (atomic)', () => { const before = ksv().SystemName; const r = saveSet({ SystemName: 'ShouldNotSave', BogusKey: 'x' }); eq(r.status, 'error'); eq(ksv().SystemName, before); ok(ksv().BogusKey === undefined); });
+t('B: invalid values rejected server-side', () => {
+  [{ ReserveStart: '2026-13-45' }, { LowStockThreshold: 'abc' }, { LowStockThreshold: '-1' }, { WebhookUrl: 'http://x.com/h' }, { ContactPhone: 'abc' }, { InvoiceCompanyEmail: 'nope' },
+   { ContactLine: 'javascript:alert(1)' }, { LogoUrl: 'javascript:alert(1)' }, { SystemName: '' }, { FlashCampaignTitle: 'x'.repeat(200) }, { ReserveEnd: '' }].forEach(o => { const r = saveSet(o); eq(r.status, 'error', JSON.stringify(o) + ' -> ' + JSON.stringify(r)); });
+  eq(saveSet('nope').status, 'error'); eq(saveSet({}).status, 'error'); eq(saveSet(['x']).status, 'error');
+});
+t('B: booking window order enforced server-side, even when only one side is sent', () => {
+  eq(saveSet({ ReserveStart: '2026-06-01T00:00', ReserveEnd: '2026-07-01T00:00' }).status, 'success');
+  eq(saveSet({ ReserveEnd: '2026-05-01T00:00' }).status, 'error'); eq(saveSet({ ReserveStart: '2026-08-01T00:00' }).status, 'error');
+});
+t('B: valid contact settings accepted and stored', () => { const r = saveSet({ ContactPhone: '02-123-4567', ContactLine: '@mystore', ContactHours: '10:00 - 21:00' }); eq(r.status, 'success', JSON.stringify(r)); eq(ksv().ContactLine, '@mystore'); eq(saveSet({ ContactLine: 'https://line.me/R/ti/p/@x' }).status, 'success'); });
+t('B: unchanged legacy value is not re-validated (does not block saving other fields)', () => eq(ctx.validateSettingValue_('LogoUrl', 'weird-legacy', 'weird-legacy'), 'weird-legacy'));
+t('B: restore original booking window', () => { eq(saveSet(origWindow).status, 'success'); });
+t('B: unknown banner type rejected, no row appended', () => { const n = sheets.UI_Banners.getLastRow(); eq(api('SAVE_SETTINGS_ITEM', { type: 'foo', url: 'https://x.com/a.png' }, admin).status, 'error'); eq(sheets.UI_Banners.getLastRow(), n); });
+t('B: banner fields validated (javascript: links rejected)', () => {
+  const n = sheets.UI_Banners.getLastRow();
+  eq(api('SAVE_SETTINGS_ITEM', { type: 'herobanner', url: 'javascript:alert(1)' }, admin).status, 'error');
+  eq(api('SAVE_SETTINGS_ITEM', { type: 'herobanner', url: 'https://example.com/a.png', targetLink: 'javascript:alert(1)' }, admin).status, 'error');
+  eq(sheets.UI_Banners.getLastRow(), n);
+});
+let bnId, bnRow;
+t('B: add banner', () => { const r = api('SAVE_SETTINGS_ITEM', { type: 'herobanner', url: 'https://example.com/a.png', targetLink: 'https://example.com/x' }, admin); eq(r.status, 'success', JSON.stringify(r)); bnRow = sheets.UI_Banners.getLastRow(); bnId = sheets.UI_Banners._get(bnRow, 1); ok(bnId); });
+t('B: edit banner with matching ID works (and #route links allowed)', () => { const r = api('SAVE_SETTINGS_ITEM', { type: 'herobanner', rowIndex: bnRow, bannerId: bnId, url: 'https://example.com/b.png', targetLink: '#pos' }, admin); eq(r.status, 'success', JSON.stringify(r)); eq(sheets.UI_Banners._get(bnRow, 3), 'https://example.com/b.png'); });
+t('B: stale-row protection — wrong/missing ID or wrong type cannot overwrite a banner', () => {
+  const before = sheets.UI_Banners._get(bnRow, 3);
+  eq(api('SAVE_SETTINGS_ITEM', { type: 'herobanner', rowIndex: bnRow, bannerId: 'BAN-OTHER', url: 'https://example.com/evil.png' }, admin).status, 'error');
+  eq(api('SAVE_SETTINGS_ITEM', { type: 'herobanner', rowIndex: bnRow, url: 'https://example.com/evil.png' }, admin).status, 'error');
+  eq(api('SAVE_SETTINGS_ITEM', { type: 'promogrid', rowIndex: bnRow, bannerId: bnId, url: 'https://example.com/evil.png' }, admin).status, 'error');
+  eq(sheets.UI_Banners._get(bnRow, 3), before);
+});
+t('B: delete requires matching type; correct delete works', () => {
+  const n = sheets.UI_Banners.getLastRow();
+  eq(api('DELETE_SETTINGS_ITEM', { type: 'promogrid', rowIndex: bnRow, bannerId: bnId }, admin).status, 'error'); eq(sheets.UI_Banners.getLastRow(), n);
+  const r = api('DELETE_SETTINGS_ITEM', { type: 'herobanner', rowIndex: bnRow, bannerId: bnId }, admin); eq(r.status, 'success', JSON.stringify(r)); eq(sheets.UI_Banners.getLastRow(), n - 1);
+});
 t('DELETE_SETTINGS_ITEM bad row rejected', () => eq(api('DELETE_SETTINGS_ITEM', { type: 'banner', rowIndex: 9999 }, admin).status, 'error'));
 t('VALIDATE_COUPON unknown code', () => { const r = api('VALIDATE_COUPON', { code: 'NOPE', total: 1000 }, sales); ok(r && (r.valid === false || r.status === 'error' || r.success === false), JSON.stringify(r)); });
 let invId;

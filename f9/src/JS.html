@@ -9150,6 +9150,7 @@ window.app = {
         } else {
           // แกลเลอรีสะอาด: การ์ดโชว์แค่รูป + แถบปุ่ม — ฟอร์มแก้ไขซ่อนไว้ กางเฉพาะใบที่กด "แก้ไข" (id เดิมทุกตัว ห้ามเปลี่ยน — saveItem อ้างอิงอยู่)
           list.forEach(item => {
+            this._bannerIds[typeKey + ':' + item.rowIndex] = item.id || '';
             const previewUrl = window.app.esc(window.app.formatImageUrl(item.url));
             const hasLink = !!(item.targetLink && item.targetLink.trim());
             cardsHtml += `
@@ -9270,6 +9271,7 @@ window.app = {
       }
     },
     
+    _bannerIds: {}, // 'type:rowIndex' → ID ของแบนเนอร์ที่แสดงอยู่ — ส่งกลับตอนบันทึกให้ server ยืนยันว่าแถวไม่ได้ขยับ
     saveItem: async function(type, rowIndex, inputId, targetLinkId, detailsId, titleId, buttonTextId) {
       let url = document.getElementById(inputId).value.trim();
       const targetLink = targetLinkId ? document.getElementById(targetLinkId).value.trim() : '';
@@ -9285,7 +9287,7 @@ window.app = {
       window.app.showLoading('กำลังบันทึกข้อมูล...');
       try {
         if (hasPendingImage) url = await window.app.flushImageUpload(stateKey);
-        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, rowIndex: rowIndex, url: url, targetLink: targetLink, details: details, title: title, buttonText: buttonText });
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, rowIndex: rowIndex, bannerId: (this._bannerIds[type + ':' + rowIndex] || ''), url: url, targetLink: targetLink, details: details, title: title, buttonText: buttonText });
         if(res && res.status==='success') {
           await window.app.refreshGlobalData();
           Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จ', showConfirmButton: false, timer: 1200 });

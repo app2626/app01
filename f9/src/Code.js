@@ -1034,7 +1034,8 @@ function getAllInitialData(ss, isAdmin) {
     heroBanners: heroBanners,
     gridBanners: gridBanners,
     popupBanners: popupBanners,
-    settings: getKeyValueSettings(ss)
+    // เฉพาะคีย์ที่ไม่ใช่ความลับ (Webhook URL / Drive Folder ID ไม่ส่งให้หน้าเว็บของ role ใดเลย — Admin อ่านผ่าน GET_SETTINGS_LIST)
+    settings: publicSettings_(getKeyValueSettings(ss))
   };
 }
 
@@ -2453,33 +2454,146 @@ function getSettingsList(ss) {
   };
 }
 
+// ===== ตั้งค่าระบบ (Settings sheet): allowlist คีย์ + กฎตรวจค่า บังคับฝั่ง server เสมอ (หน้าเว็บตรวจแค่เพื่อ UX) =====
+// คีย์ที่เป็นความลับ/ใช้ฝั่ง server เท่านั้น: ห้ามส่งให้ role อื่นผ่าน GET_ALL_DATA และห้ามลง AuditLog เป็นข้อความธรรมดา
+// (Admin ยังอ่านค่าจริงได้จาก GET_SETTINGS_LIST เพื่อแสดงในหน้าตั้งค่า) — คีย์ใหม่ที่ชื่อมี webhook/secret/token/password/apikey ถูกซ่อนให้อัตโนมัติ
+var SETTING_SECRET_KEY_RE_ = /webhook|secret|token|password|passwd|api[_-]?key|private/i;
+var SETTING_SERVER_ONLY_KEYS_ = ['DriveFolderId'];
+var BANNER_TYPES_ = ['loginbg', 'herobanner', 'promogrid', 'popupbanner'];
+
+function isSecretSettingKey_(k) { return SETTING_SECRET_KEY_RE_.test(String(k)); }
+function publicSettings_(settings) {
+  const out = {};
+  Object.keys(settings || {}).forEach(k => {
+    if (!isSecretSettingKey_(k) && SETTING_SERVER_ONLY_KEYS_.indexOf(k) === -1) out[k] = settings[k];
+  });
+  return out;
+}
+function redactSettingsForAudit_(settings) {
+  const out = {};
+  Object.keys(settings || {}).forEach(k => { out[k] = (isSecretSettingKey_(k) && settings[k]) ? '[redacted]' : settings[k]; });
+  return out;
+}
+
+// คีย์ที่แก้ได้ผ่าน SAVE_SETTINGS_ITEM(bookingsettings) — คีย์อื่นถูกปฏิเสธ (กันเขียนคีย์มั่ว/ทับคีย์ภายในระบบ)
+var SETTING_RULES_ = {
+  SystemName:            { label: 'ชื่อเว็บแอป', required: true, max: 80 },
+  Currency:              { label: 'สกุลเงิน', max: 10 },
+  ReserveStart:          { label: 'วันเริ่มจอง', type: 'datetime', required: true },
+  ReserveEnd:            { label: 'วันสิ้นสุดการจอง', type: 'datetime', required: true },
+  FlashCampaignTitle:    { label: 'ชื่อแคมเปญ', max: 120 },
+  LowStockThreshold:     { label: 'เกณฑ์เตือนสต๊อกต่ำ', type: 'int', required: true, min: 0, max: 9999 },
+  WebhookUrl:            { label: 'Webhook URL', type: 'https', max: 500 },
+  LineWebhookUrl:        { label: 'LINE Webhook URL', type: 'https', max: 500 },
+  DriveFolderId:         { label: 'Drive Folder ID', type: 'drive', max: 300 },
+  LogoUrl:               { label: 'โลโก้เว็บแอป', type: 'url', max: 500 },
+  InvoiceLogoUrl:        { label: 'โลโก้ใบเสนอราคา', type: 'url', max: 500 },
+  ApproverSignatureUrl:  { label: 'ลายเซ็นผู้อนุมัติ', type: 'url', max: 500 },
+  InvoiceCompanyName:    { label: 'ชื่อบริษัท', max: 120 },
+  InvoiceCompanyAddress: { label: 'ที่อยู่บริษัท', max: 400 },
+  InvoiceCompanyEmail:   { label: 'อีเมลบริษัท', type: 'email', max: 120 },
+  ApproverName:          { label: 'ชื่อผู้อนุมัติ', max: 120 },
+  ContactPhone:          { label: 'เบอร์โทร', type: 'phone' },
+  ContactLine:           { label: 'LINE', type: 'line', max: 120 },
+  ContactHours:          { label: 'เวลาทำการ', max: 120 }
+};
+
+// คืนค่าที่ผ่านการตรวจ/ทำให้เป็นมาตรฐานแล้ว หรือ throw Error ข้อความไทย — current = ค่าที่เก็บอยู่ในชีต (ถ้าไม่เปลี่ยนจากเดิมจะไม่ตรวจซ้ำ
+// กันค่าเก่าในระบบจริงที่เก่ากว่ากติกานี้ ทำให้บันทึกช่องอื่นไม่ได้)
+function validateSettingValue_(key, raw, current) {
+  const rule = SETTING_RULES_[key];
+  let v = (raw === null || raw === undefined) ? '' : String(raw).trim();
+  if (current !== undefined && v === String(current).trim()) return v;
+  const label = rule.label || key;
+  if (rule.required && v === '') throw new Error(label + ' ห้ามเว้นว่าง');
+  if (rule.max && v.length > rule.max) throw new Error(label + ' ยาวเกินไป (สูงสุด ' + rule.max + ' ตัวอักษร)');
+  if (v === '') return v;
+  switch (rule.type) {
+    case 'datetime':
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(v) || isNaN(new Date(v).getTime())) throw new Error(label + ' รูปแบบวันเวลาไม่ถูกต้อง');
+      break;
+    case 'int':
+      if (!/^\d{1,6}$/.test(v) || parseInt(v, 10) < rule.min || parseInt(v, 10) > rule.max) throw new Error(label + ' ต้องเป็นจำนวนเต็ม ' + rule.min + '–' + rule.max);
+      break;
+    case 'https':
+      if (!/^https:\/\/[^\s<>"']+$/i.test(v)) throw new Error(label + ' ต้องเป็นลิงก์ที่ขึ้นต้นด้วย https://');
+      break;
+    case 'url':
+      if (!/^https?:\/\/[^\s<>"']+$/i.test(v)) throw new Error(label + ' ต้องเป็นลิงก์ http(s)');
+      break;
+    case 'email':
+      if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(v)) throw new Error(label + ' รูปแบบอีเมลไม่ถูกต้อง');
+      break;
+    case 'phone':
+      if (!/^[0-9+\-\s().#,]{5,40}$/.test(v)) throw new Error(label + ' ใช้ได้เฉพาะตัวเลข เว้นวรรค และเครื่องหมาย + - ( ) . # ,');
+      break;
+    case 'line':
+      if (!(/^https:\/\/[^\s<>"']+$/i.test(v) || /^@?[A-Za-z0-9._-]{2,60}$/.test(v))) throw new Error(label + ' ใส่ LINE ID หรือลิงก์ https:// เท่านั้น');
+      break;
+    case 'drive': {
+      const idMatch = v.match(/folders\/([a-zA-Z0-9_-]+)/);
+      if (idMatch && idMatch[1]) v = idMatch[1];
+      if (!/^[a-zA-Z0-9_-]{10,100}$/.test(v)) throw new Error(label + ' ไม่ถูกต้อง');
+      try {
+        DriveApp.getFolderById(v);
+      } catch (e) {
+        throw new Error("Drive Folder ID ที่ตั้งค่าไว้ไม่ถูกต้อง หรือบัญชีนี้ไม่มีสิทธิ์เข้าถึงโฟลเดอร์นั้น");
+      }
+      break;
+    }
+  }
+  return v;
+}
+
+// ช่องของแบนเนอร์ (UI_Banners): ลิงก์ต้องเป็น http(s) (หรือ #เส้นทางภายใน) — กัน javascript: ที่จะกลายเป็น href คลิกได้บนหน้าร้าน
+function validateBannerFields_(f) {
+  const lim = (v, max, label) => { if (v.length > max) throw new Error(label + ' ยาวเกินไป (สูงสุด ' + max + ' ตัวอักษร)'); };
+  lim(f.url, 1000, 'ลิงก์รูป'); lim(f.targetLink, 1000, 'ลิงก์ปลายทาง'); lim(f.details, 500, 'คำอธิบาย'); lim(f.title, 120, 'หัวข้อ'); lim(f.buttonText, 40, 'ข้อความปุ่ม');
+  if (f.url && !/^https?:\/\/[^\s<>"']+$/i.test(f.url)) throw new Error('ลิงก์รูปต้องขึ้นต้นด้วย http:// หรือ https://');
+  if (f.targetLink && !(/^https?:\/\/[^\s<>"']+$/i.test(f.targetLink) || /^#[A-Za-z0-9_-]{1,40}$/.test(f.targetLink))) throw new Error('ลิงก์ปลายทางต้องขึ้นต้นด้วย http:// หรือ https:// (หรือ #ชื่อหน้า)');
+}
+
 function saveSettingsItem(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     if (secureUser.Role !== 'Admin') throw new Error("ไม่มีสิทธิ์แก้ไขตั้งค่าระบบ");
+    payload = payload || {};
     const type = payload.type;
-    
+    if (type !== 'bookingsettings' && BANNER_TYPES_.indexOf(type) === -1) throw new Error("ประเภทการตั้งค่าไม่ถูกต้อง");
+
     if (type === 'bookingsettings') {
       const sheet = ss.getSheetByName("Settings");
       if (!sheet) throw new Error("Settings sheet not found");
       const settings = payload.settings;
+      if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new Error("รูปแบบข้อมูลตั้งค่าไม่ถูกต้อง");
+      const keys = Object.keys(settings);
+      if (keys.length === 0 || keys.length > 30) throw new Error("จำนวนรายการตั้งค่าไม่ถูกต้อง");
       const data = sheet.getDataRange().getValues();
-      for (let key in settings) {
+      const current = {};
+      for (let i = 1; i < data.length; i++) {
+        const k = (data[i][0] === null || data[i][0] === undefined) ? '' : data[i][0].toString().trim();
+        if (k) current[k] = (data[i][1] === null || data[i][1] === undefined) ? '' : data[i][1].toString();
+      }
+
+      // ตรวจทุกคีย์ก่อนเขียนจริง — คีย์ใดไม่ผ่านจะไม่มีคีย์ใดถูกบันทึกเลย (ไม่ให้เขียนค้างครึ่งๆ กลางๆ)
+      const clean = {};
+      keys.forEach(key => {
+        if (!Object.prototype.hasOwnProperty.call(SETTING_RULES_, key)) throw new Error("ไม่รู้จักคีย์ตั้งค่า: " + String(key).slice(0, 40));
+        clean[key] = validateSettingValue_(key, settings[key], current[key]);
+      });
+      const effStart = clean.ReserveStart !== undefined ? clean.ReserveStart : current.ReserveStart;
+      const effEnd = clean.ReserveEnd !== undefined ? clean.ReserveEnd : current.ReserveEnd;
+      if (effStart && effEnd) {
+        const ds = new Date(effStart), de = new Date(effEnd);
+        if (!isNaN(ds.getTime()) && !isNaN(de.getTime()) && ds.getTime() >= de.getTime()) throw new Error("วันเวลาเริ่มจองต้องมาก่อนวันเวลาสิ้นสุดการจอง");
+      }
+
+      Object.keys(clean).forEach(key => {
+        // กัน formula injection (rule 24) — path นี้เป็น key-value generic ครอบข้อความอิสระที่ Admin พิมพ์เอง
+        // phone/line ผ่าน whitelist อักขระแล้ว และเซลล์ถูกบังคับเป็นข้อความ (@) — ไม่ต้องเติม ' หน้าค่าที่ขึ้นต้น + หรือ @ (ไม่งั้น "'@mystore" ถูกเก็บจริงในชีต)
+        const val = (SETTING_RULES_[key].type === 'phone' || SETTING_RULES_[key].type === 'line') ? clean[key] : sanitizeSheetText_(clean[key]);
         let found = false;
-        let val = settings[key].toString().trim();
-        if (key === 'DriveFolderId' && val !== '') {
-          const idMatch = val.match(/folders\/([a-zA-Z0-9_-]+)/);
-          if (idMatch && idMatch[1]) val = idMatch[1];
-          try {
-            DriveApp.getFolderById(val);
-          } catch (e) {
-            throw new Error("Drive Folder ID ที่ตั้งค่าไว้ไม่ถูกต้อง หรือบัญชีนี้ไม่มีสิทธิ์เข้าถึงโฟลเดอร์ (ตรวจที่ ตั้งค่าระบบ → ฐานข้อมูล)");
-          }
-        }
-        // กัน formula injection (rule 24) — path นี้เป็น key-value generic ครอบทั้ง SystemName/InvoiceCompanyName/InvoiceCompanyAddress/
-        // InvoiceCompanyEmail/ApproverName ซึ่งเป็นข้อความอิสระที่ Admin พิมพ์เองและถูกพิมพ์ลงใบเสนอราคา/ใบแจ้งหนี้จริง — เดิมไม่เคย sanitize เลย
-        val = sanitizeSheetText_(val);
         for (let i = 1; i < data.length; i++) {
           if (data[i][0] === key) {
             // บังคับ cell เป็น plain text ก่อนเขียน — ไม่งั้น Sheets แปลง "2026-06-01T00:00" เป็น Date
@@ -2493,23 +2607,32 @@ function saveSettingsItem(payload, secureUser, ss) {
         }
         if (!found) {
           const newRow = sheet.getLastRow() + 1;
-          // Remark map ตาม key — path นี้เป็น key-value generic ไม่ได้มีแค่ค่าจองแล้ว (รอบ 11 เพิ่ม DriveFolderId)
+          // Remark map ตาม key — path นี้เป็น key-value generic ไม่ได้มีแค่ค่าจองแล้ว
           const remarkMap = { ReserveStart: 'วันเริ่มจองสินค้า', ReserveEnd: 'วันสิ้นสุดจองสินค้า', FlashCampaignTitle: 'ข้อความแคมเปญบนแถบ Pre Booking หน้าร้าน', LowStockThreshold: 'เกณฑ์แจ้งเตือนสต๊อกใกล้หมด (ชิ้น)', WebhookUrl: 'Webhook URL แจ้งเตือนเมื่อมีใบจองใหม่หรือสต๊อกใกล้หมด', DriveFolderId: 'โฟลเดอร์ Drive เก็บรูปอัปโหลด', SystemName: 'ชื่อเว็บแอป (แสดงบนแท็บเบราว์เซอร์/หน้า login/เมนู — ใช้ตอนนำไปสำเนาใช้กับร้าน/แบรนด์อื่น)', LogoUrl: 'โลโก้เว็บแอป (แสดงหน้า login/แถบเมนู/ส่วนท้าย)', InvoiceCompanyName: 'ชื่อบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyAddress: 'ที่อยู่บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyEmail: 'อีเมลติดต่อ (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceLogoUrl: 'โลโก้บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', ApproverSignatureUrl: 'รูปลายเซ็นผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)', ApproverName: 'ชื่อผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)' };
           sheet.getRange(newRow, 2).setNumberFormat('@');
           sheet.getRange(newRow, 1, 1, 3).setValues([[key, val, remarkMap[key] || key]]);
         }
-      }
-      logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Booking Settings: " + JSON.stringify(settings));
+      });
+      // AuditLog: ค่าที่เป็นความลับ (Webhook ฯลฯ) ถูกแทนด้วย [redacted]
+      logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Booking Settings: " + JSON.stringify(redactSettingsForAudit_(clean)));
       return { status: 'success' };
     }
-    
-    // กัน formula injection (rule 24) — banner url/targetLink/details/title/buttonText เป็นข้อความอิสระที่ Admin พิมพ์เอง เดิมไม่เคย sanitize
-    const url = sanitizeSheetText_(payload.url ? payload.url.toString().trim() : "");
-    const targetLink = sanitizeSheetText_(payload.targetLink ? payload.targetLink.toString().trim() : "");
-    const details = sanitizeSheetText_(payload.details ? payload.details.toString().trim() : "");
-    // Title/Button Text (2026-09-19, พอร์ตแนวคิดจาก pbzf8) — ใช้เฉพาะ popupbanner เท่านั้น แต่รับ/sanitize เป็น generic เหมือนฟิลด์อื่น ไม่ error ถ้า type อื่นส่งมาว่าง
-    const title = sanitizeSheetText_(payload.title ? payload.title.toString().trim() : "");
-    const buttonText = sanitizeSheetText_(payload.buttonText ? payload.buttonText.toString().trim() : "");
+
+    // กัน formula injection (rule 24) — banner url/targetLink/details/title/buttonText เป็นข้อความอิสระที่ Admin พิมพ์
+    const rawFields = {
+      url: payload.url ? payload.url.toString().trim() : "",
+      targetLink: payload.targetLink ? payload.targetLink.toString().trim() : "",
+      details: payload.details ? payload.details.toString().trim() : "",
+      title: payload.title ? payload.title.toString().trim() : "",
+      buttonText: payload.buttonText ? payload.buttonText.toString().trim() : ""
+    };
+    validateBannerFields_(rawFields);
+    const url = sanitizeSheetText_(rawFields.url);
+    const targetLink = sanitizeSheetText_(rawFields.targetLink);
+    const details = sanitizeSheetText_(rawFields.details);
+    // Title/Button Text — ใช้เฉพาะ popupbanner เท่านั้น แต่รับ/sanitize ทุก type เพื่อให้ path เดียวกัน
+    const title = sanitizeSheetText_(rawFields.title);
+    const buttonText = sanitizeSheetText_(rawFields.buttonText);
     const rowIndex = payload.rowIndex;
     const bannersSheet = ss.getSheetByName("UI_Banners");
     if (!bannersSheet) throw new Error("UI_Banners sheet not found. Please click Auto Setup.");
@@ -2532,18 +2655,25 @@ function saveSettingsItem(payload, secureUser, ss) {
       logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Login BG: " + url);
       return { status: 'success' };
     }
-    
+
     if (rowIndex) {
-      // กัน rowIndex เพี้ยน (ค้างจาก UI เก่า/แถวถูกลบไปแล้ว) เขียนทับ header หรือแถวนอกขอบเขตชีตแบบเงียบๆ
+      // กัน rowIndex เพี้ยน (ค้างจาก UI เก่า/แถวถูกลบไปแล้ว) เขียนทับ header หรือแถวนอกชีต
       const ri = parseInt(rowIndex, 10);
       if (!Number.isInteger(ri) || ri < 2 || ri > bannersSheet.getLastRow()) throw new Error("ตำแหน่งแถวไม่ถูกต้อง กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
-      bannersSheet.getRange(rowIndex, 3).setValue(url);
-      bannersSheet.getRange(rowIndex, 4).setValue('Active');
-      bannersSheet.getRange(rowIndex, 5).setValue(targetLink);
-      bannersSheet.getRange(rowIndex, 6).setValue(details);
-      bannersSheet.getRange(rowIndex, 7).setValue(title);
-      bannersSheet.getRange(rowIndex, 8).setValue(buttonText);
-      logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Setting " + type + " at row " + rowIndex + ": " + url);
+      // ยืนยันว่าแถวนี้ยังเป็นแบนเนอร์ใบเดิม (ID + type ตรงกัน) — ถ้ามี Admin อีกคนลบ/แทรกแถวไปก่อน เลขแถวจะเลื่อน
+      // และการเขียนทับจะไปโดนแบนเนอร์ใบอื่น (ตอนลบมีเช็คนี้อยู่แล้ว ตอนแก้เดิมไม่มี)
+      const head = bannersSheet.getRange(ri, 1, 1, 2).getValues()[0];
+      const idAtRow = (head[0] === null || head[0] === undefined) ? '' : head[0].toString().trim();
+      const typeAtRow = (head[1] === null || head[1] === undefined) ? '' : head[1].toString().trim();
+      const bid = payload.bannerId ? payload.bannerId.toString().trim() : '';
+      if (typeAtRow !== type || (idAtRow && idAtRow !== bid)) throw new Error("ข้อมูลแบนเนอร์เปลี่ยนไปแล้ว (อาจมีผู้ดูแลคนอื่นแก้ไข/ลบ) กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
+      bannersSheet.getRange(ri, 3).setValue(url);
+      bannersSheet.getRange(ri, 4).setValue('Active');
+      bannersSheet.getRange(ri, 5).setValue(targetLink);
+      bannersSheet.getRange(ri, 6).setValue(details);
+      bannersSheet.getRange(ri, 7).setValue(title);
+      bannersSheet.getRange(ri, 8).setValue(buttonText);
+      logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Setting " + type + " at row " + ri + ": " + url);
     } else {
       bannersSheet.appendRow([generateId('BAN'), type, url, 'Active', targetLink, details, title, buttonText]);
       logAudit(secureUser.Username, "SETTING_INSERT", "Added Setting " + type + ": " + url);
@@ -2861,6 +2991,10 @@ function deleteSettingsItem(payload, secureUser, ss) {
       }
     }
 
+    // ยืนยัน type ของแถวที่จะลบตรงกับที่หน้าเว็บส่งมา (กันลบผิดใบเมื่อชีตขยับ แม้ไม่มี bannerId)
+    if (BANNER_TYPES_.indexOf(type) === -1) throw new Error("ประเภทการตั้งค่าไม่ถูกต้อง");
+    const rowType = (bannersSheet.getRange(rowIndex, 2).getValue() || '').toString().trim();
+    if (rowType !== type) throw new Error("ข้อมูลแบนเนอร์เปลี่ยนไปแล้ว กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
     bannersSheet.deleteRow(rowIndex);
     logAudit(secureUser.Username, "SETTING_DELETE", "Deleted Setting " + type + " at row " + rowIndex);
     return { status: 'success' };

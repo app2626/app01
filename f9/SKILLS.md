@@ -83,3 +83,5 @@ Token bearer เซ็นด้วย HMAC (อายุ 30 วัน), รห�
 - **Tailwind แบบ precompiled**: ไม่ใช้ CDN ตอน runtime แล้ว — CSS สร้างเป็น `src/TailwindCSS.html` (`npm run build:css`, ตั้งค่าที่ `tailwind.config.js` มี safelist สำหรับ class ที่ประกอบด้วยสตริง) ต้องรันใหม่ทุกครั้งที่เพิ่ม class ใหม่
 - **ข้อควรระวัง GAS**: ตัวตัดคอมเมนต์ตอน serve ไม่รู้จักสตริง — ห้ามมี `/*` ในสตริงของ `<script>`, และ `//` (เช่น `https://...`) ใน template literal (backtick) จะตัดบรรทัดที่เหลือทิ้ง
 - **ทดสอบ**: `npm test` (server ~109 ข้อ ด้วย gasmock + client ~130 ข้อ ด้วย Chrome headless) ก่อน `clasp push` ทุกครั้ง; `clasp push` ไม่เปลี่ยนสิ่งที่ผู้ใช้เห็น ต้อง `clasp deploy -i <deploymentId>` แยกต่างหาก
+
+**ตั้งค่าระบบ (เพิ่มเติม)**: ค่าที่เป็นความลับ (Webhook URL, Drive Folder ID) ไม่ถูกส่งให้หน้าเว็บของ role ใดนอกจากหน้าตั้งค่าของ Admin และถูกซ่อนใน AuditLog; server ตรวจค่าทุกช่องตามกติกาต่อคีย์ (วันที่, ตัวเลข, https, อีเมล, เบอร์, LINE) และปฏิเสธคีย์/ประเภทที่ไม่รู้จักทั้งก้อน; การแก้/ลบแบนเนอร์ยืนยัน ID + ประเภทของแถวก่อนเสมอ กันเขียนทับใบอื่นเมื่อมีแอดมินหลายคน; ลิงก์แบนเนอร์ต้องเป็น http(s)
