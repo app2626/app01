@@ -8,40 +8,41 @@ window.app = {
   cart: [],
   currentRoute: '',
 
+  // label = ชื่อไทย (บรรทัดบน) · sub = ชื่ออังกฤษ (บรรทัดล่าง) — สิทธิ์/route ผูกกับ id เท่านั้น เปลี่ยนชื่อได้อิสระ
   menuConfig: [
-      { label: 'MAIN MENU', isCategory: true, roles: ['Admin', 'Manager', 'Sales'] },
-      { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Dashboard', roles: ['Admin', 'Manager', 'Sales'] },
-      { id: 'pos', icon: 'fa-shopping-cart', label: 'Pre Order', roles: ['Admin', 'Manager', 'Sales'] },
-      { id: 'orders', icon: 'fa-file-invoice-dollar', label: 'Orders', roles: ['Admin', 'Manager', 'Sales'] },
-      { id: 'invoice', icon: 'fa-file-invoice', label: 'ใบเสนอราคา/ใบแจ้งหนี้', roles: ['Admin', 'Manager', 'Sales'] },
-      { label: 'ANALYTICS & REPORTS', isCategory: true, roles: ['Admin', 'Manager', 'Sales'] },
-      { id: 'analytics', icon: 'fa-chart-pie', label: 'Sales Analytics', roles: ['Admin', 'Manager'] },
-      { id: 'target', icon: 'fa-crosshairs', label: 'Target & Forecast', roles: ['Admin', 'Manager'] },
-      { id: 'bookingsummary', icon: 'fa-table', label: 'สรุปยอดจองรายวัน', roles: ['Admin', 'Manager'] },
-      { id: 'salessummary', icon: 'fa-layer-group', label: 'สรุปยอดรุ่น/แอเรีย/ช่องทาง', roles: ['Admin', 'Manager'] },
-      { id: 'branchbookingsummary', icon: 'fa-store-alt', label: 'สรุปยอดจองตามสาขา', roles: ['Admin', 'Manager'] },
-      { id: 'allbookingsummary', icon: 'fa-boxes-stacked', label: 'สรุปข้อมูลจองทั้งหมด', roles: ['Admin', 'Manager'] },
-      { label: 'SETTINGS', isCategory: true, roles: ['Admin', 'Manager'] },
-      { 
-        id: 'admin_settings', icon: 'fa-cogs', label: 'ตั้งค่าระบบ', roles: ['Admin', 'Manager'],
+      { label: 'เมนูหลัก', sub: 'Main Menu', isCategory: true, roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'แดชบอร์ด', sub: 'Dashboard', roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'pos', icon: 'fa-shopping-cart', label: 'สั่งจองสินค้า', sub: 'Pre Booking', roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'orders', icon: 'fa-file-invoice-dollar', label: 'รายการใบจอง', sub: 'Orders', roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'invoice', icon: 'fa-file-invoice', label: 'ใบเสนอราคา/แจ้งหนี้', sub: 'Quotation & Invoice', roles: ['Admin', 'Manager', 'Sales'] },
+      { label: 'วิเคราะห์/รายงาน', sub: 'Reports', isCategory: true, roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'analytics', icon: 'fa-chart-pie', label: 'วิเคราะห์ยอดขาย', sub: 'Sales Analytics', roles: ['Admin', 'Manager'] },
+      { id: 'target', icon: 'fa-crosshairs', label: 'เป้าหมายและพยากรณ์', sub: 'Target & Forecast', roles: ['Admin', 'Manager'] },
+      { id: 'bookingsummary', icon: 'fa-table', label: 'สรุปยอดจองรายวัน', sub: 'Daily Bookings', roles: ['Admin', 'Manager'] },
+      { id: 'salessummary', icon: 'fa-layer-group', label: 'สรุปรุ่น/แอเรีย/ช่องทาง', sub: 'Model · Area · Channel', roles: ['Admin', 'Manager'] },
+      { id: 'branchbookingsummary', icon: 'fa-store-alt', label: 'สรุปยอดจองตามสาขา', sub: 'Branch Bookings', roles: ['Admin', 'Manager'] },
+      { id: 'allbookingsummary', icon: 'fa-boxes-stacked', label: 'สรุปข้อมูลจองทั้งหมด', sub: 'All Bookings', roles: ['Admin', 'Manager'] },
+      { label: 'ตั้งค่า', sub: 'Settings', isCategory: true, roles: ['Admin', 'Manager'] },
+      {
+        id: 'admin_settings', icon: 'fa-cogs', label: 'ตั้งค่าระบบ', sub: 'System Settings', roles: ['Admin', 'Manager'],
         isParent: true,
         children: [
-          { label: 'Master Data', isCategory: true, roles: ['Admin'] },
-          { id: 'products', icon: 'fa-box-open', label: 'Products', roles: ['Admin'] },
-          { id: 'branches', icon: 'fa-store-alt', label: 'Branches', roles: ['Admin'] },
-          { id: 'channels', icon: 'fa-network-wired', label: 'Channels', roles: ['Admin'] },
-          { id: 'members', icon: 'fa-users', label: 'Members', roles: ['Admin'] },
-          { id: 'inventorylog', icon: 'fa-boxes', label: 'Inventory', roles: ['Admin'] },
-          { label: 'Promotions', isCategory: true, roles: ['Admin', 'Manager'] },
-          { id: 'giftmappings', icon: 'fa-project-diagram', label: 'Set Premium', roles: ['Admin', 'Manager'] },
-          { id: 'autopromotions', icon: 'fa-magic', label: 'Auto Promotions', roles: ['Admin', 'Manager'] },
-          { id: 'promotions', icon: 'fa-tags', label: 'Promotions', roles: ['Admin'] },
-          { id: 'coupons', icon: 'fa-ticket-alt', label: 'Coupons (โค้ดส่วนลด)', roles: ['Admin'] },
-          { id: 'interests', icon: 'fa-heart', label: 'Interests', roles: ['Admin'] },
-          { label: 'ตั้งค่าระบบ', isCategory: true, roles: ['Admin'] },
-          { id: 'systemsettings', icon: 'fa-sliders-h', label: 'ตั้งค่าระบบ', roles: ['Admin'] },
-          { label: 'System', isCategory: true, roles: ['Admin'] },
-          { id: 'auditlog', icon: 'fa-history', label: 'Audit', roles: ['Admin'] }
+          { label: 'ข้อมูลหลัก', sub: 'Master Data', isCategory: true, roles: ['Admin'] },
+          { id: 'products', icon: 'fa-box-open', label: 'สินค้า', sub: 'Products', roles: ['Admin'] },
+          { id: 'branches', icon: 'fa-store-alt', label: 'สาขา', sub: 'Branches', roles: ['Admin'] },
+          { id: 'channels', icon: 'fa-network-wired', label: 'ช่องทางขาย', sub: 'Channels', roles: ['Admin'] },
+          { id: 'members', icon: 'fa-users', label: 'สมาชิก', sub: 'Members', roles: ['Admin'] },
+          { id: 'inventorylog', icon: 'fa-boxes', label: 'ประวัติสต็อก', sub: 'Inventory', roles: ['Admin'] },
+          { label: 'โปรโมชั่น', sub: 'Promotions', isCategory: true, roles: ['Admin', 'Manager'] },
+          { id: 'giftmappings', icon: 'fa-project-diagram', label: 'ชุดของแถม', sub: 'Set Premium', roles: ['Admin', 'Manager'] },
+          { id: 'autopromotions', icon: 'fa-magic', label: 'โปรโมชั่นอัตโนมัติ', sub: 'Auto Promotions', roles: ['Admin', 'Manager'] },
+          { id: 'promotions', icon: 'fa-tags', label: 'ส่วนลดและโปรโมชั่น', sub: 'Promotions', roles: ['Admin'] },
+          { id: 'coupons', icon: 'fa-ticket-alt', label: 'โค้ดส่วนลด', sub: 'Coupons', roles: ['Admin'] },
+          { id: 'interests', icon: 'fa-heart', label: 'ความสนใจลูกค้า', sub: 'Interests', roles: ['Admin'] },
+          { label: 'การตั้งค่า', sub: 'Configuration', isCategory: true, roles: ['Admin'] },
+          { id: 'systemsettings', icon: 'fa-sliders-h', label: 'ตั้งค่าทั่วไป', sub: 'General Settings', roles: ['Admin'] },
+          { label: 'ระบบ', sub: 'System', isCategory: true, roles: ['Admin'] },
+          { id: 'auditlog', icon: 'fa-history', label: 'บันทึกการใช้งาน', sub: 'Audit Log', roles: ['Admin'] }
         ]
       }
   ],
@@ -239,17 +240,46 @@ window.app = {
     else { el.classList.remove('border-emerald-500','ring-emerald-200'); el.classList.add('border-slate-200'); }
   },
 
+  // ตรวจเลขบัตรประชาชน / Passport — กติกาเดียวกับ normalizeIdCard_ ใน Code.js (server เป็นตัวบังคับจริง)
+  // คืน { ok, value, type: 'thai'|'passport', msg }
+  validateIdCard: function(raw) {
+    const v = String(raw == null ? '' : raw).replace(/[\s-]/g, '').toUpperCase();
+    if (!v) return { ok: false, msg: 'กรุณากรอกเลขบัตรประชาชน / Passport' };
+    if (/^\d+$/.test(v)) {
+      if (v.length === 13) {
+        let sum = 0; for (let i = 0; i < 12; i++) sum += parseInt(v.charAt(i), 10) * (13 - i);
+        if ((11 - (sum % 11)) % 10 !== parseInt(v.charAt(12), 10)) return { ok: false, msg: 'เลขบัตรประชาชนไม่ถูกต้อง (ตรวจเลขหลักสุดท้ายไม่ผ่าน)' };
+        return { ok: true, value: v, type: 'thai' };
+      }
+      if (v.length >= 6 && v.length <= 9) return { ok: true, value: v, type: 'passport' };
+      return { ok: false, msg: 'เลขบัตรประชาชนต้องมี 13 หลัก หรือ Passport 6-9 ตัวอักษร' };
+    }
+    if (/^[A-Z0-9]{6,9}$/.test(v)) return { ok: true, value: v, type: 'passport' };
+    return { ok: false, msg: 'เลข Passport ต้องเป็นตัวอักษรอังกฤษ/ตัวเลข 6-9 ตัว' };
+  },
+
+  // จัดรูปแบบช่องบัตรประชาชน/Passport ระหว่างพิมพ์: มีตัวอักษร = โหมด Passport (ตัวพิมพ์ใหญ่ ไม่เกิน 9 ตัว) · ตัวเลขล้วน = จัดขีดแบบบัตรประชาชน 13 หลัก
   formatIdCard: function(el) {
-    let val = el.value.replace(/\D/g, '');
-    let res = '';
-    if (val.length > 0) res += val.substring(0,1);
-    if (val.length > 1) res += '-' + val.substring(1,5);
-    if (val.length > 5) res += '-' + val.substring(5,10);
-    if (val.length > 10) res += '-' + val.substring(10,12);
-    if (val.length > 12) res += '-' + val.substring(12,13);
+    const raw = String(el.value || '').toUpperCase();
+    const hasLetter = /[A-Z]/.test(raw);
+    let res;
+    if (hasLetter) {
+      res = raw.replace(/[^A-Z0-9]/g, '').slice(0, 9);
+    } else {
+      const val = raw.replace(/\D/g, '').slice(0, 13);
+      res = '';
+      if (val.length > 0) res += val.substring(0,1);
+      if (val.length > 1) res += '-' + val.substring(1,5);
+      if (val.length > 5) res += '-' + val.substring(5,10);
+      if (val.length > 10) res += '-' + val.substring(10,12);
+      if (val.length > 12) res += '-' + val.substring(12,13);
+    }
     el.value = res;
-    if (val.length === 13) { el.classList.remove('border-slate-200','border-rose-500'); el.classList.add('border-emerald-500','ring-emerald-200'); }
-    else { el.classList.remove('border-emerald-500','ring-emerald-200'); el.classList.add('border-slate-200'); }
+    const r = window.app.validateIdCard(res);
+    el.classList.remove('border-emerald-500', 'ring-emerald-200', 'border-rose-500', 'border-slate-200');
+    if (r.ok) el.classList.add('border-emerald-500', 'ring-emerald-200');
+    else el.classList.add(res.replace(/[^A-Za-z0-9]/g, '').length >= 6 ? 'border-rose-500' : 'border-slate-200');
+    el.title = r.ok ? (r.type === 'thai' ? 'บัตรประชาชนไทย' : 'Passport') : (r.msg || '');
   },
 
   formatImageUrl: function(url, size='w500') {
@@ -553,7 +583,7 @@ window.app = {
          </div>
 
          <div class="footer">
-           <p>ขอบคุณที่ใช้บริการ / Thank you for your preorder</p>
+           <p>ขอบคุณที่ใช้บริการ / Thank you for your pre-booking</p>
            <p>เอกสารฉบับนี้ใช้เป็นหลักฐานในการรับสินค้า กรุณานำมาแสดงในวันรับสินค้า</p>
          </div>
        </div>
@@ -1051,6 +1081,29 @@ window.app = {
         el.classList.add('hidden');
         document.body.style.overflow = '';
     }
+    // ปิดหน้าต่างสินค้า = ถอด ?p= ออกจาก URL (ลิงก์ที่แชร์ได้ผูกกับ modal ที่เปิดอยู่เท่านั้น)
+    if (modalId === 'addToCartModal' && window.app.pos && window.app.pos.setSharedModel) window.app.pos.setSharedModel('');
+  },
+
+  // ข้อมูลติดต่อร้านใน footer (ตั้งค่าที่ ตั้งค่าระบบ › ข้อมูลติดต่อร้าน: ContactPhone / ContactLine / ContactHours)
+  renderFooterContact: function() {
+    const box = document.getElementById('footerContact'); if (!box) return;
+    const st = (window.app.globalData && window.app.globalData.settings) || {};
+    const clean = (v) => String(v == null ? '' : v).replace(/^'+/, '').trim(); // ค่าที่ขึ้นต้น + = - @ ถูกกัน formula โดยเติม ' ไว้หน้า
+    const phone = clean(st.ContactPhone), line = clean(st.ContactLine), hours = clean(st.ContactHours);
+    const parts = [];
+    if (phone) {
+      const digits = phone.replace(/[^0-9+]/g, '');
+      parts.push('<a href="tel:' + window.app.esc(digits) + '" class="hover:text-[#FF6B00] transition-colors"><i class="fas fa-phone mr-1.5 text-slate-400"></i>' + window.app.esc(phone) + '</a>');
+    }
+    if (line) {
+      const href = /^https?:\/\//i.test(line) ? line : 'https://line.me/R/ti/p/' + encodeURIComponent(line.charAt(0) === '@' ? line : '@' + line);
+      const shown = /^https?:\/\//i.test(line) ? 'LINE' : (line.charAt(0) === '@' ? line : '@' + line);
+      parts.push('<a href="' + window.app.esc(href) + '" target="_blank" rel="noopener noreferrer" class="hover:text-[#FF6B00] transition-colors"><i class="fab fa-line mr-1.5 text-emerald-500"></i>' + window.app.esc(shown) + '</a>');
+    }
+    if (hours) parts.push('<span><i class="far fa-clock mr-1.5 text-slate-400"></i>' + window.app.esc(hours) + '</span>');
+    box.innerHTML = parts.join('');
+    box.classList.toggle('hidden', parts.length === 0);
   },
 
   // =========================================================================
@@ -1356,6 +1409,20 @@ window.app = {
       : { text: '#64748b', grid: 'rgba(226, 232, 240, 0.4)', datalabel: '#334155' };
   },
 
+  // เมนูผู้ใช้มุมล่างซ้าย (โหมดมืด/เปลี่ยนรหัสผ่าน/ออกจากระบบ)
+  toggleUserMenu: function(ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const pop = document.getElementById('userMenuPop'), btn = document.getElementById('userMenuBtn');
+    if (!pop) return;
+    const open = pop.classList.toggle('hidden') === false;
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+  closeUserMenu: function() {
+    const pop = document.getElementById('userMenuPop'), btn = document.getElementById('userMenuBtn');
+    if (pop) pop.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  },
+
   updateThemeToggleUI: function() {
     const isDark = document.documentElement.classList.contains('dark');
     document.querySelectorAll('.theme-toggle-icon').forEach(icon => {
@@ -1525,6 +1592,25 @@ window.app = {
     window.app.applyLogo('sidebarLogoBox', 'sidebarLogoIcon', appLogoUrl);
     window.app.applyLogo('mobileLogoBox', 'mobileLogoIcon', appLogoUrl);
     window.app.applyLogo('footerLogoBox', 'footerLogoIcon', appLogoUrl);
+    window.app.renderFooterContact();
+    // footer ปีปัจจุบัน + ปุ่มกลับขึ้นบน (อยู่ใน <template> จึงใส่สคริปต์ inline ไม่ได้ — ต้องผูกที่นี่หลัง clone)
+    try { const fy = document.getElementById('footerYear'); if (fy) fy.textContent = new Date().getFullYear(); } catch (e) {}
+    if (!window.__userMenuBound) {
+      window.__userMenuBound = true;
+      document.addEventListener('click', function (e) {
+        const wrap = document.getElementById('userMenuWrap');
+        if (wrap && !wrap.contains(e.target)) window.app.closeUserMenu();
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') window.app.closeUserMenu(); });
+    }
+    if (!window.__backToTopBound) {
+      window.__backToTopBound = true;
+      window.addEventListener('scroll', function () {
+        const b = document.getElementById('backToTopBtn'); if (!b) return;
+        const show = (window.pageYOffset || document.documentElement.scrollTop) > 600;
+        b.classList.toggle('hidden', !show); b.classList.toggle('flex', show);
+      }, { passive: true });
+    }
     
     window.app.buildMenu();
     window.app.updateThemeToggleUI();
@@ -1536,7 +1622,8 @@ window.app = {
       if(res && res.status === 'success') {
          window.app.globalData = res;
          window.app.preloadBanners();
-         if(!window.location.hash) window.location.hash = '#dashboard';
+         // ลิงก์สินค้าที่แชร์ (?p=) ไม่มี hash → พาไปหน้าสั่งจอง (pos) แทน dashboard
+         if(!window.location.hash) window.location.hash = window.__DEEP_MODEL ? '#pos' : '#dashboard';
          window.app.route();
 
          setTimeout(() => { window.app.showPopupBanner(); }, 500);
@@ -1585,6 +1672,15 @@ window.app = {
       return defaultRoles.includes(uRole); 
   },
 
+  // แถวเมนูสองบรรทัด: ไทย (บน) + อังกฤษ (ล่าง) — ตัดด้วย … ให้บรรทัดเดียว ความสูงแต่ละรายการเท่ากัน, title แสดงชื่อเต็ม
+  navLabelHtml: function(m, big) {
+    const th = this.esc(m.label), en = m.sub ? this.esc(m.sub) : '';
+    return `<span class="min-w-0 flex-1"><span class="nav-th block truncate leading-tight">${th}</span>${en ? `<span class="nav-sub block truncate leading-tight ${big ? 'text-[11px]' : 'text-[10px]'} font-semibold opacity-60">${en}</span>` : ''}</span>`;
+  },
+  navCategoryHtml: function(m, cls) {
+    return `<div class="${cls} truncate whitespace-nowrap">${this.esc(m.label)}${m.sub ? ` <span class="normal-case tracking-normal font-semibold opacity-60">· ${this.esc(m.sub)}</span>` : ''}</div>`;
+  },
+
   buildMenu: function() {
     const deskNav = document.getElementById('desktopMenu');
     const mobNav = document.getElementById('mobileMenu');
@@ -1596,8 +1692,8 @@ window.app = {
     this.menuConfig.forEach(m => {
       if(m.isCategory) {
           if (this.checkMenuAccess('category', m.roles)) {
-              deskHtmlStr += `<div class="px-4 pt-4 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">${m.label}</div>`;
-              mobHtmlStr += `<div class="px-4 pt-4 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest mt-1">${m.label}</div>`;
+              deskHtmlStr += this.navCategoryHtml(m, 'px-4 pt-4 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1');
+              mobHtmlStr += this.navCategoryHtml(m, 'px-4 pt-4 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest mt-1');
           }
       } else if(m.isParent) {
           let childDeskHtml = '';
@@ -1607,12 +1703,12 @@ window.app = {
           m.children.forEach(child => {
              if(child.isCategory) {
                  if(this.checkMenuAccess('category', child.roles)) {
-                    childDeskHtml += `<div class="px-3 pt-3 pb-1 text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">${child.label}</div>`;
-                    childMobHtml += `<div class="px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">${child.label}</div>`;
+                    childDeskHtml += this.navCategoryHtml(child, 'px-3 pt-3 pb-1 text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1');
+                    childMobHtml += this.navCategoryHtml(child, 'px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1');
                  }
              } else if(this.checkMenuAccess(child.id, child.roles)) {
-                childDeskHtml += `<a href="#${child.id}" class="nav-link block px-3 py-2.5 rounded-xl text-[13px] font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-desk-${child.id}"><i class="fas ${child.icon} mr-2 w-4 text-center opacity-50 text-[11px]"></i>${child.label}</a>`;
-                childMobHtml += `<a href="#${child.id}" class="nav-link block px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-mob-${child.id}" onclick="window.app.closeMobileMenu()"><i class="fas ${child.icon} mr-2 w-4 text-center opacity-50 text-[11px]"></i>${child.label}</a>`;
+                childDeskHtml += `<a href="#${child.id}" class="nav-link flex items-center px-3 py-2 rounded-xl text-[13px] font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-desk-${child.id}" title="${this.esc(child.label)}${child.sub ? ' — ' + this.esc(child.sub) : ''}"><i class="fas ${child.icon} mr-2 w-4 text-center opacity-50 text-[11px]"></i>${this.navLabelHtml(child)}</a>`;
+                childMobHtml += `<a href="#${child.id}" class="nav-link flex items-center px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-mob-${child.id}" onclick="window.app.closeMobileMenu()"><i class="fas ${child.icon} mr-2 w-4 text-center opacity-50 text-[11px]"></i>${this.navLabelHtml(child)}</a>`;
                 hasChildAccess = true;
              }
           });
@@ -1620,7 +1716,7 @@ window.app = {
           if(hasChildAccess) { 
              deskHtmlStr += `<div>
                 <button onclick="document.getElementById('desk-sub-${m.id}').classList.toggle('hidden')" class="w-full text-left px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-desk-${m.id}">
-                  <span><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${m.label}</span>
+                  <span class="flex items-center min-w-0 flex-1"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m)}</span>
                   <i class="fas fa-chevron-down text-[10px] opacity-50"></i>
                 </button>
                 <div id="desk-sub-${m.id}" class="hidden pl-8 pr-2 py-1 space-y-0.5 bg-slate-50/50 rounded-xl mt-1">
@@ -1630,7 +1726,7 @@ window.app = {
 
              mobHtmlStr += `<div>
                <button onclick="document.getElementById('sub-${m.id}').classList.toggle('hidden')" class="w-full text-left px-4 py-3 rounded-xl text-base font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-mob-${m.id}">
-                 <span><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${m.label}</span>
+                 <span class="flex items-center min-w-0 flex-1"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m, true)}</span>
                  <i class="fas fa-chevron-down text-sm"></i>
                </button>
                <div id="sub-${m.id}" class="hidden pl-6 pr-2 py-2 space-y-1 bg-slate-50/50 rounded-xl mt-1 border border-slate-100/50">
@@ -1640,8 +1736,8 @@ window.app = {
           }
       } else {
           if(this.checkMenuAccess(m.id, m.roles)) {
-             deskHtmlStr += `<a href="#${m.id}" class="nav-link flex items-center px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all w-full" id="nav-desk-${m.id}"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${m.label}</a>`;
-             mobHtmlStr += `<a href="#${m.id}" class="nav-link block px-4 py-3 rounded-xl text-base font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-mob-${m.id}" onclick="window.app.closeMobileMenu()"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70 text-sm"></i>${m.label}</a>`;
+             deskHtmlStr += `<a href="#${m.id}" class="nav-link flex items-center px-3 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all w-full" id="nav-desk-${m.id}" title="${this.esc(m.label)}${m.sub ? ' — ' + this.esc(m.sub) : ''}"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m)}</a>`;
+             mobHtmlStr += `<a href="#${m.id}" class="nav-link flex items-center px-4 py-2.5 rounded-xl text-base font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-mob-${m.id}" onclick="window.app.closeMobileMenu()"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70 text-sm"></i>${this.navLabelHtml(m, true)}</a>`;
           }
       }
     });
@@ -1686,7 +1782,7 @@ window.app = {
     if(deskActive) {
       deskActive.classList.remove('text-slate-500', 'hover:bg-indigo-50');
       deskActive.classList.add('bg-indigo-600', 'text-white', 'hover:bg-indigo-700', 'active-link');
-      if(document.getElementById('pageTitle')) document.getElementById('pageTitle').innerText = deskActive.innerText;
+      if(document.getElementById('pageTitle')) { const th = deskActive.querySelector('.nav-th'); document.getElementById('pageTitle').innerText = th ? th.textContent : deskActive.innerText; }
     }
     if(mobActive) {
       mobActive.classList.remove('text-slate-600', 'hover:bg-indigo-50');
@@ -1824,7 +1920,7 @@ window.app = {
             { key: 'Contact Number', label: 'เบอร์โทร', type: 'text' },
             { key: 'Email', label: 'Email', type: 'text' },
             { key: 'ID Card_Passport', label: 'เลขที่บัตรประชาชน', type: 'text' },
-            { key: 'Pre Order No', label: 'เลขที่ Pre Order', type: 'text' },
+            { key: 'Pre Order No', label: 'เลขที่ Pre Booking', type: 'text' },
             { key: 'Code Handraiser', label: 'Code Handraiser', type: 'text' },
             { key: 'Pickup Date', label: 'รอบรับเครื่องลูกค้าวันที่', type: 'text' },
             { key: 'SKU', label: 'SKU', type: 'readonly' },
@@ -2076,6 +2172,7 @@ window.app = {
           });
           
           this.renderBanners();
+          this.lastBuiltAt = res.data.builtAt || Date.now(); this.updateFreshness();
 
           const bSel = document.getElementById('dashBranch'); const sSel = document.getElementById('dashSales');
           if(bSel && sSel) {
@@ -2117,26 +2214,48 @@ window.app = {
       });
       emptyEl.classList.remove('hidden');
     },
+    // ดึงข้อมูล Dashboard ใหม่ — force=true (ปุ่มรีเฟรช) ข้ามแคชฝั่ง server; ตัวจับเวลา 30 วิ ใช้แคชปกติ (ลดภาระชีต)
+    reloadData: async function(force) {
+      const stat = document.getElementById('dashSyncStatus'); if(stat) { stat.classList.remove('bg-slate-100','text-slate-600'); stat.classList.add('bg-emerald-50','text-emerald-600'); }
+      let ok = false;
+      try {
+        const res = await window.app.api('GET_ADVANCED_DASHBOARD', force ? { refresh: true } : {});
+        if(res && res.status === 'success') {
+          this.rawOrders = res.data.orders.map(o => {
+             let bInfo = window.app.globalData.branches.find(b => b['Branch Code'] === o['Branch Code']) || {};
+             let pInfo = window.app.globalData.products.find(p => p.SKU == o.SKU) || {};
+             o.Mall = bInfo.Mall || '-'; o.Region = bInfo.Region || '-'; o.Province = bInfo.Province || '-'; o['Type Name'] = bInfo['Type Name'] || '-'; o.Area = bInfo.Area || '-';
+             o.Category = pInfo.Category || '-'; o.Model = pInfo.Model || '-'; o.Capacity = pInfo.Capacity || '-';
+             return o;
+          });
+          this.lastBuiltAt = res.data.builtAt || Date.now();
+          this.applyFilters();
+          ok = true;
+        }
+      } catch(e) {}
+      setTimeout(() => { if(stat) { stat.classList.remove('bg-emerald-50','text-emerald-600'); stat.classList.add('bg-slate-100','text-slate-600'); } }, 1500);
+      this.updateFreshness();
+      return ok;
+    },
+    // ปุ่ม "รีเฟรช": ข้ามแคช server + แจ้งผล
+    refreshNow: async function(btn) {
+      const restore = window.app.buttonBusy ? (window.app.buttonBusy(btn) || function(){}) : function(){};
+      try {
+        const ok = await this.reloadData(true);
+        window.app.toast(ok ? 'อัปเดตข้อมูลล่าสุดแล้ว' : 'อัปเดตไม่สำเร็จ กรุณาลองใหม่', ok ? 'success' : 'warning');
+      } finally { restore(); }
+    },
+    updateFreshness: function() {
+      const el = document.getElementById('dashFreshness'); if(!el) return;
+      const t = this.lastBuiltAt ? new Date(this.lastBuiltAt) : new Date();
+      el.textContent = 'ข้อมูลเมื่อ ' + t.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    },
     startAutoRefresh: function() {
       if(this.refreshTimer) clearInterval(this.refreshTimer);
-      this.refreshTimer = setInterval(async () => {
-        if(window.app.currentRoute !== 'dashboard') return; 
-        const stat = document.getElementById('dashSyncStatus'); if(stat) { stat.classList.remove('bg-slate-100','text-slate-600'); stat.classList.add('bg-emerald-50','text-emerald-600'); }
-        try {
-          const res = await window.app.api('GET_ADVANCED_DASHBOARD', {});
-          if(res && res.status === 'success') { 
-            this.rawOrders = res.data.orders.map(o => {
-               let bInfo = window.app.globalData.branches.find(b => b['Branch Code'] === o['Branch Code']) || {};
-               let pInfo = window.app.globalData.products.find(p => p.SKU == o.SKU) || {};
-               o.Mall = bInfo.Mall || '-'; o.Region = bInfo.Region || '-'; o.Province = bInfo.Province || '-'; o['Type Name'] = bInfo['Type Name'] || '-'; o.Area = bInfo.Area || '-';
-               o.Category = pInfo.Category || '-'; o.Model = pInfo.Model || '-'; o.Capacity = pInfo.Capacity || '-';
-               return o;
-            });
-            this.applyFilters(); 
-          }
-        } catch(e) {}
-        setTimeout(() => { if(stat) { stat.classList.remove('bg-emerald-50','text-emerald-600'); stat.classList.add('bg-slate-100','text-slate-600'); } }, 1500);
-      }, 30000); 
+      this.refreshTimer = setInterval(() => {
+        if(window.app.currentRoute !== 'dashboard') return;
+        this.reloadData(false);
+      }, 30000);
     },
     resetFilters: function() { 
       ['dashStartDate','dashEndDate','dashBranch','dashSales'].forEach(id=>{
@@ -5496,6 +5615,7 @@ window.app = {
       const s = document.getElementById('searchProduct');
       if (s && s.value.trim()) p.q = [s.value.trim()];
       if (this.storePage > 1) p.page = [String(this.storePage)];
+      if (this.sharedModel) p.p = [this.sharedModel];
       return p;
     },
     syncUrl: function() {
@@ -5509,7 +5629,7 @@ window.app = {
     applyUrlParams: function(params, force) {
       params = params || {};
       const g = (k) => (Array.isArray(params[k]) ? params[k] : (params[k] !== undefined ? [String(params[k])] : [])).map(String);
-      const known = ['cat', 'grp', 'cap', 'col', 'pr', 'pmin', 'pmax', 'sort', 'stock', 'q', 'page'];
+      const known = ['cat', 'grp', 'cap', 'col', 'pr', 'pmin', 'pmax', 'sort', 'stock', 'q', 'page', 'p'];
       if (!force && !known.some(k => g(k).length)) return; // ไม่มีพารามิเตอร์ของเรา = คงตัวกรองในหน่วยความจำไว้
       const f = this.emptyStoreFilters();
       f.category = g('cat')[0] || '';
@@ -5528,14 +5648,55 @@ window.app = {
         this.renderStoreHeader();
         this.filter();
         if (page > 1) this.goStorePage(page);
+        // ลิงก์สินค้าที่แชร์ (?p=รุ่น): เปิดหน้าต่างรายละเอียดรุ่นนั้นทันที; กด Back ที่ไม่มี p = ปิดหน้าต่าง
+        const pm = (g('p')[0] || '').slice(0, 120);
+        if (pm) { if (this.sharedModel !== pm) this.openSharedModel(pm); }
+        else if (force && this.sharedModel) window.app.hideModal('addToCartModal');
       } finally { this._applyingUrl = false; }
       this._lastUrlKey = JSON.stringify(this.paramsFromState());
+    },
+    // จำรุ่นที่เปิดอยู่ในหน้าต่างสินค้า แล้วซิงก์ลง URL (?p=) เพื่อให้คัดลอกลิงก์ตรงรุ่นได้
+    setSharedModel: function(model) {
+      model = model || '';
+      if (this.sharedModel === model) return;
+      this.sharedModel = model;
+      this.syncUrl();
+    },
+    openSharedModel: function(model) {
+      const ok = (window.app.globalData.products || []).some(p => p.Model === model && p.Status === 'เปิด');
+      if (!ok) { window.app.toast('ไม่พบสินค้ารุ่นนี้ (อาจปิดการขายแล้ว)', 'warning'); return; }
+      this.openAddToCartModal('MODEL:' + model);
+    },
+    productLink: function(model) {
+      const base = window.__APP_URL || '';
+      if (!base || !model) return '';
+      return base + (base.indexOf('?') === -1 ? '?' : '&') + 'p=' + encodeURIComponent(model);
+    },
+    copyProductLink: function() {
+      const url = this.productLink(this.sharedModel);
+      if (!url) { window.app.toast('ยังสร้างลิงก์ไม่ได้ (ไม่พบ URL ของแอป)', 'warning'); return; }
+      const done = () => window.app.toast('คัดลอกลิงก์สินค้าแล้ว', 'success');
+      const fallback = () => {
+        try {
+          const ta = document.createElement('textarea'); ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); const okc = document.execCommand('copy'); document.body.removeChild(ta);
+          if (okc) return done();
+        } catch (e) {}
+        Swal.fire({ title: 'คัดลอกลิงก์นี้', input: 'text', inputValue: url, confirmButtonText: 'ปิด' });
+      };
+      try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, fallback); else fallback(); } catch (e) { fallback(); }
     },
     loadUrlState: function() {
       const self = this;
       try {
         if (window.google && google.script && google.script.url && google.script.url.getLocation) {
-          google.script.url.getLocation(function(loc) { self.applyUrlParams((loc && loc.parameters) || {}, false); });
+          google.script.url.getLocation(function(loc) {
+            let prm = (loc && loc.parameters) || {};
+            // สำรอง: ถ้า getLocation ไม่คืน p แต่ server ส่งรุ่นมากับหน้า (ลิงก์แชร์) ให้ใช้ค่านั้นครั้งเดียว
+            if (!prm.p && window.__DEEP_MODEL) { prm = Object.assign({}, prm, { p: [window.__DEEP_MODEL] }); }
+            window.__DEEP_MODEL = '';
+            self.applyUrlParams(prm, false);
+          });
         } else {
           const sp = new URLSearchParams(window.location.search), o = {};
           sp.forEach((v, k) => { (o[k] = o[k] || []).push(v); });
@@ -5971,6 +6132,7 @@ window.app = {
       }
 
       window.app.showModal('addToCartModal');
+      this.setSharedModel(prod && prod.Model ? prod.Model : '');
     },
     renderVariantOptions: function(selectedCapacity, selectedColor) {
         const groupProducts = this.currentGroupProducts;
@@ -6656,13 +6818,16 @@ window.app = {
       const custName = document.getElementById('coCustomer').value;
       const phone = document.getElementById('coPhone').value.replace(/\D/g, '');
       const email = document.getElementById('coEmail').value;
-      const idCard = document.getElementById('coIdCard').value.replace(/\D/g, '');
+      const idCheck = window.app.validateIdCard(document.getElementById('coIdCard').value);
+      const idCard = idCheck.ok ? idCheck.value : '';
       const bkStaffName = document.getElementById('bkStaffName').value.trim();
       const bkPhone = document.getElementById('bkPhone').value.replace(/\D/g, '').trim();
       
       if(!custName || !phone || !email || !idCard || !bkStaffName || !bkPhone) { 
           return window.app.toast('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน', 'warning'); 
       }
+      
+      if(!idCheck.ok) { return window.app.toast(idCheck.msg, 'warning'); }
       
       if(phone.length !== 10) {
           return window.app.toast('เบอร์โทรศัพท์ลูกค้าไม่ถูกต้อง (ต้องเป็น 10 หลัก)', 'warning');
@@ -8662,10 +8827,33 @@ window.app = {
               </div>
               <div class="space-y-2">
                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">ชื่อเว็บแอป</label>
-                <input type="text" id="webAppNameInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.SystemName) || '')}" placeholder="เช่น Mobile Pre Order System">
+                <input type="text" id="webAppNameInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.SystemName) || '')}" placeholder="เช่น Mobile Pre Booking System">
               </div>
               <div class="flex justify-end pt-2 border-t border-slate-100">
                 <button onclick="window.app.settingsManager.saveAppName()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกชื่อเว็บแอป</button>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <div class="p-6 bg-slate-50 border-b border-slate-100">
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-headset text-indigo-500 mr-2"></i> ข้อมูลติดต่อร้าน</h3>
+              <p class="text-xs text-slate-500 mt-1">แสดงที่ส่วนท้ายของทุกหน้า — เว้นว่างช่องไหน ช่องนั้นจะไม่แสดง</p>
+            </div>
+            <div class="p-8 space-y-4">
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider" for="contactPhoneInput">เบอร์โทร</label>
+                <input type="text" id="contactPhoneInput" maxlength="40" inputmode="tel" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" placeholder="เช่น 02-123-4567 หรือ 081-234-5678" value="${window.app.esc(((this.data.keyValueSettings || {}).ContactPhone || '').replace(/^'+/, ''))}">
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider" for="contactLineInput">LINE</label>
+                <input type="text" id="contactLineInput" maxlength="120" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" placeholder="LINE ID เช่น @mystore หรือวางลิงก์ LINE แบบ https" value="${window.app.esc(((this.data.keyValueSettings || {}).ContactLine || '').replace(/^'+/, ''))}">
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider" for="contactHoursInput">เวลาทำการ</label>
+                <input type="text" id="contactHoursInput" maxlength="120" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" placeholder="เช่น ทุกวัน 10:00 - 21:00 น." value="${window.app.esc(((this.data.keyValueSettings || {}).ContactHours || '').replace(/^'+/, ''))}">
+              </div>
+              <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button type="button" onclick="window.app.settingsManager.saveContactInfo(this)" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกข้อมูลติดต่อ</button>
               </div>
             </div>
           </div>
@@ -8820,7 +9008,7 @@ window.app = {
               <div class="bg-amber-50/60 border border-amber-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
                 <div class="min-w-0">
                   <h4 class="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center"><i class="fas fa-broom mr-1.5"></i> ล้างแคชข้อมูล</h4>
-                  <p class="text-[11px] text-slate-500 mt-1">ใช้หลังแก้ไขชีต Products / Promotions / Coupons ตรงๆ ใน Google Sheets เพื่อให้หน้า POS เห็นข้อมูลล่าสุดทันที (ปกติแคชค้าง 6 ชั่วโมง)</p>
+                  <p class="text-[11px] text-slate-500 mt-1">ใช้หลังแก้ไขชีต Products / Promotions / Coupons ตรงๆ ใน Google Sheets เพื่อให้หน้า Pre Booking เห็นข้อมูลล่าสุดทันที (ปกติแคชค้าง 6 ชั่วโมง)</p>
                 </div>
                 <button type="button" onclick="window.app.settingsManager.clearCache()" class="shrink-0 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center"><i class="fas fa-sync-alt mr-2"></i> ล้างแคชตอนนี้</button>
               </div>
@@ -8828,8 +9016,8 @@ window.app = {
               <div class="bg-indigo-50/50 border border-indigo-100/50 rounded-2xl p-5 space-y-3">
                 <h4 class="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center"><i class="fas fa-info-circle mr-1.5"></i> คำแนะนำการทำงานของระบบ</h4>
                 <ul class="text-xs text-slate-600 space-y-2 pl-5 list-disc leading-relaxed">
-                  <li>ระบบจะเริ่มเปิดให้จองสินค้าหน้า POS เมื่อเวลาปัจจุบันถึงวันเริ่มจอง</li>
-                  <li>หากเวลาปัจจุบันเลยวันสิ้นสุดการจองที่ตั้งค่าไว้ หน้าจอ POS จะ <strong class="text-rose-600 font-bold">ปิดการทำงานทั้งหมด</strong> โดยจะไม่สามารถค้นหา/คลิกเลือกสินค้าเพื่อใส่ตะกร้า และปุ่มดำเนินการข้อมูลลูกค้าจะถูกล็อกทันที</li>
+                  <li>ระบบจะเริ่มเปิดให้จองสินค้าหน้า Pre Booking เมื่อเวลาปัจจุบันถึงวันเริ่มจอง</li>
+                  <li>หากเวลาปัจจุบันเลยวันสิ้นสุดการจองที่ตั้งค่าไว้ หน้า Pre Booking จะ <strong class="text-rose-600 font-bold">ปิดการทำงานทั้งหมด</strong> โดยจะไม่สามารถค้นหา/คลิกเลือกสินค้าเพื่อใส่ตะกร้า และปุ่มดำเนินการข้อมูลลูกค้าจะถูกล็อกทันที</li>
                   <li>จะมีแถบเวลานับถอยหลัง (Countdown Timer) พร้อมชื่อแคมเปญ Pre Booking แสดงให้เห็นเวลาเหลือจอง ณ ขณะนั้นเพื่อกระตุ้นยอดขาย</li>
                 </ul>
               </div>
@@ -9192,7 +9380,7 @@ window.app = {
           const fresh = await window.app.api('GET_ALL_DATA', {});
           if (fresh && fresh.status === 'success') window.app.globalData = fresh;
         } catch (e2) { /* โหลดใหม่ไม่ได้ก็ไม่เป็นไร รีเฟรชหน้าเองได้ */ }
-        Swal.fire('สำเร็จ', 'ล้างแคชเรียบร้อย หน้า POS จะใช้ข้อมูลล่าสุดจากชีต', 'success');
+        Swal.fire('สำเร็จ', 'ล้างแคชเรียบร้อย หน้า Pre Booking จะใช้ข้อมูลล่าสุดจากชีต', 'success');
       } catch (e) {
         Swal.fire('ระบบขัดข้อง', 'ล้างแคชไม่สำเร็จ กรุณาลองใหม่', 'error');
       }
@@ -9238,6 +9426,30 @@ window.app = {
       } finally {
         restoreBtn();
       }
+    },
+
+    saveContactInfo: async function(btn) {
+      const phone = document.getElementById('contactPhoneInput').value.trim();
+      const line = document.getElementById('contactLineInput').value.trim();
+      const hours = document.getElementById('contactHoursInput').value.trim();
+      if (phone && !/^[0-9+\-\s().#,]{5,40}$/.test(phone)) { Swal.fire('เบอร์โทรไม่ถูกต้อง', 'ใช้ได้เฉพาะตัวเลข เว้นวรรค และเครื่องหมาย + - ( )', 'warning'); return; }
+      if (line && /^(javascript|data|vbscript):/i.test(line)) { Swal.fire('LINE ไม่ถูกต้อง', 'ใส่ LINE ID หรือลิงก์ https เท่านั้น', 'warning'); return; }
+      if (/^[a-z][a-z0-9+.-]*:/i.test(line) && !/^https?:\/\//i.test(line)) { Swal.fire('LINE ไม่ถูกต้อง', 'ถ้าใส่เป็นลิงก์ ต้องขึ้นต้นด้วย https://', 'warning'); return; }
+      const restoreBtn = window.app.buttonBusy(btn || document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { ContactPhone: phone, ContactLine: line, ContactHours: hours } });
+        if (res && res.status === 'success') {
+          await window.app.refreshGlobalData();
+          window.app.renderFooterContact();
+          Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลติดต่อแล้ว', timer: 1500, showConfirmButton: false });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch (e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally { restoreBtn(); }
     },
 
     saveAppName: async function() {

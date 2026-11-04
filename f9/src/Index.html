@@ -14,9 +14,15 @@
   </script>
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title><?= appName ?> — Enterprise Portal</title>
-  <meta name="description" content="ระบบจองสินค้าล่วงหน้าสำหรับองค์กร - Enterprise Pre-Order Management">
+  <title><?= appName ?> — จองสินค้าล่วงหน้า</title>
+  <meta name="description" content="ระบบจองสินค้าล่วงหน้าสำหรับองค์กร - Enterprise Pre-Booking Management">
   <meta name="theme-color" content="#254d71">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<?= appName ?> — จองสินค้าล่วงหน้า">
+  <meta property="og:description" content="จองสินค้าล่วงหน้า ล็อกราคาทันที รับของแถมตามสาขาและช่องทาง">
+  <meta property="og:locale" content="th_TH">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23141416'/%3E%3Cpath d='M36 8 18 36h12l-2 20 18-28H34z' fill='%23FF6B00'/%3E%3C/svg%3E">
   
   <!-- PWA & Mobile Native App Config -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -51,6 +57,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <?!= include('CSS'); ?>
+  <?!= include('TailwindCSS'); ?>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen relative overflow-x-hidden">
   <div id="app" class="w-full min-h-screen flex flex-col"></div>
@@ -147,9 +154,22 @@
         <!-- Navigation Menu -->
         <div class="flex-1 overflow-y-auto custom-scrollbar px-4 py-5 flex flex-col space-y-1.5" id="desktopMenu"></div>
         
-        <!-- User Profile Area -->
-        <div class="p-4 border-t border-slate-100 bg-slate-50/50 mt-auto">
-           <div class="flex items-center gap-3 mb-4">
+        <!-- User Profile Area: การ์ดผู้ใช้ใบเดียว กดแล้วเปิดเมนู (โหมดมืด / เปลี่ยนรหัสผ่าน / ออกจากระบบ) แทนปุ่มใหญ่ 3 ปุ่ม -->
+        <div class="relative p-3 border-t border-slate-100 bg-slate-50/50 mt-auto" id="userMenuWrap">
+           <div id="userMenuPop" class="hidden absolute bottom-full left-3 right-3 mb-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-50" role="menu" aria-label="เมนูผู้ใช้">
+              <div class="px-3 py-2 text-[11px] text-slate-400 font-semibold tabular-nums flex items-center gap-1.5"><i class="far fa-clock"></i><span id="clock"></span></div>
+              <button type="button" role="menuitem" onclick="window.app.toggleTheme()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-colors text-left">
+                 <i class="fas fa-moon theme-toggle-icon w-4 text-center"></i> <span class="theme-toggle-label">โหมดมืด</span>
+              </button>
+              <button type="button" role="menuitem" onclick="window.app.closeUserMenu(); window.app.openChangePassword()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-colors text-left">
+                 <i class="fas fa-key w-4 text-center"></i> เปลี่ยนรหัสผ่าน
+              </button>
+              <div class="my-1 border-t border-slate-100"></div>
+              <button type="button" role="menuitem" onclick="window.app.closeUserMenu(); window.app.logout()" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold text-rose-500 hover:bg-rose-50 transition-colors text-left">
+                 <i class="fas fa-sign-out-alt w-4 text-center"></i> ออกจากระบบ
+              </button>
+           </div>
+           <button type="button" id="userMenuBtn" onclick="window.app.toggleUserMenu(event)" aria-haspopup="menu" aria-expanded="false" aria-controls="userMenuPop" class="w-full flex items-center gap-3 p-2 rounded-xl border border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm transition-all text-left">
              <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 border-2 border-white shadow-sm flex items-center justify-center flex-shrink-0">
                <i class="fas fa-user text-indigo-500 text-sm"></i>
              </div>
@@ -157,20 +177,7 @@
                <div class="text-[13px] font-bold text-slate-700 leading-tight truncate" id="headerUserName">Name</div>
                <div class="text-[10px] uppercase tracking-[0.12em] text-indigo-500 font-bold truncate" id="headerRole">Role</div>
              </div>
-           </div>
-           
-           <div class="flex justify-between items-center text-[10px] text-slate-400 font-semibold tabular-nums px-1 mb-3">
-              <span><i class="far fa-clock mr-1"></i> <span id="clock"></span></span>
-           </div>
-           
-           <button onclick="window.app.toggleTheme()" class="w-full py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 font-bold text-xs shadow-sm mb-2">
-              <i class="fas fa-moon theme-toggle-icon"></i> <span class="theme-toggle-label">โหมดมืด</span>
-           </button>
-           <button onclick="window.app.openChangePassword()" class="w-full py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 font-bold text-xs shadow-sm mb-2">
-              <i class="fas fa-key"></i> เปลี่ยนรหัสผ่าน
-           </button>
-           <button onclick="window.app.logout()" class="w-full py-2.5 rounded-xl bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-all flex items-center justify-center gap-2 font-bold text-sm shadow-sm">
-              <i class="fas fa-sign-out-alt"></i> ออกจากระบบ
+             <i class="fas fa-ellipsis-vertical text-slate-400 text-sm px-1"></i>
            </button>
         </div>
       </aside>
@@ -230,22 +237,26 @@
         
         <main class="flex-1 w-full p-4 md:p-6 lg:p-8" id="page-content"></main>
       
-        <footer class="mt-auto w-full relative z-0 border-t border-slate-100 bg-white/30 backdrop-blur-sm">
-           <div class="w-full py-4 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-3">
+        <footer class="mt-auto w-full relative z-0 border-t border-slate-100 bg-white/30 backdrop-blur-sm" role="contentinfo">
+           <div class="w-full py-5 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-3">
               <div class="flex items-center gap-3">
                 <div id="footerLogoBox" class="w-6 h-6 rounded bg-[#8a6428] flex items-center justify-center shadow-sm opacity-80 overflow-hidden">
                   <i id="footerLogoIcon" class="fas fa-layer-group text-white text-[10px]"></i>
                 </div>
-                <p class="text-slate-400 text-xs font-medium">© 2026 <?= appName ?>.</p>
+                <p class="text-slate-400 text-xs font-medium">© <span id="footerYear">2026</span> <?= appName ?>. สงวนลิขสิทธิ์</p>
               </div>
-              <div class="flex items-center gap-4">
-                <p class="text-slate-400 text-xs font-medium flex items-center gap-1.5">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-                  Online
-                </p>
-              </div>
+              <nav class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1" aria-label="ลิงก์ด่วน" id="footerQuickLinks">
+                <button type="button" onclick="window.app.pos && window.app.pos.openOrderTrackModal && window.app.pos.openOrderTrackModal()" class="text-slate-400 hover:text-[#FF6B00] text-xs font-bold transition-colors"><i class="fas fa-qrcode mr-1"></i>เช็คสถานะใบจอง</button>
+                <button type="button" onclick="window.app.pos && window.app.pos.openTradeInStandalone && window.app.pos.openTradeInStandalone()" class="text-slate-400 hover:text-[#FF6B00] text-xs font-bold transition-colors"><i class="fas fa-retweet mr-1"></i>เก่าแลกใหม่</button>
+              </nav>
+              <p class="text-slate-400 text-xs font-medium flex items-center gap-1.5">
+                <i class="fas fa-lock text-[10px]"></i> ข้อมูลเข้ารหัสและปลอดภัย
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block ml-2"></span> Online
+              </p>
            </div>
+           <div id="footerContact" class="hidden w-full px-4 sm:px-6 lg:px-8 pb-4 -mt-1 flex flex-wrap items-center justify-center md:justify-start gap-x-5 gap-y-1.5 text-xs font-semibold text-slate-500" aria-label="ข้อมูลติดต่อร้าน"></div>
         </footer>
+        <button type="button" id="backToTopBtn" aria-label="เลื่อนขึ้นด้านบน" title="กลับขึ้นด้านบน" onclick="window.scrollTo({top:0,behavior:'smooth'})" class="hidden fixed bottom-28 right-7 lg:bottom-32 lg:right-12 z-[39] w-11 h-11 rounded-full bg-[#141416] text-[#FF6B00] border border-[#FF6B00]/50 shadow-lg hover:scale-105 transition-all items-center justify-center"><i class="fas fa-arrow-up"></i></button>
       </div>
 
       <div id="popupBannerModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true" aria-label="แบนเนอร์ประชาสัมพันธ์">
@@ -308,6 +319,8 @@
 
             <div class="flex items-center gap-2 w-full md:w-auto justify-end">
               <span id="dashSyncStatus" class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200"><i class="fas fa-sync fa-spin text-indigo-500 mr-1.5"></i> Live</span>
+              <span id="dashFreshness" class="hidden md:inline text-[11px] font-semibold text-slate-400 tabular-nums"></span>
+              <button type="button" onclick="window.app.dashboard.refreshNow(this)" class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors" title="ดึงข้อมูลล่าสุดจากชีตทันที (ข้ามแคช)" aria-label="รีเฟรชข้อมูล"><i class="fas fa-rotate mr-1.5"></i> รีเฟรช</button>
               <button aria-label="ล้างตัวกรอง" class="w-9 h-9 flex items-center justify-center text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm transition-colors" onclick="window.app.dashboard.resetFilters()"><i class="fas fa-undo"></i></button>
               <button class="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 font-bold border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-colors text-sm shadow-sm" onclick="window.app.dashboard.exportCSV()"><i class="fas fa-file-csv"></i> Export</button>
             </div>
@@ -793,7 +806,10 @@
             
             <div class="px-6 py-4 border-b-2 border-[#FF6B00] flex justify-between items-center bg-[#141416] text-white">
                <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH</span> เลือกสเปคสินค้าและของแถม</h3>
+               <div class="flex items-center gap-1">
+               <button type="button" aria-label="คัดลอกลิงก์สินค้ารุ่นนี้" title="คัดลอกลิงก์สินค้ารุ่นนี้" id="shareProductBtn" class="text-slate-300 hover:text-[#FF6B00] focus:outline-none transition-colors h-9 px-2.5 flex items-center justify-center gap-1.5 rounded-lg hover:bg-white/10 text-xs font-bold" onclick="window.app.pos.copyProductLink()"><i class="fas fa-link"></i><span class="hidden sm:inline">คัดลอกลิงก์</span></button>
                <button type="button" aria-label="ปิดหน้าต่างเลือกสินค้า" class="text-slate-300 hover:text-[#FF6B00] focus:outline-none transition-colors w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 -mr-1" onclick="window.app.hideModal('addToCartModal')"><i class="fas fa-times text-lg"></i></button>
+               </div>
             </div>
             
             <div class="p-6 md:p-8 overflow-y-auto custom-scrollbar flex-1 bg-white">
@@ -972,7 +988,7 @@
                         <div class="relative"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">เบอร์โทรศัพท์ <span class="text-rose-500">*</span></label><input type="tel" maxlength="12" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all" id="coPhone" oninput="window.app.formatPhone(this); window.app.pos.onPhoneInput()" required><i id="coPhoneSpin" class="fas fa-spinner fa-spin absolute right-3 bottom-3 text-indigo-500 text-xs hidden pointer-events-none" aria-hidden="true"></i></div>
                         <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">อีเมล (Email) <span class="text-rose-500">*</span></label><input type="email" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coEmail" required></div>
                         <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">บัตรประชาชน / Passport <span class="text-rose-500">*</span></label><input type="text" maxlength="17" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all" id="coIdCard" oninput="window.app.formatIdCard(this)" required></div>
-                        <div class="sm:col-span-2"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">เลขที่ Pre Order</label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coPreOrderNo" placeholder="เว้นว่างได้ถ้าไม่มี"></div>
+                        <div class="sm:col-span-2"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">เลขที่ Pre Booking</label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coPreOrderNo" placeholder="เว้นว่างได้ถ้าไม่มี"></div>
                         <div class="sm:col-span-2"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">รหัสลงทะเบียน (Code Handraiser)</label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coCodeHandraiser" placeholder="เว้นว่างได้ถ้าไม่มี"></div>
                      </div>
                   </div>
@@ -1675,35 +1691,6 @@
     </div>
   </div>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    /* ต้องตั้งหลังโหลด CDN: ถ้าตั้ง window.tailwind ก่อน ตัว CDN จะเขียนทับทั้งก้อน (ชุดสีนี้ไม่เคยถูกใช้จริง ปุ่ม indigo-* จึงเป็นม่วงมาตรฐาน)
-       ไม่เปิดใช้ borderRadius/backdropBlur แบบ "แบนราบ" ที่เคยเขียนไว้ เพราะไม่เคยแสดงผลจริง และจะเปลี่ยนหน้าตาทั้งแอป */
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-              indigo: { 50: '#eef3f8', 100: '#dce7f0', 200: '#b8cee1', 300: '#85abc9', 400: '#5485ad', 500: '#366891', 600: '#254d71', 700: '#1b3a59', 800: '#112840', 900: '#0a1a2a' },
-              slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
-              emerald: { 50: '#ecfdf5', 100: '#d1fae5', 400: '#34d399', 500: '#10b981', 600: '#059669' },
-              amber: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
-              rose: { 50: '#fff1f2', 100: '#ffe4e6', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48' },
-              cyan: { 50: '#ecfeff', 400: '#22d3ee', 500: '#06b6d4' },
-              purple: { 50: '#faf5ff', 400: '#c084fc', 500: '#a855f7' }
-          },
-          fontFamily: {
-            sans: ['Plus Jakarta Sans', 'Sarabun', 'sans-serif'],
-          },
-          boxShadow: {
-            'enterprise': '0 10px 25px -3px rgba(15, 42, 67, 0.08), 0 4px 10px -4px rgba(15, 42, 67, 0.05)',
-            'enterprise-lg': '0 20px 40px -8px rgba(15, 42, 67, 0.12), 0 8px 16px -6px rgba(15, 42, 67, 0.06)',
-            'glow-indigo': '0 0 20px -5px rgba(37, 77, 113, 0.35)',
-          }
-        }
-      }
-    };
-  </script>
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1711,7 +1698,7 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script>window.__TRACK_PARAM = <?!= JSON.stringify(trackParam || '') ?>;</script>
+  <script>window.__TRACK_PARAM = <?!= JSON.stringify(trackParam || '') ?>; window.__APP_URL = <?!= JSON.stringify(appUrl || '') ?>; window.__DEEP_MODEL = <?!= JSON.stringify(deepModel || '') ?>;</script>
   <?!= include('JS'); ?>
 </body>
 </html>

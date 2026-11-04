@@ -5,12 +5,18 @@ function doGet(e) {
   // ชื่อเว็บแอปตั้งค่าได้จากเมนู "ตั้งค่าระบบ" (Settings sheet, key SystemName) — เพื่อให้สำเนาโปรเจกต์ไปใช้ที่อื่น
   // เปลี่ยนชื่อได้จากหน้าเว็บล้วนๆ โดยไม่ต้องแก้โค้ด/deploy ใหม่
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const appName = (getKeyValueSettings(ss).SystemName || '').toString().trim() || 'Mobile Pre Order System';
+  const appName = (getKeyValueSettings(ss).SystemName || '').toString().trim() || 'Mobile Pre Booking System';
   const template = HtmlService.createTemplateFromFile('Index');
   template.appName = appName;
   // เลขใบจองจากลิงก์ ?track= / ?orderId= — กรองเหลือเฉพาะอักขระปลอดภัยก่อนฝังลงสคริปต์ (กัน script injection)
   const rawTrack = (e && e.parameter && (e.parameter.track || e.parameter.orderId)) || '';
   template.trackParam = /^[A-Za-z0-9_\-]{1,64}$/.test(String(rawTrack)) ? String(rawTrack) : '';
+  // ลิงก์สินค้าที่แชร์ (?p=ชื่อรุ่น): ส่งให้หน้าเว็บเพื่อพาไปหน้าสั่งจองแล้วเปิดรุ่นนั้น (ตัดความยาว; ฝั่งหน้าเว็บ escape เองตอนแสดง)
+  const rawP = (e && e.parameter && e.parameter.p) ? String(e.parameter.p) : '';
+  // ค่านี้ถูกฝังใน <script> ด้วย JSON.stringify ซึ่งไม่ escape </script> — ตัด < > & ตัวควบคุม และ U+2028/2029 ออกก่อน กัน script injection
+  template.deepModel = rawP.length <= 120 ? rawP.replace(/[<>&\u0000-\u001f\u2028\u2029]/g, '') : '';
+  // URL /exec ของ deployment ปัจจุบัน — ใช้สร้างลิงก์แชร์สินค้า (?p=รุ่น); ใน iframe ของ GAS หน้าเว็บอ่าน URL ชั้นนอกเองไม่ได้
+  try { template.appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) { template.appUrl = ''; }
   return template.evaluate()
     .setTitle(appName)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -62,7 +68,7 @@ function setupDatabase(userToken) {
   const initialAdminPassword = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
   const dummyData = {
     "Settings": [
-      ["SystemName", "Mobile Pre Order System", "ชื่อระบบ"],
+      ["SystemName", "Mobile Pre Booking System", "ชื่อระบบ"],
       ["Currency", "THB", "สกุลเงิน"],
       ["ReserveStart", "2026-06-01T00:00:00", "วันเริ่มจองสินค้า"],
       ["ReserveEnd", "2026-06-30T23:59:59", "วันสิ้นสุดจองสินค้า"]
@@ -192,7 +198,7 @@ function migrateProductColumnLayout_20260919() {
   CacheService.getScriptCache().remove("TABLE_Products");
   logAudit('SYSTEM', "MIGRATE_SCHEMA", "ย้ายคอลัมน์ Products: Marketing Model ไปติด Model, Original Price ไปติด Price (คอลัมน์เดิมเปลี่ยนชื่อเป็น '(เดิม)' เก็บข้อมูลไว้ครบ ไม่ลบ/ไม่ทับ)");
 
-  return "เสร็จสมบูรณ์ — ตรวจสอบแถว header ของชีต Products แล้วทดสอบหน้า Products/POS/Checkout ก่อนใช้งานจริง";
+  return "เสร็จสมบูรณ์ — ตรวจสอบแถว header ของชีต Products แล้วทดสอบหน้า Products/Pre Booking/Checkout ก่อนใช้งานจริง";
 }
 
 // One-time cleanup (2026-09-19): ลบคอลัมน์ archive "(เดิม)" ที่ migrateProductColumnLayout_20260919() สร้างไว้
@@ -445,7 +451,21 @@ function looksLikePasswordHash_(value) {
   return /^[a-f0-9]{64}$/i.test((value || '').toString().trim());
 }
 
+// action ที่ "อ่านอย่างเดียว" — ไม่ต้องล้างแคช Dashboard; action อื่นทั้งหมด (บันทึก/ลบ/จอง/แก้/อัปโหลด/เคลียร์แคช) ล้างแคชก่อนและหลังทำงาน
+// (ล้างหลังด้วย กันผู้อ่านที่ยิงเข้ามาระหว่างเขียนแล้วเขียนค่าเก่ากลับลงแคช) — เพิ่ม action อ่านใหม่ต้องมาเพิ่มที่นี่ ไม่งั้นแค่ล้างแคชเกินจำเป็น (ปลอดภัย)
+var DASH_READ_ACTIONS_ = ['LOGIN', 'GET_ADVANCED_DASHBOARD', 'GET_TABLE', 'GET_ALL_DATA', 'GET_SETTINGS_LIST', 'GET_CUSTOMER_BY_PHONE', 'GET_INVOICES', 'TRACK_ORDER', 'PUBLIC_TRACK_ORDER', 'VALIDATE_COUPON'];
+
 function apiHandler(action, payload, userToken) {
+  const isWrite = DASH_READ_ACTIONS_.indexOf(action) === -1;
+  if (isWrite) invalidateDashboardCache_();
+  try {
+    return apiHandlerInner_(action, payload, userToken);
+  } finally {
+    if (isWrite) invalidateDashboardCache_();
+  }
+}
+
+function apiHandlerInner_(action, payload, userToken) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let secureUser = null;
@@ -471,7 +491,7 @@ function apiHandler(action, payload, userToken) {
 
     switch(action) {
       case 'LOGIN': return doLogin(payload.username, payload.password, ss);
-      case 'GET_ADVANCED_DASHBOARD': return getAdvancedDashboard(secureUser, ss);
+      case 'GET_ADVANCED_DASHBOARD': return getAdvancedDashboard(secureUser, ss, payload);
       case 'GET_TABLE':
         // ตารางอ่อนไหว (ข้อมูลสมาชิก/ตั้งค่า/ประวัติระบบ) อ่านได้เฉพาะ Admin — บังคับสิทธิ์ฝั่ง server เสมอ
         if (['Members', 'Settings', 'AuditLog'].includes(payload.tableName) && secureUser.Role !== 'Admin') {
@@ -1018,24 +1038,92 @@ function getAllInitialData(ss, isAdmin) {
   };
 }
 
-function getAdvancedDashboard(secureUser, ss) {
-  const isAdmin = secureUser.Role === 'Admin';
-  let orders = getTableDataAsJson(ss.getSheetByName("Orders"));
-  const products = getTableDataAsJson(ss.getSheetByName("Products"), isAdmin);
-  // Dashboard เปิดได้ทุก role — ห้ามส่ง Password hash ออกไปหน้าบ้านเด็ดขาด
-  const members = getTableDataAsJson(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; });
+// ---- แคช Dashboard (ชุดข้อมูลดิบก่อนกรองตามสิทธิ์) ----
+// Dashboard เดิมอ่านทั้งชีต Orders + Products + Members จากชีตใหม่ทุกครั้ง และหน้าเว็บยิงซ้ำทุก 30 วินาที → ช้า/timeout
+// แคชเฉพาะ "ข้อมูลดิบ" (Orders ยังเป็นค่าตามชีต ไม่ถอดรหัส PII, Members ตัด Password แล้ว) แล้วกรองสาขาของ Sales / ถอดรหัสทีหลังตอนส่งออก
+// ค่าที่ใหญ่เกิน 100KB/คีย์ของ CacheService จึงแบ่งเป็นก้อนละไม่เกิน 30,000 ตัวอักษร (ไทย 3 ไบต์/ตัว → ≤ 90KB)
+var DASH_CACHE_KEY_ = 'DASH_BASE';
+var DASH_CACHE_TTL_ = 120; // วินาที — เขียนผ่านแอปจะล้างทันที; แก้ชีตตรงๆ เห็นภายใน 2 นาที หรือกดปุ่มรีเฟรช (refresh:true)
+var DASH_CHUNK_ = 30000;
 
-  // Deobfuscate PII for display
-  orders = orders.map(o => {
-    if (o['Contact Number']) o['Contact Number'] = deobfuscate(o['Contact Number']);
-    if (o['ID Card_Passport']) o['ID Card_Passport'] = deobfuscate(o['ID Card_Passport']);
-    return o;
+function dashCachePut_(str) {
+  const cache = CacheService.getScriptCache();
+  const n = Math.ceil(str.length / DASH_CHUNK_);
+  for (let i = 0; i < n; i++) cache.put(DASH_CACHE_KEY_ + '_' + i, str.substr(i * DASH_CHUNK_, DASH_CHUNK_), DASH_CACHE_TTL_);
+  cache.put(DASH_CACHE_KEY_ + '_meta', JSON.stringify({ n: n, len: str.length }), DASH_CACHE_TTL_); // meta เขียนทีหลังสุด: ผู้อ่านเห็นก็ต่อเมื่อก้อนครบ
+}
+
+function dashCacheGet_() {
+  const cache = CacheService.getScriptCache();
+  const metaRaw = cache.get(DASH_CACHE_KEY_ + '_meta');
+  if (!metaRaw) return null;
+  try {
+    const meta = JSON.parse(metaRaw);
+    let out = '';
+    for (let i = 0; i < meta.n; i++) {
+      const part = cache.get(DASH_CACHE_KEY_ + '_' + i);
+      if (part === null || part === undefined) return null; // ก้อนหาย (หมดอายุ/ถูกไล่ออก) = ถือว่าไม่มีแคช
+      out += part;
+    }
+    if (out.length !== meta.len) return null;
+    return JSON.parse(out);
+  } catch (e) { return null; }
+}
+
+function invalidateDashboardCache_() {
+  try { CacheService.getScriptCache().remove(DASH_CACHE_KEY_ + '_meta'); } catch (e) {}
+}
+
+function getAdvancedDashboard(secureUser, ss, payload) {
+  const isAdmin = secureUser.Role === 'Admin';
+  const forceRefresh = !!(payload && payload.refresh === true);
+  let base = forceRefresh ? null : dashCacheGet_();
+  if (!base) {
+    base = {
+      orders: getTableDataAsJson(ss.getSheetByName("Orders")),
+      // Admin เห็นข้อมูลสินค้าสดเสมอ (ข้ามแคชตาราง) ตอนสร้างชุดข้อมูลใหม่
+      products: getTableDataAsJson(ss.getSheetByName("Products"), isAdmin || forceRefresh),
+      // Dashboard เปิดได้ทุก role — ห้ามส่ง Password hash ออกไปหน้าบ้านเด็ดขาด (ตัดก่อนลงแคชด้วย)
+      members: getTableDataAsJson(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
+      builtAt: new Date().getTime()
+    };
+    try { dashCachePut_(JSON.stringify(base)); } catch (e) {}
+  }
+
+  // Deobfuscate PII for display (ทำกับสำเนา ไม่แก้ base ที่แคชไว้)
+  let orders = base.orders.map(o => {
+    const c = Object.assign({}, o);
+    if (c['Contact Number']) c['Contact Number'] = deobfuscate(c['Contact Number']);
+    if (c['ID Card_Passport']) c['ID Card_Passport'] = deobfuscate(c['ID Card_Passport']);
+    return c;
   });
 
   if (secureUser.Role === 'Sales') {
-    orders = orders.filter(o => o['Branch Code'] === secureUser['Branch Code']); 
+    orders = orders.filter(o => o['Branch Code'] === secureUser['Branch Code']);
   }
-  return { status: 'success', data: { orders: orders, products: products, members: members } };
+  return { status: 'success', data: { orders: orders, products: base.products, members: base.members, builtAt: base.builtAt } };
+}
+
+
+// ตรวจ/ทำให้เป็นรูปมาตรฐาน "เลขบัตรประชาชน / Passport" (ฝั่ง server เป็นตัวบังคับจริง — client ตรวจซ้ำเพื่อแจ้งเร็ว)
+//  - ตัวเลขล้วน 13 หลัก = บัตรประชาชนไทย ต้องผ่าน checksum (mod 11)
+//  - ตัวเลขล้วน 6-9 หลัก หรือ ตัวอักษร+ตัวเลข 6-9 ตัว (A-Z, 0-9) = Passport (เก็บเป็นตัวพิมพ์ใหญ่)
+//  - อย่างอื่นไม่ผ่าน (เช่น 0000, 10-12 หลัก) — คืนสตริงที่ normalize แล้ว หรือ throw ข้อความภาษาไทย
+function normalizeIdCard_(raw) {
+  const v = (raw === null || raw === undefined ? '' : raw).toString().replace(/[\s-]/g, '').toUpperCase();
+  if (!v) throw new Error("กรุณากรอกเลขบัตรประชาชน / Passport");
+  if (/^\d+$/.test(v)) {
+    if (v.length === 13) {
+      let sum = 0;
+      for (let i = 0; i < 12; i++) sum += parseInt(v.charAt(i), 10) * (13 - i);
+      if ((11 - (sum % 11)) % 10 !== parseInt(v.charAt(12), 10)) throw new Error("เลขบัตรประชาชนไม่ถูกต้อง (ตรวจเลขหลักสุดท้ายไม่ผ่าน)");
+      return v;
+    }
+    if (v.length >= 6 && v.length <= 9) return v; // Passport ตัวเลขล้วน
+    throw new Error("เลขบัตรประชาชนต้องมี 13 หลัก หรือ Passport 6-9 ตัวอักษร");
+  }
+  if (/^[A-Z0-9]{6,9}$/.test(v)) return v; // Passport มีตัวอักษร
+  throw new Error("เลข Passport ต้องเป็นตัวอักษรอังกฤษ/ตัวเลข 6-9 ตัว");
 }
 
 function processCheckout(payload, secureUser, ss) {
@@ -1069,6 +1157,7 @@ function processCheckout(payload, secureUser, ss) {
       if (!(parseFloat(payload.depositAmount) > 0)) throw new Error("จอง T ต้องระบุจำนวนเงินมัดจำมากกว่า 0");
     }
 
+    payload.idCard = normalizeIdCard_(payload.idCard); // บังคับรูปแบบเลขบัตร/Passport ก่อนแตะสต็อก
     const dateStr = Utilities.formatDate(new Date(), "GMT+7", "yyMMdd");
     const orderData = orderSheet.getDataRange().getValues();
     const existingHeaders = orderData[0].map(h => h.toString().trim());
@@ -2405,7 +2494,7 @@ function saveSettingsItem(payload, secureUser, ss) {
         if (!found) {
           const newRow = sheet.getLastRow() + 1;
           // Remark map ตาม key — path นี้เป็น key-value generic ไม่ได้มีแค่ค่าจองแล้ว (รอบ 11 เพิ่ม DriveFolderId)
-          const remarkMap = { ReserveStart: 'วันเริ่มจองสินค้า', ReserveEnd: 'วันสิ้นสุดจองสินค้า', FlashCampaignTitle: 'ข้อความแคมเปญบนแถบ Pre Booking หน้า POS', LowStockThreshold: 'เกณฑ์แจ้งเตือนสต๊อกใกล้หมด (ชิ้น)', WebhookUrl: 'Webhook URL แจ้งเตือนเมื่อมีใบจองใหม่หรือสต๊อกใกล้หมด', DriveFolderId: 'โฟลเดอร์ Drive เก็บรูปอัปโหลด', SystemName: 'ชื่อเว็บแอป (แสดงบนแท็บเบราว์เซอร์/หน้า login/เมนู — ใช้ตอนนำไปสำเนาใช้กับร้าน/แบรนด์อื่น)', LogoUrl: 'โลโก้เว็บแอป (แสดงหน้า login/แถบเมนู/ส่วนท้าย)', InvoiceCompanyName: 'ชื่อบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyAddress: 'ที่อยู่บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyEmail: 'อีเมลติดต่อ (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceLogoUrl: 'โลโก้บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', ApproverSignatureUrl: 'รูปลายเซ็นผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)', ApproverName: 'ชื่อผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)' };
+          const remarkMap = { ReserveStart: 'วันเริ่มจองสินค้า', ReserveEnd: 'วันสิ้นสุดจองสินค้า', FlashCampaignTitle: 'ข้อความแคมเปญบนแถบ Pre Booking หน้าร้าน', LowStockThreshold: 'เกณฑ์แจ้งเตือนสต๊อกใกล้หมด (ชิ้น)', WebhookUrl: 'Webhook URL แจ้งเตือนเมื่อมีใบจองใหม่หรือสต๊อกใกล้หมด', DriveFolderId: 'โฟลเดอร์ Drive เก็บรูปอัปโหลด', SystemName: 'ชื่อเว็บแอป (แสดงบนแท็บเบราว์เซอร์/หน้า login/เมนู — ใช้ตอนนำไปสำเนาใช้กับร้าน/แบรนด์อื่น)', LogoUrl: 'โลโก้เว็บแอป (แสดงหน้า login/แถบเมนู/ส่วนท้าย)', InvoiceCompanyName: 'ชื่อบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyAddress: 'ที่อยู่บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceCompanyEmail: 'อีเมลติดต่อ (ใบเสนอราคา/ใบแจ้งหนี้)', InvoiceLogoUrl: 'โลโก้บริษัท (ใบเสนอราคา/ใบแจ้งหนี้)', ApproverSignatureUrl: 'รูปลายเซ็นผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)', ApproverName: 'ชื่อผู้อนุมัติ (ประทับเมื่ออนุมัติใบเสนอราคา/ใบแจ้งหนี้)' };
           sheet.getRange(newRow, 2).setNumberFormat('@');
           sheet.getRange(newRow, 1, 1, 3).setValues([[key, val, remarkMap[key] || key]]);
         }

@@ -259,6 +259,13 @@
     color: #ffffff !important;
     font-weight: 700 !important;
   }
+  /* เส้นนำทางสีส้มแบรนด์ด้านซ้ายของรายการที่เลือก + ชื่ออังกฤษบรรทัดล่างให้อ่านชัดบนพื้นเข้ม */
+  .nav-link.active-link { position: relative; }
+  .nav-link.active-link::before {
+    content: ''; position: absolute; left: 5px; top: 22%; bottom: 22%; width: 3px;
+    border-radius: 3px; background: #FF6B00;
+  }
+  .nav-link.active-link .nav-sub { opacity: 0.8 !important; }
 
   /* === Blob Background Animations === */
   @keyframes blob {

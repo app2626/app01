@@ -38,7 +38,10 @@ function page() {
   let ix = fs.readFileSync(SRC + 'Index.html', 'utf8');
   ix = ix.split('<?= appName ?>').join('MPOS Test');
   ix = ix.replace("<?!= JSON.stringify(trackParam || '') ?>", '""');
+  ix = ix.replace("<?!= JSON.stringify(deepModel || '') ?>", '""');
+  ix = ix.replace("<?!= JSON.stringify(appUrl || '') ?>", '"https://script.google.com/macros/s/TEST/exec"');
   ix = ix.replace("<?!= include('CSS'); ?>", () => fs.readFileSync(SRC + 'CSS.html', 'utf8'));
+  ix = ix.replace("<?!= include('TailwindCSS'); ?>", () => fs.readFileSync(SRC + 'TailwindCSS.html', 'utf8'));
   ix = ix.replace("<?!= include('JS'); ?>", () => fs.readFileSync(SRC + 'JS.html', 'utf8'));
   return ix.replace('<head>', '<head>' + STUB);
 }
@@ -164,6 +167,51 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await T('URL sync: page number pushed', async () => { await P("window.app.pos.clearStoreFilters(true);window.app.pos.goStorePage(2);true"); await sleep(250); const last = JSON.parse(await P("JSON.stringify(window.__pushes[window.__pushes.length-1].p)")); ok(last.page && last.page[0] === '2', JSON.stringify(last)); });
   await T('URL load: shared link restores filters, does not push back', async () => { await P("window.app.pos.clearStoreFilters(true);true"); await sleep(200); const n = await P("window.__pushes.length"); await P("window.__top.parameters={cat:['แท็บเล็ต'],cap:['128GB','256GB'],sort:['desc'],stock:['1'],pmin:['5000']};window.app.pos.loadUrlState();true"); await sleep(400); const f = JSON.parse(await P("JSON.stringify(window.app.pos.storeFilters)")); ok(f.category === 'แท็บเล็ต' && f.capacities.length === 2 && f.sort === 'desc' && f.inStock === true && f.priceMin === 5000, JSON.stringify(f)); ok(/แท็บเล็ต/.test(await P("document.querySelector('.sf-h1').textContent"))); eq(await P("window.__pushes.length"), n, 'apply must not re-push'); });
   await T('URL load: back button handler resets to empty state', async () => { await P("window.__hist({location:{parameters:{}}});true"); await sleep(400); ok(!(await P("window.app.pos.storeFiltersActive()")), 'filters still active'); });
+  console.log('== PRODUCT DEEP LINK (?p=) + FOOTER CONTACT');
+  await T('deep link: opening a product modal pushes ?p=<Model>; closing removes it', async () => {
+    await P("window.app.pos.clearStoreFilters(true);true"); await sleep(250);
+    const model = await P("(window.app.globalData.products.find(p=>p.Status==='เปิด')||{}).Model");
+    ok(model, 'no open product model in seed');
+    await P("window.app.pos.openAddToCartModal('MODEL:'+" + JSON.stringify(model) + ");true"); await sleep(250);
+    const last = JSON.parse(await P("JSON.stringify(window.__pushes[window.__pushes.length-1].p)"));
+    ok(last.p && last.p[0] === model, JSON.stringify(last));
+    await P("window.app.hideModal('addToCartModal');true"); await sleep(250);
+    const after = JSON.parse(await P("JSON.stringify(window.__pushes[window.__pushes.length-1].p)"));
+    ok(!after.p, JSON.stringify(after));
+  });
+  await T('deep link: shared URL (?p=) opens that model; unknown model shows warning, not a crash', async () => {
+    const model = await P("(window.app.globalData.products.find(p=>p.Status==='เปิด')||{}).Model");
+    await P("window.app.pos.applyUrlParams({p:[" + JSON.stringify(model) + "]},false);true"); await sleep(400);
+    ok(await P("!document.getElementById('addToCartModal').classList.contains('hidden')"), 'modal not opened');
+    ok((await P("window.app.pos.sharedModel")) === model);
+    await P("window.app.hideModal('addToCartModal');true"); await sleep(200);
+    await P("window.app.pos.applyUrlParams({p:['__no_such_model__']},false);true"); await sleep(300);
+    ok(await P("document.getElementById('addToCartModal').classList.contains('hidden')"), 'modal opened for unknown model');
+  });
+  await T('deep link: back button without p closes the open modal', async () => {
+    const model = await P("(window.app.globalData.products.find(p=>p.Status==='เปิด')||{}).Model");
+    await P("window.app.pos.openAddToCartModal('MODEL:'+" + JSON.stringify(model) + ");true"); await sleep(250);
+    await P("window.__hist({location:{parameters:{}}});true"); await sleep(400);
+    ok(await P("document.getElementById('addToCartModal').classList.contains('hidden')"), 'modal still open');
+  });
+  await T('deep link: productLink builds <appUrl>?p=<encoded model>; empty without model', async () => {
+    eq(await P("window.app.pos.productLink('Galaxy S 25')"), 'https://script.google.com/macros/s/TEST/exec?p=Galaxy%20S%2025');
+    eq(await P("window.app.pos.productLink('')"), '');
+    ok(await P("!!document.getElementById('shareProductBtn')"));
+  });
+  await T('footer contact: renders tel/LINE/hours from Settings, escapes HTML, strips formula guard apostrophe', async () => {
+    await P("window.app.globalData.settings=Object.assign({},window.app.globalData.settings,{ContactPhone:\"'+66 2 123 4567\",ContactLine:'@mystore',ContactHours:'<b>10-21</b>'});window.app.renderFooterContact();true");
+    const h = await P("document.getElementById('footerContact').innerHTML");
+    ok(/href="tel:\+6621234567"/.test(h), h); ok(/line\.me\/R\/ti\/p\/%40mystore/.test(h), h); ok(!/<b>/.test(h) && /&lt;b&gt;/.test(h), h);
+    ok(await P("!document.getElementById('footerContact').classList.contains('hidden')"));
+  });
+  await T('footer contact: hidden when no contact settings; javascript: LINE value never becomes href', async () => {
+    await P("window.app.globalData.settings=Object.assign({},window.app.globalData.settings,{ContactPhone:'',ContactLine:'javascript:alert(1)',ContactHours:''});window.app.renderFooterContact();true");
+    const h = await P("document.getElementById('footerContact').innerHTML");
+    ok(!/href="javascript:/i.test(h), h);
+    await P("window.app.globalData.settings=Object.assign({},window.app.globalData.settings,{ContactPhone:'',ContactLine:'',ContactHours:''});window.app.renderFooterContact();true");
+    ok(await P("document.getElementById('footerContact').classList.contains('hidden')"));
+  });
   await T('URL load: search term + page restored', async () => { await P("window.app.pos.applyUrlParams({q:['Test1'],page:['1']},false);true"); await sleep(300); ok(await P("document.getElementById('searchProduct').value==='Test1'")); await P("window.app.pos.clearStoreFilters(true);true"); await sleep(200); });
   await T('URL load: hostile params are sanitized (no XSS, bad values ignored)', async () => { await P("window.app.pos.applyUrlParams({cat:['<img src=x onerror=window.__xss=1>'],sort:['<script>'],pr:['x'],pmin:['abc'],grp:['\"><svg onload=window.__xss=1>']},true);true"); await sleep(400); ok(!(await P("window.__xss")), 'XSS executed'); ok(await P("!document.querySelector('.sf-h1 img') && !document.querySelector('.sf-crumb img, .sf-crumb svg, #storeSidebar svg[onload]')"), 'injected element'); const f = JSON.parse(await P("JSON.stringify(window.app.pos.storeFilters)")); ok(f.sort === '' && f.priceRange === '' && f.priceMin === '', JSON.stringify(f)); await P("window.app.pos.clearStoreFilters(true);true"); await sleep(200); });
   await T('clear-all resets multi-select arrays', async () => { await P("window.app.pos.setStoreFilter('color','Blue');window.app.pos.setStoreFilter('capacity','128GB');window.app.pos.clearStoreFilters(true);true"); await sleep(200); const f = JSON.parse(await P("JSON.stringify(window.app.pos.storeFilters)")); ok(!f.colors.length && !f.capacities.length && !f.groups.length); });
@@ -230,7 +278,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const hd = sheets.Products.rows[0], sc = hd.indexOf('SKU'), kc = hd.indexOf('Stock');
     const stock = (sku) => Number(sheets.Products.rows.find(r => r[sc] === sku)[kc]);
     const s1 = stock('T3-0'), s2 = stock('CASE-T3'), n0 = sheets.Orders.rows.length;
-    await P(`(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};set('coCustomer','ลูกค้า ซื้อคู่');set('coPhone','0812345678');set('coEmail','a@b.co');set('coIdCard','1234567890123');set('bkStaffName','พนักงาน ทดสอบ');set('bkPhone','0899999999');document.getElementById('radResF').checked=true;window.app.pos.submitCheckout();return true})()`);
+    await P(`(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};set('coCustomer','ลูกค้า ซื้อคู่');set('coPhone','0812345678');set('coEmail','a@b.co');set('coIdCard','1234567890121');set('bkStaffName','พนักงาน ทดสอบ');set('bkPhone','0899999999');document.getElementById('radResF').checked=true;window.app.pos.submitCheckout();return true})()`);
     await sleep(900);
     const dbg = await P("JSON.stringify({vis:Swal.isVisible(),title:(Swal.getTitle()||{}).textContent,html:(Swal.getHtmlContainer()||{}).textContent,confirm:!!Swal.getConfirmButton(),cartLen:window.app.pos.cartData.length,sub:window.app.pos.isSubmitting})");
     if (!(await P("!!(Swal.isVisible() && Swal.getConfirmButton() && /ยืนยัน/.test(Swal.getConfirmButton().textContent))"))) throw new Error('confirm dialog not shown: ' + dbg);
@@ -289,6 +337,66 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await send('Emulation.clearDeviceMetricsOverride'); await waitFor('innerWidth > 1000', 5000); await sleep(300);
   await T('desktop: mobile filter button hidden, sidebar visible', async () => { const v = await ev("(()=>{const b=document.querySelector('.sf-filter-btn');const s=document.getElementById('storeSidebar');return JSON.stringify({btn:getComputedStyle(b).display,side:getComputedStyle(s).display,sideCls:s.className,w:innerWidth,open:window.app.pos.sidebarOpen})})()"); const o = JSON.parse(v); ok(o.btn === 'none' && o.side !== 'none', v); });
   await T('dark mode: sidebar + pagination readable', async () => { await ev("document.documentElement.classList.add('dark');window.app.pos.renderStoreHeader();window.app.pos.filter();true"); await sleep(400); const c = await ev("(()=>{const p=document.querySelector('.sf-panel');const t=document.querySelector('.sf-title');return [getComputedStyle(p).backgroundColor,getComputedStyle(t).color]})()"); ok(c[0] !== 'rgb(255, 255, 255)', 'panel bg still white in dark: ' + c[0]); await shot('pos-dark'); await ev("document.documentElement.classList.remove('dark');true"); });
+
+  console.log('== SIDEBAR MENU');
+  curPhase = 'sidebar';
+  await ev("document.documentElement.classList.remove('dark');window.location.hash='#pos';true"); await sleep(600);
+  await T('menu: items are Thai on top, English below (dashboard / pos / orders)', async () => { const r = JSON.parse(await ev("JSON.stringify(['dashboard','pos','orders'].map(id=>{const a=document.getElementById('nav-desk-'+id);return [a.querySelector('.nav-th').textContent,a.querySelector('.nav-sub').textContent]}))")); ok(JSON.stringify(r) === JSON.stringify([['แดชบอร์ด','Dashboard'],['สั่งจองสินค้า','Pre Booking'],['รายการใบจอง','Orders']]), JSON.stringify(r)); });
+  await T('menu: every Thai label is a single line (no wrapping), no horizontal overflow', async () => { const r = JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('#desktopMenu .nav-link')].filter(a=>a.offsetParent).map(a=>{const t=a.querySelector('.nav-th');return {id:a.id,h:Math.round(t.getBoundingClientRect().height),over:a.scrollWidth>a.clientWidth+1}}))")); const bad = r.filter(x => x.h > 24 || x.over); ok(r.length >= 8 && !bad.length, JSON.stringify(bad)); });
+  await T('menu: active item gets the orange accent bar', async () => { const c = await ev("(()=>{const a=document.getElementById('nav-desk-pos');return JSON.stringify([a.classList.contains('active-link'),getComputedStyle(a,'::before').backgroundColor,getComputedStyle(a,'::before').content])})()"); const [act, bg, ct] = JSON.parse(c); ok(act && bg === 'rgb(255, 107, 0)' && ct !== 'none', c); });
+  await T('menu: category headers show Thai + English', async () => { const t = await ev("document.getElementById('desktopMenu').textContent"); ok(t.includes('เมนูหลัก') && t.includes('Main Menu') && t.includes('วิเคราะห์/รายงาน'), t.slice(0, 120)); const h = JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('#desktopMenu > div')].filter(d=>/uppercase/.test(d.className)).map(d=>Math.round(d.getBoundingClientRect().height)))")); ok(h.length >= 2 && Math.max(...h) <= 40, 'category header wraps: ' + h); });
+  await T('user menu: closed by default, old big buttons gone, opens on click, has 3 actions', async () => {
+    ok(await ev("document.getElementById('userMenuPop').classList.contains('hidden')"), 'should start hidden');
+    await ev("document.getElementById('userMenuBtn').click();true"); await sleep(150);
+    ok(await ev("!document.getElementById('userMenuPop').classList.contains('hidden') && document.getElementById('userMenuBtn').getAttribute('aria-expanded')==='true'"), 'did not open');
+    const t = await ev("document.getElementById('userMenuPop').textContent"); ok(/เปลี่ยนรหัสผ่าน/.test(t) && /ออกจากระบบ/.test(t) && /โหมด/.test(t), t.replace(/\s+/g, ' '));
+    ok(await ev("document.querySelectorAll('#desktopSidebar > div:last-child > button').length === 1"), 'sidebar bottom should have a single user button');
+  });
+  await T('user menu: closes on outside click and on Escape', async () => {
+    await ev("document.getElementById('pageTitle')||0;document.body.click();true"); await sleep(150);
+    ok(await ev("document.getElementById('userMenuPop').classList.contains('hidden')"), 'outside click did not close');
+    await ev("document.getElementById('userMenuBtn').click();true"); await sleep(100);
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await sleep(150);
+    ok(await ev("document.getElementById('userMenuPop').classList.contains('hidden')"), 'Escape did not close');
+  });
+  await T('user menu: dark-mode toggle still works from the menu and updates label', async () => {
+    await ev("document.getElementById('userMenuBtn').click();true"); await sleep(100);
+    await ev("document.querySelector('#userMenuPop .theme-toggle-label').closest('button').click();true"); await sleep(250);
+    const d = await ev("JSON.stringify([document.documentElement.classList.contains('dark'),document.querySelector('#userMenuPop .theme-toggle-label').textContent])"); const [dk, lb] = JSON.parse(d); ok(dk === true && lb === 'โหมดสว่าง', d);
+    await ev("document.querySelector('#userMenuPop .theme-toggle-label').closest('button').click();true"); await sleep(250);
+    ok(await ev("!document.documentElement.classList.contains('dark')"), 'could not switch back to light');
+    await ev("window.app.closeUserMenu();true");
+  });
+
+  console.log('== ID CARD / PASSPORT FIELD');
+  curPhase = 'idcard';
+  await T('validateIdCard: valid Thai ID, numeric passport, alnum passport accepted', async () => { const r = JSON.parse(await ev("JSON.stringify(['1234567890121','1-2345-67890-12-1','123456789','ab123456','AB1234567'].map(v=>window.app.validateIdCard(v)))")); ok(r.every(x => x.ok), JSON.stringify(r)); ok(r[0].type === 'thai' && r[2].type === 'passport' && r[3].value === 'AB123456', JSON.stringify(r)); });
+  await T('validateIdCard: bad checksum / 0000 / 10-12 digits / empty / junk rejected', async () => { const r = JSON.parse(await ev("JSON.stringify(['1234567890123','0000','12345678901','','AB1','AB-1234567890'].map(v=>window.app.validateIdCard(v).ok))")); ok(r.every(x => x === false), JSON.stringify(r)); });
+  await T('formatIdCard: letters => passport mode (uppercase, kept, max 9); digits => Thai ID dashes', async () => {
+    const r = JSON.parse(await ev("(()=>{const e=document.createElement('input');const f=v=>{e.value=v;window.app.formatIdCard(e);return e.value};return JSON.stringify([f('ab-12 3456'),f('abcdefghijkl'),f('1234567890121'),f('0000'),e.classList.contains('border-emerald-500')])})()"));
+    ok(r[0] === 'AB123456' && r[1] === 'ABCDEFGHI' && r[2] === '1-2345-67890-12-1' && r[3] === '0-000' && r[4] === false, JSON.stringify(r));
+  });
+  await T('formatIdCard: valid input turns the field green, invalid 13-digit stays non-green', async () => { const r = JSON.parse(await ev("(()=>{const e=document.createElement('input');e.value='1234567890121';window.app.formatIdCard(e);const a=e.classList.contains('border-emerald-500');e.value='1234567890123';window.app.formatIdCard(e);return JSON.stringify([a,e.classList.contains('border-emerald-500')])})()")); ok(r[0] === true && r[1] === false, JSON.stringify(r)); });
+
+  console.log('== FOOTER / BACK-TO-TOP / META');
+  curPhase = 'footer';
+  await ev("document.documentElement.classList.remove('dark');true");
+  await T('footer: year is current year, brand copyright present', async () => { const t = await ev("document.querySelector('footer').textContent"); ok(t.includes(String(new Date().getFullYear())) && t.includes('สงวนลิขสิทธิ์'), t.slice(0, 120)); });
+  await T('footer: quick links (track order, trade-in) exist and call real handlers', async () => { const r = await ev("JSON.stringify([...document.querySelectorAll('#footerQuickLinks button')].map(b=>b.getAttribute('onclick')))"); ok(/openOrderTrackModal/.test(r) && /openTradeInStandalone/.test(r), r); ok(await ev("typeof window.app.pos.openOrderTrackModal==='function' && typeof window.app.pos.openTradeInStandalone==='function'")); });
+  await T('back-to-top: hidden at top of page', async () => ok(await ev("window.scrollTo(0,0);document.getElementById('backToTopBtn').classList.contains('hidden')")));
+  await T('back-to-top: appears when page offset >600px, hides again at top (offset simulated: POS page only scrolls ~460px on desktop)', async () => {
+    await ev("Object.defineProperty(window,'pageYOffset',{get:()=>1200,configurable:true});window.dispatchEvent(new Event('scroll'));true"); await sleep(200);
+    ok(await ev("!document.getElementById('backToTopBtn').classList.contains('hidden')"), 'button still hidden when offset=1200');
+    await ev("Object.defineProperty(window,'pageYOffset',{get:()=>0,configurable:true});window.dispatchEvent(new Event('scroll'));true"); await sleep(200);
+    ok(await ev("document.getElementById('backToTopBtn').classList.contains('hidden')"), 'button not hidden at offset=0');
+    await ev("Object.defineProperty(window,'pageYOffset',{get:()=>window.scrollY,configurable:true});true");
+  });
+  await T('back-to-top: click scrolls the page back to top', async () => {
+    await ev("window.scrollTo(0,300);true"); await sleep(200);
+    await ev("document.getElementById('backToTopBtn').click();true"); await waitFor('window.pageYOffset < 5', 4000);
+    ok(await ev("window.pageYOffset < 5"));
+  });
+  await T('meta: no "Enterprise Portal" in title, og:title + favicon present', async () => { const m = await ev("JSON.stringify({t:document.title,og:!!document.querySelector('meta[property=\"og:title\"]'),ic:!!document.querySelector('link[rel=icon]')})"); const o = JSON.parse(m); ok(!/Enterprise Portal/.test(o.t) && o.og && o.ic, m); });
 
   console.log('== SALES USER');
   curPhase = 'sales';

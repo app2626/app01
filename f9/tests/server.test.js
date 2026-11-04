@@ -30,11 +30,31 @@ t('GET_ALL_DATA', () => { all = unwrap(api('GET_ALL_DATA', {}, admin)); ok(all.p
 ['Products', 'Branches', 'Channels', 'Promotions', 'Interests', 'GiftMappings', 'Members', 'Orders', 'Settings', 'UI_Banners', 'Target', 'AuditLog', 'InventoryLog'].forEach(n =>
   t('GET_TABLE ' + n, () => { const r = api('GET_TABLE', { tableName: n }, admin); ok(Array.isArray(r) || (r && r.status !== 'error'), JSON.stringify(r).slice(0, 150)); }));
 t('GET_ADVANCED_DASHBOARD', () => { const r = api('GET_ADVANCED_DASHBOARD', {}, admin); ok(r && r.status !== 'error', JSON.stringify(r).slice(0, 200)); });
+t('dashboard cache: 2nd read served from cache (same builtAt); never contains Password', () => {
+  const r1 = api('GET_ADVANCED_DASHBOARD', {}, admin); const r2 = api('GET_ADVANCED_DASHBOARD', {}, admin);
+  ok(r1.data.builtAt && r1.data.builtAt === r2.data.builtAt, 'builtAt ' + r1.data.builtAt + ' vs ' + r2.data.builtAt);
+  ok(ctx.dashCacheGet_() !== null, 'cache empty');
+  ok(!JSON.stringify(ctx.dashCacheGet_()).includes('"Password"'), 'password leaked into cache');
+  ok(r1.data.members.every(m => !('Password' in m)));
+});
+t('dashboard cache: refresh:true rebuilds; any write action invalidates it', () => {
+  api('GET_ADVANCED_DASHBOARD', {}, admin); ok(ctx.dashCacheGet_() !== null);
+  api('CLEAR_CACHE', {}, admin); eq(ctx.dashCacheGet_(), null);
+  api('GET_ADVANCED_DASHBOARD', {}, admin); ok(ctx.dashCacheGet_() !== null);
+  const r = api('GET_ADVANCED_DASHBOARD', { refresh: true }, admin); ok(r.status === 'success' && ctx.dashCacheGet_() !== null);
+});
+t('dashboard cache: large payload is chunked and round-trips intact', () => {
+  const big = { orders: Array.from({ length: 400 }, (_, i) => ({ id: i, note: 'ทดสอบข้อความไทยยาว'.repeat(8) })), builtAt: 1 };
+  ctx.dashCachePut_(JSON.stringify(big)); const back = ctx.dashCacheGet_(); eq(back.orders.length, 400); eq(back.orders[399].note, big.orders[399].note);
+  ctx.invalidateDashboardCache_(); eq(ctx.dashCacheGet_(), null);
+});
 t('GET_SETTINGS_LIST', () => { const r = api('GET_SETTINGS_LIST', {}, admin); ok(r && r.status !== 'error', JSON.stringify(r).slice(0, 200)); });
 t('getPublicConfig', () => { const r = ctx.getPublicConfig(); ok('loginBg' in r && 'logoUrl' in r); });
 t('doGet renders Index', () => { const o = ctx.doGet({}); ok(o.html.includes('tmpl-pos')); });
 t('doGet passes a safe ?track= value to the template', () => { ctx.doGet({ parameter: { track: 'ORD-20261104-001' } }); eq(ctx.__lastTemplate.trackParam, 'ORD-20261104-001'); ctx.doGet({ parameter: { orderId: 'ORD-9' } }); eq(ctx.__lastTemplate.trackParam, 'ORD-9'); });
 t('doGet drops an unsafe ?track= value (script injection)', () => { ctx.doGet({ parameter: { track: '</script><script>alert(1)</script>' } }); eq(ctx.__lastTemplate.trackParam, ''); ctx.doGet({ parameter: { track: 'x'.repeat(65) } }); eq(ctx.__lastTemplate.trackParam, ''); ctx.doGet({}); eq(ctx.__lastTemplate.trackParam, ''); });
+t('doGet passes ?p= model to template, stripping script-breaking characters', () => { ctx.doGet({ parameter: { p: 'SAMSUNG GALAXY S26</script><script>alert(1)</script>' } }); const v = ctx.__lastTemplate.deepModel; ok(v && !/[<>&]/.test(v), String(v)); ctx.doGet({ parameter: { p: 'SAMSUNG GALAXY Z FOLD 8 ULTRA 12/256GB' } }); eq(ctx.__lastTemplate.deepModel, 'SAMSUNG GALAXY Z FOLD 8 ULTRA 12/256GB'); });
+t('doGet ignores an over-long ?p= value', () => { ctx.doGet({ parameter: { p: 'x'.repeat(500) } }); eq(ctx.__lastTemplate.deepModel, ''); });
 t('include()', () => ok(ctx.include('CSS').includes('<style')));
 
 const tbl = (n, u) => { const r = api('GET_TABLE', { tableName: n }, u || admin); if (r.status !== 'success') throw new Error(JSON.stringify(r)); return r.data; };
@@ -54,6 +74,13 @@ t('Members password stored hashed, not plaintext', () => { const row = sheets.Me
 t('GET_TABLE Members hides Password', () => ok(tbl('Members').every(m => !('Password' in m))));
 t('Sales cannot read Members/Settings/AuditLog', () => ['Members', 'Settings', 'AuditLog'].forEach(n => eq(api('GET_TABLE', { tableName: n }, sales).status, 'error', n)));
 t('Sales cannot read Target', () => eq(api('GET_TABLE', { tableName: 'Target' }, sales).status, 'error'));
+t('dashboard cache: Sales gets only own-branch orders even when the shared cache was built by Admin', () => {
+  const a = api('GET_ADVANCED_DASHBOARD', {}, admin); ok(ctx.dashCacheGet_() !== null, 'admin did not warm cache');
+  const r = api('GET_ADVANCED_DASHBOARD', {}, sales); ok(r.status === 'success', JSON.stringify(r).slice(0, 150));
+  ok(r.data.orders.every(o => o['Branch Code'] === sales['Branch Code']), 'foreign branch rows leaked');
+  ok(r.data.orders.length <= a.data.orders.length);
+  ok(!JSON.stringify(r).includes('"Password"'));
+});
 t('Sales cannot SAVE_RECORD Members', () => eq(api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: { Username: 'evil', Password: 'x', Role: 'Admin' } }, sales).status, 'error'));
 t('Sales cannot DELETE_RECORD', () => eq(api('DELETE_RECORD', { tableName: 'Products', idField: 'SKU', idValue: 'SKU-S24U' }, sales).status, 'error'));
 t('Sales cannot BULK_UPDATE/CLEAR_CACHE/SAVE_PRODUCT_GROUP', () => { eq(api('BULK_UPDATE_PRODUCTS', { updates: [] }, sales).status, 'error'); eq(api('CLEAR_CACHE', {}, sales).status, 'error'); eq(api('SAVE_PRODUCT_GROUP', { shared: { Model: 'X' }, variants: [{ sku: 'X1', stock: 1 }] }, sales).status, 'error'); });
@@ -73,12 +100,15 @@ t('UPDATE_PRODUCT_GROUP rename Model rejected', () => eq(api('UPDATE_PRODUCT_GRO
 console.log('== CHECKOUT');
 const FSTAT = 'จอง F (สวมสิทธิ์การจอง)', TSTAT = 'จอง T (มีการจอง)';
 const cartFor = (qty, sku) => [{ SKU: sku || 'SKU-S24U', 'Product Name': 'Samsung Galaxy S24 Ultra', qty, Price: 46900, brandGifts: [], channelGifts: [] }];
-const co = (over) => Object.assign({ cart: cartFor(1), branch: 'B01', channel: 'Retail', customerName: 'ลูกค้าทดสอบ', contactPhone: '0812345678', email: 'a@b.c', idCard: '1234567890123', resStatus: FSTAT, clientRequestId: 'REQ-' + Math.random(), discount: 0 }, over || {});
+const co = (over) => Object.assign({ cart: cartFor(1), branch: 'B01', channel: 'Retail', customerName: 'ลูกค้าทดสอบ', contactPhone: '0812345678', email: 'a@b.c', idCard: '1234567890121', resStatus: FSTAT, clientRequestId: 'REQ-' + Math.random(), discount: 0 }, over || {});
 const stockOf = sku => Number(tbl('Products').find(x => x.SKU === sku).Stock);
 t('CHECKOUT happy path decrements stock', () => { const b = stockOf('SKU-S24U'); const r = api('CHECKOUT', co(), sales); eq(r.status, 'success', JSON.stringify(r)); eq(stockOf('SKU-S24U'), b - 1); });
 t('CHECKOUT rows have exact header width', () => { const rows = sheets.Orders.rows; ok(rows.length >= 2); rows.slice(1).forEach((r, i) => eq(r.length, ctx.ORDERS_HEADERS_.length, 'row ' + (i + 2))); });
 t('CHECKOUT writes InventoryLog SALE row', () => ok(sheets.InventoryLog.rows.some(r => r[3] === 'SALE' && r[2] === 'SKU-S24U')));
 t('CHECKOUT idempotent (same clientRequestId)', () => { const p = co({ clientRequestId: 'SAME-1' }); api('CHECKOUT', p, sales); const n = sheets.Orders.rows.length, s = stockOf('SKU-S24U'); api('CHECKOUT', p, sales); eq(sheets.Orders.rows.length, n, 'dup rows'); eq(stockOf('SKU-S24U'), s, 'double stock deduction'); });
+t('CHECKOUT idCard: valid Thai ID (checksum) / numeric & alnum passport accepted', () => { ['1234567890121', '1-2345-67890-12-1', '123456789', 'ab123456', 'AB1234567'].forEach(id => eq(api('CHECKOUT', co({ idCard: id, clientRequestId: 'ID-' + id + Math.random() }), sales).status, 'success', 'id=' + id)); });
+t('CHECKOUT idCard: stored normalized (digits only / uppercase passport)', () => { api('CHECKOUT', co({ idCard: '1-2345-67890-12-1', clientRequestId: 'ID-N1' + Math.random() }), sales); api('CHECKOUT', co({ idCard: 'ab123456', clientRequestId: 'ID-N2' + Math.random() }), sales); const col = ctx.ORDERS_HEADERS_.indexOf('ID Card_Passport'); const vals = sheets.Orders.rows.map(r => String(r[col])); ok(vals.includes('1234567890121') && vals.includes('AB123456'), vals.slice(-6).join('|')); });
+t('CHECKOUT idCard: bad checksum / 0000 / 10-12 digits / empty / junk rejected, stock untouched', () => { const s0 = stockOf('SKU-S24U'); ['1234567890123', '0000', '12345678901', '', 'AB1', 'AB-1234567890', '12 34 5'].forEach(id => eq(api('CHECKOUT', co({ idCard: id, clientRequestId: 'IDX-' + Math.random() }), sales).status, 'error', 'id=' + id)); eq(stockOf('SKU-S24U'), s0); });
 t('CHECKOUT empty cart rejected', () => eq(api('CHECKOUT', co({ cart: [] }), sales).status, 'error'));
 t('CHECKOUT qty > stock rejected, stock unchanged', () => { const s = stockOf('SKU-S24U'); eq(api('CHECKOUT', co({ cart: cartFor(9999) }), sales).status, 'error'); eq(stockOf('SKU-S24U'), s); });
 t('CHECKOUT qty 0 / negative / fractional rejected', () => { [0, -3, 'abc'].forEach(q => eq(api('CHECKOUT', co({ cart: cartFor(q) }), sales).status, 'error', 'qty=' + q)); });
