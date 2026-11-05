@@ -1100,6 +1100,15 @@ function saveBatchRecords(token, payload) {
     let errors = [];
     let rowsToInsert = [];
 
+    if (!payload || !Array.isArray(payload.items) || payload.items.length === 0 || payload.items.length > 500) {
+      return { success: false, message: "ข้อมูลรายการไม่ถูกต้อง" };
+    }
+    // กัน Sheets ตีความข้อความจาก client ที่ขึ้นต้นด้วย = + - @ เป็นสูตร (SKU/IMEI ถูกตรวจกับ Stock แล้ว แต่ desc ไม่ได้ตรวจ)
+    const safeText_ = function(v) {
+      const s = (v == null ? "" : v).toString();
+      return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+    };
+
     payload.items.forEach((item, index) => {
       let checkKey = `${branchLocCode}|${item.sku}|${item.imei}`;
       let transferKey = `Warehouse Transfer|${item.sku}|${item.imei}`;
@@ -1115,7 +1124,7 @@ function saveBatchRecords(token, payload) {
       } else {
         rowsToInsert.push([
           timestamp, formattedActDate, actEmpName, branchLocCode, branchLocName,
-          item.sku, item.desc, item.imei, itemStatus, "'" + (item.codeMyOppo || "").toString().trim(), "", "", "", "", ""
+          item.sku, safeText_(item.desc), item.imei, itemStatus, "'" + (item.codeMyOppo || "").toString().trim(), "", "", "", "", ""
         ]);
       }
     });
@@ -1150,6 +1159,13 @@ function updateStatus(token, rowId, newStatus) {
     // rowId ต้องชี้ไปยังแถวข้อมูลจริงเท่านั้น (แถว 1 คือ header) ป้องกัน rowId ที่ถูกดัดแปลงจาก client ทำให้ header เสียหาย
     if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
       return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
+    }
+
+    // สาขาเปลี่ยนสถานะได้เฉพาะรายการ ACT ของสาขาตัวเอง (คอลัมน์ D = LocCode) — Admin แก้ได้ทุกแถว
+    // ก่อนหน้านี้ใครก็ตามที่ login แล้วยิง rowId ของสาขาอื่นผ่าน google.script.run ตรงๆ ก็แก้สถานะข้ามสาขาได้
+    const ownerLoc = (sheet.getRange(rowId, 4).getDisplayValue() || "").toString().trim();
+    if (session.locCode !== ADMIN_SESSION_LOCCODE && ownerLoc !== session.locCode) {
+      return { success: false, message: "คุณไม่มีสิทธิ์แก้ไขสถานะรายการของสาขาอื่น" };
     }
 
     const rowVals = sheet.getRange(rowId, 6, 1, 4).getDisplayValues()[0]; // sku, desc, imei, oldStatus
@@ -2298,7 +2314,9 @@ function verifyAdminAndExport(token, pin, rowIds) {
   if (getFailCount_('exportpinfail_', failKey) >= EXPORT_PIN_MAX_ATTEMPTS) {
     return { success: false, message: `กรอกรหัส PIN ผิดเกินกำหนด กรุณารออีก ${EXPORT_PIN_LOCKOUT_MINUTES} นาทีแล้วลองใหม่` };
   }
-  if(pin === ADMIN_PIN) {
+  // PIN อ่านจาก Script Properties (ADMIN_PIN) ก่อน เพื่อไม่ต้องเก็บรหัสไว้ในซอร์สโค้ด/Git — ถ้ายังไม่ตั้งค่าจะ fallback เป็นค่าเดิมในโค้ด
+  const configuredPin = PropertiesService.getScriptProperties().getProperty('ADMIN_PIN') || ADMIN_PIN;
+  if(pin !== undefined && pin !== null && pin.toString() === configuredPin.toString()) {
     clearFailCount_('exportpinfail_', failKey);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");

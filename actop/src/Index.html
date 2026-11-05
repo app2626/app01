@@ -369,7 +369,7 @@
             </div>
             <div class="mb-3 form-check">
                 <input type="checkbox" class="form-check-input" id="loginRememberMe">
-                <label class="form-check-label text-secondary" for="loginRememberMe">จดจำรหัสสาขาและรหัสผ่าน</label>
+                <label class="form-check-label text-secondary" for="loginRememberMe">จดจำรหัสสาขา</label>
             </div>
             <div id="loginErrorMsg" class="alert alert-danger py-2 d-none"></div>
             <button type="submit" class="btn btn-primary w-100 fw-bold py-2"><i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
@@ -1229,9 +1229,11 @@
 
     var REMEMBER_LOGIN_KEY = 'actopRememberedLogin';
 
-    function saveRememberedLogin(locCode, password) {
+    // เก็บเฉพาะรหัสสาขา (ไม่ใช่ความลับ) — ห้ามเก็บรหัสผ่านใน localStorage เพราะอ่านย้อนกลับได้ทันทีจาก DevTools/สคริปต์ใดๆ ในหน้านี้
+    // การเข้าระบบต่อเนื่องใช้ session token (actssToken) ที่ server ตั้งอายุไว้อยู่แล้ว ไม่ต้องจำรหัสผ่าน
+    function saveRememberedLogin(locCode) {
         try {
-            localStorage.setItem(REMEMBER_LOGIN_KEY, btoa(unescape(encodeURIComponent(JSON.stringify({ locCode: locCode, password: password })))));
+            localStorage.setItem(REMEMBER_LOGIN_KEY, JSON.stringify({ locCode: locCode }));
         } catch (e) {}
     }
 
@@ -1243,9 +1245,11 @@
         try {
             var raw = localStorage.getItem(REMEMBER_LOGIN_KEY);
             if (!raw) return;
-            var data = JSON.parse(decodeURIComponent(escape(atob(raw))));
+            // ข้อมูลรูปแบบเก่า (base64 ที่มีรหัสผ่านอยู่ข้างใน) → ลบทิ้งทันที ไม่นำมาใช้
+            if (raw.charAt(0) !== '{') { clearRememberedLogin(); return; }
+            var data = JSON.parse(raw);
+            if (data.password !== undefined) { clearRememberedLogin(); return; }
             $('#loginLocCode').val(data.locCode || '');
-            $('#loginPassword').val(data.password || '');
             $('#loginRememberMe').prop('checked', true);
         } catch (e) { clearRememberedLogin(); }
     }
@@ -1552,7 +1556,7 @@
                     try { localStorage.setItem('actssToken', res.token); } catch(e) {}
 
                     if (rememberMe) {
-                        saveRememberedLogin(locCode, password);
+                        saveRememberedLogin(locCode);
                     } else {
                         clearRememberedLogin();
                     }
