@@ -22,84 +22,73 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            /* โทนสีแบรนด์ OPPO ปรับเป็นธีม Organic Biophilic — เขียวมอสส์/เขียวใบไม้เป็นสีหลัก, ดินเผา/เทอราคอตต้าเป็นสีรอง, ครีม/หินทรายเป็นพื้นหลัง (ตัวแปรยังใช้ชื่อเดิม --navy/--gold/--accent-blue ฯลฯ เพื่อไม่ต้องแก้ทุกจุดที่อ้างอิง) */
-            --navy: #2B3B26;
-            --navy-dark: #10160D;
-            --gold: #5EA858;
-            --gold-dark: #457A41;
-            --gold-light: #EAF3E1;
-            --accent-blue: #C97B4A;
-            --accent-blue-dark: #A85F35;
-            --soft-panel: #F1F5E9;
-            --muted-green: #5C8A52;
-            --muted-red: #B25A45;
-            --muted-amber: #C98A2E;
-            --border-gray: #E3DDCC;
-            --bg-page: #FAF7EE;
-            --organic-radius: 18px;
-            --organic-radius-sm: 12px;
-            --leaf-shadow: 0 4px 16px rgba(43,59,38,0.10);
-            --leaf-shadow-lg: 0 10px 30px rgba(43,59,38,0.14);
+            /* โทนสีอ้างอิง Otis Super App (ธีม Velzon): กรมท่าเข้มสำหรับ topbar, ม่วงคราม #4B38B3 เป็นสีหลัก, ส้ม #EC6224 เป็นสีแบรนด์, พื้นหลังเทาอ่อน #F3F3F9 (ตัวแปรยังใช้ชื่อเดิม --navy/--gold/--accent-blue เพื่อไม่ต้องแก้ทุกจุดที่อ้างอิง) */
+            --navy: #1E1D40;
+            --navy-dark: #15142E;
+            --gold: #4B38B3;
+            --gold-dark: #3A2B94;
+            --gold-light: #ECE9FA;
+            --accent-blue: #4B38B3;
+            --accent-blue-dark: #3A2B94;
+            --brand-orange: #EC6224;
+            --soft-panel: #F3F6F9;
+            --muted-green: #0AB39C;
+            --muted-red: #F06548;
+            --muted-amber: #F7B84B;
+            --border-gray: #E9EBEC;
+            --bg-page: #F3F3F9;
+            --text-body: #495057;
+            --organic-radius: 5px;
+            --organic-radius-sm: 4px;
+            --leaf-shadow: 0 1px 2px rgba(56,65,74,0.15);
+            --leaf-shadow-lg: 0 5px 10px rgba(30,32,37,0.12);
         }
 
-        /* บังคับขนาดตัวอักษร 12px ทั้งระบบ */
+        /* ขนาดตัวอักษรฐาน 12px ทั้งระบบ (ฟอนต์ Inter แบบ Otis + Prompt เป็น fallback ภาษาไทย) */
         body, table, .btn, .form-control, .form-select, .form-label, .small, .badge {
             font-size: 12px !important;
-            font-family: 'Prompt', 'Kanit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', 'Prompt', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        h1, h2, h3, h4, h5, h6, .nav-link, .kpi-container h1 { font-family: 'Kanit', 'Prompt', 'Segoe UI', Tahoma, sans-serif; }
+        h1, h2, h3, h4, h5, h6, .nav-link, .kpi-container h1 { font-family: 'Inter', 'Prompt', 'Segoe UI', Tahoma, sans-serif; }
         h2, h3, h4 { font-size: 18px !important; }
         h5, h6 { font-size: 14px !important; }
         .kpi-container h1 { font-size: 26px !important; }
 
-        body {
-            background-color: var(--bg-page);
-            background-image:
-                radial-gradient(circle at 8% 12%, rgba(76,140,74,0.05) 0%, transparent 40%),
-                radial-gradient(circle at 94% 6%, rgba(201,123,74,0.05) 0%, transparent 38%),
-                radial-gradient(circle at 88% 92%, rgba(76,140,74,0.04) 0%, transparent 42%),
-                url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%234C8C4A' stroke-width='1' opacity='0.05'%3E%3Cpath d='M10 100 C 10 60, 40 40, 60 10 C 80 40, 110 60, 110 100'/%3E%3Cpath d='M60 10 L60 100'/%3E%3C/g%3E%3C/svg%3E");
-            background-attachment: fixed;
-            background-size: auto, auto, auto, 120px 120px;
-        }
-        [data-theme="dark"] body {
-            background-image:
-                radial-gradient(circle at 8% 12%, rgba(76,140,74,0.07) 0%, transparent 40%),
-                radial-gradient(circle at 94% 6%, rgba(201,123,74,0.05) 0%, transparent 38%),
-                radial-gradient(circle at 88% 92%, rgba(76,140,74,0.06) 0%, transparent 42%),
-                url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%234C8C4A' stroke-width='1' opacity='0.08'%3E%3Cpath d='M10 100 C 10 60, 40 40, 60 10 C 80 40, 110 60, 110 100'/%3E%3Cpath d='M60 10 L60 100'/%3E%3C/g%3E%3C/svg%3E");
-        }
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
-        ::-webkit-scrollbar-track { background: var(--soft-panel); }
-        ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 20px; border: 2px solid var(--soft-panel); }
-        ::-webkit-scrollbar-thumb:hover { background: var(--gold-dark); }
-        [data-theme="dark"] ::-webkit-scrollbar-track { background: #182013; }
-        [data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--gold); border-color: #182013; }
+        body { background-color: var(--bg-page); color: var(--text-body); }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #C4C8D4; border-radius: 20px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+        [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #3A4048; }
+        [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
         .card { border-radius: var(--organic-radius); box-shadow: var(--leaf-shadow); margin-bottom: 20px; border: 1px solid var(--border-gray); }
-        .marquee-container { background: var(--gold-light); border-left: 4px solid var(--gold); padding: 10px 14px; border-radius: var(--organic-radius-sm); color: var(--navy); font-weight: 600; }
+        .marquee-container { background: #fff; border: 1px solid var(--border-gray); border-left: 3px solid var(--brand-orange); padding: 8px 14px; border-radius: var(--organic-radius); color: var(--text-body); font-weight: 500; box-shadow: var(--leaf-shadow); }
         .form-locked { opacity: 0.5; pointer-events: none; }
-        .item-row { background: #fff; padding: 15px; border-radius: var(--organic-radius-sm); border: 1px solid var(--border-gray); margin-bottom: 12px; position: relative; transition: all 0.2s; }
-        .item-row:hover { border-color: var(--gold); box-shadow: 0 4px 14px rgba(76,140,74,0.16); transform: translateY(-1px); }
+        .item-row { background: #fff; padding: 15px; border-radius: var(--organic-radius); border: 1px solid var(--border-gray); margin-bottom: 12px; position: relative; transition: all 0.2s; }
+        .item-row:hover { border-color: var(--gold); box-shadow: 0 3px 10px rgba(75,56,179,0.14); }
         .btn-remove-row { position: absolute; top: -10px; right: -10px; border-radius: 50%; width: 24px; height: 24px; padding: 0; line-height: 1; z-index: 10; display: none; }
         .item-row:not(:first-child) .btn-remove-row { display: block; }
 
-        th { white-space: nowrap; background-color: var(--soft-panel) !important; color: var(--navy) !important; font-weight: 600; border-bottom: 2px solid var(--gold) !important; }
+        th { white-space: nowrap; background-color: #F3F6F9 !important; color: #495057 !important; font-weight: 600; border-bottom: 1px solid var(--border-gray) !important; text-transform: uppercase; letter-spacing: 0.3px; }
         table.dataTable.dtr-inline.collapsed>tbody>tr>td.dtr-control:before, table.dataTable.dtr-inline.collapsed>tbody>tr>th.dtr-control:before { background-color: var(--gold); }
 
-        .kpi-container { background: var(--gold-light); border: 1px solid var(--border-gray); border-left: 4px solid var(--gold); border-radius: var(--organic-radius); color: var(--navy); padding: 16px 20px; text-align: left; box-shadow: var(--leaf-shadow); transition: box-shadow 0.2s, transform 0.2s; }
-        .kpi-container:hover { box-shadow: var(--leaf-shadow-lg); transform: translateY(-2px); }
-        .kpi-container h6 { color: #6c757d !important; opacity: 1 !important; }
+        .kpi-container { background: #fff; border: 1px solid var(--border-gray); border-left: 3px solid var(--gold); border-radius: var(--organic-radius); color: var(--navy); padding: 16px 20px; text-align: left; box-shadow: var(--leaf-shadow); transition: box-shadow 0.2s; }
+        .kpi-container:hover { box-shadow: var(--leaf-shadow-lg); }
+        .kpi-container h6 { color: #878A99 !important; opacity: 1 !important; text-transform: uppercase; letter-spacing: 0.4px; }
         .kpi-container h1 { color: var(--gold) !important; }
-        .kpi-container.kpi-sold { border-left-color: var(--muted-green); background: #E9F2E4; }
-        .kpi-container.kpi-unsold { border-left-color: var(--muted-amber); background: #FBF0DE; }
-        .select2-container--bootstrap-5 .select2-selection { min-height: 32px; font-size: 12px; border-radius: 10px !important; }
+        .kpi-container.kpi-sold { border-left-color: var(--muted-green); background: #fff; }
+        .kpi-container.kpi-sold h1 { color: var(--muted-green) !important; }
+        .kpi-container.kpi-unsold { border-left-color: var(--brand-orange); background: #fff; }
+        .kpi-container.kpi-unsold h1 { color: var(--brand-orange) !important; }
+        .select2-container--bootstrap-5 .select2-selection { min-height: 32px; font-size: 12px; border-radius: var(--organic-radius) !important; }
         td.model-details-control { cursor: pointer; }
+
 
         /* ตัวกรอง Model แบบติ๊กหลายรายการ (checkbox style) */
         #select2-filterModel-results .select2-results__option,
@@ -177,128 +166,181 @@
         .swal2-popup.custom-detail-popup { padding: 0 !important; overflow: hidden; }
         .swal2-html-container { margin: 0 !important; padding: 0 !important; }
 
-        /* แถบ Header หลัก */
-        .app-header-bar { background: var(--soft-panel) !important; border-bottom: 2px solid var(--gold); border-radius: var(--organic-radius) !important; position: relative; overflow: hidden; }
-        .app-header-bar::before { content: ""; position: absolute; top: -30px; right: -30px; width: 110px; height: 110px; background: radial-gradient(circle, rgba(76,140,74,0.16) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
-        .app-header-bar::after { content: ""; position: absolute; bottom: -40px; left: 30%; width: 90px; height: 90px; background: radial-gradient(circle, rgba(201,123,74,0.12) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
-        .app-header-bar > * { position: relative; z-index: 1; }
-        .app-header-badge { background: #fff !important; color: var(--navy) !important; border: 1px solid var(--border-gray); border-radius: 999px !important; }
 
-        /* แท็บหลัก: ทรงใบไม้โค้งมน พื้นครีม ตัวหนังสือเข้มชัดเจน active เป็นแคปซูลเขียวมอสส์ */
-        #myTab { background: #fff !important; border-radius: var(--organic-radius) !important; }
-        .nav-pills .nav-item .nav-link { border-radius: 999px; border: none; transition: all 0.2s; color: #5a5c69; background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 10px 16px; }
-        .nav-pills .nav-item .nav-link:hover { color: var(--navy); background: var(--gold-light); }
-        .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily, .tab-track, .tab-transfer, .tab-settings { border-color: transparent !important; color: #5a5c69 !important; background: transparent !important; }
-        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-transfer.active, .tab-settings.active { background: linear-gradient(135deg, var(--gold), var(--gold-dark)) !important; color: #fff !important; box-shadow: 0 3px 10px rgba(76,140,74,0.35) !important; }
+        /* แถบ Header หลัก: topbar กรมท่าเข้มแบบ Otis */
+        .app-header-bar { background: var(--navy) !important; border-radius: var(--organic-radius) !important; color: #fff; padding: 10px 16px !important; box-shadow: var(--leaf-shadow); }
+        .app-header-bar h3, .app-header-bar h3.text-primary { color: #fff !important; font-weight: 600 !important; }
+        .app-header-bar h3 .text-gold { color: var(--brand-orange) !important; }
+        .app-header-badge { background: rgba(255,255,255,0.08) !important; color: #E9EBEC !important; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--organic-radius) !important; font-weight: 500; }
 
-        [data-theme="dark"] .app-header-bar { background: var(--navy) !important; border-bottom: 2px solid var(--gold); }
-        [data-theme="dark"] .app-header-badge { background: rgba(255,255,255,0.08) !important; color: var(--gold) !important; border: 1px solid rgba(76,140,74,0.5); }
-        [data-theme="dark"] #myTab { background: var(--navy) !important; }
-        [data-theme="dark"] .nav-pills .nav-item .nav-link { color: rgba(255,255,255,0.65); }
-        [data-theme="dark"] .nav-pills .nav-item .nav-link:hover { color: #fff; background: rgba(76,140,74,0.15); }
-        [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily, [data-theme="dark"] .tab-track, [data-theme="dark"] .tab-transfer, [data-theme="dark"] .tab-settings { color: rgba(255,255,255,0.65) !important; }
-        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active, [data-theme="dark"] .tab-track.active, [data-theme="dark"] .tab-transfer.active, [data-theme="dark"] .tab-settings.active { background: linear-gradient(135deg, var(--gold), var(--gold-dark)) !important; color: #fff !important; }
+        /* แท็บหลัก: แถบขาวมุมเหลี่ยมเล็ก active เป็นม่วงคราม */
+        #myTab { background: #fff !important; border-radius: var(--organic-radius) !important; border: 1px solid var(--border-gray); }
+        .nav-pills .nav-item .nav-link { border-radius: var(--organic-radius-sm); border: none; transition: all 0.2s; color: #6C757D; background: transparent; margin-bottom: 0; box-shadow: none !important; padding: 9px 14px; font-weight: 500 !important; }
+        .nav-pills .nav-item .nav-link:hover { color: var(--gold); background: var(--gold-light); }
+        .tab-form, .tab-data, .tab-dash, .tab-deep, .tab-daily, .tab-track, .tab-transfer, .tab-settings { border-color: transparent !important; color: #6C757D !important; background: transparent !important; }
+        .tab-form.active, .tab-data.active, .tab-dash.active, .tab-deep.active, .tab-daily.active, .tab-track.active, .tab-transfer.active, .tab-settings.active { background: var(--gold) !important; color: #fff !important; box-shadow: 0 2px 6px rgba(75,56,179,0.35) !important; }
 
-        /* กรอบบนของเนื้อหา (Pane) โทนเดียวกันทั้งระบบ */
-        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #settings-pane { border-top: 3px solid var(--gold) !important; border-radius: var(--organic-radius) !important; }
+        [data-theme="dark"] .app-header-bar { background: #15142E !important; }
+        [data-theme="dark"] #myTab { background: #212529 !important; border-color: #2E343A; }
+        [data-theme="dark"] .nav-pills .nav-item .nav-link { color: #ADB5BD; }
+        [data-theme="dark"] .nav-pills .nav-item .nav-link:hover { color: #fff; background: rgba(75,56,179,0.25); }
+        [data-theme="dark"] .tab-form, [data-theme="dark"] .tab-data, [data-theme="dark"] .tab-dash, [data-theme="dark"] .tab-deep, [data-theme="dark"] .tab-daily, [data-theme="dark"] .tab-track, [data-theme="dark"] .tab-transfer, [data-theme="dark"] .tab-settings { color: #ADB5BD !important; }
+        [data-theme="dark"] .tab-form.active, [data-theme="dark"] .tab-data.active, [data-theme="dark"] .tab-dash.active, [data-theme="dark"] .tab-deep.active, [data-theme="dark"] .tab-daily.active, [data-theme="dark"] .tab-track.active, [data-theme="dark"] .tab-transfer.active, [data-theme="dark"] .tab-settings.active { background: var(--gold) !important; color: #fff !important; }
 
-        /* รีโทนสี Bootstrap utility ให้เป็นโทน Deep Navy + Gold ทั้งระบบ */
-        .bg-primary { background-color: var(--navy) !important; }
+        /* กรอบบนของเนื้อหา (Pane) */
+        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #settings-pane { border-top: 3px solid var(--brand-orange) !important; border-radius: var(--organic-radius) !important; }
+
+        /* รีโทนสี Bootstrap utility */
+        .bg-primary { background-color: var(--gold) !important; }
         .bg-success { background-color: var(--muted-green) !important; }
         .bg-danger { background-color: var(--muted-red) !important; }
         .bg-warning { background-color: var(--muted-amber) !important; }
-        .text-warning { color: var(--muted-amber) !important; }
-        .text-primary { color: var(--navy) !important; }
+        .text-warning { color: #D9982A !important; }
+        .text-primary { color: var(--gold) !important; }
         .text-success { color: var(--muted-green) !important; }
         .text-danger { color: var(--muted-red) !important; }
-        .text-info { color: var(--navy) !important; }
-        .border-primary { border-color: var(--navy) !important; }
+        .text-info { color: #299CDB !important; }
+        .border-primary { border-color: var(--gold) !important; }
         .border-danger { border-color: var(--muted-red) !important; }
-        .border-info { border-color: var(--navy) !important; }
+        .border-info { border-color: #299CDB !important; }
         .btn-primary { background-color: var(--accent-blue) !important; border-color: var(--accent-blue) !important; color: #fff !important; }
         .btn-primary:hover, .btn-primary:focus { background-color: var(--accent-blue-dark) !important; border-color: var(--accent-blue-dark) !important; color: #fff !important; }
-        .btn-success { background-color: var(--accent-blue) !important; border-color: var(--accent-blue) !important; color: #fff !important; }
-        .btn-success:hover, .btn-success:focus { background-color: var(--accent-blue-dark) !important; border-color: var(--accent-blue-dark) !important; color: #fff !important; }
+        .btn-success { background-color: var(--muted-green) !important; border-color: var(--muted-green) !important; color: #fff !important; }
+        .btn-success:hover, .btn-success:focus { background-color: #099885 !important; border-color: #099885 !important; color: #fff !important; }
+        .btn-outline-primary { color: #3577F1 !important; border-color: #3577F1 !important; }
+        .btn-outline-primary:hover { background-color: #3577F1 !important; color: #fff !important; }
 
-        /* ปุ่มทรงมนแบบออร์แกนิก + ยกตัวเบาๆ เวลาชี้ */
-        .btn { border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
-        .btn:hover { transform: translateY(-1px); }
+        /* ปุ่มมุมเหลี่ยมเล็กแบบ Velzon + เงาบางๆ */
+        .btn { border-radius: 4.8px; box-shadow: 0 3px 3px rgba(56,65,74,0.1); transition: box-shadow 0.15s ease, background-color 0.15s ease; }
+        .btn:hover { box-shadow: 0 5px 10px rgba(56,65,74,0.18); }
         .btn.btn-remove-row, .btn-close { border-radius: 50%; }
-        .form-control, .form-select, .input-group-text { border-radius: 10px !important; border-color: var(--border-gray); }
-        .badge { border-radius: 999px; }
+        .form-control, .form-select, .input-group-text { border-radius: var(--organic-radius-sm) !important; border-color: #CED4DA; }
+        .form-control:focus, .form-select:focus { border-color: #A59BDB; box-shadow: 0 0 0 0.2rem rgba(75,56,179,0.15); }
+        .badge { border-radius: 4px; font-weight: 600; }
 
-        [data-theme="dark"] .btn-primary, [data-theme="dark"] .btn-success { background-color: var(--navy) !important; border-color: var(--navy) !important; color: var(--gold) !important; }
-        [data-theme="dark"] .btn-primary:hover, [data-theme="dark"] .btn-primary:focus,
-        [data-theme="dark"] .btn-success:hover, [data-theme="dark"] .btn-success:focus { background-color: var(--navy-dark) !important; border-color: var(--navy-dark) !important; color: var(--gold) !important; }
+        [data-theme="dark"] .btn-primary { background-color: var(--gold) !important; border-color: var(--gold) !important; color: #fff !important; }
+        [data-theme="dark"] .btn-primary:hover, [data-theme="dark"] .btn-primary:focus { background-color: var(--gold-dark) !important; border-color: var(--gold-dark) !important; color: #fff !important; }
         .btn-danger { background-color: var(--muted-red) !important; border-color: var(--muted-red) !important; }
         .btn-outline-danger { color: var(--muted-red) !important; border-color: var(--muted-red) !important; }
         .btn-outline-danger:hover { background-color: var(--muted-red) !important; color: #fff !important; }
         .text-gold { color: var(--gold) !important; }
 
-        /* ลูกเล่นสีตัวเลขราคาในตาราง: ราคาป้าย/ราคาส่วนลด/ราคาโปร */
-        .price-rrp { color: #9A9484; text-decoration: line-through; text-decoration-thickness: 1.5px; font-weight: 500; white-space: nowrap; }
+        /* สีตัวเลขราคาในตาราง: ราคาป้าย/ราคาส่วนลด/ราคาโปร */
+        .price-rrp { color: #878A99; text-decoration: line-through; text-decoration-thickness: 1.5px; font-weight: 500; white-space: nowrap; }
         .price-discount { color: var(--muted-red); font-weight: 700; white-space: nowrap; }
         .price-discount:before { content: "\f02f"; font-family: "Font Awesome 5 Free"; font-weight: 900; font-size: 10px; margin-right: 4px; opacity: 0.75; }
-        .price-promo { color: var(--gold-dark); font-weight: 800; font-size: 13px !important; white-space: nowrap; background: var(--gold-light); padding: 2px 8px; border-radius: 20px; display: inline-block; }
+        .price-promo { color: var(--brand-orange); font-weight: 800; font-size: 13px !important; white-space: nowrap; background: #FDEEE6; padding: 2px 8px; border-radius: 4px; display: inline-block; }
         .price-promo:before { content: "\f0e7"; font-family: "Font Awesome 5 Free"; font-weight: 900; font-size: 10px; margin-right: 4px; }
-        [data-theme="dark"] .price-rrp { color: #7A8072; }
-        [data-theme="dark"] .price-discount { color: #E08A6F; }
-        [data-theme="dark"] .price-promo { color: #8FD986; background: rgba(94,168,88,0.15); }
+        [data-theme="dark"] .price-rrp { color: #878A99; }
+        [data-theme="dark"] .price-discount { color: #F5876F; }
+        [data-theme="dark"] .price-promo { color: #FF9B6B; background: rgba(236,98,36,0.15); }
 
-        /* ปุ่มสลับโหมดมืด/สว่าง */
-        .theme-toggle-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(76,140,74,0.5); color: var(--gold); border-radius: 50%; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .theme-toggle-btn:hover { background: rgba(76,140,74,0.2); color: var(--gold); transform: translateY(-1px) rotate(-8deg); }
+        /* ปุ่มสลับโหมด/ไอคอนบน topbar */
+        .theme-toggle-btn { background: transparent; border: none; box-shadow: none; color: #CED4DA; border-radius: 4px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .theme-toggle-btn:hover { background: rgba(255,255,255,0.1); color: #fff; box-shadow: none; }
 
-        /* ===================== โหมดมืด (Dark Mode) — โทนป่าไม้ยามค่ำคืน ===================== */
-        [data-theme="dark"] { --bg-page: #10160D; }
-        [data-theme="dark"] body { background-color: var(--bg-page); color: #E7ECDF; }
+        /* ===================== โหมดมืด (Dark Mode) — โทนเทาถ่านแบบ Velzon ===================== */
+        [data-theme="dark"] { --bg-page: #1A1D21; --text-body: #CED4DA; }
+        [data-theme="dark"] body { background-color: var(--bg-page); color: #CED4DA; }
         [data-theme="dark"] .card,
-        [data-theme="dark"] .item-row { background-color: #1B2417; border-color: #2C3A26; color: #E7ECDF; }
-        [data-theme="dark"] .kpi-container { background-color: rgba(76,140,74,0.12); border-color: #2C3A26; color: #E7ECDF; }
-        [data-theme="dark"] .kpi-container.kpi-sold { background-color: rgba(92,138,82,0.15); }
-        [data-theme="dark"] .kpi-container.kpi-unsold { background-color: rgba(201,138,46,0.15); }
-        [data-theme="dark"] .kpi-container h6 { color: #9BA88E !important; }
-        [data-theme="dark"] th { background-color: var(--navy) !important; color: white !important; border-bottom: 2px solid var(--gold) !important; }
-        [data-theme="dark"] table.dataTable, [data-theme="dark"] table.dataTable td { color: #E7ECDF; background-color: #1B2417; }
-        [data-theme="dark"] table.dataTable.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #212C1B; box-shadow: none; }
-        [data-theme="dark"] .table-hover > tbody > tr:hover > * { background-color: #283523; color: #fff; }
-        [data-theme="dark"] .table-bordered, [data-theme="dark"] .table-bordered td, [data-theme="dark"] .table-bordered th { border-color: #2C3A26; }
-        [data-theme="dark"] .bg-light { background-color: #161F11 !important; }
-        [data-theme="dark"] .bg-white { background-color: #1B2417 !important; }
-        [data-theme="dark"] .text-dark { color: #EDF0E5 !important; }
-        [data-theme="dark"] .text-secondary, [data-theme="dark"] .text-muted { color: #9BA88E !important; }
-        [data-theme="dark"] .text-primary, [data-theme="dark"] .text-info { color: var(--gold) !important; }
+        [data-theme="dark"] .item-row { background-color: #212529; border-color: #2E343A; color: #CED4DA; }
+        [data-theme="dark"] .kpi-container,
+        [data-theme="dark"] .kpi-container.kpi-sold,
+        [data-theme="dark"] .kpi-container.kpi-unsold { background-color: #212529; border-color: #2E343A; color: #CED4DA; }
+        [data-theme="dark"] .kpi-container { border-left-color: var(--gold); }
+        [data-theme="dark"] .kpi-container.kpi-sold { border-left-color: var(--muted-green); }
+        [data-theme="dark"] .kpi-container.kpi-unsold { border-left-color: var(--brand-orange); }
+        [data-theme="dark"] .kpi-container h1 { color: #9A8CF0 !important; }
+        [data-theme="dark"] .kpi-container h6 { color: #878A99 !important; }
+        [data-theme="dark"] th { background-color: #2A2F34 !important; color: #E9ECEF !important; border-bottom: 1px solid #373D44 !important; }
+        [data-theme="dark"] table.dataTable, [data-theme="dark"] table.dataTable td { color: #CED4DA; background-color: #212529; }
+        [data-theme="dark"] table.dataTable.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: #262B30; box-shadow: none; }
+        [data-theme="dark"] .table-hover > tbody > tr:hover > * { background-color: #2E343A; color: #fff; }
+        [data-theme="dark"] .table-bordered, [data-theme="dark"] .table-bordered td, [data-theme="dark"] .table-bordered th { border-color: #2E343A; }
+        [data-theme="dark"] .bg-light { background-color: #1A1D21 !important; }
+        [data-theme="dark"] .bg-white { background-color: #212529 !important; }
+        [data-theme="dark"] .text-dark { color: #E9ECEF !important; }
+        [data-theme="dark"] .text-secondary, [data-theme="dark"] .text-muted { color: #878A99 !important; }
+        [data-theme="dark"] .text-primary, [data-theme="dark"] .text-info, [data-theme="dark"] .text-gold { color: #9A8CF0 !important; }
         [data-theme="dark"] .border-primary, [data-theme="dark"] .border-info { border-color: var(--gold) !important; }
-        [data-theme="dark"] .border, [data-theme="dark"] .border-top, [data-theme="dark"] .border-bottom { border-color: #2C3A26 !important; }
-        [data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background-color: #161F11; border-color: #35452D; color: #EDF0E5; }
-        [data-theme="dark"] .form-control::placeholder { color: #7A8570; }
-        [data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { background-color: #161F11; color: #EDF0E5; }
-        [data-theme="dark"] .input-group-text { background-color: #212C1B; border-color: #35452D; color: #E7ECDF; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection { background-color: #161F11; border-color: #35452D; color: #EDF0E5; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection__rendered { color: #EDF0E5 !important; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-dropdown { background-color: #161F11; border-color: #35452D; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option { color: #EDF0E5; }
-        [data-theme="dark"] .select2-search__field { background-color: #161F11 !important; color: #EDF0E5 !important; }
-        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] { background-color: #2A3823 !important; }
-        [data-theme="dark"] .select2-selection__choice { background-color: #283523 !important; border-color: #35452D !important; color: #EDF0E5 !important; }
-        [data-theme="dark"] .select2-selection__choice__display { color: #EDF0E5 !important; }
-        [data-theme="dark"] .marquee-container { background: rgba(76,140,74,0.12); color: var(--gold); }
-        [data-theme="dark"] #overlay { background: rgba(16,22,13,0.97); }
+        [data-theme="dark"] .border, [data-theme="dark"] .border-top, [data-theme="dark"] .border-bottom { border-color: #2E343A !important; }
+        [data-theme="dark"] .form-control, [data-theme="dark"] .form-select { background-color: #1A1D21; border-color: #373D44; color: #E9ECEF; }
+        [data-theme="dark"] .form-control::placeholder { color: #6C757D; }
+        [data-theme="dark"] .form-control:focus, [data-theme="dark"] .form-select:focus { background-color: #1A1D21; color: #E9ECEF; }
+        [data-theme="dark"] .input-group-text { background-color: #262B30; border-color: #373D44; color: #CED4DA; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection { background-color: #1A1D21; border-color: #373D44; color: #E9ECEF; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-selection__rendered { color: #E9ECEF !important; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-dropdown { background-color: #1A1D21; border-color: #373D44; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option { color: #E9ECEF; }
+        [data-theme="dark"] .select2-search__field { background-color: #1A1D21 !important; color: #E9ECEF !important; }
+        [data-theme="dark"] .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] { background-color: #2E343A !important; }
+        [data-theme="dark"] .select2-selection__choice { background-color: #2E343A !important; border-color: #373D44 !important; color: #E9ECEF !important; }
+        [data-theme="dark"] .select2-selection__choice__display { color: #E9ECEF !important; }
+        [data-theme="dark"] .marquee-container { background: #212529; border-color: #2E343A; color: #CED4DA; }
+        [data-theme="dark"] #overlay { background: rgba(26,29,33,0.97); }
         [data-theme="dark"] #overlay .spinner-border { color: var(--gold) !important; }
-        [data-theme="dark"] .swal2-popup { background: #1B2417 !important; color: #EDF0E5 !important; border: 1px solid #2C3A26 !important; }
-        [data-theme="dark"] .swal2-container { background: rgba(16,22,13,0.85) !important; }
-        [data-theme="dark"] .hud-ring { border-color: #2C3A26; border-top-color: var(--gold); }
+        [data-theme="dark"] .swal2-popup { background: #212529 !important; color: #E9ECEF !important; border: 1px solid #2E343A !important; }
+        [data-theme="dark"] .swal2-container { background: rgba(10,12,14,0.8) !important; }
+        [data-theme="dark"] .hud-ring { border-color: #2E343A; border-top-color: var(--gold); }
 
-        /* หน้าจอเข้าสู่ระบบ */
+        /* หน้าจอเข้าสู่ระบบ: พื้นเทาอ่อน แถบกรมท่าด้านบน การ์ดขาว แถบสีแบรนด์ส้ม */
         #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-page); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
-        #loginScreen::before { content: ""; position: absolute; top: -80px; left: -80px; width: 260px; height: 260px; background: radial-gradient(circle, rgba(76,140,74,0.14) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
-        #loginScreen::after { content: ""; position: absolute; bottom: -100px; right: -100px; width: 320px; height: 320px; background: radial-gradient(circle, rgba(201,123,74,0.12) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
-        .login-box { background: #fff; border: 1px solid var(--border-gray); border-top: 4px solid var(--gold); border-radius: 28px 28px var(--organic-radius) var(--organic-radius); padding: 32px; width: 100%; max-width: 380px; box-shadow: var(--leaf-shadow-lg); position: relative; z-index: 1; }
-        [data-theme="dark"] .login-box { background: #1B2417; border-color: #2C3A26; }
+        #loginScreen::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 38%; background: var(--navy); pointer-events: none; }
+        .login-box { background: #fff; border: 1px solid var(--border-gray); border-top: 4px solid var(--brand-orange); border-radius: var(--organic-radius); padding: 32px; width: 100%; max-width: 380px; box-shadow: var(--leaf-shadow-lg); position: relative; z-index: 1; }
+        [data-theme="dark"] .login-box { background: #212529; border-color: #2E343A; border-top-color: var(--brand-orange); }
+        [data-theme="dark"] #loginScreen::before { background: #15142E; }
 
         /* SweetAlert2 ต้องอยู่เหนือ #loginScreen (z-index 10000) เสมอ ไม่งั้น modal บังคับเปลี่ยนรหัสผ่านจะโผล่มาแบบมองไม่เห็น */
         .swal2-container { z-index: 10001 !important; }
         .swal2-popup { border-radius: var(--organic-radius) !important; }
+
+        /* ===================== Sidebar ซ้ายแบบ Otis (Velzon vertical layout) ===================== */
+        :root { --sidebar-w: 250px; }
+        #myTab { position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w); z-index: 1040; margin: 0 !important; padding: 0 0 16px !important; flex-direction: column; flex-wrap: nowrap; overflow-y: auto; border: 0 !important; border-right: 1px solid var(--border-gray) !important; border-radius: 0 !important; box-shadow: 1px 0 6px rgba(56,65,74,0.08); transition: transform 0.25s ease; }
+        #myTab .nav-item { margin: 0 !important; width: 100%; }
+        #myTab .sidebar-brand { display: flex; align-items: center; gap: 10px; height: 70px; padding: 0 20px; border-bottom: 1px solid var(--border-gray); margin-bottom: 8px !important; color: var(--navy); font-weight: 700; font-size: 17px; letter-spacing: 0.3px; }
+        #myTab .sidebar-brand i { color: var(--brand-orange); font-size: 26px; }
+        #myTab .sidebar-brand small { display: block; font-size: 10px; font-weight: 500; color: #878A99; letter-spacing: 0.6px; text-transform: uppercase; margin-top: -2px; }
+        #myTab .sidebar-caption { padding: 14px 20px 6px; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #878A99; }
+        #myTab .nav-link { width: 100%; text-align: left; border-radius: 0 !important; padding: 11px 20px !important; display: flex; align-items: center; gap: 10px; border-left: 3px solid transparent !important; font-weight: 500 !important; font-size: 13px !important; white-space: normal; }
+        #myTab .nav-link i { width: 18px; text-align: center; font-size: 14px; flex: 0 0 18px; }
+        #myTab .nav-link:hover { background: #F3F3F9 !important; color: var(--gold) !important; }
+        #myTab .nav-link.active { background: var(--gold-light) !important; color: var(--gold) !important; box-shadow: none !important; border-left-color: var(--brand-orange) !important; font-weight: 600 !important; }
+        [data-theme="dark"] #myTab { background: #212529 !important; box-shadow: none; border-right-color: #2E343A !important; }
+        [data-theme="dark"] #myTab .sidebar-brand { color: #fff; border-bottom-color: #2E343A; }
+        [data-theme="dark"] #myTab .nav-link:hover { background: rgba(75,56,179,0.2) !important; color: #fff !important; }
+        [data-theme="dark"] #myTab .nav-link.active { background: rgba(75,56,179,0.3) !important; color: #fff !important; }
+
+        /* ปรับให้ตรงกับหน้าจริงของ Otis: topbar เต็มความกว้างติดขอบ sidebar, เมนูตัวเล็ก, active เป็นตัวอักษรม่วง */
+        .container-fluid.mt-3 { margin-top: 0 !important; padding: 0 !important; }
+        .container-fluid.mt-3 > .row { margin: 0 !important; }
+        .container-fluid.mt-3 > .row > .col-12 { padding: 0; }
+        .container-fluid.mt-3 > .row > .col-12.mt-2 { padding: 14px 24px 0; margin-top: 0 !important; }
+        .app-header-bar { border-radius: 0 !important; box-shadow: none !important; height: 58px; padding: 0 24px !important; }
+        #myTab .sidebar-brand { height: 58px; }
+        #myTab .sidebar-caption { padding: 14px 20px 4px; font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+        #myTab .nav-link { font-size: 12px !important; padding: 10px 20px !important; border-left: 0 !important; font-weight: 400 !important; color: #495057; }
+        #myTab .nav-link.active { background: transparent !important; color: var(--gold) !important; font-weight: 600 !important; }
+        #myTab .nav-link:hover { background: transparent !important; }
+        [data-theme="dark"] #myTab .nav-link { color: #ADB5BD; }
+        [data-theme="dark"] #myTab .nav-link.active { background: transparent !important; color: #9A8CF0 !important; }
+        [data-theme="dark"] #myTab .nav-link:hover { background: transparent !important; }
+        #myTabContent { padding: 14px 24px 24px; }
+        .btn-success { background-color: #45CB85 !important; border-color: #45CB85 !important; }
+        .btn-success:hover, .btn-success:focus { background-color: #3AB574 !important; border-color: #3AB574 !important; }
+        .sidebar-toggle-btn { display: none; }
+        .sidebar-backdrop { display: none; }
+        @media (min-width: 992px) {
+            body { padding-left: var(--sidebar-w); }
+            .app-header-bar h3 .brand-icon { display: none; }
+        }
+        @media (max-width: 991.98px) {
+            #myTab { transform: translateX(-100%); }
+            body.sidebar-open #myTab { transform: translateX(0); box-shadow: 0 0 30px rgba(0,0,0,0.3); }
+            body.sidebar-open .sidebar-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1035; }
+            .sidebar-toggle-btn { display: inline-flex; }
+            .app-header-bar h3 { font-size: 15px !important; }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -341,7 +383,10 @@
 <div class="container-fluid mt-3 px-3">
     <div class="row mb-2">
         <div class="col-12 d-flex justify-content-between align-items-center app-header-bar p-2 rounded shadow-sm">
-            <h3 class="text-primary m-0 fw-bold"><i class="fas fa-shield-halved text-gold"></i> ACT OPPO System Control Panel</h3>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="theme-toggle-btn sidebar-toggle-btn" id="sidebarToggleBtn" title="เมนู"><i class="fas fa-bars"></i></button>
+                <h3 class="text-primary m-0 fw-bold"><i class="fas fa-shield-halved text-gold brand-icon"></i> ACT OPPO System Control Panel</h3>
+            </div>
             <div class="d-flex align-items-center gap-2">
                 <button type="button" class="theme-toggle-btn" id="themeToggleBtn" title="สลับโหมดมืด/สว่าง">
                     <i class="fas fa-moon"></i>
@@ -365,13 +410,20 @@
         </div>
     </div>
 
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <ul class="nav nav-pills mb-3 p-2 rounded shadow-sm" id="myTab" role="tablist">
+        <li class="nav-item sidebar-brand" role="presentation">
+            <i class="fas fa-shield-halved"></i>
+            <div>ACT OPPO<small>Control Panel</small></div>
+        </li>
+        <li class="nav-item sidebar-caption" role="presentation">เมนูหลัก</li>
         <li class="nav-item">
             <button class="nav-link tab-form active fw-bold shadow-sm" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-pane" type="button"><i class="fas fa-edit"></i> ฟอร์มบันทึกข้อมูลหน้าสาขา</button>
         </li>
         <li class="nav-item ms-2">
             <button class="nav-link tab-data fw-bold shadow-sm" id="data-tab" data-bs-toggle="tab" data-bs-target="#data-pane" type="button"><i class="fas fa-table"></i> ข้อมูลACTทั้งหมด</button>
         </li>
+        <li class="nav-item sidebar-caption" role="presentation">รายงานและแดชบอร์ด</li>
         <li class="nav-item ms-2">
             <button class="nav-link tab-dash fw-bold shadow-sm" id="dash-tab" data-bs-toggle="tab" data-bs-target="#dash-pane" type="button"><i class="fas fa-chart-pie"></i> แดชบอร์ดสรุปผู้บริหาร</button>
         </li>
@@ -384,6 +436,7 @@
         <li class="nav-item ms-2">
             <button class="nav-link tab-track fw-bold shadow-sm" id="track-tab" data-bs-toggle="tab" data-bs-target="#track-pane" type="button"><i class="fas fa-map-marker-alt"></i> ติดตามขายสินค้า(แอเรีย)</button>
         </li>
+        <li class="nav-item sidebar-caption" role="presentation">โอนย้าย</li>
         <li class="nav-item ms-2">
             <button class="nav-link tab-transfer fw-bold shadow-sm" id="transfer-tab" data-bs-toggle="tab" data-bs-target="#transfer-pane" type="button"><i class="fas fa-truck-arrow-right"></i> โอนย้ายสต๊อก</button>
         </li>
@@ -391,6 +444,7 @@
             <button class="nav-link tab-act-transfer fw-bold shadow-sm" id="act-transfer-tab" data-bs-toggle="tab" data-bs-target="#act-transfer-pane" type="button"><i class="fas fa-right-left"></i> โอนย้ายรายการ ACT</button>
         </li>
         <li class="nav-item ms-2" id="settingsTabLi" style="display:none;">
+            <div class="sidebar-caption">ขั้นสูง</div>
             <button class="nav-link tab-settings fw-bold shadow-sm" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane" type="button"><i class="fas fa-gears"></i> ตั้งค่าระบบ</button>
         </li>
     </ul>
@@ -1074,6 +1128,30 @@
             .replace(/'/g, '&#39;');
     }
 
+    // ===== ตัวช่วยสำหรับระบบกรอง =====
+    // ข้อมูลในตารางถูก escapeHtml ก่อนลง DOM (& → &amp; ฯลฯ) ตอนเทียบกับค่าใน dropdown ต้องถอดรหัสกลับก่อน
+    function decodeHtml(s) {
+        var t = document.createElement('textarea');
+        t.innerHTML = s == null ? '' : s;
+        return t.value;
+    }
+    function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    // ค้นหาแบบตรงทั้งค่า (ไม่ใช่แค่มีบางส่วน) เช่น กรองสาขา "BKK1" ต้องไม่เจอ "BKK10"
+    function exactColSearch(v) { return v ? '^\\s*' + escapeRegex(escapeHtml(v)) + '\\s*$' : ''; }
+    // แปลงค่า <input type="date"> (YYYY-MM-DD) เป็นเวลาท้องถิ่น ไม่ให้เพี้ยนข้ามวันตามโซนเวลา
+    function parseInputDate(str, endOfDay) {
+        var p = str.split('-');
+        return endOfDay ? new Date(+p[0], p[1] - 1, +p[2], 23, 59, 59, 999) : new Date(+p[0], p[1] - 1, +p[2], 0, 0, 0, 0);
+    }
+    function applyDataColumnFilters() {
+        if (!dataTableInstance) return;
+        dataTableInstance.column(9).search(exactColSearch($('#filterArea').val()), true, false);
+        dataTableInstance.column(7).search(exactColSearch($('#filterLoc').val()), true, false);
+        dataTableInstance.column(16).search(exactColSearch($('#filterStatus').val()), true, false);
+        dataTableInstance.column(2).search(($('#filterImei').val() || '').trim(), false, false);
+        dataTableInstance.draw();
+    }
+
     // อนุญาตเฉพาะลิงก์ http/https เท่านั้น กัน javascript: หรือ scheme อื่นที่รันโค้ดได้ตอนคลิก
     function safeUrl(str) {
         var s = (str || '').toString().trim();
@@ -1600,18 +1678,16 @@
         $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
             if (settings.nTable.id !== 'dataTable') return true; 
 
-            var filterProductStr = $('#filterProduct').val() ? $('#filterProduct').val().toLowerCase() : "";
+            // ค่าใน dropdown สินค้าคือ SKU → ต้องตรงทั้งค่า (ไม่ใช่ substring: SKU "A1" ห้ามเจอ "A10")
+            var filterProductStr = ($('#filterProduct').val() || '').trim().toLowerCase();
             if (filterProductStr) {
-                var descCol = data[0] ? data[0].toLowerCase() : "";
-                var skuCol = data[1] ? data[1].toLowerCase() : "";
-                if (descCol.indexOf(filterProductStr) === -1 && skuCol.indexOf(filterProductStr) === -1) {
-                    return false;
-                }
+                var skuCol = decodeHtml(data[1]).trim().toLowerCase();
+                if (skuCol !== filterProductStr) return false;
             }
 
             var selectedModels = $('#filterModel').val() || [];
             if (selectedModels.length > 0) {
-                var modelCol = data[18] ? data[18].toString() : "";
+                var modelCol = decodeHtml(data[18]).trim();
                 if (selectedModels.indexOf(modelCol) === -1) return false;
             }
 
@@ -1631,11 +1707,8 @@
             else { rowDate = new Date(parts[2], parts[1] - 1, parts[0]); }
             rowDate.setHours(0,0,0,0);
 
-            var minD = minDateStr ? new Date(minDateStr) : null;
-            if(minD) minD.setHours(0,0,0,0);
-            
-            var maxD = maxDateStr ? new Date(maxDateStr) : null;
-            if(maxD) maxD.setHours(23,59,59,999);
+            var minD = minDateStr ? parseInputDate(minDateStr, false) : null;
+            var maxD = maxDateStr ? parseInputDate(maxDateStr, true) : null;
 
             if (minD && maxD) return rowDate >= minD && rowDate <= maxD;
             else if (minD) return rowDate >= minD;
@@ -1647,10 +1720,8 @@
             if(dataTableInstance) dataTableInstance.draw();
         });
 
-        $('#filterArea').on('change', function() { if(dataTableInstance) dataTableInstance.column(9).search(this.value).draw(); });
-        $('#filterLoc').on('change', function() { if(dataTableInstance) dataTableInstance.column(7).search(this.value).draw(); });
-        $('#filterImei').on('keyup', function() { if(dataTableInstance) dataTableInstance.column(2).search(this.value).draw(); });
-        $('#filterStatus').on('change', function() { if(dataTableInstance) dataTableInstance.column(16).search(this.value).draw(); });
+        $('#filterArea, #filterLoc, #filterStatus').on('change', applyDataColumnFilters);
+        $('#filterImei').on('keyup input', applyDataColumnFilters);
         $('#filterProduct').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
         $('#filterModel').on('change', function() { if(dataTableInstance) dataTableInstance.draw(); });
 
@@ -1669,6 +1740,10 @@
         $('#track-tab').on('shown.bs.tab', function() { generateTrackByAreaTable(); });
         $('#transfer-tab').on('shown.bs.tab', function() { loadMyTransfers(); });
         $('#act-transfer-tab').on('shown.bs.tab', function() { loadMyActTransfers(); });
+        // Sidebar มือถือ: เปิด/ปิดเมนู และปิดเองเมื่อเลือกแท็บ
+        $('#sidebarToggleBtn').on('click', function() { $('body').toggleClass('sidebar-open'); });
+        $('#sidebarBackdrop').on('click', function() { $('body').removeClass('sidebar-open'); });
+        $('#myTab .nav-link').on('click', function() { $('body').removeClass('sidebar-open'); });
 
         $('#btnAddTransferRow').click(function() {
             $('.transfer-select-sku, .transfer-select-imei').select2('destroy');
@@ -2486,6 +2561,9 @@
             }
         });
 
+        // สร้างตารางใหม่แล้ว column search ถูกรีเซ็ต แต่ dropdown ยังค้างค่าเดิม → นำตัวกรองกลับมาใช้อีกครั้ง
+        applyDataColumnFilters();
+
         globalAllRecords = records;
         globalUnsoldPool = unsoldPool;
 
@@ -2657,7 +2735,10 @@
 
         var existingModel = $('#deepFilterModel').val();
         $('#deepFilterModel').empty();
-        Object.keys(modelAggregator).sort().forEach(function(m) {
+        // ตัวเลือกรุ่นของแท็บ "เจาะลึก" ต้องมาจากสต๊อกทั้งหมด ไม่ใช่ผลที่ผ่านตัวกรองของแดชบอร์ด (ไม่งั้นเปลี่ยนตัวกรองแดชบอร์ดแล้วรายการรุ่น/ค่าที่เลือกในแท็บเจาะลึกหาย)
+        var deepModelSet = {};
+        unsoldPool.forEach(function(item) { if (item.model) deepModelSet[item.model] = true; });
+        Object.keys(deepModelSet).sort().forEach(function(m) {
             $('#deepFilterModel').append('<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>');
         });
         if(existingModel && existingModel.length) $('#deepFilterModel').val(existingModel);
@@ -2667,11 +2748,8 @@
         var startDateStr = $('#dailyFilterStartDate').val();
         var endDateStr = $('#dailyFilterEndDate').val();
         
-        var minD = startDateStr ? new Date(startDateStr) : null;
-        if(minD) minD.setHours(0,0,0,0);
-        
-        var maxD = endDateStr ? new Date(endDateStr) : null;
-        if(maxD) maxD.setHours(23,59,59,999);
+        var minD = startDateStr ? parseInputDate(startDateStr, false) : null;
+        var maxD = endDateStr ? parseInputDate(endDateStr, true) : null;
 
         var dailyModelMap = {};
 
