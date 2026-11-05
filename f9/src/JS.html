@@ -75,6 +75,21 @@ window.app = {
       : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
   },
 
+  // ประวัติการเปลี่ยนสถานะ (จากชีต OrderStatusLog) — แสดงเป็นไทม์ไลน์แนวตั้ง เก่า→ใหม่ ; showBy เฉพาะหน้าพนักงาน (หน้า public ไม่มีชื่อพนักงาน)
+  statusHistoryHtml: function(history, showBy) {
+    if (!history || !history.length) return '';
+    const esc = window.app.esc;
+    const rows = history.map((h, i) => {
+      const last = i === history.length - 1;
+      return '<li class="flex gap-2.5 items-start">'
+        + '<span class="mt-1 w-2.5 h-2.5 shrink-0 rounded-full ' + (last ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-slate-300') + '"></span>'
+        + '<span class="text-[11px] leading-snug"><strong class="' + (last ? 'text-emerald-700' : 'text-slate-700') + '">' + esc(h.to || '-') + '</strong>'
+        + (h.from ? ' <span class="text-slate-400">(จาก ' + esc(h.from) + ')</span>' : '')
+        + '<br><span class="text-slate-400 font-semibold">' + esc(h.time) + (showBy && h.by ? ' · ' + esc(h.by) : '') + '</span></span></li>';
+    }).join('');
+    return '<div class="status-history px-4 py-3 border-b border-slate-100"><div class="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">ประวัติการดำเนินการ</div><ul class="space-y-2.5">' + rows + '</ul></div>';
+  },
+
   // 5B.1 — esc ข้อความแล้ว highlight คำค้น: หา match บน raw text, esc ทีละ segment แล้วครอบ <mark>
   // (ปลอดภัยกว่า replace หลัง esc ทั้งก้อน เพราะคำค้นจะไม่มีวัน match เข้าไปใน entity เช่น &amp;)
   highlightEsc: function(raw, term) {
@@ -1104,6 +1119,8 @@ window.app = {
     if (hours) parts.push('<span><i class="far fa-clock mr-1.5 text-slate-400"></i>' + window.app.esc(hours) + '</span>');
     box.innerHTML = parts.join('');
     box.classList.toggle('hidden', parts.length === 0);
+    const col = document.getElementById('footerContactCol');
+    if (col) col.classList.toggle('hidden', parts.length === 0);
   },
 
   // =========================================================================
@@ -1181,9 +1198,9 @@ window.app = {
       const esc = this.esc, escJs = this.escAttrJs;
       const st = (o.status || 'Pending').toString();
       const stLower = st.toLowerCase();
-      const isComplete = stLower.includes('complete') || stLower.includes('สำเร็จ') || stLower.includes('รับเครื่องแล้ว');
+      const isComplete = stLower.includes('complete') || stLower.includes('deliver') || stLower.includes('สำเร็จ') || stLower.includes('รับเครื่องแล้ว');
       const isReady = stLower.includes('ready') || stLower.includes('พร้อมรับ');
-      const isConfirmed = stLower.includes('confirm') || stLower.includes('ยืนยัน') || o.deposit > 0;
+      const isConfirmed = stLower.includes('confirm') || stLower.includes('paid') || stLower.includes('ยืนยัน') || o.deposit > 0;
       const stepIdx = isComplete ? 4 : isReady ? 3 : isConfirmed ? 2 : 1;
       const steps = ['รับคำสั่งจอง', 'ล็อกสิทธิ์/มัดจำ', 'พร้อมรับที่สาขา', 'ส่งมอบสำเร็จ'];
 
@@ -1229,6 +1246,7 @@ window.app = {
                 }).join('')}
              </div>
           </div>
+          ${this.statusHistoryHtml(o.history, false)}
 
           <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-5">
              <div class="md:col-span-7 space-y-4">
@@ -1459,11 +1477,14 @@ window.app = {
     if(panel) panel.classList.toggle('hidden');
   },
   
-  toggleSidebar: function() {
+  // ซ่อน/แสดงเมนูด้านข้าง (เดสก์ท็อป) — hide=true คือ "โหมดเต็มจอ" ; persist=true จำค่าไว้ในเครื่องผู้ใช้ (เปิดครั้งหน้ายังเป็นโหมดเดิม)
+  setSidebarHidden: function(hide, persist) {
     const sidebar = document.getElementById('desktopSidebar');
     const showBtn = document.getElementById('desktopShowSidebarBtn');
     const mainWrapper = document.getElementById('mainContentWrapper');
-    if (sidebar.classList.contains('lg:flex')) {
+    if (!sidebar) return;
+    const isHidden = sidebar.classList.contains('lg:hidden');
+    if (hide && !isHidden) {
        sidebar.classList.remove('lg:flex');
        sidebar.classList.add('lg:hidden');
        if(showBtn) showBtn.style.display = 'flex';
@@ -1471,7 +1492,7 @@ window.app = {
           mainWrapper.classList.remove('lg:w-[calc(100%-260px)]');
           mainWrapper.classList.add('lg:w-full');
        }
-    } else {
+    } else if (!hide && isHidden) {
        sidebar.classList.remove('lg:hidden');
        sidebar.classList.add('lg:flex');
        if(showBtn) showBtn.style.display = 'none';
@@ -1480,6 +1501,32 @@ window.app = {
           mainWrapper.classList.add('lg:w-[calc(100%-260px)]');
        }
     }
+    if (persist) { try { localStorage.setItem('f9_sidebar_hidden', hide ? '1' : '0'); } catch (e) {} }
+    this.syncSidebarButtons();
+  },
+  toggleSidebar: function() {
+    const sidebar = document.getElementById('desktopSidebar');
+    if (!sidebar) return;
+    this.setSidebarHidden(!sidebar.classList.contains('lg:hidden'), true);
+  },
+  // เรียกตอนเข้าแอป: คืนค่าโหมดเต็มจอที่ผู้ใช้เคยเลือกไว้
+  applySidebarPref: function() {
+    let pref = null;
+    try { pref = localStorage.getItem('f9_sidebar_hidden'); } catch (e) {}
+    if (pref === '1') this.setSidebarHidden(true, false); else this.syncSidebarButtons();
+  },
+  // อัปเดตไอคอน/ข้อความของปุ่ม "เต็มจอ" บนหน้าร้านให้ตรงกับสถานะจริงของ sidebar
+  syncSidebarButtons: function() {
+    const sidebar = document.getElementById('desktopSidebar');
+    const btn = document.getElementById('posFullscreenBtn');
+    if (!sidebar || !btn) return;
+    const hidden = sidebar.classList.contains('lg:hidden');
+    const ico = btn.querySelector('i');
+    if (ico) ico.className = 'fas ' + (hidden ? 'fa-compress' : 'fa-expand');
+    btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    btn.title = hidden ? 'ออกจากโหมดเต็มจอ (แสดงเมนูด้านข้าง)' : 'โหมดเต็มจอ (ซ่อนเมนูด้านข้าง)';
+    const lbl = btn.querySelector('.pos-fs-lbl');
+    if (lbl) lbl.textContent = hidden ? 'ย่อ' : 'เต็มจอ';
   },
   
   closeMobileMenu: function() {
@@ -1593,6 +1640,7 @@ window.app = {
     window.app.applyLogo('mobileLogoBox', 'mobileLogoIcon', appLogoUrl);
     window.app.applyLogo('footerLogoBox', 'footerLogoIcon', appLogoUrl);
     window.app.renderFooterContact();
+    window.app.applySidebarPref();
     // footer ปีปัจจุบัน + ปุ่มกลับขึ้นบน (อยู่ใน <template> จึงใส่สคริปต์ inline ไม่ได้ — ต้องผูกที่นี่หลัง clone)
     try { const fy = document.getElementById('footerYear'); if (fy) fy.textContent = new Date().getFullYear(); } catch (e) {}
     if (!window.__userMenuBound) {
@@ -1961,18 +2009,17 @@ window.app = {
     return Promise.race([call, timeout]);
   },
 
-  // จำ Username/Password ไว้ auto-fill ฟอร์ม login ครั้งถัดไป (ติ๊ก "จดจำ Username และ Password") — เก็บ plaintext ใน localStorage
-  // เจตนาผู้ใช้ขอมาตรงๆ เพื่อความสะดวกบนเครื่องส่วนตัว/เครื่องหน้าร้านที่ผู้ใช้เดิมประจำ — เก็บแยกจาก token session (tg_pos_user) คนละคีย์
+  // จำเฉพาะ Username ไว้ auto-fill ฟอร์ม login ครั้งถัดไป — ไม่เก็บรหัสผ่านอีกต่อไป (เซสชันอยู่ใน token 30 วันของ tg_pos_user อยู่แล้ว)
+  // ข้อมูลเก่าที่เคยเก็บ {u,p} จะถูกลบ p ทิ้งทันทีที่เปิดหน้า login
   loadRememberedLogin: function() {
     try {
       const raw = localStorage.getItem('tg_pos_remember');
       if (!raw) return;
       const saved = JSON.parse(raw);
+      if (saved && saved.p !== undefined) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: saved.u || '' }));
       const uEl = document.getElementById('loginUsername');
-      const pEl = document.getElementById('loginPassword');
       const cEl = document.getElementById('loginRemember');
       if (uEl && saved.u) uEl.value = saved.u;
-      if (pEl && saved.p) pEl.value = saved.p;
       if (cEl) cEl.checked = true;
     } catch (e) { /* localStorage บล็อก/ข้อมูลเสีย — ปล่อยฟอร์มว่างเฉยๆ ไม่ต้อง throw */ }
   },
@@ -1986,9 +2033,9 @@ window.app = {
       const pVal = document.getElementById('loginPassword').value;
       const res = await this.api('LOGIN', { username: uVal, password: pVal });
       if(res && res.status === 'success') {
-        // บันทึก/ลบข้อมูลที่จำไว้เฉพาะตอน login สำเร็จเท่านั้น — กันจำรหัสผ่านที่พิมพ์ผิดค้างไว้
+        // บันทึก/ลบ Username ที่จำไว้เฉพาะตอน login สำเร็จเท่านั้น
         const remember = document.getElementById('loginRemember');
-        if (remember && remember.checked) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: uVal, p: pVal }));
+        if (remember && remember.checked) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: uVal }));
         else localStorage.removeItem('tg_pos_remember');
         window.app.user = res.user; localStorage.setItem('tg_pos_user', JSON.stringify(window.app.user));
         Swal.fire({icon: 'success', title: 'Welcome', text: res.user.Name, timer: 1500, showConfirmButton: false});
@@ -4400,6 +4447,8 @@ window.app = {
       catch(e) { this.recentSkus = []; localStorage.removeItem('bnn_recent_skus'); }
       this.initWishlist(); this.populateSelects(); this.renderPosHeroAndVouchers(); this.renderStoreHeader(); this.renderRecentlyViewed(); this.renderCompareBar(); this.filter(); this.renderCart(); this.renderCompanions(); this.checkCriteria();
       this.startCountdown();
+      this.initStickyHeader();
+      window.app.syncSidebarButtons();
       this._lastUrlKey = '{}';
       this.loadUrlState();
     },
@@ -5467,6 +5516,22 @@ window.app = {
     },
     // 6B — header ของ storefront: แถว category tiles (BNN Flash Sale Pills) → แถว sub-chips รุ่น (Product Group) → แถว filter chips
     // re-render ทั้งแถบทุกครั้งที่ตัวกรองเปลี่ยน (popover ถูกสร้างใหม่ในสถานะปิดเสมอ)
+    // ตรึง header ร้านค้า: sentinel ใต้ขอบบนของ viewport = header กำลังลอยตรึงอยู่ -> เติมคลาส is-stuck (ย่อ header บนมือถือ)
+    // sentinel อยู่เหนือ header เสมอ จึงไม่ถูกกระทบตอน header เปลี่ยนความสูง (กันกระพริบวนลูป)
+    initStickyHeader: function() {
+      try {
+        if (this._stickyObs) { this._stickyObs.disconnect(); this._stickyObs = null; }
+        const s = document.getElementById('posStoreSentinel');
+        const h = document.getElementById('posStoreHeader');
+        if (!s || !h || typeof IntersectionObserver === 'undefined') return;
+        const topPx = window.innerWidth < 1024 ? 61 : 1;
+        this._stickyObs = new IntersectionObserver(function(entries) {
+          h.classList.toggle('is-stuck', !entries[0].isIntersecting && entries[0].boundingClientRect.top < topPx);
+        }, { rootMargin: '-' + topPx + 'px 0px 0px 0px', threshold: 0 });
+        this._stickyObs.observe(s);
+      } catch (e) { /* ไม่รองรับ IntersectionObserver — header ยังตรึงได้ แค่ไม่ย่อ */ }
+    },
+
     renderStoreHeader: function() {
       const bar = document.getElementById('storeFilterBar');
       const side = document.getElementById('storeSidebar');
@@ -5528,7 +5593,9 @@ window.app = {
 
       // --- ส่วนหัวรายการ: breadcrumb + ชื่อหมวด + จำนวน + แถบเรียงตาม ---
       const title = f.groups.length === 1 ? f.groups[0] : (f.category || 'สินค้าทั้งหมด');
-      let html = '<nav class="sf-crumb" aria-label="breadcrumb"><span>หน้าหลัก</span><i class="fas fa-chevron-right"></i><span' + (f.category ? '' : ' class="cur"') + '>สินค้าทั้งหมด</span>'
+      const catChip = (val, label) => '<button type="button" class="sf-chip' + (f.category === val ? ' on' : '') + '" onclick="window.app.pos.setStoreCategory(\'' + escJs(val) + '\')" aria-pressed="' + (f.category === val ? 'true' : 'false') + '">' + esc(label) + '</button>';
+      let html = '<div class="sf-catchips" aria-label="หมวดสินค้า">' + catChip('', 'ทั้งหมด') + cats.map(c => catChip(c, c)).join('') + '</div>';
+      html += '<nav class="sf-crumb" aria-label="breadcrumb"><span>หน้าหลัก</span><i class="fas fa-chevron-right"></i><span' + (f.category ? '' : ' class="cur"') + '>สินค้าทั้งหมด</span>'
         + (f.category ? '<i class="fas fa-chevron-right"></i><span' + (f.groups.length ? '' : ' class="cur"') + '>' + esc(f.category) + '</span>' : '')
         + (f.groups.length ? '<i class="fas fa-chevron-right"></i><span class="cur">' + esc(f.groups.join(', ')) + '</span>' : '') + '</nav>';
       html += '<div class="sf-head"><h2 class="sf-h1">' + esc(title) + '</h2><span id="storeResultCount" class="sf-count"></span></div>';
@@ -6016,7 +6083,9 @@ window.app = {
       let card = '<div class="pos-card group relative flex flex-col h-full bg-white rounded-2xl overflow-hidden' + (isGift ? ' opacity-80' : '') + '" data-card-key="' + esc(cardKey) + '">';
       card +=      topLeftBadge;
       card +=      topRightBadge;
-      card += '    <div class="relative h-[150px] md:h-[180px] p-4 pt-8 flex items-center justify-center bg-white overflow-hidden">';
+      const openable = !isGift && !outOfStock;
+      const openAttr = openable ? ' onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')"' : '';
+      card += '    <div class="relative h-[150px] md:h-[180px] p-4 pt-8 flex items-center justify-center bg-white overflow-hidden' + (openable ? ' cursor-pointer' : '') + '"' + openAttr + '>';
       card +=        soldOutOverlay;
       card +=        compareBtnHtml;
       card +=        wishlistBtnHtml;
@@ -6024,7 +6093,8 @@ window.app = {
       card += '    </div>';
       card += '    <div class="p-3 flex flex-col flex-1 gap-1.5">';
       card += '      <div class="sf-brand">' + brandLabel + '</div>';
-      card += '      <div class="font-bold text-slate-900 text-xs md:text-[14px] line-clamp-2 leading-snug min-h-[2.25rem]" title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
+      const nameOpenAttr = openable ? ' role="link" tabindex="0" onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')" onkeydown="if(event.key===\'Enter\'){window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')}"' : '';
+      card += '      <div class="font-bold text-slate-900 text-xs md:text-[14px] line-clamp-2 leading-snug min-h-[2.25rem]' + (openable ? ' cursor-pointer hover:text-[#FF6B00] transition-colors' : '') + '"' + nameOpenAttr + ' title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
       if (p.isGroup) card += '<div class="text-[10px] text-slate-500 font-medium line-clamp-1 -mt-0.5" title="' + esc(pName) + '">' + esc(pName) + '</div>';
       if (bundleBadge || installmentBadge || giftCountBadge) {
         card += '<div class="flex items-center gap-1 flex-wrap">' + bundleBadge + installmentBadge + giftCountBadge + '</div>';
@@ -6093,6 +6163,11 @@ window.app = {
       if (!el) return;
       const searchEl = document.getElementById('searchProduct');
       el.outerHTML = this.cardHtml(grp, searchEl ? searchEl.value.trim() : '');
+    },
+    // กดรูป/ชื่อบนการ์ด = เปิดหน้ารายละเอียด (addToCartModal) เหมือนปุ่ม "จองด่วน" — ปุ่มหัวใจ/เทียบสเปคที่อยู่บนรูปต้องไม่ถูกแย่งคลิก
+    openCardDetail: function(ev, sku) {
+      if (ev && ev.target && ev.target.closest && ev.target.closest('button, a, input, select')) return;
+      this.openAddToCartModal(sku);
     },
     openAddToCartModal: function(id) {
       if (this.isBookingBlocked) {
@@ -6667,7 +6742,6 @@ window.app = {
     renderCart: function() {
       const cD = document.getElementById('cartItems');
       const cL = document.getElementById('cartCount');
-      const flC = document.getElementById('floatingCartCount');
       const hdC = document.getElementById('headerCartCount');
       const mobBar = document.getElementById('posMobileStickyCart');
       const mobCnt = document.getElementById('mobileStickyCount');
@@ -6675,7 +6749,6 @@ window.app = {
       if(this.cartData.length===0){ 
           cD.innerHTML='<div class="h-full min-h-[200px] flex flex-col items-center justify-center text-slate-400 opacity-75"><div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-3"><i class="fas fa-shopping-basket text-3xl text-slate-300"></i></div><p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">ยังไม่มีสินค้าในตะกร้า Pre Booking</p><p class="text-[11px] text-slate-400 mt-1">เลือกสินค้าและกดปุ่ม "จองด่วน" เพื่อเพิ่มลงตะกร้า</p></div>'; 
           if(cL) cL.innerText='0'; 
-          if(flC) flC.innerText='0';
           if(hdC) hdC.innerText='0';
           if(mobCnt) mobCnt.innerText='0';
           if(mobBar) mobBar.classList.add('hidden');
@@ -6698,10 +6771,15 @@ window.app = {
         let pPrice = i.Price ? (parseFloat(i.Price.toString().replace(/[^\d.\-]/g,'')) || 0).toLocaleString() : '0';
         
         html+='<div class="bg-white border border-slate-200/90 p-3.5 rounded-2xl shadow-sm mb-3 relative group hover:border-amber-400 transition-all">';
-        html+='  <div class="pr-7"><span class="inline-block px-1.5 py-0.5 rounded bg-[#FF6B00] text-white text-[9px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH DEAL</span><h6 class="text-xs md:text-sm font-extrabold text-slate-900 leading-snug mb-1">' + window.app.esc(i['Product Name']) + '</h6></div>';
+        const variantTxt = [i.Color, i.Capacity].map(v => (v === null || v === undefined) ? '' : String(v).trim()).filter(v => v && v !== '-').join(' · ');
+        const unitNum = i.Price ? (parseFloat(i.Price.toString().replace(/[^\d.\-]/g,'')) || 0) : 0;
+        html+='  <div class="pr-7 flex gap-3 items-start">';
+        html+='    <div class="w-14 h-14 shrink-0 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden"><img src="' + window.app.esc(window.app.formatImageUrl(i['Image URL'] || '', 'w200')) + '" loading="lazy" alt="" onerror="this.onerror=null;this.src=window.app.NO_IMG;" class="max-w-full max-h-full object-contain"></div>';
+        html+='    <div class="min-w-0"><span class="inline-block px-1.5 py-0.5 rounded bg-[#FF6B00] text-white text-[9px] font-black uppercase mb-1"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH DEAL</span><h6 class="text-xs md:text-sm font-extrabold text-slate-900 leading-snug mb-0.5">' + window.app.esc(i['Product Name']) + '</h6>' + (variantTxt ? '<div class="text-[11px] text-slate-500 font-semibold">' + window.app.esc(variantTxt) + '</div>' : '') + '</div>';
+        html+='  </div>';
         html+=   gHtml;
         html+='  <div class="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">';
-        html+='    <div class="text-[#E11D48] font-black text-base md:text-lg tabular-nums">฿' + pPrice + '</div>';
+        html+='    <div><div class="text-[#E11D48] font-black text-base md:text-lg tabular-nums">฿' + pPrice + '</div>' + (i.qty > 1 ? '<div class="text-[11px] text-slate-500 font-semibold tabular-nums">รวม ฿' + (unitNum * i.qty).toLocaleString() + ' (' + i.qty + ' ชิ้น)</div>' : '') + '</div>';
         html+='    <div class="flex bg-slate-100 rounded-xl border border-slate-200 items-center overflow-hidden p-0.5">';
         html+='      <button aria-label="ลดจำนวน" class="w-7 h-7 flex items-center justify-center text-slate-600 bg-white rounded-lg shadow-sm hover:bg-rose-50 hover:text-[#E11D48] transition-colors" onclick="window.app.pos.updateQtyInCart(' + idx + ',-1)"><i class="fas fa-minus text-[0.65rem]"></i></button>';
         html+='      <span class="w-9 text-center text-xs font-black text-slate-900 tabular-nums">' + i.qty + '</span>';
@@ -6713,7 +6791,6 @@ window.app = {
       }); 
       cD.innerHTML=html; 
       if(cL) cL.innerText=c;
-      if(flC) flC.innerText=c;
       if(hdC) hdC.innerText=c;
       if(mobCnt) mobCnt.innerText=c;
       if(mobBar) mobBar.classList.remove('hidden');
@@ -7347,9 +7424,9 @@ window.app = {
         resWrap.innerHTML = orders.map(o => {
           const st = (o.status || 'Pending').toString();
           const stLower = st.toLowerCase();
-          const stepIdx = (stLower.includes('complete') || stLower.includes('สำเร็จ') || stLower.includes('รับเครื่องแล้ว')) ? 4
+          const stepIdx = (stLower.includes('complete') || stLower.includes('deliver') || stLower.includes('สำเร็จ') || stLower.includes('รับเครื่องแล้ว')) ? 4
                         : (stLower.includes('ready') || stLower.includes('พร้อมรับ')) ? 3
-                        : (stLower.includes('confirm') || stLower.includes('ยืนยัน') || o.deposit > 0) ? 2 : 1;
+                        : (stLower.includes('confirm') || stLower.includes('paid') || stLower.includes('ยืนยัน') || o.deposit > 0) ? 2 : 1;
           const qrUrl = 'https:\/\/quickchart.io/qr?size=160&margin=1&text=' + encodeURIComponent(o.orderId + '|' + o.branch + '|NET:' + o.netTotal);
           const steps = ['รับคำสั่งจอง', 'ล็อกสิทธิ์/มัดจำ', 'พร้อมรับที่สาขา', 'ส่งมอบสำเร็จ'];
 
@@ -7363,6 +7440,7 @@ window.app = {
                 <span class="px-2.5 py-0.5 rounded-full bg-white/15 text-[#FF6B00] text-[11px] font-extrabold">สถานะ: ${esc(st)}</span>
               </div>
 
+              ${window.app.statusHistoryHtml(o.history, true)}
               <div class="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                 <div class="md:col-span-8 space-y-3">
                   <!-- 4-Step Visual Order Timeline -->

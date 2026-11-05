@@ -129,7 +129,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     try { await waitFor("document.querySelectorAll('#productGrid .pos-card').length>0", 6000); }
     catch (e) { throw new Error('no cards; grid=' + (await ev("document.getElementById('productGrid').innerText.slice(0,200)")) + ' products=' + (await ev('(window.app.globalData.products||[]).length'))); }
   });
-  await shot('pos-desktop');
+  await shot('pos-desktop'); await ev("document.getElementById('posStoreHeader').scrollIntoView({block:'start',behavior:'instant'});window.scrollTo({top:0,behavior:'instant'});true"); await sleep(250); await shot('pos-top-desktop');
 
   console.log('== STOREFRONT LAYOUT / FILTERS / PAGINATION');
   const cnt = () => ev("document.querySelectorAll('#productGrid .pos-card').length");
@@ -335,7 +335,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await T('mobile: sidebar hidden, filter button visible', async () => ok(await ev("(()=>{const s=document.getElementById('storeSidebar');const b=document.querySelector('.sf-filter-btn');return getComputedStyle(s).display==='none'&&getComputedStyle(b).display!=='none'})()")));
   await T('mobile: filter button opens sidebar', async () => { await ev("document.querySelector('.sf-filter-btn').click();true"); await sleep(300); ok(await ev("getComputedStyle(document.getElementById('storeSidebar')).display!=='none'")); await ev("document.querySelector('.sf-filter-btn').click();true"); });
   await T('mobile: 2-column card grid', async () => { const cols = await ev("getComputedStyle(document.querySelector('#productGrid .pos-storefront.grid')).gridTemplateColumns.split(' ').length"); ok(cols === 2, 'cols=' + cols); });
-  await shot('pos-mobile');
+  await shot('pos-mobile'); await ev("document.getElementById('posStoreHeader').scrollIntoView({block:'start',behavior:'instant'});window.scrollTo({top:0,behavior:'instant'});true"); await sleep(250); await shot('pos-top-mobile'); await ev("window.scrollTo({top:1200,behavior:'instant'});true"); await sleep(450); { const m = JSON.parse(await ev("JSON.stringify({top:document.getElementById('posStoreHeader').getBoundingClientRect().top,stuck:document.getElementById('posStoreHeader').classList.contains('is-stuck'),where:getComputedStyle(document.querySelector('.pos-where')).display})")); await T('sticky header (mobile): pinned under the 60px topbar, channel/branch row hidden while stuck', async () => { ok(m.top >= 55 && m.top <= 66, JSON.stringify(m)); ok(m.stuck && m.where === 'none', JSON.stringify(m)); }); await shot('pos-sticky-mobile'); await ev("(()=>{const g=window.app.globalData;g.__bakS1=g.settings;g.settings=Object.assign({},g.settings,{ContactPhone:'02-123-4567',ContactLine:'@teststore',ContactHours:'10:00-20:00'});window.app.renderFooterContact();document.querySelector('footer').scrollIntoView({block:'end',behavior:'instant'});return true})()"); await sleep(300); await shot('footer-mobile'); await ev("(()=>{const g=window.app.globalData;g.settings=g.__bakS1;window.app.renderFooterContact();return true})()"); await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(250); }
   await T('mobile: cart drawer companions fit the screen (no horizontal overflow)', async () => {
     await P("window.app.pos.cartData=[{...window.app.globalData.products.find(p=>p.SKU==='T3-0'),qty:1,brandGifts:[],channelGifts:[]}];window.app.pos.saveAndRender();window.app.pos.toggleCart();true"); await sleep(700);
     const m = JSON.parse(await P("JSON.stringify((()=>{const d=document.getElementById('cartDrawer'),c=document.getElementById('cartCompanions');return {dw:d.scrollWidth,dc:d.clientWidth,rows:c.querySelectorAll('.sf-comp').length,over:[...c.querySelectorAll('.sf-comp')].some(r=>r.scrollWidth>r.clientWidth+1),vis:!c.classList.contains('hidden')}})())"));
@@ -391,6 +391,66 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   curPhase = 'footer';
   await ev("document.documentElement.classList.remove('dark');true");
   await T('footer: year is current year, brand copyright present', async () => { const t = await ev("document.querySelector('footer').textContent"); ok(t.includes(String(new Date().getFullYear())) && t.includes('สงวนลิขสิทธิ์'), t.slice(0, 120)); });
+  await T('status history: renders timeline, escapes HTML, hides staff name on public view', async () => {
+    const r = await ev("(function(){const h=[{time:'2026-11-05 10:00',from:'',to:'Pending',by:'somchai'},{time:'2026-11-05 12:30',from:'Pending',to:'<img src=x onerror=1>',by:'somchai'}];return JSON.stringify({pub:window.app.statusHistoryHtml(h,false),staff:window.app.statusHistoryHtml(h,true),empty:window.app.statusHistoryHtml([],false)});})()");
+    const o = JSON.parse(r); ok(o.pub.includes('Pending') && o.pub.includes('2026-11-05 12:30'), 'timeline missing'); ok(!o.pub.includes('somchai'), 'staff name leaked on public view'); ok(o.staff.includes('somchai'), 'staff view lacks name'); ok(!o.pub.includes('<img') && o.pub.includes('&lt;img'), 'not escaped'); eq(o.empty, '');
+  });
+  await T('storefront header: search+cart on top, channel/branch chips keep their ids, category chips filter', async () => {
+    const r = JSON.parse(await ev("(()=>{const h=document.getElementById('posStoreHeader');const banner=document.getElementById('posTimerBanner');return JSON.stringify({top:!!h&&!!banner&&(h.compareDocumentPosition(banner)&Node.DOCUMENT_POSITION_FOLLOWING)>0,ids:['searchProduct','posChannelSelect','posBranchSelect','headerCartCount'].every(i=>h.querySelector('#'+i)),chips:document.querySelectorAll('.sf-catchips .sf-chip').length,allOn:!!document.querySelector('.sf-catchips .sf-chip.on')})})()"));
+    ok(r.top, 'header must precede flash banner'); ok(r.ids, 'ids moved/missing'); ok(r.chips >= 3 && r.allOn, JSON.stringify(r));
+    await ev("window.app.pos.clearStoreFilters(false);[...document.querySelectorAll('.sf-catchips .sf-chip')].find(b=>b.textContent.trim()==='แท็บเล็ต').click();true"); await sleep(400);
+    ok(await ev("document.querySelector('.sf-catchips .sf-chip.on').textContent.trim()==='แท็บเล็ต' && /แท็บเล็ต/.test(document.querySelector('.sf-h1').textContent)"), 'chip click did not apply category');
+    await ev("window.app.pos.clearStoreFilters(false);true"); await sleep(250);
+  });
+  await T('sticky header: stays pinned at top while the page scrolls (desktop) and compacts', async () => {
+    await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(200);
+    const r0 = JSON.parse(await ev("JSON.stringify({top:document.getElementById('posStoreHeader').getBoundingClientRect().top,stuck:document.getElementById('posStoreHeader').classList.contains('is-stuck')})"));
+    ok(!r0.stuck, 'should not be stuck at page top ' + JSON.stringify(r0));
+    await ev("window.scrollTo({top:900,behavior:'instant'});true"); await sleep(400);
+    const r = JSON.parse(await ev("JSON.stringify({top:document.getElementById('posStoreHeader').getBoundingClientRect().top,stuck:document.getElementById('posStoreHeader').classList.contains('is-stuck'),sy:window.scrollY})"));
+    ok(r.sy > 300, 'page did not scroll: ' + JSON.stringify(r)); ok(Math.abs(r.top) <= 2, 'header not pinned: ' + JSON.stringify(r)); ok(r.stuck, 'is-stuck not applied');
+    await shot('pos-sticky-desktop');
+    await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(300);
+    ok(!(await ev("document.getElementById('posStoreHeader').classList.contains('is-stuck')")), 'is-stuck not cleared at top');
+  });
+  await T('cart item: thumbnail + color/capacity line, line total only when qty > 1', async () => {
+    const r = JSON.parse(await ev("(()=>{const pos=window.app.pos;const bak=pos.cartData;const base=window.app.globalData.products.find(p=>p.SKU==='T3-0');pos.cartData=[{...base,Color:'Blue',Capacity:'256GB',qty:1,brandGifts:[],channelGifts:[]},{...base,Color:'-',Capacity:'',qty:3,brandGifts:[],channelGifts:[]}];pos.renderCart();const rows=[...document.querySelectorAll('#cartItems > div')];const out={n:rows.length,img:rows.map(r=>!!r.querySelector('img')),t0:rows[0].innerText,t1:rows[1].innerText};pos.cartData=bak;pos.renderCart();return JSON.stringify(out)})()"));
+    eq(r.n, 2); ok(r.img.every(Boolean), 'thumbnail missing'); ok(/Blue · 256GB/.test(r.t0), r.t0); ok(!/รวม ฿/.test(r.t0), 'line total shown for qty 1'); ok(/รวม ฿.*3 ชิ้น/.test(r.t1), r.t1);
+  });
+  await T('card click: image and name open the detail modal; heart/compare buttons on the image do not', async () => {
+    await ev("window.app.pos.clearStoreFilters(false);window.app.pos.__bakCart=window.app.pos.cartData;window.app.pos.cartData=[];window.app.hideModal('addToCartModal');true"); await sleep(400);
+    const isOpen = "!document.getElementById('addToCartModal').classList.contains('hidden')";
+    const img = JSON.parse(await ev("(()=>{const w=document.querySelector('#productGrid .pos-card .cursor-pointer');if(!w)return JSON.stringify({none:true});w.querySelector('img').click();return JSON.stringify({ok:true})})()"));
+    ok(img.ok, 'no openable card found'); await sleep(350); ok(await ev(isOpen), 'image click did not open the modal');
+    await ev("window.app.hideModal('addToCartModal');true"); await sleep(300);
+    await ev("(()=>{const n=document.querySelector('#productGrid .pos-card [role=link]');n.click();return true})()"); await sleep(350); ok(await ev(isOpen), 'name click did not open the modal');
+    await ev("window.app.hideModal('addToCartModal');true"); await sleep(300);
+    await ev("(()=>{const b=document.querySelector('#productGrid .pos-card .bnn-compare-btn');b.click();return true})()"); await sleep(300);
+    ok(!(await ev(isOpen)), 'compare button must not open the detail modal');
+    await ev("(()=>{const b=document.querySelector('#productGrid .pos-card .bnn-compare-btn.active');if(b)b.click();window.app.pos.cartData=window.app.pos.__bakCart||[];true})()"); await sleep(200);
+  });
+  await T('fullscreen mode: button hides sidebar + widens content, icon/label sync, preference persisted, toggles back', async () => {
+    const st = "JSON.stringify({hid:document.getElementById('desktopSidebar').classList.contains('lg:hidden'),full:document.getElementById('mainContentWrapper').classList.contains('lg:w-full'),ico:document.querySelector('#posFullscreenBtn i').className,pressed:document.getElementById('posFullscreenBtn').getAttribute('aria-pressed'),pref:localStorage.getItem('f9_sidebar_hidden'),vis:getComputedStyle(document.getElementById('posFullscreenBtn')).display})";
+    const a = JSON.parse(await ev(st)); ok(!a.hid && a.vis !== 'none' && /fa-expand/.test(a.ico), JSON.stringify(a));
+    await ev("document.getElementById('posFullscreenBtn').click();true"); await sleep(300);
+    const b = JSON.parse(await ev(st)); ok(b.hid && b.full && /fa-compress/.test(b.ico) && b.pressed === 'true' && b.pref === '1', JSON.stringify(b));
+    await shot('pos-fullscreen');
+    await ev("window.app.setSidebarHidden(false,false);window.app.setSidebarHidden(true,false);window.app.applySidebarPref();true");
+    await ev("document.getElementById('posFullscreenBtn').click();true"); await sleep(300);
+    const c = JSON.parse(await ev(st)); ok(!c.hid && !c.full && /fa-expand/.test(c.ico) && c.pressed === 'false' && c.pref === '0', JSON.stringify(c));
+  });
+  await T('footer (store style): brand + service links + contact column, year/copyright, contact column hides with no settings', async () => {
+    const r = JSON.parse(await ev("JSON.stringify({cols:document.querySelectorAll('footer .pf-grid > section').length,year:document.getElementById('footerYear').textContent,links:document.querySelectorAll('#footerQuickLinks button').length,trust:document.querySelectorAll('footer .pf-trust li').length})"));
+    eq(r.cols, 3); eq(r.year, String(new Date().getFullYear())); ok(r.links >= 2 && r.trust >= 3, JSON.stringify(r));
+    await ev("(()=>{const g=window.app.globalData;g.__bakS0=g.settings;g.settings=Object.assign({},g.settings,{ContactPhone:'02-123-4567',ContactLine:'@teststore',ContactHours:'10:00-20:00'});window.app.renderFooterContact();document.querySelector('footer').scrollIntoView({block:'end',behavior:'instant'});return true})()"); await sleep(300); await shot('footer-desktop');
+    await ev("(()=>{const g=window.app.globalData;g.settings=g.__bakS0;window.app.renderFooterContact();return true})()");
+    await ev("(()=>{const g=window.app.globalData;g.__bakS=g.settings;g.settings=Object.assign({},g.settings,{ContactPhone:'02-123-4567',ContactLine:'',ContactHours:''});window.app.renderFooterContact();return true})()");
+    ok(!(await ev("document.getElementById('footerContactCol').classList.contains('hidden')")), 'column should show when a contact exists');
+    await ev("(()=>{const g=window.app.globalData;g.settings=Object.assign({},g.settings,{ContactPhone:'',ContactLine:'',ContactHours:''});window.app.renderFooterContact();return true})()");
+    ok(await ev("document.getElementById('footerContactCol').classList.contains('hidden')"), 'column should hide when no contact');
+    await ev("(()=>{const g=window.app.globalData;g.settings=g.__bakS;window.app.renderFooterContact();return true})()");
+    await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(350);
+  });
   await T('footer: quick links (track order, trade-in) exist and call real handlers', async () => { const r = await ev("JSON.stringify([...document.querySelectorAll('#footerQuickLinks button')].map(b=>b.getAttribute('onclick')))"); ok(/openOrderTrackModal/.test(r) && /openTradeInStandalone/.test(r), r); ok(await ev("typeof window.app.pos.openOrderTrackModal==='function' && typeof window.app.pos.openTradeInStandalone==='function'")); });
   await T('back-to-top: hidden at top of page', async () => ok(await ev("window.scrollTo(0,0);document.getElementById('backToTopBtn').classList.contains('hidden')")));
   await T('back-to-top: appears when page offset >600px, hides again at top (offset simulated: POS page only scrolls ~460px on desktop)', async () => {

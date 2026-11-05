@@ -632,9 +632,6 @@
     .glass-nav {
       padding-top: env(safe-area-inset-top);
     }
-    #posCartFab {
-      bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
-    }
   }
 
   /* === Accessibility (5B.4): focus ring เฉพาะตอนนำทางด้วยคีย์บอร์ด — ไม่กวนตอนคลิกเมาส์ === */
@@ -1152,6 +1149,101 @@
   .pos-storefront .sf-body { padding-bottom: 8px; display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
   .pos-storefront .sf-opt { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 12px; color: #475569; text-align: left; font-weight: 500; }
   .pos-storefront .sf-opt:hover { color: #141416; }
+
+  /* ===== Storefront header (ค้นหา/ตะกร้า/ช่องทาง-สาขา) + แถบหมวดแนวนอน — เลย์เอาต์แบบเว็บร้านค้า ===== */
+
+  /* ===== ตรึง (sticky) header ร้านค้า =====
+     sticky ใช้ไม่ได้ถ้ามี ancestor ที่เป็น overflow:hidden (กลายเป็นกรอบเลื่อนของตัวเอง) — เปลี่ยนเป็น clip (ตัดขอบเหมือนเดิมแต่ไม่สร้างกรอบเลื่อน)
+     ครอบเฉพาะตัวห่อเนื้อหาและการ์ดร้านค้า; body ยังมี overflow-x-hidden ตัดล้นแนวนอนของ viewport อยู่แล้ว */
+  #mainContentWrapper { overflow-x: clip; }
+  #page-content .pos-shell-card { overflow: clip; }
+  .pos-store-header { position: sticky; top: 0; z-index: 30; background: #fff; margin: -14px -14px 12px; padding: 12px 14px 10px; border-bottom: 1px solid #e2e8f0; border-radius: 24px 24px 0 0; transition: box-shadow .2s; }
+  @media (min-width: 768px) { .pos-store-header { margin: -20px -20px 12px; padding: 14px 20px 12px; } }
+  @media (max-width: 1023px) { .pos-store-header { top: calc(60px + env(safe-area-inset-top)); } }
+  .pos-store-header.is-stuck { box-shadow: 0 8px 20px -10px rgba(15,23,42,.25); border-radius: 0; }
+  /* ตอนตรึงบนมือถือ: ซ่อนแถวช่องทาง/สาขา เหลือค้นหา+ตะกร้า ไม่ให้ header ตรึงกินจอ */
+  @media (max-width: 1023px) { .pos-store-header.is-stuck .pos-where { display: none; } .pos-store-header.is-stuck { padding-bottom: 8px; } }
+  html.dark .pos-store-header { background: #1e293b; border-bottom-color: #334155; }
+
+  /* ===== โหมดเต็มจอ (ปุ่มซ่อน sidebar บนหน้าร้าน) — แสดงเฉพาะเดสก์ท็อป ===== */
+  .pos-fs-btn { display: none; height: 46px; padding: 0 14px; border-radius: 999px; border: 2px solid #e2e8f0; background: #fff; color: #475569; font-weight: 800; font-size: 13px; align-items: center; gap: 8px; flex-shrink: 0; transition: all .15s; }
+  .pos-fs-btn:hover { border-color: #FF6B00; color: #FF6B00; }
+  .pos-fs-btn[aria-pressed="true"] { background: #141416; border-color: #141416; color: #fff; }
+  @media (min-width: 1024px) { .pos-fs-btn { display: inline-flex; } }
+  html.dark .pos-fs-btn { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+  html.dark .pos-fs-btn[aria-pressed="true"] { background: #FF6B00; border-color: #FF6B00; color: #fff; }
+
+  /* ===== Footer แบบร้านค้า: แบรนด์ + บริการลูกค้า + ติดต่อร้าน ===== */
+  .pos-footer { margin-top: 24px; border-top: 1px solid #e2e8f0; background: #fff; }
+  .pf-grid { display: grid; grid-template-columns: 1fr; gap: 24px; padding: 28px 16px 20px; }
+  @media (min-width: 768px) { .pf-grid { grid-template-columns: 1.6fr 1fr 1.2fr; gap: 32px; padding: 32px 24px 24px; } }
+  @media (min-width: 1024px) { .pf-grid { padding: 36px 32px 24px; } }
+  .pf-brand-row { display: flex; align-items: center; gap: 10px; }
+  .pf-logo { width: 32px; height: 32px; border-radius: 10px; background: #8a6428; display: flex; align-items: center; justify-content: center; overflow: hidden; color: #fff; font-size: 13px; }
+  .pf-name { font-size: 15px; font-weight: 900; color: #141416; }
+  .pf-tagline { margin-top: 10px; font-size: 12.5px; line-height: 1.6; color: #64748b; max-width: 360px; }
+  .pf-trust { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding: 0; list-style: none; }
+  .pf-trust li { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: #f8fafc; border: 1px solid #e2e8f0; font-size: 11px; font-weight: 700; color: #475569; }
+  .pf-trust i { color: #FF6B00; font-size: 11px; }
+  .pf-h { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: #141416; margin-bottom: 12px; }
+  .pf-links { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .pf-links button { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #64748b; transition: color .15s; text-align: left; }
+  .pf-links button:hover { color: #FF6B00; }
+  .pf-links button i { width: 16px; text-align: center; color: #94a3b8; }
+  .pf-contact { display: flex; flex-direction: column; gap: 10px; font-size: 13px; font-weight: 600; color: #475569; }
+  .pf-contact.hidden { display: none; }
+  .pf-contact a, .pf-contact span { display: inline-flex; align-items: center; }
+  .pf-bottom { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 6px; padding: 14px 16px; border-top: 1px solid #f1f5f9; font-size: 12px; font-weight: 500; color: #94a3b8; }
+  .pf-bottom p { margin: 0; }
+  @media (min-width: 768px) { .pf-bottom { flex-direction: row; padding: 14px 24px; } }
+  @media (min-width: 1024px) { .pf-bottom { padding: 14px 32px; } }
+  .pf-secure { display: inline-flex; align-items: center; gap: 6px; }
+  .pf-dot { width: 6px; height: 6px; border-radius: 999px; background: #34d399; display: inline-block; margin-left: 6px; }
+  html.dark .pos-footer { background: #1e293b; border-top-color: #334155; }
+  html.dark .pf-name, html.dark .pf-h { color: #f1f5f9; }
+  html.dark .pf-tagline, html.dark .pf-links button, html.dark .pf-contact { color: #94a3b8; }
+  html.dark .pf-trust li { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+  html.dark .pf-bottom { border-top-color: #334155; }
+  .pos-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pos-store-header { margin-bottom: 12px; }
+  .pos-store-row { display: flex; align-items: center; gap: 10px; }
+  .pos-search-wrap { position: relative; flex: 1; min-width: 0; }
+  .pos-search { width: 100%; height: 46px; padding: 0 40px 0 44px; border-radius: 999px; border: 2px solid #e2e8f0; background: #fff; font-size: 14px; font-weight: 600; color: #141416; outline: none; transition: border-color .15s, box-shadow .15s; }
+  .pos-search:focus { border-color: #FF6B00; box-shadow: 0 0 0 4px rgba(255,107,0,.15); }
+  .pos-search-ico { position: absolute; left: 17px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 14px; pointer-events: none; }
+  .pos-search-clear { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 14px; }
+  .pos-search-clear:hover { color: #e11d48; }
+  .pos-cart-btn { height: 46px; padding: 0 16px; border-radius: 999px; background: #141416; color: #FF6B00; font-weight: 900; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; border: 2px solid rgba(255,107,0,.45); transition: background .15s; }
+  .pos-cart-btn:hover { background: #000; }
+  .pos-cart-lbl { color: #fff; }
+  .pos-cart-count { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: #e11d48; color: #fff; font-size: 11px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
+  .pos-where { display: flex; gap: 8px; margin-top: 8px; }
+  .pos-where-chip { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 999px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b; font-size: 12px; }
+  .pos-where-chip select { flex: 1; min-width: 0; width: 100%; background: transparent; border: 0; outline: 0; font-size: 12px; font-weight: 800; color: #1e293b; text-overflow: ellipsis; cursor: pointer; }
+  .pos-where-chip:focus-within { border-color: #FF6B00; box-shadow: 0 0 0 3px rgba(255,107,0,.15); }
+  .sf-catchips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 10px; margin-bottom: 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .sf-catchips::-webkit-scrollbar { display: none; }
+  .sf-chip { flex-shrink: 0; padding: 7px 16px; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; color: #475569; font-size: 12.5px; font-weight: 700; white-space: nowrap; transition: all .15s; }
+  .sf-chip:hover { border-color: #FF6B00; color: #FF6B00; }
+  .sf-chip.on { background: #141416; border-color: #141416; color: #fff; }
+  @media (max-width: 639px) {
+    .pos-cart-lbl { display: none; }
+    .pos-cart-btn { padding: 0 14px; }
+    /* แถบแฟลชเซลล์: ย่อให้เป็นแถบบางๆ ปุ่มลัดเลื่อนแนวนอน แทนที่จะกินพื้นที่เกือบครึ่งจอ */
+    #posTimerBanner { padding: 8px 12px; gap: 10px; flex-direction: row; align-items: center; overflow-x: auto; scrollbar-width: none; }
+    #posTimerBanner::-webkit-scrollbar { display: none; }
+    #posTimerBanner > div:first-child { flex-shrink: 0; }
+    #posTimerBanner > div:first-child > div.flex-col { display: none; }
+    #posTimerBanner > div:last-child { flex-wrap: nowrap; flex-shrink: 0; width: auto; border-top: 0; padding-top: 0; justify-content: flex-start; }
+    #posVoucherStripWrap *, #posRecentlyViewed * { scrollbar-width: none; }
+    #posVoucherStripWrap *::-webkit-scrollbar, #posRecentlyViewed *::-webkit-scrollbar { display: none; }
+  }
+  html.dark .pos-search { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+  html.dark .pos-where-chip { background: #1e293b; border-color: #334155; color: #94a3b8; }
+  html.dark .pos-where-chip select { color: #f1f5f9; }
+  html.dark .pos-where-chip select option { background: #0f172a; color: #f1f5f9; }
+  html.dark .sf-chip { background: #1e293b; border-color: #334155; color: #cbd5e1; }
+  html.dark .sf-chip.on { background: #FF6B00; border-color: #FF6B00; color: #fff; }
   .pos-storefront .sf-opt.on { color: #141416; font-weight: 800; }
   .pos-storefront .sf-box { width: 16px; height: 16px; border: 1.5px solid #cbd5e1; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 9px; color: #fff; background: #fff; }
   .pos-storefront .sf-opt.on .sf-box { background: #FF6B00; border-color: #FF6B00; }

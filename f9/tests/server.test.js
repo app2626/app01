@@ -135,6 +135,14 @@ t('PUBLIC_TRACK_ORDER masks PII on success', () => { const r = api('PUBLIC_TRACK
 t('GET_CUSTOMER_BY_PHONE', () => { const r = api('GET_CUSTOMER_BY_PHONE', { phone: '0812345678' }, sales); ok(r && r.status !== 'error', JSON.stringify(r).slice(0, 200)); });
 t('UPDATE_FULL_ORDER (admin) sets status', () => { const r = api('UPDATE_FULL_ORDER', { data: { _rowIndex: 2, 'Order Status': 'Confirmed' } }, admin); ok(r && r.status !== 'error', JSON.stringify(r).slice(0, 200)); });
 t('UPDATE_FULL_ORDER by Sales blocked', () => eq(api('UPDATE_FULL_ORDER', { data: { _rowIndex: 2, 'Order Status': 'Confirmed' } }, sales).status, 'error'));
+console.log('== ORDER STATUS HISTORY');
+t('status log: checkout wrote initial Pending row', () => { const h = ctx.getOrderStatusHistory_(ss, oid, true); ok(h.length >= 1 && h[0].to === 'Pending' && h[0].from === '', JSON.stringify(h)); });
+t('status log: UPDATE_FULL_ORDER status change appends from->to + by', () => { const n = ctx.getOrderStatusHistory_(ss, oid, true).length; const row = sheets.Orders.rows.findIndex((r, i) => i > 0 && r[0] === oid) + 1; const cur = sheets.Orders.rows[row - 1][ctx.ORDERS_HEADERS_.indexOf('Order Status')]; const to = cur === 'Paid' ? 'Delivered' : 'Paid'; const r = api('UPDATE_FULL_ORDER', { data: { _rowIndex: row, 'Order Status': to } }, admin); ok(r.status !== 'error', JSON.stringify(r).slice(0, 200)); const h = ctx.getOrderStatusHistory_(ss, oid, true); eq(h.length, n + 1); eq(h[h.length - 1].to, to); eq(h[h.length - 1].from, cur); eq(h[h.length - 1].by, 'admin'); });
+t('status log: saving without status change adds no row', () => { const n = ctx.getOrderStatusHistory_(ss, oid, true).length; const row = sheets.Orders.rows.findIndex((r, i) => i > 0 && r[0] === oid) + 1; const cur = sheets.Orders.rows[row - 1][ctx.ORDERS_HEADERS_.indexOf('Order Status')]; api('UPDATE_FULL_ORDER', { data: { _rowIndex: row, 'Order Status': cur } }, admin); eq(ctx.getOrderStatusHistory_(ss, oid, true).length, n); });
+t('status log: public tracking returns history without staff names', () => { const r = api('PUBLIC_TRACK_ORDER', { orderId: oid, phone: '0812345678' }, null); ok(r.order.history.length >= 2, JSON.stringify(r.order.history)); ok(!JSON.stringify(r.order.history).includes('admin') && r.order.history.every(h => h.by === undefined), 'staff name leaked'); });
+t('status log: staff TRACK_ORDER includes who changed it', () => { const r = api('TRACK_ORDER', { query: oid }, admin); ok(r.orders[0].history.some(h => h.by === 'admin'), JSON.stringify(r.orders[0].history)); });
+t('status log: OrderStatusLog table readable by Admin only', () => { eq(api('GET_TABLE', { tableName: 'OrderStatusLog' }, sales).status, 'error'); });
+
 console.log('== SETTINGS / COUPON / INVOICE / CACHE');
 console.log('== SETTINGS HARDENING (A: secrets never leave Admin, B: server-side validation)');
 const ksv = () => ctx.getKeyValueSettings(ctx.SpreadsheetApp.getActiveSpreadsheet());

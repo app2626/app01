@@ -494,7 +494,7 @@ function apiHandlerInner_(action, payload, userToken) {
       case 'GET_ADVANCED_DASHBOARD': return getAdvancedDashboard(secureUser, ss, payload);
       case 'GET_TABLE':
         // ตารางอ่อนไหว (ข้อมูลสมาชิก/ตั้งค่า/ประวัติระบบ) อ่านได้เฉพาะ Admin — บังคับสิทธิ์ฝั่ง server เสมอ
-        if (['Members', 'Settings', 'AuditLog'].includes(payload.tableName) && secureUser.Role !== 'Admin') {
+        if (['Members', 'Settings', 'AuditLog', 'OrderStatusLog'].includes(payload.tableName) && secureUser.Role !== 'Admin') {
           throw new Error("Permission Denied: Admin only");
         }
         // Target: หน้า Target/Analytics เปิดให้เฉพาะ Admin/Manager ใน menuConfig — ต้องบังคับฝั่ง server ด้วย ไม่งั้น Sales เรียก action นี้ตรงๆ ผ่าน console ได้
@@ -1488,6 +1488,7 @@ function processCheckout(payload, secureUser, ss) {
     }
     
     logAudit(secureUser.Username, "CHECKOUT", "Created Order: " + orderId);
+    if (orderRows.length > 0) logOrderStatus_(ss, orderId, '', 'Pending', secureUser.Username);
     try { bumpCouponUsage_(ss, couponCodesUsed || []); } catch (cuErr) {}
     try {
       sendCheckoutWebhookNotification_(ss, orderId, actualChannel, actualBranch, payload, orderRows, prodData, skuIdx, nameIdx, stockIdx);
@@ -1638,6 +1639,7 @@ function trackOrderLookup(payload, secureUser, ss) {
     }
   }
 
+  Object.keys(orderMap).forEach(k => { orderMap[k].history = getOrderStatusHistory_(ss, k, true); });
   return { status: 'success', orders: Object.values(orderMap).reverse() };
 }
 
@@ -1748,6 +1750,7 @@ function publicTrackOrderLookup(payload, ss) {
 
   // คำนวณยอดคงเหลือชำระหน้าร้าน
   orderData.balanceDue = Math.max(0, orderData.netTotal - orderData.deposit);
+  orderData.history = getOrderStatusHistory_(ss, orderData.orderId, false);
 
   return { status: 'success', order: orderData };
 }
@@ -2042,6 +2045,8 @@ function updateFullOrder(dataObj, secureUser, ss) {
     });
     
     logAudit(secureUser.Username, "EDIT_ORDER", "Edited Order Bill: " + orderId + " (Status: " + newStatus + ")");
+    const prevOrderStatus = matchingRows.length ? (matchingRows[0].rowData[oHeaders.indexOf("Order Status")] || 'Pending').toString().trim() : '';
+    if (prevOrderStatus !== (newStatus || '').toString().trim()) logOrderStatus_(ss, orderId, prevOrderStatus, newStatus.toString().trim(), secureUser.Username);
     return { status: 'success' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
@@ -2763,6 +2768,45 @@ function uploadImage(payload, secureUser, ss) {
 // ลำดับคอลัมน์ Orders ตามชีวิตจริง (setupDatabase ใช้สร้างชีตใหม่ + processCheckout ใช้ตรวจว่าชีตเดิมไม่ถูกสลับคอลัมน์)
 // orderRows.push() ทั้ง 3 จุดใน processCheckout เป็น array ตำแหน่งตรงตัว (ไม่ได้ map ด้วยชื่อ header) — ถ้าคอลัมน์ในชีตจริงสลับตำแหน่งไปจากนี้
 // (เช่น มีคนแทรก/ย้ายคอลัมน์ใน Sheets UI ตรงๆ) ข้อมูลจะเขียนผิดคอลัมน์แบบเงียบๆ จึงต้องเช็คก่อนเขียนทุกครั้ง ดู rule ที่เกี่ยวข้องใน CLAUDE.md
+// ประวัติการเปลี่ยนสถานะออเดอร์ (ชีตแยก — ไม่แตะ Orders ที่เขียนแบบ positional) สร้างเองอัตโนมัติเมื่อมีการเขียนครั้งแรก
+var ORDER_STATUS_LOG_HEADERS_ = ["OrderID", "Timestamp", "From", "To", "By"];
+
+function ensureOrderStatusLog_(ss) {
+  let sheet = ss.getSheetByName("OrderStatusLog");
+  if (!sheet) {
+    sheet = ss.insertSheet("OrderStatusLog");
+    sheet.appendRow(ORDER_STATUS_LOG_HEADERS_);
+    try { sheet.setFrozenRows(1); } catch (e) {}
+  }
+  return sheet;
+}
+
+// เขียนประวัติ 1 บรรทัด — ห้ามให้ความล้มเหลวของ log ไปทำให้การจอง/แก้ไขออเดอร์ล้ม (ครอบ try/catch ไว้เสมอ)
+function logOrderStatus_(ss, orderId, fromStatus, toStatus, by) {
+  try {
+    const sheet = ensureOrderStatusLog_(ss);
+    const ts = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd HH:mm");
+    sheet.appendRow([sanitizeSheetText_(String(orderId)), "'" + ts, sanitizeSheetText_(String(fromStatus || '')), sanitizeSheetText_(String(toStatus || '')), sanitizeSheetText_(String(by || ''))]);
+  } catch (e) {}
+}
+
+// คืนประวัติสถานะของออเดอร์ เรียงเก่า→ใหม่ — includeBy=false สำหรับหน้า public (ไม่เปิดเผยชื่อพนักงาน)
+function getOrderStatusHistory_(ss, orderId, includeBy) {
+  try {
+    const sheet = ss.getSheetByName("OrderStatusLog");
+    if (!sheet) return [];
+    const data = sheet.getDataRange().getDisplayValues();
+    const out = [];
+    for (let i = 1; i < data.length; i++) {
+      if ((data[i][0] || '').toString().trim() !== orderId) continue;
+      const item = { time: (data[i][1] || '').toString().replace(/^'/, ''), from: data[i][2] || '', to: data[i][3] || '' };
+      if (includeBy) item.by = data[i][4] || '';
+      out.push(item);
+    }
+    return out;
+  } catch (e) { return []; }
+}
+
 var ORDERS_HEADERS_ = [
   "OrderID", "Timestamp", "Channel", "Branch Code", "Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser",
   "SKU", "Product Name", "Qty", "Unit Price", "Promo", "Reservation Status", "Staff", "Booking Phone",
