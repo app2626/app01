@@ -1,0 +1,465 @@
+<script>
+  // หน้าจัดการเนื้อหา (แบนเนอร์ / ข่าวสาร / หมวดหมู่ข่าว) หน้าตาแบบ Otis CMS (otis.tg.co.th/superapp/banner):
+  // ปุ่มเพิ่ม/ลบที่เลือก → กล่องค้นหา (ตัวกรองหลายช่อง) → ตารางมีช่องติ๊ก, เลือกจำนวนแถว, ค้นหาด่วน, เรียงคอลัมน์, แบ่งหน้า, ป้ายสถานะ
+  // ข้อมูลทุกชนิดผ่านตัวกรอง/เรียง/แบ่งหน้าฝั่ง client (admin เท่านั้น ปริมาณหลักสิบถึงร้อย) — สิทธิ์และการตรวจค่าจริงอยู่ที่ server เสมอ
+  // ทุกค่าที่มาจากชีตผ่าน window.app.esc ก่อนลง innerHTML; ปุ่มในตารางใช้ data-act + event delegation (ไม่ฝัง id ลงใน onclick)
+  window.app.cms = {
+    S: {},
+    kind: null,
+    PAGE_SIZES: [10, 25, 50, 100],
+    TYPE_LABEL: { herobanner: 'แบนเนอร์หลัก (Hero)', promogrid: 'แบนเนอร์โปรโมชัน (Grid)', popupbanner: 'ป๊อปอัป (Popup)' },
+    STATE_LABEL: { live: 'แสดงอยู่', upcoming: 'รอแสดง', expired: 'หมดอายุ', inactive: 'ปิดใช้งาน' },
+    STATE_CLS: { live: 'cms-b-green', upcoming: 'cms-b-amber', expired: 'cms-b-gray', inactive: 'cms-b-red' },
+
+    esc: function(v) { return window.app.esc(v === null || v === undefined ? '' : String(v)); },
+    fmtDay: function(s) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || '');
+      if (!m) return '';
+      const mon = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][Number(m[2]) - 1];
+      return Number(m[3]) + ' ' + mon + ' ' + (Number(m[1]) + 543);
+    },
+    fmtDayTime: function(s) {
+      const d = this.fmtDay(s);
+      const t = /[ T](\d{2}:\d{2})/.exec(s || '');
+      return d ? d + (t ? ' ' + t[1] + ' น.' : '') : '';
+    },
+    badge: function(state) { return '<span class="cms-badge ' + (this.STATE_CLS[state] || 'cms-b-gray') + '">' + this.esc(this.STATE_LABEL[state] || state) + '</span>'; },
+    shortId: function(id) { const s = String(id || ''); return s.length > 14 ? s.slice(-8) : s; },
+    clip: function(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; },
+    thumb: function(url) {
+      if (!url) return '<span class="cms-muted">-</span>';
+      return '<img class="cms-thumb" loading="lazy" src="' + this.esc(window.app.formatImageUrl(url, 'w200')) + '" onerror="this.onerror=null;this.src=window.app.NO_IMG" alt="">';
+    },
+    link: function(text, id) { return '<a href="#" class="cms-link" data-act="edit" data-id="' + this.esc(id) + '">' + this.esc(text || '(ไม่มีหัวข้อ)') + '</a>'; },
+
+    // ---------- รายการประเภทเนื้อหา ----------
+    cfg: function(kind) {
+      const self = this;
+      const K = {
+        banners: {
+          title: 'จัดการแบนเนอร์', crumb: 'แบนเนอร์', canAdd: true, searchable: ['title', 'details', 'targetLink', 'typeLabel'],
+          load: async function(st) {
+            const res = await window.app.api('GET_SETTINGS_LIST', {});
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'โหลดแบนเนอร์ไม่สำเร็จ');
+            const rows = [];
+            [['herobanner', res.data.heroBanners], ['promogrid', res.data.promoGrids], ['popupbanner', res.data.popupBanners]].forEach(function(p) {
+              (p[1] || []).forEach(function(b, i) {
+                rows.push({ key: b.id || (p[0] + ':' + b.rowIndex), id: b.id || '', type: p[0], typeLabel: self.TYPE_LABEL[p[0]], order: i + 1, rowIndex: b.rowIndex, url: b.url, title: b.title || '', details: b.details || '', targetLink: b.targetLink || '', buttonText: b.buttonText || '', startDate: b.startDate || '', endDate: b.endDate || '', state: b.schedule || 'live' });
+              });
+            });
+            st.rows = rows;
+          },
+          filters: [
+            { key: 'q', label: 'หัวข้อ / รายละเอียด', type: 'text', test: function(r, v) { return (r.title + ' ' + r.details).toLowerCase().indexOf(v.toLowerCase()) !== -1; } },
+            { key: 'type', label: 'ประเภท', type: 'select', options: function() { return [['herobanner', self.TYPE_LABEL.herobanner], ['promogrid', self.TYPE_LABEL.promogrid], ['popupbanner', self.TYPE_LABEL.popupbanner]]; }, test: function(r, v) { return r.type === v; } },
+            { key: 'state', label: 'สถานะ', type: 'select', options: function() { return [['live', 'แสดงอยู่'], ['upcoming', 'รอแสดง'], ['expired', 'หมดอายุ']]; }, test: function(r, v) { return r.state === v; } },
+            { key: 'from', label: 'วันที่เริ่มต้น (ตั้งแต่)', type: 'date', test: function(r, v) { return !!r.startDate && r.startDate >= v; } },
+            { key: 'to', label: 'วันที่สิ้นสุด (ถึง)', type: 'date', test: function(r, v) { return !!r.endDate && r.endDate <= v; } }
+          ],
+          columns: [
+            { label: 'ID', sort: function(r) { return r.id; }, cell: function(r) { return self.esc(self.shortId(r.id) || '-'); } },
+            { label: 'ประเภท', sort: function(r) { return r.type; }, cell: function(r) { return self.esc(r.typeLabel); } },
+            { label: 'รูป', cell: function(r) { return self.thumb(r.url); } },
+            { label: 'หัวข้อ', sort: function(r) { return r.title; }, cell: function(r) { return self.link(r.title || r.details || r.typeLabel, r.key); } },
+            { label: 'รายละเอียด', cell: function(r) { return self.esc(self.clip(r.details, 40)); } },
+            { label: 'ลิงก์ปลายทาง', cell: function(r) { return self.esc(self.clip(r.targetLink, 30)); } },
+            { label: 'วันที่เริ่ม', sort: function(r) { return r.startDate; }, cell: function(r) { return self.esc(self.fmtDay(r.startDate)); } },
+            { label: 'วันที่สิ้นสุด', sort: function(r) { return r.endDate; }, cell: function(r) { return self.esc(self.fmtDay(r.endDate)); } },
+            { label: 'สถานะ', sort: function(r) { return r.state; }, cell: function(r) { return self.badge(r.state); } }
+          ],
+          remove: async function(rows) {
+            const sorted = rows.slice().sort(function(a, b) { return b.rowIndex - a.rowIndex; }); // ลบแถวล่างก่อน เลขแถวบนไม่เลื่อน
+            let done = 0;
+            for (let i = 0; i < sorted.length; i++) {
+              const r = sorted[i];
+              const res = await window.app.api('DELETE_SETTINGS_ITEM', { type: r.type, rowIndex: r.rowIndex, bannerId: r.id });
+              if (!res || res.status !== 'success') throw new Error((res && res.message ? res.message : 'ลบไม่สำเร็จ') + (done ? ' (ลบไปแล้ว ' + done + ' รายการ)' : ''));
+              done++;
+            }
+            await window.app.refreshGlobalData();
+            return done;
+          },
+          editForm: function(r, st) {
+            const types = r ? '<input class="cms-in" disabled value="' + self.esc(r.typeLabel) + '">'
+              : '<select id="cmsType" class="cms-in">' + Object.keys(self.TYPE_LABEL).map(function(k) { return '<option value="' + k + '">' + self.esc(self.TYPE_LABEL[k]) + '</option>'; }).join('') + '</select>';
+            return self.field('ประเภท', types)
+              + self.imageField(r ? r.url : '')
+              + self.field('หัวข้อ (ใช้กับแบนเนอร์หลักและป๊อปอัป)', '<input id="cmsTitle" class="cms-in" maxlength="120" value="' + self.esc(r ? r.title : '') + '">')
+              + self.field('คำอธิบาย', '<input id="cmsDetails" class="cms-in" maxlength="500" value="' + self.esc(r ? r.details : '') + '">')
+              + self.field('ลิงก์ปลายทาง (http(s) หรือ #หน้า เช่น #pos)', '<input id="cmsLink" class="cms-in" maxlength="1000" value="' + self.esc(r ? r.targetLink : '') + '">')
+              + self.field('ข้อความปุ่ม (ป๊อปอัป)', '<input id="cmsBtn" class="cms-in" maxlength="60" value="' + self.esc(r ? r.buttonText : '') + '">')
+              + '<div class="cms-two">' + self.field('เริ่มแสดงวันที่', '<input type="date" id="cmsStart" class="cms-in" value="' + self.esc(r ? r.startDate : '') + '">') + self.field('แสดงถึงวันที่ (รวมวันนั้น)', '<input type="date" id="cmsEnd" class="cms-in" value="' + self.esc(r ? r.endDate : '') + '">') + '</div>'
+              + '<p class="cms-hint">เว้นวันที่ว่าง = แสดงตลอด · เวลาไทย</p>';
+          },
+          readForm: function(r) {
+            const g = function(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+            const url = g('cmsUrl');
+            if (!url && !window.app.pendingImageUploads.cmsImg) { Swal.showValidationMessage('กรุณาเลือกรูปหรือกรอกลิงก์รูปภาพ'); return false; }
+            const s = g('cmsStart'), e = g('cmsEnd');
+            if (s && e && s > e) { Swal.showValidationMessage('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มแสดง'); return false; }
+            return { type: r ? r.type : g('cmsType'), url: url, title: g('cmsTitle'), details: g('cmsDetails'), targetLink: g('cmsLink'), buttonText: g('cmsBtn'), startDate: s, endDate: e };
+          },
+          save: async function(v, r) {
+            if (window.app.pendingImageUploads.cmsImg) v.url = await window.app.flushImageUpload('cmsImg');
+            const p = { type: v.type, url: v.url, title: v.title, details: v.details, targetLink: v.targetLink, buttonText: v.buttonText, startDate: v.startDate, endDate: v.endDate };
+            if (r) { p.rowIndex = r.rowIndex; p.bannerId = r.id; }
+            const res = await window.app.api('SAVE_SETTINGS_ITEM', p);
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'บันทึกไม่สำเร็จ');
+            await window.app.refreshGlobalData();
+          }
+        },
+
+        news: {
+          title: 'จัดการข่าวสาร', crumb: 'ข่าวสาร', canAdd: true, searchable: ['title', 'detail', 'category', 'createdBy'],
+          extraButtons: '<button type="button" class="cms-btn cms-btn-line" data-act="goto" data-to="newscats"><i class="fas fa-tags"></i> จัดการหมวดหมู่</button>',
+          load: async function(st) {
+            const res = await window.app.api('NEWS_LIST', {});
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'โหลดข่าวสารไม่สำเร็จ');
+            st.cats = res.data.categories || [];
+            st.rows = (res.data.news || []).map(function(n) { return Object.assign({ key: n.id, state: n.status === 'Inactive' ? 'inactive' : n.schedule }, n); });
+          },
+          filters: [
+            { key: 'q', label: 'หัวข้อ', type: 'text', test: function(r, v) { return r.title.toLowerCase().indexOf(v.toLowerCase()) !== -1; } },
+            { key: 'cat', label: 'หมวดหมู่', type: 'select', options: function(st) { return (st.cats || []).map(function(c) { return [c.name, c.name]; }); }, test: function(r, v) { return r.category === v; } },
+            { key: 'state', label: 'สถานะ', type: 'select', options: function() { return [['live', 'แสดงอยู่'], ['upcoming', 'รอแสดง'], ['expired', 'หมดอายุ'], ['inactive', 'ปิดใช้งาน']]; }, test: function(r, v) { return r.state === v; } },
+            { key: 'from', label: 'วันที่เริ่มต้น (ตั้งแต่)', type: 'date', test: function(r, v) { return !!r.startDate && r.startDate >= v; } },
+            { key: 'to', label: 'วันที่สิ้นสุด (ถึง)', type: 'date', test: function(r, v) { return !!r.endDate && r.endDate <= v; } },
+            { key: 'by', label: 'สร้างโดย', type: 'text', test: function(r, v) { return r.createdBy.toLowerCase().indexOf(v.toLowerCase()) !== -1; } }
+          ],
+          columns: [
+            { label: 'ID', sort: function(r) { return r.id; }, cell: function(r) { return self.esc(self.shortId(r.id)); } },
+            { label: 'Seq', sort: function(r) { return r.seq; }, cell: function(r) { return '<input type="number" min="0" max="9999" class="cms-seq" data-act="seq" data-id="' + self.esc(r.id) + '" value="' + self.esc(r.seq) + '">'; } },
+            { label: 'หมวดหมู่', sort: function(r) { return r.category; }, cell: function(r) { return self.esc(r.category); } },
+            { label: 'หัวข้อ', sort: function(r) { return r.title; }, cell: function(r) { return self.link(self.clip(r.title, 60), r.id); } },
+            { label: 'รายละเอียด', cell: function(r) { return self.esc(self.clip(r.detail, 40)); } },
+            { label: 'วันที่เริ่ม', sort: function(r) { return r.startDate; }, cell: function(r) { return self.esc(self.fmtDay(r.startDate)); } },
+            { label: 'วันที่สิ้นสุด', sort: function(r) { return r.endDate; }, cell: function(r) { return self.esc(self.fmtDay(r.endDate)); } },
+            { label: 'วันที่แก้ไข', sort: function(r) { return r.updatedAt; }, cell: function(r) { return self.esc(self.fmtDay(r.updatedAt)); } },
+            { label: 'แก้ไขโดย', cell: function(r) { return self.esc(r.updatedBy); } },
+            { label: 'วันที่สร้าง', sort: function(r) { return r.createdAt; }, cell: function(r) { return self.esc(self.fmtDay(r.createdAt)); } },
+            { label: 'สร้างโดย', sort: function(r) { return r.createdBy; }, cell: function(r) { return self.esc(r.createdBy); } },
+            { label: 'สถานะ', sort: function(r) { return r.state; }, cell: function(r) { return self.badge(r.state); } }
+          ],
+          remove: async function(rows) {
+            const res = await window.app.api('NEWS_DELETE', { ids: rows.map(function(r) { return r.id; }) });
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'ลบไม่สำเร็จ');
+            await window.app.refreshGlobalData();
+            return res.deleted;
+          },
+          canEdit: function(st) {
+            if ((st.cats || []).some(function(c) { return c.status !== 'Inactive'; })) return true;
+            Swal.fire({ icon: 'info', title: 'ยังไม่มีหมวดหมู่', text: 'ต้องสร้างหมวดหมู่ข่าวก่อนจึงจะเพิ่มข่าวได้', confirmButtonText: 'ไปหน้าจัดการหมวดหมู่', showCancelButton: true, cancelButtonText: 'ปิด' })
+              .then(function(r) { if (r.isConfirmed) window.location.hash = '#newscats'; });
+            return false;
+          },
+          editForm: function(r, st) {
+            const cats = (st.cats || []).filter(function(c) { return c.status !== 'Inactive' || (r && r.category === c.name); });
+            const sel = '<select id="cmsCat" class="cms-in">' + cats.map(function(c) { return '<option value="' + self.esc(c.name) + '"' + (r && r.category === c.name ? ' selected' : '') + '>' + self.esc(c.name) + '</option>'; }).join('') + '</select>';
+            return self.field('หมวดหมู่', sel)
+              + self.field('หัวข้อ *', '<input id="cmsTitle" class="cms-in" maxlength="150" value="' + self.esc(r ? r.title : '') + '">')
+              + self.field('รายละเอียด', '<textarea id="cmsDetail" class="cms-in" rows="5" maxlength="5000">' + self.esc(r ? r.detail : '') + '</textarea>')
+              + self.imageField(r ? r.imageUrl : '')
+              + self.field('ลิงก์ (http(s) หรือ #หน้า)', '<input id="cmsLink" class="cms-in" maxlength="1000" value="' + self.esc(r ? r.link : '') + '">')
+              + '<div class="cms-two">' + self.field('ลำดับ (Seq)', '<input type="number" min="0" max="9999" id="cmsSeq" class="cms-in" value="' + self.esc(r ? r.seq : 0) + '">')
+              + self.field('สถานะ', '<select id="cmsStatus" class="cms-in"><option value="Active"' + (!r || r.status === 'Active' ? ' selected' : '') + '>ใช้งาน</option><option value="Inactive"' + (r && r.status === 'Inactive' ? ' selected' : '') + '>ปิดใช้งาน</option></select>') + '</div>'
+              + '<div class="cms-two">' + self.field('วันที่เริ่ม', '<input type="date" id="cmsStart" class="cms-in" value="' + self.esc(r ? r.startDate : '') + '">') + self.field('วันที่สิ้นสุด (รวมวันนั้น)', '<input type="date" id="cmsEnd" class="cms-in" value="' + self.esc(r ? r.endDate : '') + '">') + '</div>'
+              + '<p class="cms-hint">ข่าวแสดงหน้าร้านเมื่อสถานะ "ใช้งาน" และอยู่ในช่วงวันที่ · Seq น้อยขึ้นก่อน · เว้นวันที่ว่าง = ไม่จำกัด</p>';
+          },
+          readForm: function(r) {
+            const g = function(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+            if (!g('cmsTitle')) { Swal.showValidationMessage('กรุณากรอกหัวข้อ'); return false; }
+            const s = g('cmsStart'), e = g('cmsEnd');
+            if (s && e && s > e) { Swal.showValidationMessage('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม'); return false; }
+            return { id: r ? r.id : '', category: g('cmsCat'), title: g('cmsTitle'), detail: document.getElementById('cmsDetail').value.trim(), imageUrl: g('cmsUrl'), link: g('cmsLink'), seq: g('cmsSeq') === '' ? 0 : Number(g('cmsSeq')), status: g('cmsStatus'), startDate: s, endDate: e };
+          },
+          save: async function(v, r) {
+            if (window.app.pendingImageUploads.cmsImg) v.imageUrl = await window.app.flushImageUpload('cmsImg');
+            const res = await window.app.api('NEWS_SAVE', v);
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'บันทึกไม่สำเร็จ');
+            await window.app.refreshGlobalData();
+          }
+        },
+
+        newscats: {
+          title: 'จัดการหมวดหมู่ข่าว', crumb: 'ข่าวสาร', canAdd: true, searchable: ['name'],
+          extraButtons: '<button type="button" class="cms-btn cms-btn-line" data-act="goto" data-to="news"><i class="fas fa-arrow-left"></i> กลับหน้าข่าวสาร</button>',
+          load: async function(st) {
+            const res = await window.app.api('NEWS_LIST', {});
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'โหลดหมวดหมู่ไม่สำเร็จ');
+            st.rows = (res.data.categories || []).map(function(c) { return Object.assign({ key: c.id, state: c.status === 'Inactive' ? 'inactive' : 'live' }, c); });
+          },
+          filters: [
+            { key: 'q', label: 'ชื่อหมวดหมู่', type: 'text', test: function(r, v) { return r.name.toLowerCase().indexOf(v.toLowerCase()) !== -1; } },
+            { key: 'state', label: 'สถานะ', type: 'select', options: function() { return [['live', 'ใช้งาน'], ['inactive', 'ปิดใช้งาน']]; }, test: function(r, v) { return r.state === v; } }
+          ],
+          columns: [
+            { label: 'ID', sort: function(r) { return r.id; }, cell: function(r) { return self.esc(self.shortId(r.id)); } },
+            { label: 'ชื่อหมวดหมู่', sort: function(r) { return r.name; }, cell: function(r) { return self.link(r.name, r.id); } },
+            { label: 'จำนวนข่าว', sort: function(r) { return r.used; }, cell: function(r) { return self.esc(r.used); } },
+            { label: 'สถานะ', sort: function(r) { return r.state; }, cell: function(r) { return '<span class="cms-badge ' + (r.state === 'live' ? 'cms-b-green' : 'cms-b-red') + '">' + (r.state === 'live' ? 'ใช้งาน' : 'ปิดใช้งาน') + '</span>'; } }
+          ],
+          remove: async function(rows) {
+            const res = await window.app.api('NEWS_CAT_DELETE', { ids: rows.map(function(r) { return r.id; }) });
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'ลบไม่สำเร็จ');
+            return res.deleted;
+          },
+          editForm: function(r) {
+            return self.field('ชื่อหมวดหมู่ *', '<input id="cmsName" class="cms-in" maxlength="60" value="' + self.esc(r ? r.name : '') + '">')
+              + self.field('สถานะ', '<select id="cmsStatus" class="cms-in"><option value="Active"' + (!r || r.status === 'Active' ? ' selected' : '') + '>ใช้งาน</option><option value="Inactive"' + (r && r.status === 'Inactive' ? ' selected' : '') + '>ปิดใช้งาน</option></select>')
+              + (r && r.used ? '<p class="cms-hint">เปลี่ยนชื่อแล้วข่าวทั้ง ' + self.esc(r.used) + ' รายการในหมวดนี้จะเปลี่ยนตาม</p>' : '');
+          },
+          readForm: function(r) {
+            const name = document.getElementById('cmsName').value.trim();
+            if (!name) { Swal.showValidationMessage('กรุณากรอกชื่อหมวดหมู่'); return false; }
+            return { id: r ? r.id : '', name: name, status: document.getElementById('cmsStatus').value };
+          },
+          save: async function(v) {
+            const res = await window.app.api('NEWS_CAT_SAVE', v);
+            if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'บันทึกไม่สำเร็จ');
+          }
+        }
+      };
+      return K[kind] || null;
+    },
+
+    field: function(label, inner) { return '<div class="cms-f"><label>' + label + '</label>' + inner + '</div>'; },
+    imageField: function(url) {
+      return '<div class="cms-f"><label>รูปภาพ</label><div class="cms-imgrow">'
+        + '<img id="cmsPrev" class="cms-prev' + (url ? '' : ' hidden') + '" src="' + this.esc(url ? window.app.formatImageUrl(url, 'w200') : '') + '" alt="">'
+        + '<div class="cms-imgctl"><input type="file" id="cmsFile" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this,\'cmsImg\',function(u){var p=document.getElementById(\'cmsPrev\');p.src=u;p.classList.remove(\'hidden\');var i=document.getElementById(\'cmsUrl\');if(i)i.value=\'\';})">'
+        + '<input id="cmsUrl" class="cms-in" maxlength="1000" placeholder="หรือวางลิงก์รูป (http หรือ https)" value="' + this.esc(url || '') + '"></div></div></div>';
+    },
+
+    // ---------- หน้าหลัก ----------
+    open: async function(kind) {
+      const cfg = this.cfg(kind);
+      if (!cfg) return;
+      const content = document.getElementById('page-content');
+      if (!content) return;
+      this.kind = kind;
+      this.S[kind] = { rows: [], cats: [], applied: {}, quick: '', sort: null, page: 1, size: 10, selected: {} };
+      content.innerHTML = this.shellHtml(cfg);
+      const root = document.getElementById('cmsRoot');
+      root.addEventListener('click', this.onClick.bind(this));
+      root.addEventListener('change', this.onChange.bind(this));
+      root.addEventListener('input', this.onInput.bind(this));
+      root.addEventListener('keydown', this.onKey.bind(this));
+      await this.reload();
+    },
+
+    shellHtml: function(cfg) {
+      const filt = cfg.filters.map(function(f) {
+        return '<div class="cms-fl"><label>' + this.esc(f.label) + '</label><div id="cmsFw_' + f.key + '">' + this.filterInput(f, null) + '</div></div>';
+      }, this).join('');
+      return '<div id="cmsRoot" class="cms-page">'
+        + '<div class="cms-head"><h1>' + this.esc(cfg.title) + '</h1><span class="cms-crumb">' + this.esc(cfg.crumb) + ' &gt; ' + this.esc(cfg.title) + '</span></div>'
+        + '<div class="cms-card">'
+        + '<div class="cms-actions"><button type="button" class="cms-btn cms-btn-green" data-act="add"><i class="fas fa-plus"></i> เพิ่มรายการ</button>'
+        + '<button type="button" class="cms-btn cms-btn-red" data-act="delmany"><i class="fas fa-trash"></i> ลบรายการที่เลือก</button>' + (cfg.extraButtons || '') + '</div>'
+        + '<div class="cms-search"><div class="cms-search-h">ค้นหา</div><div class="cms-search-b"><div class="cms-filters">' + filt + '</div>'
+        + '<div class="cms-search-btns"><button type="button" class="cms-btn cms-btn-sm cms-btn-green" data-act="search"><i class="fas fa-search"></i> ค้นหา</button><button type="button" class="cms-btn cms-btn-sm cms-btn-outline" data-act="reset"><i class="fas fa-rotate"></i> รีเซ็ต</button></div></div></div>'
+        + '<div class="cms-bar"><label>แสดง <select class="cms-sel" data-act="size">' + this.PAGE_SIZES.map(function(n) { return '<option value="' + n + '">' + n + '</option>'; }).join('') + '</select> แถว</label>'
+        + '<label>ค้นหา : <input type="search" class="cms-quick" data-act="quick"></label></div>'
+        + '<div class="cms-wrap"><table class="cms-table"><thead id="cmsHead"></thead><tbody id="cmsBody"><tr><td class="cms-empty">กำลังโหลดข้อมูล...</td></tr></tbody></table></div>'
+        + '<div class="cms-foot"><div id="cmsInfo"></div><div id="cmsPager" class="cms-pager"></div></div>'
+        + '</div></div>';
+    },
+
+    filterInput: function(f, st) {
+      const id = 'cmsF_' + f.key;
+      if (f.type === 'select') {
+        const opts = f.options(st || { cats: [] });
+        return '<select id="' + id + '" class="cms-in"><option value="">ทั้งหมด</option>' + opts.map(function(o) { return '<option value="' + this.esc(o[0]) + '">' + this.esc(o[1]) + '</option>'; }, this).join('') + '</select>';
+      }
+      return '<input id="' + id + '" class="cms-in" type="' + (f.type === 'date' ? 'date' : 'text') + '">';
+    },
+
+    reload: async function() {
+      const kind = this.kind, cfg = this.cfg(kind), st = this.S[kind];
+      try {
+        await cfg.load.call(this, st);
+      } catch (e) {
+        const body = document.getElementById('cmsBody');
+        if (body && this.kind === kind) body.innerHTML = '<tr><td class="cms-empty" colspan="20">' + this.esc(e.message || e) + '</td></tr>';
+        return;
+      }
+      if (this.kind !== kind || !document.getElementById('cmsRoot')) return; // ผู้ใช้ย้ายหน้าไปแล้วระหว่างโหลด
+      // เติมตัวเลือกของตัวกรองแบบ select ที่ขึ้นกับข้อมูล (เช่น หมวดหมู่ข่าว) โดยคงค่าที่เลือกไว้
+      cfg.filters.forEach(function(f) {
+        if (f.type !== 'select') return;
+        const w = document.getElementById('cmsFw_' + f.key), cur = document.getElementById('cmsF_' + f.key);
+        if (!w) return;
+        const v = cur ? cur.value : '';
+        w.innerHTML = this.filterInput(f, st);
+        const n = document.getElementById('cmsF_' + f.key);
+        if (n && Array.prototype.some.call(n.options, function(o) { return o.value === v; })) n.value = v;
+      }, this);
+      const keys = {};
+      st.rows.forEach(function(r) { keys[r.key] = true; });
+      Object.keys(st.selected).forEach(function(k) { if (!keys[k]) delete st.selected[k]; });
+      this.refresh();
+    },
+
+    view: function() {
+      const st = this.S[this.kind], cfg = this.cfg(this.kind);
+      let rows = st.rows.filter(function(r) {
+        return cfg.filters.every(function(f) { const v = st.applied[f.key]; return !v || f.test(r, v); });
+      });
+      const q = st.quick.trim().toLowerCase();
+      if (q) rows = rows.filter(function(r) { return cfg.searchable.some(function(k) { return String(r[k] === undefined ? '' : r[k]).toLowerCase().indexOf(q) !== -1; }); });
+      if (st.sort) {
+        const col = cfg.columns[st.sort.col], d = st.sort.dir;
+        rows = rows.map(function(r, i) { return { r: r, i: i }; }).sort(function(a, b) {
+          const x = col.sort(a.r), y = col.sort(b.r);
+          const c = (typeof x === 'number' && typeof y === 'number') ? x - y : String(x).localeCompare(String(y), 'th');
+          return c !== 0 ? c * d : a.i - b.i;
+        }).map(function(o) { return o.r; });
+      }
+      return rows;
+    },
+
+    refresh: function() {
+      const st = this.S[this.kind], cfg = this.cfg(this.kind);
+      const rows = this.view();
+      const pages = Math.max(1, Math.ceil(rows.length / st.size));
+      if (st.page > pages) st.page = pages;
+      const from = (st.page - 1) * st.size, slice = rows.slice(from, from + st.size);
+      const allOn = slice.length > 0 && slice.every(function(r) { return st.selected[r.key]; });
+      document.getElementById('cmsHead').innerHTML = '<tr><th class="cms-c-chk"><input type="checkbox" data-act="selall"' + (allOn ? ' checked' : '') + '></th>'
+        + cfg.columns.map(function(c, i) {
+          const on = st.sort && st.sort.col === i;
+          return '<th' + (c.sort ? ' class="cms-sortable' + (on ? (st.sort.dir === 1 ? ' cms-asc' : ' cms-desc') : '') + '" data-act="sort" data-col="' + i + '"' : '') + '>' + this.esc(c.label) + '</th>';
+        }, this).join('') + '<th>จัดการ</th></tr>';
+      document.getElementById('cmsBody').innerHTML = slice.length ? slice.map(function(r) {
+        return '<tr' + (st.selected[r.key] ? ' class="cms-sel-row"' : '') + '><td class="cms-c-chk"><input type="checkbox" data-act="sel" data-id="' + this.esc(r.key) + '"' + (st.selected[r.key] ? ' checked' : '') + '></td>'
+          + cfg.columns.map(function(c) { return '<td>' + c.cell(r) + '</td>'; }).join('')
+          + '<td class="cms-c-act"><button type="button" class="cms-ico" title="แก้ไข" data-act="edit" data-id="' + this.esc(r.key) + '"><i class="fas fa-pen"></i></button><button type="button" class="cms-ico cms-ico-red" title="ลบ" data-act="del" data-id="' + this.esc(r.key) + '"><i class="fas fa-trash"></i></button></td></tr>';
+      }, this).join('') : '<tr><td class="cms-empty" colspan="' + (cfg.columns.length + 2) + '">ไม่พบข้อมูล</td></tr>';
+      document.getElementById('cmsInfo').textContent = rows.length ? 'แสดง ' + (from + 1) + ' ถึง ' + (from + slice.length) + ' จากทั้งหมด ' + rows.length + ' รายการ' : 'แสดง 0 ถึง 0 จากทั้งหมด 0 รายการ';
+      const nSel = Object.keys(st.selected).length;
+      const delBtn = document.querySelector('#cmsRoot [data-act="delmany"]');
+      if (delBtn) delBtn.innerHTML = '<i class="fas fa-trash"></i> ลบรายการที่เลือก' + (nSel ? ' (' + nSel + ')' : '');
+      // ปุ่มแบ่งหน้า: ก่อนหน้า · เลขหน้ารอบหน้าปัจจุบัน · ถัดไป
+      let pg = '<button type="button" class="cms-pg" data-act="page" data-p="' + (st.page - 1) + '"' + (st.page <= 1 ? ' disabled' : '') + '>ก่อนหน้า</button>';
+      for (let p = Math.max(1, st.page - 2); p <= Math.min(pages, st.page + 2); p++) pg += '<button type="button" class="cms-pg' + (p === st.page ? ' cms-pg-on' : '') + '" data-act="page" data-p="' + p + '">' + p + '</button>';
+      pg += '<button type="button" class="cms-pg" data-act="page" data-p="' + (st.page + 1) + '"' + (st.page >= pages ? ' disabled' : '') + '>ถัดไป</button>';
+      document.getElementById('cmsPager').innerHTML = pg;
+    },
+
+    readFilters: function() {
+      const st = this.S[this.kind], cfg = this.cfg(this.kind);
+      st.applied = {};
+      cfg.filters.forEach(function(f) { const e = document.getElementById('cmsF_' + f.key); if (e && e.value.trim()) st.applied[f.key] = e.value.trim(); });
+      st.page = 1;
+    },
+
+    // ---------- เหตุการณ์ ----------
+    onClick: function(ev) {
+      const el = ev.target.closest('[data-act]');
+      if (!el || !this.S[this.kind]) return;
+      const act = el.getAttribute('data-act'), st = this.S[this.kind];
+      if (act === 'edit') { ev.preventDefault(); return this.edit(el.getAttribute('data-id')); }
+      if (act === 'add') return this.edit(null);
+      if (act === 'del') return this.removeRows([el.getAttribute('data-id')]);
+      if (act === 'delmany') return this.removeRows(Object.keys(st.selected));
+      if (act === 'search') { this.readFilters(); return this.refresh(); }
+      if (act === 'reset') {
+        this.cfg(this.kind).filters.forEach(function(f) { const e = document.getElementById('cmsF_' + f.key); if (e) e.value = ''; });
+        st.applied = {}; st.quick = ''; st.page = 1;
+        const q = document.querySelector('#cmsRoot [data-act="quick"]'); if (q) q.value = '';
+        return this.refresh();
+      }
+      if (act === 'sort') {
+        const col = Number(el.getAttribute('data-col'));
+        st.sort = (st.sort && st.sort.col === col) ? (st.sort.dir === 1 ? { col: col, dir: -1 } : null) : { col: col, dir: 1 };
+        return this.refresh();
+      }
+      if (act === 'page') { const p = Number(el.getAttribute('data-p')); if (p >= 1) { st.page = p; this.refresh(); } return; }
+      if (act === 'goto') { window.location.hash = '#' + el.getAttribute('data-to'); return; }
+    },
+    onChange: function(ev) {
+      const el = ev.target.closest('[data-act]');
+      if (!el || !this.S[this.kind]) return;
+      const act = el.getAttribute('data-act'), st = this.S[this.kind];
+      if (act === 'size') { st.size = Number(el.value) || 10; st.page = 1; return this.refresh(); }
+      if (act === 'sel') { const id = el.getAttribute('data-id'); if (el.checked) st.selected[id] = true; else delete st.selected[id]; return this.refresh(); }
+      if (act === 'selall') {
+        const rows = this.view(), from = (st.page - 1) * st.size;
+        rows.slice(from, from + st.size).forEach(function(r) { if (el.checked) st.selected[r.key] = true; else delete st.selected[r.key]; });
+        return this.refresh();
+      }
+      if (act === 'seq') return this.saveSeq(el.getAttribute('data-id'), el);
+    },
+    onInput: function(ev) {
+      const el = ev.target;
+      if (el && el.getAttribute && el.getAttribute('data-act') === 'quick') { const st = this.S[this.kind]; st.quick = el.value; st.page = 1; this.refresh(); }
+    },
+    onKey: function(ev) {
+      if (ev.key === 'Enter' && ev.target && /^cmsF_/.test(ev.target.id || '')) { ev.preventDefault(); this.readFilters(); this.refresh(); }
+    },
+
+    // ---------- แก้ไข / ลบ ----------
+    edit: async function(key) {
+      const kind = this.kind, cfg = this.cfg(kind), st = this.S[kind];
+      const row = key ? st.rows.find(function(r) { return r.key === key; }) : null;
+      if (key && !row) return Swal.fire('ไม่พบรายการ', 'รายการนี้อาจถูกลบไปแล้ว กรุณารีเฟรชหน้า', 'warning');
+      if (!row && cfg.canEdit && cfg.canEdit.call(this, st) === false) return;
+      delete window.app.pendingImageUploads.cmsImg;
+      const r = await Swal.fire({
+        title: (row ? 'แก้ไข' : 'เพิ่ม') + cfg.title.replace('จัดการ', ''),
+        html: '<div class="cms-form">' + cfg.editForm.call(this, row, st) + '</div>',
+        width: 640, showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก', focusConfirm: false,
+        preConfirm: function() { return cfg.readForm.call(window.app.cms, row); }
+      });
+      if (!r.isConfirmed || !r.value) { delete window.app.pendingImageUploads.cmsImg; return; }
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        await cfg.save.call(this, r.value, row);
+        window.app.hideLoading();
+        await this.reload();
+        Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จ', showConfirmButton: false, timer: 1200 });
+      } catch (e) {
+        window.app.hideLoading();
+        Swal.fire('บันทึกไม่สำเร็จ', this.esc(e.message || e), 'error');
+      }
+    },
+
+    removeRows: async function(keys) {
+      const kind = this.kind, cfg = this.cfg(kind), st = this.S[kind];
+      const rows = keys.map(function(k) { return st.rows.find(function(r) { return r.key === k; }); }).filter(Boolean);
+      if (!rows.length) return Swal.fire('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการลบ', 'warning');
+      const c = await Swal.fire({ icon: 'warning', title: 'ยืนยันการลบ?', text: 'ลบ ' + rows.length + ' รายการ ไม่สามารถกู้คืนได้', showCancelButton: true, confirmButtonColor: '#e11d48', confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก' });
+      if (!c.isConfirmed) return;
+      window.app.showLoading('กำลังลบข้อมูล...');
+      try {
+        const n = await cfg.remove.call(this, rows);
+        window.app.hideLoading();
+        rows.forEach(function(r) { delete st.selected[r.key]; });
+        await this.reload();
+        Swal.fire({ icon: 'success', title: 'ลบแล้ว ' + n + ' รายการ', showConfirmButton: false, timer: 1200 });
+      } catch (e) {
+        window.app.hideLoading();
+        await this.reload();
+        Swal.fire('ลบไม่สำเร็จ', this.esc(e.message || e), 'error');
+      }
+    },
+
+    saveSeq: async function(id, input) {
+      const st = this.S[this.kind], row = st.rows.find(function(r) { return r.key === id; });
+      const v = Number(input.value);
+      if (!row || input.value === '' || !Number.isInteger(v) || v < 0 || v > 9999) { if (row) input.value = row.seq; return Swal.fire('แจ้งเตือน', 'ลำดับต้องเป็นจำนวนเต็ม 0-9999', 'warning'); }
+      if (v === row.seq) return;
+      input.disabled = true;
+      try {
+        const res = await window.app.api('NEWS_SET_SEQ', { id: id, seq: v });
+        if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'บันทึกลำดับไม่สำเร็จ');
+        row.seq = v;
+        await window.app.refreshGlobalData();
+        this.reload();
+      } catch (e) {
+        input.value = row.seq; input.disabled = false;
+        Swal.fire('บันทึกลำดับไม่สำเร็จ', this.esc(e.message || e), 'error');
+      }
+    }
+  };
+</script>

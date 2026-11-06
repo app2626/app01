@@ -1,0 +1,195 @@
+<script>
+  // นำเข้า CSV ของตารางสาขา / ช่องทางขาย / สมาชิก (Admin) — สินค้ามีตัวนำเข้าของตัวเองใน JS_ProductGroup.html
+  // client แค่แปลงไฟล์เป็นแถว + แสดงตัวอย่าง (dryRun); ตัวตรวจจริงและการเขียนอยู่ที่ server (importRecords) เสมอ
+  // เพิ่มรายการใหม่เท่านั้น — ID ที่มีอยู่แล้วถูกข้ามและรายงาน ไม่เขียนทับ
+  window.app.importer = {
+    MAX_ROWS: 1000,
+    MAX_BYTES: 2 * 1024 * 1024,
+    TABLES: {
+      Branches: {
+        label: 'สาขา',
+        requiredHeader: 'Branch Code',
+        headers: ['Channel', 'Branch Code', 'Branch Name', 'Area', 'Mall', 'Region', 'Province', 'Type Name'],
+        example: ['Retail', 'B99', 'สาขาตัวอย่าง', 'กรุงเทพ', 'ห้างตัวอย่าง', 'Central', 'กรุงเทพมหานคร', 'Mall'],
+        notes: [
+          'ต้องมี <b>Branch Code</b> (ห้ามซ้ำ), <b>Branch Name</b> และ <b>Channel</b>',
+          'Channel คือชื่อช่องทางที่ใช้เลือกในหน้าสั่งจอง — สะกดให้ตรงกับสาขาอื่น ๆ ที่มีอยู่ ถ้าเป็นชื่อใหม่ระบบจะเตือน',
+          'รหัสสาขาที่เป็นตัวเลขยาว ๆ ต้องตั้งคอลัมน์เป็นข้อความ (Text)'
+        ]
+      },
+      Channels: {
+        label: 'ช่องทางขาย',
+        requiredHeader: 'Channel Name',
+        headers: ['Channel ID', 'Channel Name', 'Description'],
+        example: ['', 'ช่องทางตัวอย่าง', 'รายละเอียดช่องทาง'],
+        notes: [
+          'ต้องมี <b>Channel Name</b>',
+          'เว้น <b>Channel ID</b> ว่างได้ — ระบบออกเลขให้ต่อจากเลขสูงสุด (CH-01, CH-02, ...)',
+          'ช่องทางที่ใช้ในหน้าสั่งจองมาจากค่า Channel ของ <b>สาขา</b> การเพิ่มช่องทางในหน้านี้ไม่ทำให้ขึ้นในหน้าสั่งจองเอง'
+        ]
+      },
+      Members: {
+        label: 'สมาชิก',
+        requiredHeader: 'Username',
+        headers: ['Username', 'Password', 'Role', 'Name', 'Branch Code', 'Accessible Menus'],
+        example: ['sale.example', '', 'Sales', 'ชื่อ นามสกุล', 'B01', ''],
+        notes: [
+          'ต้องมี <b>Username</b> (ใช้ A-Z a-z 0-9 . _ @ - ยาว 3-50), <b>Role</b> (Admin / Manager / Sales) และ <b>Name</b>',
+          '<b>Password</b> เว้นว่างได้ — ระบบสุ่มรหัสให้แล้ว<b>แสดงครั้งเดียว</b>หลังนำเข้า (ต้องบันทึกไว้ทันที); ถ้าระบุจะถูกเข้ารหัสที่เซิร์ฟเวอร์ ห้ามเก็บรหัสจริงไว้ในไฟล์ที่แชร์ต่อ',
+          '<b>Branch Code</b> ต้องมีอยู่ในหน้าสาขาแล้ว (นำเข้าสาขาก่อน) หรือเป็น ALL — เว้นว่างได้เฉพาะ Admin (= ALL)',
+          '<b>Accessible Menus</b> เว้นว่าง = สิทธิ์ตามบทบาท, * = ทุกเมนู หรือรหัสเมนูคั่นด้วยจุลภาค',
+          'Username ที่ซ้ำ (ไม่สนตัวพิมพ์เล็ก/ใหญ่) จะถูกข้าม — ไม่แก้ไขผู้ใช้เดิม'
+        ]
+      }
+    },
+
+    cfg: function(table) { return this.TABLES[table] || null; },
+
+    // ไฟล์ตัวอย่าง: kind = 'csv' (UTF-8 + BOM) หรือ 'xls' (HTML นามสกุล .xls ที่ตั้งทุกคอลัมน์เป็นข้อความไว้ล่วงหน้า — Excel อาจเตือนเรื่องรูปแบบไฟล์ตอนเปิด ให้กดเปิดต่อ)
+    downloadTemplate: function(table, kind) {
+      const c = this.cfg(table); if (!c) return;
+      const esc = window.app.esc;
+      let blob, name;
+      if (kind === 'xls') {
+        const cell = (v) => '<td style="mso-number-format:\'\\@\'">' + esc(v) + '</td>';
+        const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">'
+          + '<style>td,col{mso-number-format:"\\@"}</style></head><body><table>'
+          + '<colgroup>' + c.headers.map(() => '<col style="mso-number-format:\'\\@\'">').join('') + '</colgroup>'
+          + '<tr>' + c.headers.map(cell).join('') + '</tr><tr>' + c.example.map(cell).join('') + '</tr></table></body></html>';
+        blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        name = table.toLowerCase() + '_import_template_text.xls';
+      } else {
+        const escCell = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+        const csv = '\uFEFF' + c.headers.map(escCell).join(',') + '\r\n' + c.example.map(escCell).join(',') + '\r\n';
+        blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        name = table.toLowerCase() + '_import_template.csv';
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    },
+
+    open: async function(table) {
+      const c = this.cfg(table);
+      if (!c) return;
+      const r = await Swal.fire({
+        title: 'นำเข้า' + c.label + 'จากไฟล์ CSV',
+        icon: 'info',
+        html: '<div class="text-left text-sm leading-relaxed space-y-1.5">'
+          + '<p>ใช้ไฟล์ CSV (UTF-8) ที่มีหัวคอลัมน์ตรงกับปุ่ม <b>Export CSV</b> ของหน้านี้ — ดาวน์โหลดไฟล์ตัวอย่างเพื่อดูรูปแบบ</p>'
+          + '<ul class="list-disc pl-5">'
+          + '<li>เพิ่มเฉพาะ<b>รายการใหม่</b> — รายการที่มีอยู่แล้วจะถูกข้ามและรายงาน ไม่เขียนทับข้อมูลเดิม</li>'
+          + c.notes.map(n => '<li>' + n + '</li>').join('')
+          + '<li>ครั้งละไม่เกิน ' + this.MAX_ROWS + ' แถว และจะแสดงตัวอย่างผลให้ตรวจก่อนบันทึกจริง</li>'
+          + '<li>ถ้าเปิดไฟล์ใน Excel แล้วตัวเลขยาวกลายเป็น 8.65E+13 ข้อมูลเสียถาวร — ตั้งคอลัมน์เป็นข้อความ (Text) ก่อนวาง หรือ <a href="#" class="underline font-bold text-indigo-600" onclick="window.app.importer.downloadTemplate(\'' + table + '\',\'xls\');return false;">ดาวน์โหลดไฟล์ Excel ที่ตั้งเป็นข้อความไว้แล้ว</a></li>'
+          + '</ul></div>',
+        showCancelButton: true, showDenyButton: true,
+        confirmButtonText: 'เลือกไฟล์ CSV', denyButtonText: 'ดาวน์โหลดไฟล์ตัวอย่าง', cancelButtonText: 'ยกเลิก'
+      });
+      if (r.isDenied) return this.downloadTemplate(table, 'csv');
+      if (!r.isConfirmed) return;
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.csv,text/csv';
+      input.onchange = () => { if (input.files && input.files[0]) this.handleFile(table, input.files[0]); };
+      input.click();
+    },
+
+    // แปลงไฟล์ → แถว (ตัวอ่าน CSV ใช้ร่วมกับตัวนำเข้าสินค้า) — คืน { rows } หรือโยน Error พร้อมข้อความที่อ่านรู้เรื่อง
+    readRows: async function(table, file) {
+      const c = this.cfg(table);
+      if (file.size > this.MAX_BYTES) throw new Error('ไฟล์ใหญ่เกิน 2 MB');
+      const parsed = window.app.productGroup.parseCsv(await file.text());
+      if (!parsed) throw new Error('ไฟล์ CSV ไม่สมบูรณ์ (เครื่องหมายคำพูดไม่ปิด)');
+      const header = (parsed[0] || []).map(h => String(h).trim());
+      const idCol = c.requiredHeader;
+      if (header.indexOf(idCol) === -1) throw new Error("ไม่พบหัวคอลัมน์ '" + idCol + "' ในแถวแรกของไฟล์ — ลองใช้ไฟล์ตัวอย่าง");
+      const rows = [];
+      parsed.slice(1).forEach(cells => {
+        if (!cells.some(x => String(x).trim() !== '')) return; // ข้ามบรรทัดว่าง
+        const o = {};
+        header.forEach((h, i) => { if (h) o[h] = cells[i] === undefined ? '' : cells[i]; });
+        rows.push(o);
+      });
+      if (rows.length === 0) throw new Error('ไม่พบข้อมูลในไฟล์');
+      if (rows.length > this.MAX_ROWS) throw new Error('ไฟล์มี ' + rows.length + ' แถว นำเข้าได้ครั้งละไม่เกิน ' + this.MAX_ROWS + ' แถว');
+      return rows;
+    },
+
+    handleFile: async function(table, file) {
+      const esc = window.app.esc;
+      try {
+        const rows = await this.readRows(table, file);
+        window.app.showLoading('กำลังตรวจไฟล์ ' + rows.length + ' แถว...');
+        let res;
+        try { res = await window.app.api('IMPORT_RECORDS', { table: table, rows: rows, dryRun: true }); } finally { window.app.hideLoading(); }
+        if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'ตรวจไฟล์ไม่สำเร็จ');
+        await this.showPreview(table, res, rows, file.name);
+      } catch (e) {
+        Swal.fire('นำเข้าไม่ได้', esc(e.message || String(e)), 'error');
+      }
+    },
+
+    showPreview: async function(table, res, rows, fileName) {
+      const esc = window.app.esc;
+      const c = this.cfg(table);
+      const block = (title, cls, items, total) => {
+        if (!total) return '';
+        const shown = items.slice(0, 8).map(it => '<li>แถว ' + esc(it.line) + (it.sku ? ' · <b>' + esc(it.sku) + '</b>' : '') + ' — ' + esc(it.reason) + '</li>').join('');
+        const more = total > 8 ? '<li class="opacity-70">และอีก ' + (total - 8) + ' รายการ</li>' : '';
+        return '<div class="mt-3 text-left"><div class="font-bold ' + cls + '">' + esc(title) + ' ' + total + ' รายการ</div><ul class="list-disc pl-5 text-xs leading-relaxed">' + shown + more + '</ul></div>';
+      };
+      const html = '<div class="text-sm text-left">ไฟล์ <b>' + esc(fileName) + '</b> · ทั้งหมด ' + res.total + ' แถว</div>'
+        + '<div class="mt-2 text-left text-base font-extrabold text-emerald-700">เพิ่ม' + esc(c.label) + 'ใหม่ ' + res.created + ' รายการ</div>'
+        + (table === 'Members' && res.generatedCount ? '<div class="mt-1 text-left text-xs font-bold text-amber-700">ระบบจะสุ่มรหัสผ่านให้ ' + res.generatedCount + ' คน (แสดงครั้งเดียวหลังนำเข้า)</div>' : '')
+        + block('ข้าม (มีอยู่แล้ว/ซ้ำในไฟล์)', 'text-amber-700', res.skipped || [], res.skippedCount)
+        + block('ข้อมูลไม่ถูกต้อง (ไม่นำเข้า)', 'text-rose-700', res.errors || [], res.errorCount)
+        + block('ข้อสังเกต', 'text-slate-700', res.warnings || [], res.warningCount);
+      if (res.created === 0) { await Swal.fire({ title: 'ไม่มีรายการใหม่ให้นำเข้า', html: html, icon: 'warning' }); return; }
+      const cf = await Swal.fire({ title: 'ตรวจสอบก่อนนำเข้า', html: html, icon: res.errorCount ? 'warning' : 'question', showCancelButton: true, confirmButtonText: 'นำเข้า ' + res.created + ' รายการ', cancelButtonText: 'ยกเลิก' });
+      if (!cf.isConfirmed) return;
+      window.app.showLoading('กำลังนำเข้า' + c.label + '...');
+      try {
+        const fin = await window.app.api('IMPORT_RECORDS', { table: table, rows: rows, dryRun: false });
+        window.app.hideLoading();
+        if (!fin || fin.status !== 'success') throw new Error(fin && fin.message ? fin.message : 'นำเข้าไม่สำเร็จ');
+        await window.app.refreshGlobalData();
+        if (window.app.grid && window.app.grid.tableName === table) window.app.grid.loadData();
+        await this.showDone(table, fin);
+      } catch (e) {
+        window.app.hideLoading();
+        Swal.fire('นำเข้าไม่สำเร็จ', esc(e.message || String(e)), 'error');
+      }
+    },
+
+    // สรุปผล — สมาชิกที่ระบบสุ่มรหัสผ่านให้ต้องแสดงตรงนี้ "ครั้งเดียว" (ไม่เก็บไว้ที่ใด): ปิดหน้าต่างแล้วดูอีกไม่ได้
+    showDone: async function(table, fin) {
+      const esc = window.app.esc;
+      const c = this.cfg(table);
+      const summary = 'เพิ่ม' + c.label + 'ใหม่ ' + fin.created + ' รายการ' + (fin.skippedCount ? ' (ข้าม ' + fin.skippedCount + ')' : '') + (fin.errorCount ? ' (ไม่ถูกต้อง ' + fin.errorCount + ')' : '');
+      const gen = fin.generatedPasswords || [];
+      if (!gen.length) { await Swal.fire('นำเข้าสำเร็จ', esc(summary), 'success'); return; }
+      const rowsHtml = gen.map(g => '<tr><td class="px-2 py-1 font-bold">' + esc(g.username) + '</td><td class="px-2 py-1 font-mono">' + esc(g.password) + '</td></tr>').join('');
+      await Swal.fire({
+        title: 'นำเข้าสำเร็จ — บันทึกรหัสผ่านก่อนปิด',
+        icon: 'success',
+        html: '<div class="text-sm text-left mb-2">' + esc(summary) + '<br><b class="text-rose-700">รหัสผ่านด้านล่างแสดงครั้งเดียวเท่านั้น</b> ปิดหน้าต่างแล้วดูอีกไม่ได้ (ผู้ใช้เปลี่ยนรหัสเองได้หลังเข้าสู่ระบบ)</div>'
+          + '<div class="max-h-64 overflow-auto border border-slate-200 rounded-lg text-left text-sm"><table class="w-full"><thead><tr class="bg-slate-100"><th class="px-2 py-1 text-left">Username</th><th class="px-2 py-1 text-left">รหัสผ่านชั่วคราว</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>',
+        showDenyButton: true, denyButtonText: 'ดาวน์โหลดเป็น CSV',
+        confirmButtonText: 'ฉันบันทึกรหัสผ่านแล้ว',
+        allowOutsideClick: false, allowEscapeKey: false,
+        preDeny: () => {
+          const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+          const csv = '\uFEFF' + 'Username,Password\r\n' + gen.map(g => q(g.username) + ',' + q(g.password)).join('\r\n') + '\r\n';
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+          a.download = 'new_member_passwords.csv';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+          return false; // คงหน้าต่างไว้ — ปิดได้เมื่อกด "ฉันบันทึกรหัสผ่านแล้ว" เท่านั้น
+        }
+      });
+    }
+  };
+</script>

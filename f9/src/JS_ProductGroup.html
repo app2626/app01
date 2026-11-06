@@ -463,7 +463,7 @@ window.app.productGroup = {
         window.app.hideLoading();
         if (res && res.status === 'success') {
           window.app.hideModal('bulkQuickEditModal');
-          window.app.toast('อัปเดตราคาและสต๊อกสำเร็จ ' + (res.updatedCount || updates.length) + ' SKU');
+          if (res.updatedCount > 0) window.app.toast('อัปเดตราคาและสต๊อกสำเร็จ ' + res.updatedCount + ' SKU'); else window.app.toast('ไม่มีรายการที่ถูกอัปเดต (ไม่พบ SKU ในระบบ)', 'warning');
           await window.app.refreshGlobalData();
           if (window.app.grid && window.app.grid.tableName === 'Products') {
             window.app.grid.loadData();
@@ -474,6 +474,142 @@ window.app.productGroup = {
       } catch (e) {
         window.app.hideLoading();
         Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      }
+    },
+    // ===== นำเข้าสินค้าจากไฟล์ CSV (Admin) — เพิ่ม SKU ใหม่เท่านั้น ข้าม SKU ที่มีอยู่แล้ว =====
+    // client แค่แปลงไฟล์เป็นแถว + แสดงตัวอย่าง (dryRun); ตัวตรวจจริงและการเขียนอยู่ที่ server (importProducts) เสมอ
+    IMPORT_HEADERS: ['SKU', 'Model', 'Marketing Model', 'Product Group', 'Capacity', 'Color', 'Image URL', 'Price', 'Original Price', 'Stock', 'Unit', 'Category', 'Status', 'Channel', 'Display', 'Processor', 'RAM', 'Rear Camera', 'Front Camera', 'Battery', 'OS', 'Connectivity', 'Warranty'],
+    IMPORT_MAX_ROWS: 1000,
+    IMPORT_MAX_BYTES: 2 * 1024 * 1024,
+
+    // CSV แบบ RFC4180 (เครื่องหมายคำพูดครอบฟิลด์, "" = เครื่องหมายคำพูดในข้อความ, ขึ้นบรรทัดใหม่ในฟิลด์ได้, BOM นำหน้าได้) — คืน null ถ้าเครื่องหมายคำพูดไม่ปิด
+    parseCsv: function(text) {
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const rows = [];
+      let row = [], cur = '', quoted = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quoted) {
+          if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else quoted = false; }
+          else cur += ch;
+        } else if (ch === '"') quoted = true;
+        else if (ch === ',') { row.push(cur); cur = ''; }
+        else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; rows.push(row); row = []; }
+        else cur += ch;
+      }
+      if (quoted) return null;
+      if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+      return rows;
+    },
+
+    downloadImportTemplate: function() {
+      const escCell = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+      const example = ['SKU-EXAMPLE-BLK', 'Galaxy Example', 'Galaxy Example 5G', 'Galaxy', '256GB', 'Black', '', '29900', '32900', '10', 'เครื่อง', 'โมบาย', 'เปิด', 'ALL'];
+      while (example.length < this.IMPORT_HEADERS.length) example.push('');
+      const csv = '﻿' + this.IMPORT_HEADERS.map(escCell).join(',') + '\r\n' + example.map(escCell).join(',') + '\r\n';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      a.download = 'products_import_template.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    },
+
+    // ไฟล์ตัวอย่างสำหรับ Excel ที่ตั้งทุกคอลัมน์เป็น "ข้อความ" (Text) ไว้ล่วงหน้า — วางรหัสตัวเลขยาว ๆ แล้วไม่กลายเป็น 8.65E+13
+    // (ไฟล์ HTML นามสกุล .xls; Excel อาจเตือนเรื่องรูปแบบไฟล์ตอนเปิด ให้กดเปิดต่อ) — บันทึกต่อเป็น CSV UTF-8 แล้วนำเข้าตามปกติ
+    downloadImportTemplateXls: function() {
+      const esc = window.app.esc;
+      const example = ['8650000000001', 'Galaxy Example', 'Galaxy Example 5G', 'Galaxy', '256GB', 'Black', '', '29900', '32900', '10', 'เครื่อง', 'โมบาย', 'เปิด', 'ALL'];
+      while (example.length < this.IMPORT_HEADERS.length) example.push('');
+      const cell = (v) => '<td style="mso-number-format:\'\\@\'">' + esc(v) + '</td>';
+      const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">'
+        + '<style>td,col{mso-number-format:"\\@"}</style></head><body><table>'
+        + '<colgroup>' + this.IMPORT_HEADERS.map(() => '<col style="mso-number-format:\'\\@\'">').join('') + '</colgroup>'
+        + '<tr>' + this.IMPORT_HEADERS.map(cell).join('') + '</tr><tr>' + example.map(cell).join('') + '</tr></table></body></html>';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' }));
+      a.download = 'products_import_template_text.xls';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    },
+
+    openImport: async function() {
+      const r = await Swal.fire({
+        title: 'นำเข้าสินค้าจากไฟล์ CSV',
+        icon: 'info',
+        html: '<div class="text-left text-sm leading-relaxed space-y-1.5">'
+          + '<p>ใช้ไฟล์ CSV (UTF-8) ที่มีหัวคอลัมน์ตรงกับปุ่ม <b>Export CSV</b> ของหน้านี้ — ดาวน์โหลดไฟล์ตัวอย่างเพื่อดูรูปแบบ</p>'
+          + '<ul class="list-disc pl-5">'
+          + '<li>เพิ่มเฉพาะ <b>SKU ใหม่</b> — SKU ที่มีอยู่แล้วจะถูกข้ามและรายงาน ไม่เขียนทับข้อมูลเดิม</li>'
+          + '<li>รุ่นใหม่ต้องมี Model, Marketing Model, ความจุ, ราคา, หมวด (Category) และสต๊อก</li>'
+          + '<li>ไม่ต้องกรอก Product Name — ระบบสร้างจาก Model + Color ให้</li>'
+          + '<li>รหัสตัวเลขยาว (SKU/บาร์โค้ด) ต้องตั้งคอลัมน์เป็น <b>ข้อความ (Text)</b> ก่อนวาง ไม่เช่นนั้น Excel จะแปลงเป็น 8.65E+13 และข้อมูลเสียถาวร — Excel: เลือกคอลัมน์ → Ctrl+1 → Text · Google Sheets: Format → Number → Plain text · หรือ <a href="#" class="underline font-bold text-indigo-600" onclick="window.app.productGroup.downloadImportTemplateXls();return false;">ดาวน์โหลดไฟล์ Excel ที่ตั้งเป็นข้อความไว้แล้ว</a></li>'
+          + '<li>ครั้งละไม่เกิน ' + this.IMPORT_MAX_ROWS + ' แถว และจะแสดงตัวอย่างผลให้ตรวจก่อนบันทึกจริง</li>'
+          + '</ul></div>',
+        showCancelButton: true, showDenyButton: true,
+        confirmButtonText: 'เลือกไฟล์ CSV', denyButtonText: 'ดาวน์โหลดไฟล์ตัวอย่าง', cancelButtonText: 'ยกเลิก'
+      });
+      if (r.isDenied) return this.downloadImportTemplate();
+      if (!r.isConfirmed) return;
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.csv,text/csv';
+      input.onchange = () => { if (input.files && input.files[0]) this.handleImportFile(input.files[0]); };
+      input.click();
+    },
+
+    handleImportFile: async function(file) {
+      const esc = window.app.esc;
+      try {
+        if (file.size > this.IMPORT_MAX_BYTES) throw new Error('ไฟล์ใหญ่เกิน 2 MB');
+        const parsed = this.parseCsv(await file.text());
+        if (!parsed) throw new Error('ไฟล์ CSV ไม่สมบูรณ์ (เครื่องหมายคำพูดไม่ปิด)');
+        const header = (parsed[0] || []).map(h => String(h).trim());
+        if (header.indexOf('SKU') === -1) throw new Error("ไม่พบหัวคอลัมน์ 'SKU' ในแถวแรกของไฟล์ — ลองใช้ไฟล์ตัวอย่าง");
+        const rows = [];
+        parsed.slice(1).forEach(cells => {
+          if (!cells.some(c => String(c).trim() !== '')) return; // ข้ามบรรทัดว่าง
+          const o = {};
+          header.forEach((h, i) => { if (h) o[h] = cells[i] === undefined ? '' : cells[i]; });
+          rows.push(o);
+        });
+        if (rows.length === 0) throw new Error('ไม่พบข้อมูลสินค้าในไฟล์');
+        if (rows.length > this.IMPORT_MAX_ROWS) throw new Error('ไฟล์มี ' + rows.length + ' แถว นำเข้าได้ครั้งละไม่เกิน ' + this.IMPORT_MAX_ROWS + ' แถว');
+        window.app.showLoading('กำลังตรวจไฟล์ ' + rows.length + ' แถว...');
+        let res;
+        try { res = await window.app.api('IMPORT_PRODUCTS', { rows: rows, dryRun: true }); } finally { window.app.hideLoading(); }
+        if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'ตรวจไฟล์ไม่สำเร็จ');
+        await this.showImportPreview(res, rows, file.name);
+      } catch (e) {
+        Swal.fire('นำเข้าไม่ได้', esc(e.message || String(e)), 'error');
+      }
+    },
+
+    showImportPreview: async function(res, rows, fileName) {
+      const esc = window.app.esc;
+      const block = (title, cls, items, total) => {
+        if (!total) return '';
+        const shown = items.slice(0, 8).map(it => '<li>แถว ' + esc(it.line) + (it.sku ? ' · <b>' + esc(it.sku) + '</b>' : '') + ' — ' + esc(it.reason) + '</li>').join('');
+        const more = total > 8 ? '<li class="opacity-70">และอีก ' + (total - 8) + ' รายการ</li>' : '';
+        return '<div class="mt-3 text-left"><div class="font-bold ' + cls + '">' + esc(title) + ' ' + total + ' รายการ</div><ul class="list-disc pl-5 text-xs leading-relaxed">' + shown + more + '</ul></div>';
+      };
+      const html = '<div class="text-sm text-left">ไฟล์ <b>' + esc(fileName) + '</b> · ทั้งหมด ' + res.total + ' แถว</div>'
+        + '<div class="mt-2 text-left text-base font-extrabold text-emerald-700">เพิ่ม SKU ใหม่ ' + res.created + ' รายการ</div>'
+        + block('ข้าม (มีอยู่แล้ว/ซ้ำในไฟล์)', 'text-amber-700', res.skipped || [], res.skippedCount)
+        + block('ข้อมูลไม่ถูกต้อง (ไม่นำเข้า)', 'text-rose-700', res.errors || [], res.errorCount)
+        + block('ข้อสังเกต', 'text-slate-700', res.warnings || [], res.warningCount);
+      if (res.created === 0) { await Swal.fire({ title: 'ไม่มี SKU ใหม่ให้นำเข้า', html: html, icon: 'warning' }); return; }
+      const c = await Swal.fire({ title: 'ตรวจสอบก่อนนำเข้า', html: html, icon: res.errorCount ? 'warning' : 'question', showCancelButton: true, confirmButtonText: 'นำเข้า ' + res.created + ' รายการ', cancelButtonText: 'ยกเลิก' });
+      if (!c.isConfirmed) return;
+      window.app.showLoading('กำลังนำเข้าสินค้า...');
+      try {
+        const fin = await window.app.api('IMPORT_PRODUCTS', { rows: rows, dryRun: false });
+        window.app.hideLoading();
+        if (!fin || fin.status !== 'success') throw new Error(fin && fin.message ? fin.message : 'นำเข้าไม่สำเร็จ');
+        await Swal.fire('นำเข้าสำเร็จ', 'เพิ่มสินค้าใหม่ ' + fin.created + ' SKU' + (fin.skippedCount ? ' (ข้าม ' + fin.skippedCount + ')' : '') + (fin.errorCount ? ' (ไม่ถูกต้อง ' + fin.errorCount + ')' : ''), 'success');
+        await window.app.refreshGlobalData();
+        if (window.app.grid && window.app.grid.tableName === 'Products') window.app.grid.loadData();
+      } catch (e) {
+        window.app.hideLoading();
+        Swal.fire('นำเข้าไม่สำเร็จ', esc(e.message || String(e)), 'error');
       }
     }
   };

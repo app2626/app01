@@ -106,6 +106,9 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
       const len = await ev("(document.getElementById('mainContent')||document.querySelector('main')||document.body).innerText.length");
       ok(len > 20, 'page looks empty (' + len + ' chars)');
       ok(pageErrors.length === before, pageErrors.slice(before).map(e => e.text).join(' | ').slice(0, 400));
+      // ปุ่มนำเข้า CSV ต้องโผล่เฉพาะหน้าสินค้า (Products) เท่านั้น
+      if (['products', 'branches', 'channels', 'members'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !!b&&!b.classList.contains('hidden')})()"), 'import button must show on ' + r);
+      else if (['promotions', 'coupons', 'interests', 'giftmappings', 'autopromotions'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !b||b.classList.contains('hidden')})()"), 'import button must be hidden on ' + r);
       await ev("window.Swal && Swal.isVisible && Swal.isVisible() && Swal.close(); true");
     });
   }
@@ -211,14 +214,21 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await P("window.app.globalData.settings=Object.assign({},window.app.globalData.settings,{ContactPhone:'',ContactLine:'',ContactHours:''});window.app.renderFooterContact();true");
     ok(await P("document.getElementById('footerContact').classList.contains('hidden')"));
   });
-  await T('settings: banner edit sends bannerId so the server can detect a shifted row', async () => {
-    const r = JSON.parse(await ev(`(async()=>{ const a=window.app, sm=a.settingsManager; const o={api:a.api,rg:a.refreshGlobalData,init:sm.init,sl:a.showLoading};
-      let sent=null; a.api=async(act,pl)=>{ sent={act:act,pl:pl}; return {status:'success'}; }; a.refreshGlobalData=async()=>{}; sm.init=function(){}; a.showLoading=function(){};
-      const inp=document.createElement('input'); inp.id='bannerUrl-7'; inp.value='https://example.com/x.png'; document.body.appendChild(inp);
-      sm._bannerIds['herobanner:7']='BAN-XYZ'; await sm.saveItem('herobanner',7,'bannerUrl-7');
-      inp.remove(); a.api=o.api; a.refreshGlobalData=o.rg; sm.init=o.init; a.showLoading=o.sl; try{Swal.close();}catch(e){}
-      return JSON.stringify(sent); })()`));
-    ok(r && r.act === 'SAVE_SETTINGS_ITEM' && r.pl.bannerId === 'BAN-XYZ' && r.pl.rowIndex === 7 && r.pl.type === 'herobanner', JSON.stringify(r));
+  await T('cms banners: edit save sends bannerId+rowIndex+dates; reversed date range blocked; old banner tabs gone', async () => {
+    const r = JSON.parse(await ev(`(async()=>{ const a=window.app, c=a.cms; const o={api:a.api,rg:a.refreshGlobalData};
+      const cfg=c.cfg('banners'); const row={type:'herobanner',rowIndex:7,id:'BAN-XYZ',url:'https://example.com/x.png'};
+      document.body.insertAdjacentHTML('beforeend','<div id="__cf"><input id="cmsUrl" value="https://example.com/x.png"><input id="cmsTitle" value="t"><input id="cmsDetails" value=""><input id="cmsLink" value=""><input id="cmsBtn" value=""><input id="cmsStart" value="2026-11-11"><input id="cmsEnd" value="2026-11-15"></div>');
+      const good=cfg.readForm.call(c,row);
+      let sent=null; a.api=async(act,pl)=>{ sent={act:act,pl:pl}; return {status:'success'}; }; a.refreshGlobalData=async()=>{};
+      await cfg.save.call(c,good,row);
+      document.getElementById('cmsStart').value='2026-12-01';
+      const bad=cfg.readForm.call(c,row); try{Swal.close();}catch(e){}
+      document.getElementById('__cf').remove(); a.api=o.api; a.refreshGlobalData=o.rg;
+      return JSON.stringify({good:good&&{s:good.startDate,e:good.endDate},sent:sent,bad:bad,tabs:a.systemSettings.tabs.map(t=>t.id)}); })()`));
+    ok(r.sent && r.sent.act === 'SAVE_SETTINGS_ITEM' && r.sent.pl.bannerId === 'BAN-XYZ' && r.sent.pl.rowIndex === 7 && r.sent.pl.type === 'herobanner', JSON.stringify(r.sent));
+    eq(JSON.stringify(r.good), JSON.stringify({ s: '2026-11-11', e: '2026-11-15' })); eq(r.bad, false, 'start > end must be rejected');
+    ok(!r.tabs.some(t => /banner|promogrid/.test(t)), 'old banner tabs must be gone: ' + r.tabs.join());
+    ok(r.tabs.includes('loginbg') && r.tabs.includes('bookingsettings') && r.tabs.includes('autosetup'), 'other tabs kept');
   });
   await T('URL load: search term + page restored', async () => { await P("window.app.pos.applyUrlParams({q:['Test1'],page:['1']},false);true"); await sleep(300); ok(await P("document.getElementById('searchProduct').value==='Test1'")); await P("window.app.pos.clearStoreFilters(true);true"); await sleep(200); });
   await T('URL load: hostile params are sanitized (no XSS, bad values ignored)', async () => { await P("window.app.pos.applyUrlParams({cat:['<img src=x onerror=window.__xss=1>'],sort:['<script>'],pr:['x'],pmin:['abc'],grp:['\"><svg onload=window.__xss=1>']},true);true"); await sleep(400); ok(!(await P("window.__xss")), 'XSS executed'); ok(await P("!document.querySelector('.sf-h1 img') && !document.querySelector('.sf-crumb img, .sf-crumb svg, #storeSidebar svg[onload]')"), 'injected element'); const f = JSON.parse(await P("JSON.stringify(window.app.pos.storeFilters)")); ok(f.sort === '' && f.priceRange === '' && f.priceMin === '', JSON.stringify(f)); await P("window.app.pos.clearStoreFilters(true);true"); await sleep(200); });
@@ -321,6 +331,175 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     if (r.stock > 0) { ok(r.text.includes('สี' + r.color), 'no color label: ' + r.text); ok(r.text.includes('เหลือ ' + r.stock + ' ชิ้น'), 'stock text: ' + r.text + ' expected ' + r.stock); }
     else ok(/หมด/.test(r.text), 'sold-out text: ' + r.text);
     ok(/เหลือ|หมด/.test(r.tip), 'tooltip: ' + r.tip);
+  });
+  await T('category tiles: icon + plain-label buttons, "all" first, gift categories not tiled, catIcon maps names', async () => {
+    const r = JSON.parse(await P("(()=>{const a=window.app,pos=a.pos;pos.clearStoreFilters(true);const t=[...document.querySelectorAll('.sf-catchips.sf-cattiles .sf-chip.sf-tile')];return JSON.stringify({n:t.length,labels:t.map(b=>b.textContent.trim()),icons:t.map(b=>(b.querySelector('i.sf-tile-ic')||{className:''}).className.split(' ').filter(c=>/^fa-/.test(c)).join()),plain:t.every(b=>b.textContent.trim()===b.querySelector('.sf-tile-lb').textContent),map:['','โมบาย','แท็บเล็ต','สมาร์ทวอทช์','หูฟัง','อุปกรณ์เสริม','อื่นๆ'].map(n=>pos.catIcon(n))})})()"));
+    ok(r.n >= 3, 'tiles ' + r.n); eq(r.labels[0], 'ทั้งหมด'); eq(r.icons[0], 'fa-table-cells-large'); ok(r.plain, 'label text must be the category name only');
+    ok(!r.labels.some(l => l.includes('ของแถม')), 'gift categories must not be tiles: ' + r.labels);
+    eq(r.map.join(), 'fa-table-cells-large,fa-mobile-screen-button,fa-tablet-screen-button,fa-clock,fa-headphones,fa-plug,fa-box-open');
+  });
+  await T('popular shelf: ranked in-stock sellable models only, needs >=3, hidden while searching/filtering/page 2+, never throws on bad data', async () => {
+    const r = JSON.parse(await P(`(()=>{ const a=window.app,pos=a.pos,g=a.globalData,saved=g.popularModels; const out={};
+      pos.clearStoreFilters(true); document.getElementById('searchProduct').value='';
+      const ch=document.getElementById('posChannelSelect').value;
+      const ok=p=>p.Status==='เปิด'&&!(p.Category||'').includes('ของแถม')&&a.channelOk(p.Channel,ch)&&p.Model&&p.Model!=='-';
+      const models=[...new Set(g.products.filter(p=>ok(p)&&pos.stockOf(p)>0).map(p=>p.Model))]; out.avail=models.length;
+      const el=()=>document.getElementById('posPopular'), shown=()=>!el().classList.contains('hidden'), names=()=>[...el().querySelectorAll('.sf-pop-card')].map(c=>c.querySelector('.sf-pop-rank').textContent+'|'+c.getAttribute('onclick'));
+      g.popularModels=models.slice(0,8).concat(['NO-SUCH-MODEL']); pos.filter(); out.shown=shown(); out.cards=names();
+      out.skus=models.slice(0,8).map(m=>g.products.filter(p=>p.Model===m&&ok(p)&&pos.stockOf(p)>0).sort((x,y)=>(parseFloat(x.Price)||0)-(parseFloat(y.Price)||0))[0].SKU);
+      g.popularModels=models.slice(0,2); pos.filter(); out.fewHidden=!shown();
+      g.popularModels=models.slice(0,8); pos.filter(); out.back=shown();
+      document.getElementById('searchProduct').value='zzz'; pos.filter(); out.searchHidden=!shown(); document.getElementById('searchProduct').value=''; pos.filter(); out.afterSearch=shown();
+      const cat=g.products.find(ok).Category; pos.setStoreCategory(cat); out.catHidden=!shown(); pos.clearStoreFilters(true); out.afterClear=shown();
+      pos.storePage=2; pos.renderPopularShelf(); out.page2Hidden=!shown(); pos.storePage=1; pos.renderPopularShelf(); out.page1=shown();
+      const first=g.products.filter(p=>p.Model===models[0]&&ok(p)); const stocks=first.map(p=>p.Stock); first.forEach(p=>p.Stock=0); pos.filter(); out.soldOutSkipped=!names().some(n=>n.includes(first[0].SKU)); first.forEach((p,i)=>p.Stock=stocks[i]);
+      g.popularModels=null; pos.filter(); out.nullOk=!shown(); g.popularModels=['__proto__','constructor']; pos.filter(); out.weirdOk=!shown();
+      g.popularModels=saved; pos.clearStoreFilters(true); pos.filter(); return JSON.stringify(out); })()`));
+    ok(r.avail >= 3, 'fixture needs >=3 sellable in-stock models, has ' + r.avail);
+    ok(r.shown && r.cards.length === Math.min(8, r.avail), 'cards ' + JSON.stringify(r.cards));
+    r.cards.forEach((c, i) => { ok(c.startsWith((i + 1) + '|'), 'rank order ' + c); ok(c.includes(r.skus[i]), 'cheapest in-stock variant expected ' + r.skus[i] + ' in ' + c); });
+    ok(r.fewHidden && r.back && r.searchHidden && r.afterSearch && r.catHidden && r.afterClear && r.page2Hidden && r.page1 && r.soldOutSkipped && r.nullOk && r.weirdOk, JSON.stringify(r));
+  });
+  await T('csv import: parser handles quotes/BOM/CRLF/newlines; file -> preview -> confirm adds only new SKUs', async () => {
+    const pr = JSON.parse(await P(`(()=>{const pg=window.app.productGroup;const a=pg.parseCsv('\\uFEFFa,b\\r\\n"x,1","he said ""hi"""\\r\\n"l1\\nl2",z\\r\\n');return JSON.stringify({a:a,bad:pg.parseCsv('a,"b'),empty:pg.parseCsv('')})})()`));
+    eq(JSON.stringify(pr.a), JSON.stringify([['a', 'b'], ['x,1', 'he said "hi"'], ['l1\nl2', 'z']]));
+    eq(pr.bad, null); eq(JSON.stringify(pr.empty), '[]');
+    const exSku = await P("window.app.globalData.products[0].SKU");
+    const csv = 'SKU,Model,Marketing Model,Capacity,Color,Price,Stock,Category\r\nIMP-UI-1,IMP UI Model,"Import, UI",256GB,Black,"12,900",4,โมบาย\r\n' + exSku + ',IMP UI Model,,,,,1,\r\n,,,,,,,\r\n';
+    await P(`window.__imp=window.app.productGroup.handleImportFile(new File([${JSON.stringify(csv)}],'t.csv'));true`);
+    await sleep(900);
+    const prev = await P("(Swal.getHtmlContainer()||{}).textContent||''");
+    ok(/เพิ่ม SKU ใหม่ 1 รายการ/.test(prev) && /ข้าม/.test(prev) && prev.includes(exSku) && !prev.includes('ไม่ถูกต้อง'), 'preview text: ' + prev);
+    ok(!sheets.Products.rows.some(r => r.includes('IMP-UI-1')), 'preview must not write');
+    await P("Swal.clickConfirm();true"); await sleep(1200);
+    ok(/นำเข้าสำเร็จ/.test(await P("(Swal.getTitle()||{}).textContent||''")), 'success dialog');
+    await P("Swal.clickConfirm();true"); await sleep(600); await P("window.__imp");
+    ok(sheets.Products.rows.some(r => r.includes('IMP-UI-1')), 'row written to sheet');
+    ok(await P("window.app.globalData.products.some(p=>p.SKU==='IMP-UI-1')"), 'globalData refreshed with new SKU');
+    // ไฟล์ไม่มีคอลัมน์ SKU ต้องแจ้งผิดพลาด ไม่ยิง API
+    await P(`window.__imp2=window.app.productGroup.handleImportFile(new File(['a,b\\r\\n1,2\\r\\n'],'bad.csv'));true`); await sleep(500);
+    ok(/SKU/.test(await P("(Swal.getHtmlContainer()||{}).textContent||''")), 'missing SKU header message');
+    await P("Swal.close();true");
+    // cleanup: ไม่ให้สินค้าทดสอบรบกวนเทสต์ถัดไป
+    const i = sheets.Products.rows.findIndex(r => r.includes('IMP-UI-1')); if (i > 0) sheets.Products.rows.splice(i, 1);
+    ctx.CacheService.getScriptCache().remove('TABLE_Products'); await ev("window.app.refreshGlobalData().then(()=>true)");
+    ok(!(await P("window.app.globalData.products.some(p=>p.SKU==='IMP-UI-1')")), 'cleanup');
+  });
+  await T('records import UI: Branches file -> preview -> confirm; bad header rejected; channel/member buttons route to the generic importer', async () => {
+    const exCh = await P("window.app.globalData.branches[0].Channel");
+    const csv = 'Channel,Branch Code,Branch Name,Area\r\n' + exCh + ',UI-B1,สาขาทดสอบนำเข้า,กทม\r\n' + exCh + ',' + (await P("window.app.globalData.branches[0]['Branch Code']")) + ',dup,x\r\n';
+    await P(`window.__ib=window.app.importer.handleFile('Branches',new File([${JSON.stringify(csv)}],'b.csv'));true`); await sleep(900);
+    const prev = await P("(Swal.getHtmlContainer()||{}).textContent||''");
+    ok(/เพิ่มสาขาใหม่ 1 รายการ/.test(prev) && /ข้าม/.test(prev), 'preview: ' + prev);
+    ok(!sheets.Branches.rows.some(r => r.includes('UI-B1')), 'preview must not write');
+    await P("Swal.clickConfirm();true"); await sleep(1200);
+    ok(/นำเข้าสำเร็จ/.test(await P("(Swal.getTitle()||{}).textContent||''")), 'success dialog');
+    await P("Swal.clickConfirm();true"); await sleep(600); await P("window.__ib");
+    ok(sheets.Branches.rows.some(r => r.includes('UI-B1')), 'branch written');
+    ok(await P("window.app.globalData.branches.some(b=>b['Branch Code']==='UI-B1')"), 'globalData refreshed');
+    const bi = sheets.Branches.rows.findIndex(r => r.includes('UI-B1')); if (bi > 0) sheets.Branches.rows.splice(bi, 1);
+    ctx.CacheService.getScriptCache().remove('TABLE_Branches'); await ev("window.app.refreshGlobalData().then(()=>true)");
+    await P(`window.__ib2=window.app.importer.handleFile('Channels',new File(['Foo,Bar\\r\\n1,2\\r\\n'],'x.csv'));true`); await sleep(500);
+    ok(/Channel Name/.test(await P("(Swal.getHtmlContainer()||{}).textContent||''")), 'missing required header message');
+    await P("Swal.close();true");
+    for (const [tb, hd] of [['Channels', 'Channel Name'], ['Members', 'Username'], ['Branches', 'Branch Code']]) {
+      eq(await P(`window.app.importer.TABLES['${tb}'].requiredHeader`), hd);
+      ok(await P(`window.app.importer.TABLES['${tb}'].headers.includes('${hd}')`), tb + ' template has its required header');
+    }
+  });
+  await T('members import UI: generated password shown once in a non-dismissable dialog, never stored in globalData', async () => {
+    const branch = await P("window.app.globalData.branches[0]['Branch Code']");
+    const csv = 'Username,Password,Role,Name,Branch Code\r\nui.imp.user,,Sales,UI Import,' + branch + '\r\n';
+    await P(`window.__im=window.app.importer.handleFile('Members',new File([${JSON.stringify(csv)}],'m.csv'));true`); await sleep(900);
+    ok(/สุ่มรหัสผ่านให้ 1 คน/.test(await P("(Swal.getHtmlContainer()||{}).textContent||''")), 'preview mentions random password');
+    ok(!sheets.Members.rows.some(r => r.includes('ui.imp.user')), 'preview must not write');
+    await P("Swal.clickConfirm();true"); await sleep(1300);
+    const dlg = JSON.parse(await P("JSON.stringify({title:(Swal.getTitle()||{}).textContent||'',html:(Swal.getHtmlContainer()||{}).textContent||'',deny:!!(Swal.getDenyButton()&&Swal.getDenyButton().style.display!=='none'),cancel:!!(Swal.getCancelButton()&&Swal.getCancelButton().style.display!=='none')})"));
+    ok(/บันทึกรหัสผ่าน/.test(dlg.title) && dlg.html.includes('ui.imp.user') && dlg.deny && !dlg.cancel, JSON.stringify(dlg));
+    const shown = (dlg.html.match(/ui\.imp\.user\s*([a-f0-9]{16})/) || [])[1];
+    ok(shown, 'a 16-char generated password is displayed: ' + dlg.html.slice(0, 200));
+    ok(await P("Swal.isVisible()"), 'dialog open');
+    await P("document.querySelector('.swal2-container').click();true"); await sleep(250);
+    ok(await P("Swal.isVisible()"), 'clicking outside must not dismiss the password dialog');
+    ok(!JSON.stringify(await P("JSON.stringify(window.app.globalData)")).includes(shown), 'password must not be kept in globalData');
+    await P("Swal.clickConfirm();true"); await sleep(500); await P("window.__im");
+    const mh = sheets.Members.rows[0], row = sheets.Members.rows.find(r => r.includes('ui.imp.user'));
+    ok(row && /^[a-f0-9]{64}$/.test(row[mh.indexOf('Password')]) && row[mh.indexOf('Password')] !== shown, 'stored as hash only');
+    const mi = sheets.Members.rows.findIndex(r => r.includes('ui.imp.user')); if (mi > 0) sheets.Members.rows.splice(mi, 1);
+    ctx.CacheService.getScriptCache().remove('TABLE_Members'); await ev("window.app.refreshGlobalData().then(()=>true)");
+  });
+  await T('cms news page: Otis-style list renders; filter/quick search/sort/paging work; Seq edit persists and re-orders; select + delete; category rules', async () => {
+    const A = (a, pl) => P(`window.app.api(${JSON.stringify(a)},${JSON.stringify(pl)})`);
+    await A('NEWS_CAT_SAVE', { name: 'หมวด-ก' }); await A('NEWS_CAT_SAVE', { name: 'หมวด-ข' });
+    for (let i = 1; i <= 12; i++) await A('NEWS_SAVE', { category: i % 2 ? 'หมวด-ก' : 'หมวด-ข', title: 'ข่าวทดสอบ ' + String(i).padStart(2, '0'), seq: 20 - i, status: i === 3 ? 'Inactive' : 'Active' });
+    await ev("window.location.hash='#news';true"); await sleep(1500);
+    const rows = () => ev("document.querySelectorAll('#cmsBody tr').length");
+    eq(await rows(), 10, 'default page size 10');
+    ok(/จากทั้งหมด 12 รายการ/.test(await ev("document.getElementById('cmsInfo').textContent")), 'info text');
+    ok(await ev("!!document.querySelector('#cmsRoot [data-act=add]') && !!document.querySelector('#cmsRoot [data-act=delmany]') && !!document.querySelector('#cmsRoot .cms-search-h')"), 'add / delete-selected / search box');
+    eq(await ev("document.querySelector('#cmsBody tr .cms-link').textContent"), 'ข่าวทดสอบ 12', 'ordered by Seq asc (12 has seq 8)');
+    await ev("document.querySelector('#cmsRoot [data-act=page][data-p=\"2\"]').click();true");
+    eq(await rows(), 2, 'page 2 has the remaining 2');
+    await ev("document.getElementById('cmsF_q').value='ทดสอบ 05';document.querySelector('#cmsRoot [data-act=search]').click();true");
+    eq(await rows(), 1, 'title filter'); await ev("document.querySelector('#cmsRoot [data-act=reset]').click();true");
+    await ev("document.getElementById('cmsF_state').value='inactive';document.querySelector('#cmsRoot [data-act=search]').click();true");
+    eq(await rows(), 1, 'status filter (inactive)'); await ev("document.querySelector('#cmsRoot [data-act=reset]').click();true");
+    await ev("document.getElementById('cmsF_cat').value='หมวด-ข';document.querySelector('#cmsRoot [data-act=search]').click();true");
+    eq(await rows(), 6, 'category filter'); await ev("document.querySelector('#cmsRoot [data-act=reset]').click();true");
+    await ev("(()=>{const q=document.querySelector('#cmsRoot [data-act=quick]');q.value='ทดสอบ 0';q.dispatchEvent(new Event('input',{bubbles:true}));return true})()");
+    eq(await rows(), 9, 'quick search 01-09');
+    await ev("document.querySelector('#cmsRoot [data-act=reset]').click();true");
+    await ev("document.querySelector('#cmsRoot th[data-col=\"3\"]').click();true");
+    eq(await ev("document.querySelector('#cmsBody tr .cms-link').textContent"), 'ข่าวทดสอบ 01', 'sort by title asc');
+    await ev("document.querySelector('#cmsRoot th[data-col=\"3\"]').click();true");
+    eq(await ev("document.querySelector('#cmsBody tr .cms-link').textContent"), 'ข่าวทดสอบ 12', 'sort by title desc');
+    await ev("document.querySelector('#cmsRoot th[data-col=\"3\"]').click();true");
+    // Seq edit: ข่าว 11 (seq 9, อันดับ 2) -> 0 should move to the top and persist on the server
+    await ev("(()=>{const i=[...document.querySelectorAll('#cmsBody tr')].find(r=>r.querySelector('.cms-link').textContent==='ข่าวทดสอบ 11').querySelector('.cms-seq');i.value='0';i.dispatchEvent(new Event('change',{bubbles:true}));return true})()");
+    await sleep(1200);
+    eq(await ev("document.querySelector('#cmsBody tr .cms-link').textContent"), 'ข่าวทดสอบ 11', 'seq 0 goes first');
+    eq((await A('NEWS_LIST', {})).data.news[0].title, 'ข่าวทดสอบ 11', 'persisted');
+    // select 2 rows and delete
+    await ev("(()=>{const c=[...document.querySelectorAll('#cmsBody input[data-act=sel]')];c[0].click();return true})()"); await sleep(100);
+    await ev("(()=>{const c=[...document.querySelectorAll('#cmsBody input[data-act=sel]')];c[1].click();return true})()"); await sleep(100);
+    ok(/\(2\)/.test(await ev("document.querySelector('#cmsRoot [data-act=delmany]').textContent")), 'selected count on delete button');
+    await ev("document.querySelector('#cmsRoot [data-act=delmany]').click();true"); await sleep(400);
+    await P("Swal.clickConfirm();true"); await sleep(1500);
+    eq((await A('NEWS_LIST', {})).data.news.length, 10, 'two deleted');
+    await P("Swal.close();true");
+    // category page: in-use category cannot be deleted
+    await ev("window.location.hash='#newscats';true"); await sleep(1300);
+    eq(await ev("document.querySelectorAll('#cmsBody tr').length"), 2);
+    await ev("document.querySelector('#cmsBody input[data-act=sel]').click();true"); await sleep(100);
+    await ev("document.querySelector('#cmsRoot [data-act=delmany]').click();true"); await sleep(400);
+    await P("Swal.clickConfirm();true"); await sleep(1500);
+    ok(/ยังมีข่าวอยู่ในหมวด/.test(await P("(Swal.getHtmlContainer()||{}).textContent||''")), 'in-use category delete blocked with a reason');
+    await P("Swal.close();true");
+    eq((await A('NEWS_LIST', {})).data.categories.length, 2, 'categories intact');
+    // cleanup so later tests see a clean sheet
+    await A('NEWS_DELETE', { ids: (await A('NEWS_LIST', {})).data.news.map(n => n.id) });
+    await A('NEWS_CAT_DELETE', { ids: (await A('NEWS_LIST', {})).data.categories.map(c => c.id) });
+  });
+  await T('cms banners page: lists hero/grid/popup banners with schedule badges; add dialog opens; image accept string is GAS-safe', async () => {
+    await ev("window.location.hash='#banners';true"); await sleep(1500);
+    const n = await ev("document.querySelectorAll('#cmsBody tr .cms-link').length");
+    ok(n >= 1, 'banner rows rendered: ' + n);
+    ok(await ev("document.querySelectorAll('#cmsBody .cms-badge').length") >= 1, 'status badges');
+    ok(await ev("[...document.querySelectorAll('#cmsHead th')].some(t=>t.textContent.trim()==='ประเภท')"), 'type column');
+    await ev("document.getElementById('cmsF_type').value='herobanner';document.querySelector('#cmsRoot [data-act=search]').click();true");
+    ok(await ev("[...document.querySelectorAll('#cmsBody tr')].every(r=>r.querySelector('.cms-empty')||r.textContent.includes('Hero'))"), 'type filter keeps only hero banners');
+    await ev("document.querySelector('#cmsRoot [data-act=reset]').click();true");
+    await ev("document.querySelector('#cmsRoot [data-act=add]').click();true"); await sleep(500);
+    ok(await ev("!!document.getElementById('cmsType') && !!document.getElementById('cmsUrl') && !!document.getElementById('cmsStart')"), 'add form fields');
+    await P("Swal.close();true");
+    await ev("window.location.hash='#herobanners';true"); await sleep(1500); // bookmark แท็บแบนเนอร์เก่า → หน้าใหม่
+    eq(await ev("window.location.hash"), '#banners'); ok(await ev("!!document.getElementById('cmsRoot')"), 'old banner hash redirects to the new page');
+    await ev("window.location.hash='#pos';true"); await sleep(1500); // ข้อทดสอบถัดไปต้องเริ่มจากหน้าสั่งจอง
+  });
+  await T('stock meter: every in-stock line has a bar whose width tracks the count (min 8%, full at 30+), low ones are short', async () => {
+    const rows = JSON.parse(await P("JSON.stringify([...document.querySelectorAll('#productGrid .sf-stock.ok, #productGrid .sf-stock.low')].map(e=>({low:e.classList.contains('low'),n:+(e.textContent.match(/เหลือ (\\d+) ชิ้น/)||[])[1],w:parseFloat((e.querySelector('.sf-stock-bar > span')||{style:{}}).style.width)})))"));
+    ok(rows.length > 0, 'no stock lines');
+    rows.forEach(r => { ok(r.w >= 8 && r.w <= 100, 'bad width ' + JSON.stringify(r)); const exp = Math.max(8, Math.min(100, Math.round(r.n / 30 * 100))); ok(r.w === exp, 'width ' + r.w + ' != ' + exp + ' for stock ' + r.n); if (r.low) ok(r.w <= 17, 'low stock bar too long ' + r.w); });
   });
   await T('stock line also shows exact count above 5 (not just low stock)', async () => { const t = await P("[...document.querySelectorAll('#productGrid .sf-stock.ok')].map(e=>e.textContent).join('|')"); ok(/เหลือ \d+ ชิ้น/.test(t) && !/พร้อมจำหน่าย/.test(t), t.slice(0, 200)); });
 

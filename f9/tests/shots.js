@@ -39,8 +39,8 @@ function page() {
   let ix = fs.readFileSync(SRC + 'Index.html', 'utf8');
   ix = ix.split('<?= appName ?>').join('MPOS Test');
   ix = ix.replace("<?!= JSON.stringify(trackParam || '') ?>", '""');
-  ix = ix.replace("<?!= include('CSS'); ?>", () => fs.readFileSync(SRC + 'CSS.html', 'utf8'));
-  ix = ix.replace(/<\?!= include\('JS[A-Za-z_]*'\); \?>/g, m => fs.readFileSync(SRC + m.match(/'(.+?)'/)[1] + '.html', 'utf8'));
+  // resolve every include('X') (CSS, TailwindCSS, JS core + JS_*.html modules) like HtmlService does
+  ix = ix.replace(/<\?!= include\('([A-Za-z_]+)'\); \?>/g, (_, name) => fs.readFileSync(SRC + name + '.html', 'utf8'));
   return ix.replace('<head>', '<head>' + STUB);
 }
 const server = http.createServer((req, res) => {

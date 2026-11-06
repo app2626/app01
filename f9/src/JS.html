@@ -39,6 +39,10 @@ window.app = {
           { id: 'promotions', icon: 'fa-tags', label: 'ส่วนลดและโปรโมชั่น', sub: 'Promotions', roles: ['Admin'] },
           { id: 'coupons', icon: 'fa-ticket-alt', label: 'โค้ดส่วนลด', sub: 'Coupons', roles: ['Admin'] },
           { id: 'interests', icon: 'fa-heart', label: 'ความสนใจลูกค้า', sub: 'Interests', roles: ['Admin'] },
+          { label: 'เนื้อหา', sub: 'Content', isCategory: true, roles: ['Admin'] },
+          { id: 'banners', icon: 'fa-images', label: 'จัดการแบนเนอร์', sub: 'Banners', roles: ['Admin'] },
+          { id: 'news', icon: 'fa-newspaper', label: 'จัดการข่าวสาร', sub: 'News', roles: ['Admin'] },
+          { id: 'newscats', icon: 'fa-tags', label: 'หมวดหมู่ข่าว', sub: 'News Categories', roles: ['Admin'] },
           { label: 'การตั้งค่า', sub: 'Configuration', isCategory: true, roles: ['Admin'] },
           { id: 'systemsettings', icon: 'fa-sliders-h', label: 'ตั้งค่าทั่วไป', sub: 'General Settings', roles: ['Admin'] },
           { label: 'ระบบ', sub: 'System', isCategory: true, roles: ['Admin'] },
@@ -528,8 +532,8 @@ window.app = {
      
      // แยก style/เนื้อหาใบจองออกจาก wrapper เอกสารเต็ม — ใช้ร่วมกันทั้ง 2 เส้นทางด้านล่าง (popup+print บนจอใหญ่, สร้างไฟล์ PDF บนมือถือ/แท็บเลต)
      const styleBlock = `
-         @import url('https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
-         body { font-family: 'Sarabun', 'Helvetica', sans-serif; margin: 0; padding: 20px; color: #1e293b; background: #fff; }
+         @import url('https:\/\/fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
+         body { font-family: Roboto, 'Helvetica Neue', Helvetica, Tahoma, Arial, sans-serif; margin: 0; padding: 20px; color: #1e293b; background: #fff; }
          .receipt-container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e293b; padding-bottom: 15px; }
          .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; }
@@ -947,7 +951,7 @@ window.app = {
     if (!card) return;
     const win = window.open('', '_blank', 'width=800,height=750');
     if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์บัตรรับเครื่อง', 'info');
-    const html = '<html><head><title>บัตรรับเครื่องดิจิทัล (Digital Booking Pass)</title><link href=\"https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap\" rel=\"stylesheet\"><script src=\"https:\/\/cdn.tailwindcss.com\"><\/script><style>body{font-family:Sarabun,sans-serif;padding:24px;background:#f8fafc;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
+    const html = '<html><head><title>บัตรรับเครื่องดิจิทัล (Digital Booking Pass)</title><link href=\"https:\/\/fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap\" rel=\"stylesheet\"><script src=\"https:\/\/cdn.tailwindcss.com\"><\/script><style>body{font-family:Roboto,Helvetica Neue,Helvetica,Tahoma,Arial,sans-serif;padding:24px;background:#f8fafc;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
     win.document.write(html);
     win.document.close();
   },
@@ -1311,6 +1315,8 @@ window.app = {
           // รอบ 9 — สมาชิกเก่าอาจระบุ id หน้า settings เดิม (เช่น 'bookingsettings') ไว้ใน Accessible Menus:
           // ให้นับเป็นสิทธิ์เข้าหน้า systemsettings ที่ยุบรวมแล้วด้วย
           if (menuId === 'systemsettings') return window.app.systemSettings.tabs.some(t => list.includes(t.id));
+          // สิทธิ์เมนูแบนเนอร์เก่า (herobanners/promogrids/popupbanners) นับเป็นสิทธิ์หน้า banners ใหม่
+          if (menuId === 'banners') return ['herobanners', 'promogrids', 'popupbanners'].some(id => list.includes(id));
           return false;
       }
       return defaultRoles.includes(uRole); 
@@ -1401,6 +1407,11 @@ window.app = {
 
     // รอบ 9 — hash เก่าของ 6 หน้า settings ที่ยุบรวมเป็น systemsettings: redirect แล้วเปิด tab เดิม (bookmark เก่าต้องไม่เจอหน้าตาย)
     // ใช้ location.replace เพื่อไม่ทิ้ง history entry ของ hash เก่า (กดย้อนกลับแล้วไม่วนredirect)
+    // แท็บแบนเนอร์เก่า (Hero/Promo Grid/Popup) ถูกตัดออกแล้ว — bookmark เก่าส่งไปหน้า จัดการแบนเนอร์ ใหม่
+    if (['herobanners', 'promogrids', 'popupbanners'].includes(hash)) {
+      window.location.replace('#banners');
+      return;
+    }
     if (window.app.systemSettings.tabs.some(t => t.id === hash)) {
       window.app.systemSettings.pendingTab = hash;
       window.location.replace('#systemsettings');
@@ -1468,6 +1479,9 @@ window.app = {
           break;
         case 'systemsettings':
           window.app.systemSettings.init();
+          break;
+        case 'banners': case 'news': case 'newscats':
+          window.app.cms.open(hash);
           break;
         case 'products': 
           window.app.grid.init('Products', 'SKU', [

@@ -270,7 +270,7 @@ window.app.dashboard = {
           Chart.register(ChartDataLabels);
           Chart.defaults.set('plugins.datalabels', {
               color: window.app.chartTheme().datalabel,
-              font: { family: 'Sarabun', weight: 'bold', size: 10 },
+              font: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', weight: 'bold', size: 10 },
               align: 'end',
               anchor: 'end',
               offset: 4,
@@ -430,13 +430,13 @@ window.app.dashboard = {
                     indexAxis: 'y',
                     scales: {
                         x: { stacked: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' },
-                        y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 10 } } }
+                        y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', size: 10 } } }
                     },
                     plugins: {
-                        legend: { display: true, position: 'top', labels: { font: { family: 'Sarabun' } } },
+                        legend: { display: true, position: 'top', labels: { font: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif' } } },
                         datalabels: {
                             color: '#fff',
-                            font: { family: 'Sarabun', weight: 'bold', size: 10 },
+                            font: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', weight: 'bold', size: 10 },
                             anchor: 'center',
                             align: 'center',
                             formatter: (val) => val > 0 ? val : ''
@@ -679,8 +679,8 @@ window.app.dashboard = {
             legend: { display: false },
             tooltip: {
               backgroundColor: '#0f172a',
-              titleFont: { family: 'Sarabun', size: 12, weight: '700' },
-              bodyFont: { family: 'Sarabun', size: 11, weight: '400' },
+              titleFont: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', size: 12, weight: '700' },
+              bodyFont: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', size: 11, weight: '400' },
               padding: 10,
               cornerRadius: 10,
               displayColors: false,
@@ -693,7 +693,7 @@ window.app.dashboard = {
               grid: { color: window.app.chartTheme().grid, drawBorder: false },
               ticks: {
                 color: window.app.chartTheme().text,
-                font: { family: 'Sarabun', size: 10, weight: '500' }
+                font: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', size: 10, weight: '500' }
               },
               grace: '15%'
             },
@@ -701,7 +701,7 @@ window.app.dashboard = {
               grid: { display: false, drawBorder: false },
               ticks: {
                 color: window.app.chartTheme().text,
-                font: { family: 'Sarabun', size: 10, weight: '500' }
+                font: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', size: 10, weight: '500' }
               },
               grace: '15%'
             }

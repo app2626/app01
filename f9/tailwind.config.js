@@ -19,7 +19,9 @@ module.exports = {
         cyan: { 50: '#ecfeff', 400: '#22d3ee', 500: '#06b6d4' },
         purple: { 50: '#faf5ff', 400: '#c084fc', 500: '#a855f7' },
       },
-      fontFamily: { sans: ['Plus Jakarta Sans', 'Sarabun', 'sans-serif'] },
+      // ตัวอักษรเทา (slate 500-700) ใช้ดำเข้ม — เฉพาะ text-* เท่านั้น bg/border ยังเป็นสีเดิม; dark mode มี html.dark .text-slate-* ทับด้วย !important อยู่แล้ว
+      textColor: { slate: { 500: '#111827', 600: '#111827', 700: '#0b1220' } },
+      fontFamily: { sans: ['Roboto', 'Helvetica Neue', 'Helvetica', 'Tahoma', 'Arial', 'sans-serif'] },
       boxShadow: {
         'enterprise': '0 10px 25px -3px rgba(15, 42, 67, 0.08), 0 4px 10px -4px rgba(15, 42, 67, 0.05)',
         'enterprise-lg': '0 20px 40px -8px rgba(15, 42, 67, 0.12), 0 8px 16px -6px rgba(15, 42, 67, 0.06)',

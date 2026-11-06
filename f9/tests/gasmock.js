@@ -27,6 +27,7 @@ class Sheet {
   deleteColumn(c) { this.rows.forEach(r => r.splice(c - 1, 1)); }
   insertColumnAfter(c) { this.rows.forEach(r => r.splice(c, 0, '')); }
   setFrozenRows() {}
+  getMaxRows() { return 1000; }
 }
 const sheets = {};
 const ss = {

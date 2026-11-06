@@ -1206,7 +1206,7 @@ window.app.pos = {
       if (!area) return;
       const win = window.open('', '_blank', 'width=960,height=720');
       if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์ตารางเปรียบเทียบ', 'info');
-      win.document.write('<html><head><title>ตารางเปรียบเทียบสเปคสินค้า Pre Booking</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:20px;}</style></head><body><h2 class="text-lg font-black mb-3">⚡ ตารางเปรียบเทียบสเปค ราคา และของแถม Pre Booking</h2>' + area.outerHTML + '<script>setTimeout(()=>window.print(),600);<\/script></body></html>');
+      win.document.write('<html><head><title>ตารางเปรียบเทียบสเปคสินค้า Pre Booking</title><link href="https:\/\/fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Roboto,Helvetica Neue,Helvetica,Tahoma,Arial,sans-serif;padding:20px;}</style></head><body><h2 class="text-lg font-black mb-3">⚡ ตารางเปรียบเทียบสเปค ราคา และของแถม Pre Booking</h2>' + area.outerHTML + '<script>setTimeout(()=>window.print(),600);<\/script></body></html>');
       win.document.close();
     },
     filterTimer: null,
@@ -1263,6 +1263,7 @@ window.app.pos = {
       this.storePage = 1; // ทุกครั้งที่ตัวกรอง/คำค้นเปลี่ยน กลับหน้า 1 (การเปลี่ยนหน้าเรียก renderProducts ตรง ไม่ผ่าน filter)
       this.renderProducts(list);
       this.syncUrl();
+      this.renderPopularShelf();
     },
     // 6B — มี filter storefront ตัวใดตัวหนึ่ง active อยู่ไหม (ใช้โชว์ปุ่มล้างตัวกรอง + เลือก empty state)
     storeFiltersActive: function() {
@@ -1285,6 +1286,63 @@ window.app.pos = {
         }, { rootMargin: '-' + topPx + 'px 0px 0px 0px', threshold: 0 });
         this._stickyObs.observe(s);
       } catch (e) { /* ไม่รองรับ IntersectionObserver — header ยังตรึงได้ แค่ไม่ย่อ */ }
+    },
+
+    // ไอคอนไทล์หมวดสินค้า (Font Awesome 6 free) — เดาจากชื่อหมวด ไม่ตรงกฎใดใช้กล่องสินค้า; '' = "ทั้งหมด"
+    catIcon: function(name) {
+      const n = (name || '').toString().toLowerCase();
+      if (!n) return 'fa-table-cells-large';
+      if (/แท็บเล็ต|tablet|ipad/.test(n)) return 'fa-tablet-screen-button';
+      if (/วอทช์|watch|นาฬิกา/.test(n)) return 'fa-clock';
+      if (/หูฟัง|buds|earphone|headphone|airpods/.test(n)) return 'fa-headphones';
+      if (/ลำโพง|speaker/.test(n)) return 'fa-volume-high';
+      if (/ทีวี|\btv\b|จอ/.test(n)) return 'fa-tv';
+      if (/โน้ตบุ|แล็ปท็อป|laptop|notebook|คอม/.test(n)) return 'fa-laptop';
+      if (/อุปกรณ์เสริม|accessor|เคส|สายชาร์จ|ชาร์จ/.test(n)) return 'fa-plug';
+      if (/โมบาย|มือถือ|โทรศัพท์|สมาร์ทโฟน|phone|mobile/.test(n)) return 'fa-mobile-screen-button';
+      return 'fa-box-open';
+    },
+
+    // ชั้น "ยอดนิยมตอนนี้": รุ่นที่ถูกจองมากสุด (server ส่ง globalData.popularModels = ชื่อรุ่นเรียงอันดับ ไม่มีตัวเลขยอด/ข้อมูลลูกค้า)
+    // โชว์เฉพาะหน้าแรกที่ยังไม่ค้น/ไม่กรอง และเฉพาะรุ่นที่ขายได้ในช่องทางนี้และมีของ — ต้องได้ >= 3 รุ่นถึงโชว์ (น้อยกว่านั้นดูโล่ง ไม่น่าเชื่อถือ)
+    renderPopularShelf: function() {
+      const el = document.getElementById('posPopular');
+      if (!el) return;
+      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      const searchEl = document.getElementById('searchProduct');
+      const chEl = document.getElementById('posChannelSelect');
+      const channel = chEl ? chEl.value : '';
+      const idle = !(searchEl && searchEl.value.trim() !== '') && !this.storeFiltersActive() && (this.storePage || 1) === 1;
+      const g = window.app.globalData || {};
+      const priceOf = (p) => parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
+      const items = [];
+      if (idle) {
+        const prods = (g.products || []).filter(p => p.Status === 'เปิด' && !(p.Category || '').includes('ของแถม') && window.app.channelOk(p.Channel, channel));
+        (g.popularModels || []).forEach(model => {
+          if (items.length >= 8) return;
+          const inStock = prods.filter(p => p.Model === model && this.stockOf(p) > 0);
+          if (!inStock.length) return;
+          const rep = inStock.reduce((a, b) => priceOf(b) < priceOf(a) ? b : a);
+          items.push({ rank: items.length + 1, sku: rep.SKU, name: String(rep['Product Name'] || rep['Marketing Model'] || model).replace(/\s*\([^)]*\)\s*$/, '').replace(/^SAMSUNG\s+/i, ''), img: rep['Image URL'], price: priceOf(rep) });
+        });
+      }
+      const show = items.length >= 3;
+      const sig = show ? JSON.stringify(items.map(i => [i.sku, i.price])) : '';
+      if (el.dataset.sig === sig) return; // ไม่เปลี่ยน = ไม่วาดใหม่ (กันกะพริบตอนพิมพ์ค้น/สลับหน้า)
+      el.dataset.sig = sig;
+      if (!show) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      let html = '<div class="flex items-center gap-2 mb-1.5 px-0.5"><span class="text-[12px] font-black text-slate-800 flex items-center gap-1.5"><i class="fas fa-fire text-[#FF6B00]"></i> ยอดนิยมตอนนี้</span><span class="text-[10px] font-bold text-slate-400">รุ่นที่ถูกจองมากสุด</span></div>';
+      html += '<div class="sf-pop-row custom-scrollbar">';
+      items.forEach(it => {
+        html += '<button type="button" class="sf-pop-card" onclick="window.app.pos.openAddToCartModal(\'' + escJs(it.sku) + '\')" aria-label="' + esc(it.name) + ' อันดับ ' + it.rank + '">'
+          + '<span class="sf-pop-rank' + (it.rank <= 3 ? ' top' : '') + '">' + it.rank + '</span>'
+          + '<img src="' + esc(window.app.formatImageUrl(it.img)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
+          + '<span class="sf-pop-name">' + esc(it.name) + '</span>'
+          + '<span class="sf-pop-price">฿' + it.price.toLocaleString() + '</span></button>';
+      });
+      html += '</div>';
+      el.classList.remove('hidden');
+      el.innerHTML = html;
     },
 
     renderStoreHeader: function() {
@@ -1348,8 +1406,9 @@ window.app.pos = {
 
       // --- ส่วนหัวรายการ: breadcrumb + ชื่อหมวด + จำนวน + แถบเรียงตาม ---
       const title = f.groups.length === 1 ? f.groups[0] : (f.category || 'สินค้าทั้งหมด');
-      const catChip = (val, label) => '<button type="button" class="sf-chip' + (f.category === val ? ' on' : '') + '" onclick="window.app.pos.setStoreCategory(\'' + escJs(val) + '\')" aria-pressed="' + (f.category === val ? 'true' : 'false') + '">' + esc(label) + '</button>';
-      let html = '<div class="sf-catchips" aria-label="หมวดสินค้า">' + catChip('', 'ทั้งหมด') + cats.map(c => catChip(c, c)).join('') + '</div>';
+      // ไทล์ไอคอนหมวด (ยังเป็นปุ่ม .sf-chip เดิม ข้อความในปุ่ม = ชื่อหมวดล้วน — ไอคอนเป็น <i> ไม่มีข้อความ); หมวดของแถมไม่ขึ้นเป็นไทล์เพราะไม่มีการ์ดขายให้กดดู (ยังเลือกได้ที่แถบตัวกรองด้านข้างเหมือนเดิม)
+      const catChip = (val, label) => '<button type="button" class="sf-chip sf-tile' + (f.category === val ? ' on' : '') + '" onclick="window.app.pos.setStoreCategory(\'' + escJs(val) + '\')" aria-pressed="' + (f.category === val ? 'true' : 'false') + '"><i class="fas ' + this.catIcon(val) + ' sf-tile-ic" aria-hidden="true"></i><span class="sf-tile-lb">' + esc(label) + '</span></button>';
+      let html = '<div class="sf-catchips sf-cattiles" aria-label="หมวดสินค้า">' + catChip('', 'ทั้งหมด') + cats.filter(c => !c.includes('ของแถม')).map(c => catChip(c, c)).join('') + '</div>';
       html += '<nav class="sf-crumb" aria-label="breadcrumb"><span>หน้าหลัก</span><i class="fas fa-chevron-right"></i><span' + (f.category ? '' : ' class="cur"') + '>สินค้าทั้งหมด</span>'
         + (f.category ? '<i class="fas fa-chevron-right"></i><span' + (f.groups.length ? '' : ' class="cur"') + '>' + esc(f.category) + '</span>' : '')
         + (f.groups.length ? '<i class="fas fa-chevron-right"></i><span class="cur">' + esc(f.groups.join(', ')) + '</span>' : '') + '</nav>';
@@ -1370,6 +1429,7 @@ window.app.pos = {
       this.storePage = n;
       this.renderProducts(this.lastList);
       this.syncUrl();
+      this.renderPopularShelf();
       const row = document.getElementById('productGrid');
       if (row) { row.scrollTop = 0; if (row.scrollIntoView && window.innerWidth < 1024) row.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
     },
@@ -1820,8 +1880,11 @@ window.app.pos = {
         else {
           // แสดงจำนวนคงเหลือของตัวเลือกที่เลือกอยู่ (สี/ความจุ) เสมอ — กดจุดสีแล้วเห็นของสีนั้นทันที ไม่ใช่เห็นเฉพาะเมื่อเหลือน้อย
           const colorLbl = (p.isGroup && variant.Color && variant.Color !== '-') ? 'สี' + variant.Color + ' · ' : '';
-          if (stockNum <= 5) stockBarHtml = '<div class="sf-stock low"><i class="fas fa-fire"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น</div>';
-          else stockBarHtml = '<div class="sf-stock ok"><i class="fas fa-check-circle"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น</div>';
+          // หลอดสเกลความขาดแคลน: เต็มเมื่อเหลือ >= 30 ชิ้น (ชีตไม่มีสต๊อกเริ่มต้น จึงคิด % ที่ขายไปแล้วไม่ได้) ขั้นต่ำ 8% ให้เห็นหลอดเสมอ
+          const stockPct = Math.max(8, Math.min(100, Math.round(stockNum / 30 * 100)));
+          const stockMeter = '<span class="sf-stock-bar" aria-hidden="true"><span style="width:' + stockPct + '%"></span></span>';
+          if (stockNum <= 5) stockBarHtml = '<div class="sf-stock low"><i class="fas fa-fire"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น' + stockMeter + '</div>';
+          else stockBarHtml = '<div class="sf-stock ok"><i class="fas fa-check-circle"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น' + stockMeter + '</div>';
         }
       }
 
@@ -3140,7 +3203,7 @@ window.app.pos = {
       if (!card) return;
       const win = window.open('', '_blank', 'width=800,height=700');
       if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์ใบเสนอราคา', 'info');
-      const html = '<html><head><title>ใบเสนอราคา Pre Booking</title><link href="https:\/\/fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Sarabun,sans-serif;padding:24px;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
+      const html = '<html><head><title>ใบเสนอราคา Pre Booking</title><link href="https:\/\/fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet"><script src="https:\/\/cdn.tailwindcss.com"><\/script><style>body{font-family:Roboto,Helvetica Neue,Helvetica,Tahoma,Arial,sans-serif;padding:24px;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
       win.document.write(html);
       win.document.close();
     },

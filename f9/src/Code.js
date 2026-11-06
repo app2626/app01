@@ -60,7 +60,7 @@ function setupDatabase(userToken) {
     "InventoryLog": ["Log ID", "Timestamp", "SKU", "Action", "Qty", "Branch Code", "User"],
     "AuditLog": ["Log ID", "Timestamp", "User", "Action", "Details"],
     "Settings": ["Key", "Value", "Remark"],
-    "UI_Banners": ["Banner ID", "Type", "URL", "Status", "Target Link", "Details", "Title", "Button Text"],
+    "UI_Banners": ["Banner ID", "Type", "URL", "Status", "Target Link", "Details", "Title", "Button Text", "Start Date", "End Date"],
     "Target": ["Area", "เป้า"],
     "Invoices": INVOICES_HEADERS_
   };
@@ -453,7 +453,7 @@ function looksLikePasswordHash_(value) {
 
 // action ที่ "อ่านอย่างเดียว" — ไม่ต้องล้างแคช Dashboard; action อื่นทั้งหมด (บันทึก/ลบ/จอง/แก้/อัปโหลด/เคลียร์แคช) ล้างแคชก่อนและหลังทำงาน
 // (ล้างหลังด้วย กันผู้อ่านที่ยิงเข้ามาระหว่างเขียนแล้วเขียนค่าเก่ากลับลงแคช) — เพิ่ม action อ่านใหม่ต้องมาเพิ่มที่นี่ ไม่งั้นแค่ล้างแคชเกินจำเป็น (ปลอดภัย)
-var DASH_READ_ACTIONS_ = ['LOGIN', 'GET_ADVANCED_DASHBOARD', 'GET_TABLE', 'GET_ALL_DATA', 'GET_SETTINGS_LIST', 'GET_CUSTOMER_BY_PHONE', 'GET_INVOICES', 'TRACK_ORDER', 'PUBLIC_TRACK_ORDER', 'VALIDATE_COUPON'];
+var DASH_READ_ACTIONS_ = ['LOGIN', 'GET_ADVANCED_DASHBOARD', 'GET_TABLE', 'GET_ALL_DATA', 'GET_SETTINGS_LIST', 'NEWS_LIST', 'GET_CUSTOMER_BY_PHONE', 'GET_INVOICES', 'TRACK_ORDER', 'PUBLIC_TRACK_ORDER', 'VALIDATE_COUPON'];
 
 function apiHandler(action, payload, userToken) {
   const isWrite = DASH_READ_ACTIONS_.indexOf(action) === -1;
@@ -540,6 +540,12 @@ function apiHandlerInner_(action, payload, userToken) {
         return getSettingsList(ss);
       case 'SAVE_SETTINGS_ITEM': return saveSettingsItem(payload, secureUser, ss);
       case 'DELETE_SETTINGS_ITEM': return deleteSettingsItem(payload, secureUser, ss);
+      case 'NEWS_LIST': return newsList(secureUser, ss);
+      case 'NEWS_SAVE': return saveNews(payload, secureUser, ss);
+      case 'NEWS_DELETE': return deleteNews(payload, secureUser, ss);
+      case 'NEWS_SET_SEQ': return setNewsSeq(payload, secureUser, ss);
+      case 'NEWS_CAT_SAVE': return saveNewsCategory(payload, secureUser, ss);
+      case 'NEWS_CAT_DELETE': return deleteNewsCategories(payload, secureUser, ss);
       case 'UPLOAD_IMAGE': return uploadImage(payload, secureUser, ss);
       case 'CHANGE_PASSWORD': return changePassword(payload, secureUser, ss);
       case 'GET_CUSTOMER_BY_PHONE': return getCustomerByPhone(payload, secureUser, ss); // ทุก role ที่ login แล้ว — คืนเฉพาะฟิลด์เติมฟอร์ม
@@ -550,6 +556,8 @@ function apiHandlerInner_(action, payload, userToken) {
       case 'TRACK_ORDER': return trackOrderLookup(payload, secureUser, ss);
       case 'PUBLIC_TRACK_ORDER': return publicTrackOrderLookup(payload, ss);
       case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts(payload, secureUser, ss);
+      case 'IMPORT_PRODUCTS': return importProducts(payload, secureUser, ss);
+      case 'IMPORT_RECORDS': return importRecords(payload, secureUser, ss);
       case 'VALIDATE_COUPON': return validateCouponApi_(payload, ss);
       case 'CLEAR_CACHE':
         if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
@@ -764,14 +772,46 @@ function initAutoPromotionsSheet(ss) {
 
 // Retrofit "Title"/"Button Text" ให้ชีต UI_Banners ที่สร้างไว้ก่อนหน้านี้ (เดิมมีแค่ 6 คอลัมน์) — idempotent, เรียกซ้ำได้ปลอดภัย
 // พอร์ตแนวคิดมาจาก pbzf8 (PromoPopupModal.jsx) 2026-09-19 — popup แจ้งเตือนของ f9 เดิมเป็นรูปเปล่าๆ อย่างเดียว ไม่มีหัวข้อ/คำอธิบาย/ปุ่ม CTA
+// ขยายเป็น 10 คอลัมน์ (2026-11-06: เพิ่ม "Start Date"/"End Date" ต่อท้าย = ตั้งเวลาเปิด-ปิดแบนเนอร์) — เพิ่มเฉพาะคอลัมน์ที่ยังไม่มี ตำแหน่ง 7..10 คงที่
+// (UI_Banners อ่าน/เขียนตามตำแหน่ง ห้ามแทรกกลาง)
 function ensureBannerColumns_(sheet) {
   try {
-    if (sheet.getLastColumn() < 8) {
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
-      if (headers.indexOf("Title") === -1) sheet.getRange(1, 7).setValue("Title");
-      if (headers.indexOf("Button Text") === -1) sheet.getRange(1, 8).setValue("Button Text");
-    }
+    const lastCol = sheet.getLastColumn();
+    if (lastCol >= 10) return;
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
+    ["Title", "Button Text", "Start Date", "End Date"].forEach((name, k) => {
+      const col = 7 + k;
+      if (col > lastCol && headers.indexOf(name) === -1) sheet.getRange(1, col).setValue(name);
+    });
   } catch(e) {}
+}
+
+// ===== ตั้งเวลาแสดงแบนเนอร์: Start Date / End Date เป็นข้อความ yyyy-MM-dd (เวลาไทย) — ว่าง = ไม่จำกัดฝั่งนั้น, End Date นับรวมทั้งวัน =====
+var BANNER_DATE_RE_ = /^\d{4}-\d{2}-\d{2}$/;
+// ค่าในเซลล์อาจเป็น Date (ชีตแปลงสตริงวันที่ให้เอง) หรือข้อความ — ทำให้เป็น yyyy-MM-dd เสมอ, ค่าที่อ่านไม่ได้ = '' (ไม่จำกัด)
+function bannerDateStr_(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : Utilities.formatDate(v, "GMT+7", "yyyy-MM-dd");
+  const s = v.toString().trim();
+  return BANNER_DATE_RE_.test(s) ? s : '';
+}
+function bannerDateValid_(s) {
+  if (!BANNER_DATE_RE_.test(s)) return false;
+  const p = s.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  return d.getUTCFullYear() === p[0] && d.getUTCMonth() === p[1] - 1 && d.getUTCDate() === p[2];
+}
+// 'live' = แสดงอยู่, 'upcoming' = ยังไม่ถึงวันเริ่ม, 'expired' = เลยวันสิ้นสุดแล้ว (เทียบสตริง ISO ตรงๆ ได้)
+function bannerScheduleState_(start, end, now) {
+  const today = Utilities.formatDate(now || new Date(), "GMT+7", "yyyy-MM-dd");
+  if (start && today < start) return 'upcoming';
+  if (end && today > end) return 'expired';
+  return 'live';
+}
+// เขียนวันที่เป็น "ข้อความ" (format @) กัน Sheets แปลงเป็น Date เอง
+function writeBannerDates_(sheet, row, start, end) {
+  const r = sheet.getRange(row, 9, 1, 2);
+  r.setNumberFormat('@');
+  r.setValues([[start || '', end || '']]);
 }
 
 // ดึงสเปคเริ่มต้นอัตโนมัติตามชื่อรุ่น/หมวดหมู่ สำหรับเติมลงชีต Products กรณีแถวเดิมยังไม่มีข้อมูลสเปค
@@ -973,6 +1013,60 @@ function ensureProductSpecColumns_(ss) {
   } catch (e) {}
 }
 
+// ===== ยอดนิยม (ชั้น "ยอดนิยมตอนนี้" บนหน้าร้าน): รุ่น (Model) ที่ถูกจองมากสุด =====
+// ส่งให้ทุก role เห็นเฉพาะ "ชื่อรุ่นเรียงตามอันดับ" — ไม่มีตัวเลขยอด/สาขา/ข้อมูลลูกค้าเลย (ผลรวมทุกสาขา แต่ไม่รั่วรายละเอียดข้ามสาขา)
+// ช่วงเวลาไล่ขยาย 7 → 30 → 365 วัน จนมีอย่างน้อย POPULAR_MIN_MODELS_ รุ่น (ช่วงแคมเปญเงียบๆ ยังมีอันดับให้โชว์); cache 30 นาทีกันอ่านชีต Orders ทุกครั้งที่โหลดหน้า
+var POPULAR_CACHE_KEY_ = 'POPULAR_MODELS_V1';
+var POPULAR_TOP_N_ = 8;
+var POPULAR_MIN_MODELS_ = 4;
+var POPULAR_WINDOWS_DAYS_ = [7, 30, 365];
+function getPopularModels_(ss, now) {
+  const cache = CacheService.getScriptCache();
+  try { const hit = cache.get(POPULAR_CACHE_KEY_); if (hit) return JSON.parse(hit); } catch (e) {}
+  let result = [];
+  try {
+    const sheet = ss.getSheetByName("Orders");
+    if (sheet && sheet.getLastRow() >= 2) {
+      const lastCol = sheet.getLastColumn();
+      const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
+      const skuI = headers.indexOf("SKU"), qtyI = headers.indexOf("Qty"), tsI = headers.indexOf("Timestamp"), stI = headers.indexOf("Order Status");
+      if (skuI > -1 && tsI > -1) {
+        // SKU -> Model เฉพาะสินค้าขายปกติที่เปิดอยู่ (ของแถม/ส่วนลด/รุ่นที่ไม่มี Model ไม่นับ — หน้าร้านไม่แสดงเป็นการ์ดอยู่แล้ว)
+        const modelOfSku = {};
+        getTableDataAsJson(ss.getSheetByName("Products")).forEach(p => {
+          const model = (p.Model || '').toString().trim();
+          if (!model || model === '-') return;
+          if ((p.Category || '').toString().includes('ของแถม')) return;
+          if ((p.Status || '').toString().trim() !== 'เปิด') return;
+          modelOfSku[(p.SKU || '').toString().trim()] = model;
+        });
+        const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, lastCol).getValues();
+        const nowMs = (now || new Date()).getTime();
+        const events = [];
+        rows.forEach(r => {
+          const sku = (r[skuI] || '').toString().trim();
+          const model = modelOfSku[sku];
+          if (!model) return;
+          if (stI > -1 && (r[stI] || '').toString().trim() === 'Cancelled') return;
+          const t = new Date(r[tsI]).getTime();
+          if (isNaN(t)) return;
+          const q = qtyI > -1 ? (parseInt(r[qtyI], 10) || 1) : 1;
+          events.push({ model: model, t: t, q: q > 0 ? q : 1 });
+        });
+        for (let w = 0; w < POPULAR_WINDOWS_DAYS_.length; w++) {
+          const since = nowMs - POPULAR_WINDOWS_DAYS_[w] * 86400000;
+          const tally = {};
+          events.forEach(e => { if (e.t >= since && e.t <= nowMs + 86400000) tally[e.model] = (tally[e.model] || 0) + e.q; });
+          const ranked = Object.keys(tally).sort((a, b) => (tally[b] - tally[a]) || (a < b ? -1 : a > b ? 1 : 0));
+          if (ranked.length >= POPULAR_MIN_MODELS_ || w === POPULAR_WINDOWS_DAYS_.length - 1) { result = ranked.slice(0, POPULAR_TOP_N_); break; }
+        }
+      }
+    }
+  } catch (e) { result = []; }
+  try { cache.put(POPULAR_CACHE_KEY_, JSON.stringify(result), 1800); } catch (e) {}
+  return result;
+}
+
 function getAllInitialData(ss, isAdmin) {
   initAutoPromotionsSheet(ss);
   ensureProductSpecColumns_(ss);
@@ -996,7 +1090,9 @@ function getAllInitialData(ss, isAdmin) {
         const details = data[i][5] ? data[i][5].toString().trim() : "";
         const title = data[i][6] ? data[i][6].toString().trim() : "";
         const buttonText = data[i][7] ? data[i][7].toString().trim() : "";
-        if (status !== 'Deleted' && url && url.toString().trim() !== "") {
+        // หน้าร้านเห็นเฉพาะแบนเนอร์ที่อยู่ในช่วงเวลา (ว่าง = แสดงตลอด) — หน้าตั้งค่า (getSettingsList) เห็นครบพร้อมสถานะ
+        const live = bannerScheduleState_(bannerDateStr_(data[i][8]), bannerDateStr_(data[i][9])) === 'live';
+        if (live && status !== 'Deleted' && url && url.toString().trim() !== "") {
           if (type === 'herobanner') heroBanners.push({url: url.toString().trim(), link: targetLink, details: details, title: title});
           else if (type === 'promogrid') gridBanners.push({url: url.toString().trim(), link: targetLink, details: details});
           else if (type === 'popupbanner') popupBanners.push({url: url.toString().trim(), link: targetLink, details: details, title: title, buttonText: buttonText});
@@ -1034,6 +1130,8 @@ function getAllInitialData(ss, isAdmin) {
     heroBanners: heroBanners,
     gridBanners: gridBanners,
     popupBanners: popupBanners,
+    popularModels: getPopularModels_(ss),
+    news: getLiveNews_(ss),
     // เฉพาะคีย์ที่ไม่ใช่ความลับ (Webhook URL / Drive Folder ID ไม่ส่งให้หน้าเว็บของ role ใดเลย — Admin อ่านผ่าน GET_SETTINGS_LIST)
     settings: publicSettings_(getKeyValueSettings(ss))
   };
@@ -1756,6 +1854,272 @@ function publicTrackOrderLookup(payload, ss) {
 }
 
 // 6. ระบบแก้ไขราคา/ราคาเดิม/สต๊อกแบบกลุ่มด่วน (Bulk Quick Price & Stock Editor สำหรับ Admin)
+// ===== นำเข้าสินค้าจาก CSV (Admin) =====
+// payload.rows = แถวที่ client แปลงจาก CSV (คีย์ = ชื่อหัวคอลัมน์ตรงกับปุ่ม Export ของ Products); dryRun=true คืนรายงานโดยไม่เขียนชีต
+// เพิ่ม SKU ใหม่เท่านั้น — SKU ที่มีอยู่แล้ว (ในระบบหรือซ้ำในไฟล์) ถูกข้ามและรายงาน ไม่เขียนทับข้อมูลเดิม; ตรวจทุกแถวฝั่งนี้ซ้ำเสมอ (ไม่เชื่อผล dryRun/client)
+// Product Name สร้างจาก Model+Color เสมอ (กฎเดียวกับ saveProductGroup); รุ่นที่มีอยู่แล้ว/ซ้ำในไฟล์ใช้ฟิลด์ร่วม (ราคา ความจุ ฯลฯ) ของแถวแรก
+// รูปแบบที่ Excel/Sheets ใช้แสดงเลขยาว (เช่น 8.65E+13, 1E+13) — ตัวเลขเดิมสูญหายไปแล้ว ห้ามรับเป็นรหัส
+function isSciNotation_(v) { return /^[0-9]+(\.[0-9]+)?E\+[0-9]+$/i.test((v === null || v === undefined ? '' : v).toString().trim()); }
+var PRODUCT_IMPORT_MAX_ROWS_ = 1000;
+var PRODUCT_IMPORT_REPORT_CAP_ = 200;
+var PRODUCT_IMPORT_SHARED_FIELDS_ = ['Marketing Model', 'Product Group', 'Capacity', 'Price', 'Original Price', 'Unit', 'Category', 'Channel', 'Image URL'].concat(PRODUCT_SPEC_COLS_);
+function importProducts(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
+    const rowsIn = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    if (rowsIn.length === 0) throw new Error("ไม่พบข้อมูลสินค้าในไฟล์");
+    if (rowsIn.length > PRODUCT_IMPORT_MAX_ROWS_) throw new Error("นำเข้าได้ครั้งละไม่เกิน " + PRODUCT_IMPORT_MAX_ROWS_ + " แถว (ไฟล์มี " + rowsIn.length + " แถว)");
+    const dryRun = !!(payload && payload.dryRun === true);
+
+    ensureProductSpecColumns_(ss);
+    const sheet = ss.getSheetByName("Products");
+    if (!sheet) throw new Error("ไม่พบชีต Products กรุณากด Auto Setup ก่อน");
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
+    const skuIdx = headers.indexOf('SKU'), modelIdx = headers.indexOf('Model');
+    if (skuIdx === -1 || modelIdx === -1) throw new Error("โครงสร้างชีต Products ไม่ถูกต้อง (ไม่พบคอลัมน์ Model/SKU)");
+    const data = sheet.getDataRange().getValues();
+
+    const existingSkus = {}, sharedByModel = {};
+    for (let i = 1; i < data.length; i++) {
+      const s = (data[i][skuIdx] || '').toString().trim();
+      if (s) existingSkus[s] = true;
+      const m = (data[i][modelIdx] || '').toString().trim();
+      if (m && !sharedByModel[m]) { const o = {}; headers.forEach((h, c) => { o[h] = data[i][c]; }); sharedByModel[m] = o; }
+    }
+
+    const num = (v) => { const t = (v === null || v === undefined ? '' : v).toString().replace(/[,\s฿]/g, ''); return t === '' ? NaN : Number(t); };
+    const seenSku = {}, outRows = [], skipped = [], errors = [], warnings = [];
+    let skippedCount = 0, errorCount = 0, warningCount = 0;
+    const note = (list, cnt, item) => { if (list.length < PRODUCT_IMPORT_REPORT_CAP_) list.push(item); return cnt + 1; };
+
+    rowsIn.forEach((r, idx) => {
+      const line = idx + 2; // แถว 1 = หัวตาราง
+      // ค่าที่มาจาก Excel: ="8650000000001" (สูตรบังคับเป็นข้อความ) หรือมีเครื่องหมาย ' นำหน้าตัวเลข (text marker) — ถอดออกให้เหลือค่าจริง
+      const get = (k) => {
+        let v = (r && r[k] !== undefined && r[k] !== null) ? r[k].toString().trim() : '';
+        const wrapped = /^=\s*"(.*)"$/.exec(v);
+        if (wrapped) v = wrapped[1].trim(); else if (/^'\d/.test(v)) v = v.slice(1).trim();
+        return v;
+      };
+      const sku = get('SKU');
+      const fail = (reason) => { errorCount = note(errors, errorCount, { line: line, sku: sku, reason: reason }); };
+      if (!sku) return fail('ไม่มี SKU');
+      if (sku.length > 64 || /^[=+\-@]/.test(sku) || /[\u0000-\u001f]/.test(sku)) return fail('SKU ไม่ถูกต้อง (ยาวเกิน 64 ตัวอักษร หรือขึ้นต้นด้วย = + - @)');
+      if (isSciNotation_(sku)) return fail('SKU เป็นเลขวิทยาศาสตร์ (' + sku + ') — Excel แปลงตัวเลขยาวจนข้อมูลเดิมหาย กู้คืนไม่ได้ ให้ตั้งคอลัมน์ SKU เป็นข้อความ (Text) ก่อนวางข้อมูล แล้วนำเข้าใหม่');
+      const model = sanitizeSheetText_(get('Model'));
+      if (!model) return fail('ไม่มี Model');
+      if (isSciNotation_(model)) return fail('Model เป็นเลขวิทยาศาสตร์ (' + model + ') — Excel แปลงตัวเลขยาวจนข้อมูลเดิมหาย ให้ตั้งคอลัมน์ Model เป็นข้อความ (Text) ก่อนวางข้อมูล');
+      if (seenSku[sku]) { skippedCount = note(skipped, skippedCount, { line: line, sku: sku, reason: 'SKU ซ้ำกันในไฟล์' }); return; }
+      if (existingSkus[sku]) { skippedCount = note(skipped, skippedCount, { line: line, sku: sku, reason: 'มี SKU นี้ในระบบแล้ว' }); return; }
+
+      const stockStr = get('Stock').replace(/[,\s]/g, '');
+      if (!/^\d{1,9}$/.test(stockStr)) return fail('สต๊อกต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป');
+      const status = get('Status') || 'เปิด';
+      if (status !== 'เปิด' && status !== 'ปิด') return fail("สถานะต้องเป็น 'เปิด' หรือ 'ปิด'");
+
+      let shared = sharedByModel[model];
+      if (shared) {
+        const filePrice = num(get('Price'));
+        if (get('Price') !== '' && !isNaN(filePrice) && filePrice !== Number(shared['Price'])) { warningCount = note(warnings, warningCount, { line: line, sku: sku, reason: 'ราคาในไฟล์ต่างจากรุ่น ' + model + ' ที่มีอยู่ — ใช้ราคาของรุ่นเดิม' }); }
+        const fileCap = get('Capacity');
+        if (fileCap !== '' && fileCap !== (shared['Capacity'] || '').toString().trim()) { warningCount = note(warnings, warningCount, { line: line, sku: sku, reason: 'ความจุในไฟล์ต่างจากรุ่น ' + model + ' ที่มีอยู่ — ใช้ความจุของรุ่นเดิม' }); }
+      } else {
+        const price = num(get('Price'));
+        if (isNaN(price) || price < 0) return fail('ราคาไม่ถูกต้อง (รุ่นใหม่ต้องระบุราคา)');
+        if (!get('Marketing Model')) return fail('รุ่นใหม่ต้องระบุ Marketing Model');
+        if (!get('Capacity')) return fail('รุ่นใหม่ต้องระบุความจุ (Capacity)');
+        if (!get('Category')) return fail('รุ่นใหม่ต้องระบุหมวด (Category)');
+        let origPrice = '';
+        if (get('Original Price') !== '') { origPrice = num(get('Original Price')); if (isNaN(origPrice) || origPrice < 0) return fail('ราคาก่อนลด (Original Price) ไม่ถูกต้อง'); }
+        shared = { 'Model': model, 'Price': price, 'Original Price': origPrice };
+        PRODUCT_IMPORT_SHARED_FIELDS_.forEach(f => { if (f !== 'Price' && f !== 'Original Price') shared[f] = sanitizeSheetText_(get(f)); });
+        if (!shared['Channel']) shared['Channel'] = 'ALL';
+        if (!PRODUCT_SPEC_COLS_.some(c => (shared[c] || '').toString().trim() !== '')) {
+          const auto = inferDefaultProductSpecs_(shared);
+          PRODUCT_SPEC_COLS_.forEach(c => { shared[c] = auto[c] || ''; });
+        }
+        sharedByModel[model] = shared; // แถวถัดไปของรุ่นเดียวกันในไฟล์ใช้ฟิลด์ร่วมนี้
+      }
+
+      const color = sanitizeSheetText_(get('Color'));
+      const rowObj = Object.assign({}, shared, { 'SKU': sku, 'Model': model, 'Color': color, 'Stock': Number(stockStr), 'Status': status, 'Product Name': sanitizeSheetText_(buildAutoProductName_(model, color)) });
+      const ownImage = sanitizeSheetText_(get('Image URL'));
+      if (ownImage) rowObj['Image URL'] = ownImage; // รูปเฉพาะ SKU เหมือนฟอร์มเพิ่มสินค้า
+      seenSku[sku] = true;
+      outRows.push(headers.map(h => rowObj[h] !== undefined ? rowObj[h] : ''));
+    });
+
+    if (!dryRun && outRows.length > 0) {
+      const startRow = sheet.getLastRow() + 1;
+      // SKU/Model เป็นข้อความเสมอ — ไม่ให้ Sheets ตีความรหัสตัวเลขยาวเป็นตัวเลข (ปัดเป็น 8.65E+13 / เสียความแม่นยำเกิน 15 หลัก)
+      [skuIdx, modelIdx].forEach(ci => sheet.getRange(startRow, ci + 1, outRows.length, 1).setNumberFormat('@'));
+      sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
+      CacheService.getScriptCache().remove("TABLE_Products");
+      logAudit(secureUser.Username, "IMPORT_PRODUCTS", "Imported " + outRows.length + " SKU(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
+    }
+    return { status: 'success', dryRun: dryRun, total: rowsIn.length, created: outRows.length, skippedCount: skippedCount, errorCount: errorCount, warningCount: warningCount, skipped: skipped, errors: errors, warnings: warnings };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===== นำเข้า CSV: Branches / Channels / Members (Admin) =====
+// payload = { table, rows, dryRun } — กติกาเดียวกับนำเข้าสินค้า: เพิ่มรายการใหม่เท่านั้น (ID ซ้ำ = ข้ามและรายงาน ไม่เขียนทับ), ตรวจทุกแถวฝั่งนี้ซ้ำเสมอ, dryRun ไม่เขียนชีต
+// Members: รหัสผ่านถูกแฮชที่นี่เสมอ (ว่าง = สุ่มให้แล้วคืน generatedPasswords ครั้งเดียวเฉพาะรอบเขียนจริง — ห้ามลง AuditLog/ข้อความสรุป); Username ซ้ำเทียบแบบไม่สนตัวพิมพ์
+var IMPORT_RECORD_TABLES_ = {
+  Branches: { idField: 'Branch Code', textCols: ['Branch Code'], free: ['Channel', 'Branch Name', 'Area', 'Mall', 'Region', 'Province', 'Type Name'], cache: 'TABLE_Branches' },
+  Channels: { idField: 'Channel ID', textCols: ['Channel ID'], free: ['Channel Name', 'Description'], autoId: { prefix: 'CH-', pad: 2 }, cache: 'TABLE_Channels' },
+  Members: { idField: 'Username', textCols: ['Username'], free: ['Name'], ciId: true, cache: 'TABLE_Members' }
+};
+var IMPORT_MEMBER_ROLES_ = ['Admin', 'Manager', 'Sales'];
+
+// ค่าที่มาจาก Excel: ="123" (สูตรบังคับเป็นข้อความ) หรือมี ' นำหน้าตัวเลข (text marker) — ถอดออกให้เหลือค่าจริง
+function importCell_(r, k) {
+  let v = (r && typeof r === 'object' && r[k] !== undefined && r[k] !== null) ? r[k].toString().trim() : '';
+  const wrapped = /^=\s*"(.*)"$/.exec(v);
+  if (wrapped) v = wrapped[1].trim(); else if (/^'\d/.test(v)) v = v.slice(1).trim();
+  return v;
+}
+
+function importRecords(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
+    const table = ((payload && payload.table) || '').toString();
+    const spec = Object.prototype.hasOwnProperty.call(IMPORT_RECORD_TABLES_, table) ? IMPORT_RECORD_TABLES_[table] : null;
+    if (!spec) throw new Error("ไม่รองรับการนำเข้าตาราง: " + table);
+    const rowsIn = Array.isArray(payload.rows) ? payload.rows : [];
+    if (rowsIn.length === 0) throw new Error("ไม่พบข้อมูลในไฟล์");
+    if (rowsIn.length > PRODUCT_IMPORT_MAX_ROWS_) throw new Error("นำเข้าได้ครั้งละไม่เกิน " + PRODUCT_IMPORT_MAX_ROWS_ + " แถว (ไฟล์มี " + rowsIn.length + " แถว)");
+    const dryRun = payload.dryRun === true;
+
+    const sheet = ss.getSheetByName(table);
+    if (!sheet) throw new Error("ไม่พบชีต " + table + " กรุณากด Auto Setup ก่อน");
+    const data = sheet.getDataRange().getDisplayValues();
+    const headers = data[0].map(h => h.toString().trim());
+    const idIdx = headers.indexOf(spec.idField);
+    if (idIdx === -1) throw new Error("โครงสร้างชีต " + table + " ไม่ถูกต้อง (ไม่พบคอลัมน์ " + spec.idField + ")");
+    const idKey = (v) => { const t = (v === null || v === undefined ? '' : v).toString().trim(); return spec.ciId ? t.toLowerCase() : t; };
+
+    const existing = {};
+    let maxAuto = 0;
+    const autoRe = spec.autoId ? new RegExp('^' + spec.autoId.prefix + '(\\d+)$') : null;
+    for (let i = 1; i < data.length; i++) {
+      const v = (data[i][idIdx] || '').toString().trim();
+      if (!v) continue;
+      existing[idKey(v)] = true;
+      const m = autoRe ? autoRe.exec(v) : null;
+      if (m) maxAuto = Math.max(maxAuto, parseInt(m[1], 10));
+    }
+
+    // บริบทอ้างอิงข้ามตาราง (อ่านครั้งเดียว)
+    const colValues = (name, col) => {
+      const sh = ss.getSheetByName(name);
+      if (!sh || sh.getLastRow() < 2) return [];
+      const hs = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0].map(h => h.toString().trim());
+      const ci = hs.indexOf(col);
+      return ci === -1 ? [] : sh.getRange(2, ci + 1, sh.getLastRow() - 1, 1).getDisplayValues().map(r => r[0].toString().trim()).filter(Boolean);
+    };
+    const knownBranches = {}, knownChannels = {}, knownChannelNames = {};
+    if (table === 'Members') colValues('Branches', 'Branch Code').forEach(v => { knownBranches[v] = true; });
+    if (table === 'Branches') {
+      colValues('Branches', 'Channel').concat(colValues('Channels', 'Channel Name'), colValues('Channels', 'Channel ID')).forEach(v => { knownChannels[v.toLowerCase()] = true; });
+    }
+    if (table === 'Channels') colValues('Channels', 'Channel Name').forEach(v => { knownChannelNames[v.toLowerCase()] = true; });
+
+    const seen = {}, outRows = [], skipped = [], errors = [], warnings = [], generated = [];
+    let skippedCount = 0, errorCount = 0, warningCount = 0, generatedCount = 0;
+    const note = (list, cnt, item) => { if (list.length < PRODUCT_IMPORT_REPORT_CAP_) list.push(item); return cnt + 1; };
+
+    rowsIn.forEach((r, idx) => {
+      const line = idx + 2;
+      const get = (k) => importCell_(r, k);
+      let id = get(spec.idField);
+      const fail = (reason) => { errorCount = note(errors, errorCount, { line: line, sku: id, reason: reason }); };
+      const warn = (reason) => { warningCount = note(warnings, warningCount, { line: line, sku: id, reason: reason }); };
+
+      const needsAutoId = !id && !!spec.autoId; // เว้นว่าง = ให้ระบบออกเลขต่อจากสูงสุด — จองเลขหลังตรวจผ่านเท่านั้น (แถวที่ถูกปฏิเสธไม่กินเลข)
+      if (!needsAutoId) {
+        if (!id) return fail('ไม่มี ' + spec.idField);
+        if (id.length > 64 || /^[=+\-@]/.test(id) || /[\u0000-\u001f]/.test(id)) return fail(spec.idField + ' ไม่ถูกต้อง (ยาวเกิน 64 ตัวอักษร หรือขึ้นต้นด้วย = + - @)');
+        if (isSciNotation_(id)) return fail(spec.idField + ' เป็นเลขวิทยาศาสตร์ (' + id + ') — Excel แปลงตัวเลขยาวจนข้อมูลเดิมหาย ให้ตั้งคอลัมน์เป็นข้อความ (Text) ก่อนวางข้อมูล แล้วนำเข้าใหม่');
+      }
+      const key = needsAutoId ? '' : idKey(id);
+      if (!needsAutoId && seen[key]) { skippedCount = note(skipped, skippedCount, { line: line, sku: id, reason: spec.idField + ' ซ้ำกันในไฟล์' }); return; }
+      if (!needsAutoId && existing[key]) { skippedCount = note(skipped, skippedCount, { line: line, sku: id, reason: 'มี ' + spec.idField + ' นี้ในระบบแล้ว' + (spec.ciId ? ' (ไม่สนตัวพิมพ์เล็ก/ใหญ่)' : '') }); return; }
+
+      const obj = {};
+      spec.free.forEach(f => { obj[f] = sanitizeSheetText_(get(f)); });
+      obj[spec.idField] = id;
+
+      if (table === 'Branches') {
+        if (!obj['Branch Name']) return fail('ไม่มี Branch Name');
+        if (!obj['Channel']) return fail('ไม่มี Channel (สาขาที่ไม่มี Channel จะไม่แสดงในหน้าสั่งจอง)');
+        if (!knownChannels[obj['Channel'].toLowerCase()]) { warn("Channel '" + obj['Channel'] + "' ยังไม่มีในระบบ — จะเกิดเป็นช่องทางใหม่ในหน้าสั่งจอง ตรวจตัวสะกดอีกครั้ง"); knownChannels[obj['Channel'].toLowerCase()] = true; }
+      } else if (table === 'Channels') {
+        if (!obj['Channel Name']) return fail('ไม่มี Channel Name');
+        if (knownChannelNames[obj['Channel Name'].toLowerCase()]) warn("ชื่อช่องทาง '" + obj['Channel Name'] + "' ซ้ำกับที่มีอยู่แล้ว");
+        knownChannelNames[obj['Channel Name'].toLowerCase()] = true;
+      } else if (table === 'Members') {
+        if (!/^[A-Za-z0-9._@\-]{3,50}$/.test(id)) return fail('Username ใช้ได้เฉพาะ A-Z a-z 0-9 . _ @ - ความยาว 3-50 ตัวอักษร');
+        const roleIn = get('Role').toLowerCase();
+        const role = IMPORT_MEMBER_ROLES_.filter(x => x.toLowerCase() === roleIn)[0];
+        if (!role) return fail('Role ต้องเป็น Admin, Manager หรือ Sales');
+        obj['Role'] = role;
+        if (!obj['Name']) return fail('ไม่มี Name');
+        let branch = get('Branch Code');
+        if (!branch) { if (role === 'Admin') branch = 'ALL'; else return fail("ไม่มี Branch Code (Manager/Sales ต้องระบุสาขา หรือ ALL ถ้าเห็นทุกสาขา)"); }
+        if (branch !== 'ALL' && !knownBranches[branch]) return fail("ไม่พบ Branch Code '" + branch + "' ในชีต Branches (นำเข้าสาขาก่อน)");
+        obj['Branch Code'] = branch;
+        const menuTokens = get('Accessible Menus').split(/[,;\n]+/).map(t => t.trim()).filter(Boolean);
+        if (menuTokens.some(t => !/^[A-Za-z0-9_*\-]+$/.test(t))) return fail("Accessible Menus ใช้ได้เฉพาะรหัสเมนู (ตัวอักษร/ตัวเลข) คั่นด้วยจุลภาค หรือ *");
+        obj['Accessible Menus'] = menuTokens.join(',');
+        if (role === 'Admin') warn('สร้างผู้ใช้สิทธิ์ Admin (เข้าถึงได้ทุกอย่าง)');
+        else if (branch === 'ALL') warn('ผู้ใช้ ' + role + ' ตั้งสาขาเป็น ALL — เห็นข้อมูลทุกสาขา');
+        const pw = get('Password');
+        if (pw === '') {
+          generatedCount++;
+          obj['Password'] = '';
+          if (!dryRun) { const g = Utilities.getUuid().replace(/-/g, '').slice(0, 16); generated.push({ username: id, password: g }); obj['Password'] = hashPassword(g); }
+        } else if (looksLikePasswordHash_(pw)) {
+          obj['Password'] = pw;
+        } else if (pw.length < 4) {
+          return fail('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร (หรือเว้นว่างให้ระบบสุ่มให้)');
+        } else {
+          obj['Password'] = dryRun ? '' : hashPassword(pw);
+        }
+      }
+      if (needsAutoId) {
+        id = spec.autoId.prefix + String(++maxAuto).padStart(spec.autoId.pad, '0');
+        obj[spec.idField] = id;
+      } else {
+        seen[key] = true;
+      }
+      outRows.push(headers.map(h => obj[h] !== undefined ? obj[h] : ''));
+    });
+
+    if (!dryRun && outRows.length > 0) {
+      const startRow = sheet.getLastRow() + 1;
+      spec.textCols.forEach(c => { const ci = headers.indexOf(c); if (ci > -1) sheet.getRange(startRow, ci + 1, outRows.length, 1).setNumberFormat('@'); });
+      sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
+      CacheService.getScriptCache().remove(spec.cache);
+      logAudit(secureUser.Username, "IMPORT_" + table.toUpperCase(), "Imported " + outRows.length + " " + table + " row(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
+    }
+    const res = { status: 'success', table: table, dryRun: dryRun, total: rowsIn.length, created: outRows.length, skippedCount: skippedCount, errorCount: errorCount, warningCount: warningCount, skipped: skipped, errors: errors, warnings: warnings, generatedCount: generatedCount };
+    if (!dryRun && generated.length > 0) res.generatedPasswords = generated; // แสดงครั้งเดียวหลังนำเข้า — ไม่เก็บไว้ที่ใด
+    return res;
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function bulkUpdateProducts(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -1776,10 +2140,14 @@ function bulkUpdateProducts(payload, secureUser, ss) {
     const stockIdx = headers.indexOf("Stock");
     const statusIdx = headers.indexOf("Status");
 
+    // หน้า "แก้ไขราคา/สต๊อกด่วน" ส่งคีย์แบบ SKU/Price/'Original Price'/'Stock Qty'/Status ส่วน API เดิมใช้ sku/price/originalPrice/stock/status — รับทั้งสองแบบ
+    // (เดิมอ่านได้แค่แบบหลัง ทำให้หน้าจอบันทึกแล้วไม่มีอะไรเปลี่ยนแต่ขึ้นว่าสำเร็จ)
+    const pick = (u, names) => { for (let k = 0; k < names.length; k++) { if (u[names[k]] !== undefined) return u[names[k]]; } return undefined; };
     const updMap = {};
-    updates.forEach(u => {
-      const s = (u.sku || '').toString().trim();
-      if (s) updMap[s] = u;
+    updates.forEach(raw => {
+      if (!raw || typeof raw !== 'object') return;
+      const s = (pick(raw, ['sku', 'SKU']) || '').toString().trim();
+      if (s) updMap[s] = { sku: s, price: pick(raw, ['price', 'Price']), originalPrice: pick(raw, ['originalPrice', 'Original Price']), stock: pick(raw, ['stock', 'Stock', 'Stock Qty']), status: pick(raw, ['status', 'Status']) };
     });
 
     let updatedCount = 0;
@@ -2438,12 +2806,15 @@ function getSettingsList(ss) {
     const details = data[i][5] ? data[i][5].toString().trim() : "";
     const title = data[i][6] ? data[i][6].toString().trim() : "";
     const buttonText = data[i][7] ? data[i][7].toString().trim() : "";
+    const startDate = bannerDateStr_(data[i][8]);
+    const endDate = bannerDateStr_(data[i][9]);
+    const sched = { startDate: startDate, endDate: endDate, schedule: bannerScheduleState_(startDate, endDate) };
 
     if (status !== 'Deleted' && url && url.toString().trim() !== "") {
       if (type === 'loginbg') loginBg = url.toString().trim();
-      else if (type === 'herobanner') heroBanners.push({ rowIndex: rIdx, id: data[i][0] ? data[i][0].toString().trim() : '', url: url.toString().trim(), targetLink: targetLink, details: details, title: title });
-      else if (type === 'promogrid') promoGrids.push({ rowIndex: rIdx, id: data[i][0] ? data[i][0].toString().trim() : '', url: url.toString().trim(), targetLink: targetLink, details: details });
-      else if (type === 'popupbanner') popupBanners.push({ rowIndex: rIdx, id: data[i][0] ? data[i][0].toString().trim() : '', url: url.toString().trim(), targetLink: targetLink, details: details, title: title, buttonText: buttonText });
+      else if (type === 'herobanner') heroBanners.push(Object.assign({ rowIndex: rIdx, id: data[i][0] ? data[i][0].toString().trim() : '', url: url.toString().trim(), targetLink: targetLink, details: details, title: title }, sched));
+      else if (type === 'promogrid') promoGrids.push(Object.assign({ rowIndex: rIdx, id: data[i][0] ? data[i][0].toString().trim() : '', url: url.toString().trim(), targetLink: targetLink, details: details }, sched));
+      else if (type === 'popupbanner') popupBanners.push(Object.assign({ rowIndex: rIdx, id: data[i][0] ? data[i][0].toString().trim() : '', url: url.toString().trim(), targetLink: targetLink, details: details, title: title, buttonText: buttonText }, sched));
     }
   }
   
@@ -2554,6 +2925,8 @@ function validateSettingValue_(key, raw, current) {
 function validateBannerFields_(f) {
   const lim = (v, max, label) => { if (v.length > max) throw new Error(label + ' ยาวเกินไป (สูงสุด ' + max + ' ตัวอักษร)'); };
   lim(f.url, 1000, 'ลิงก์รูป'); lim(f.targetLink, 1000, 'ลิงก์ปลายทาง'); lim(f.details, 500, 'คำอธิบาย'); lim(f.title, 120, 'หัวข้อ'); lim(f.buttonText, 40, 'ข้อความปุ่ม');
+  [['startDate', 'วันที่เริ่มแสดง'], ['endDate', 'วันที่สิ้นสุด']].forEach(p => { if (f[p[0]] && !bannerDateValid_(f[p[0]])) throw new Error(p[1] + 'ไม่ถูกต้อง (ต้องเป็นวันที่จริงรูปแบบ ปปปป-ดด-วว)'); });
+  if (f.startDate && f.endDate && f.startDate > f.endDate) throw new Error('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มแสดง');
   if (f.url && !/^https?:\/\/[^\s<>"']+$/i.test(f.url)) throw new Error('ลิงก์รูปต้องขึ้นต้นด้วย http:// หรือ https://');
   if (f.targetLink && !(/^https?:\/\/[^\s<>"']+$/i.test(f.targetLink) || /^#[A-Za-z0-9_-]{1,40}$/.test(f.targetLink))) throw new Error('ลิงก์ปลายทางต้องขึ้นต้นด้วย http:// หรือ https:// (หรือ #ชื่อหน้า)');
 }
@@ -2629,7 +3002,10 @@ function saveSettingsItem(payload, secureUser, ss) {
       targetLink: payload.targetLink ? payload.targetLink.toString().trim() : "",
       details: payload.details ? payload.details.toString().trim() : "",
       title: payload.title ? payload.title.toString().trim() : "",
-      buttonText: payload.buttonText ? payload.buttonText.toString().trim() : ""
+      buttonText: payload.buttonText ? payload.buttonText.toString().trim() : "",
+      // ตั้งเวลาแสดง (yyyy-MM-dd) — ตรวจรูปแบบ/วันที่จริง/ลำดับใน validateBannerFields_ (ไม่ผ่าน sanitizeSheetText_ เพราะเป็นค่าที่ผ่าน regex เท่านั้น)
+      startDate: payload.startDate ? payload.startDate.toString().trim() : "",
+      endDate: payload.endDate ? payload.endDate.toString().trim() : ""
     };
     validateBannerFields_(rawFields);
     const url = sanitizeSheetText_(rawFields.url);
@@ -2678,9 +3054,11 @@ function saveSettingsItem(payload, secureUser, ss) {
       bannersSheet.getRange(ri, 6).setValue(details);
       bannersSheet.getRange(ri, 7).setValue(title);
       bannersSheet.getRange(ri, 8).setValue(buttonText);
+      writeBannerDates_(bannersSheet, ri, rawFields.startDate, rawFields.endDate);
       logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Setting " + type + " at row " + ri + ": " + url);
     } else {
       bannersSheet.appendRow([generateId('BAN'), type, url, 'Active', targetLink, details, title, buttonText]);
+      writeBannerDates_(bannersSheet, bannersSheet.getLastRow(), rawFields.startDate, rawFields.endDate);
       logAudit(secureUser.Username, "SETTING_INSERT", "Added Setting " + type + ": " + url);
     }
     return { status: 'success' };
@@ -3002,6 +3380,267 @@ function deleteInvoice(payload, secureUser, ss) {
     sheet.deleteRow(rowIdx + 1);
     logAudit(secureUser.Username, "INVOICE_DELETE", "Deleted invoice " + data[rowIdx][headers.indexOf("Invoice No")] + " (" + invoiceId + ")");
     return { status: 'success' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===== ข่าวสาร (ชีต News + NewsCategories) — จัดการจากเมนู "จัดการข่าวสาร" (Admin เท่านั้น) =====
+// News อ่าน/เขียนตามตำแหน่งคอลัมน์ (เหมือน Orders/UI_Banners) — ห้ามแทรกกลาง เพิ่มคอลัมน์ใหม่ต่อท้ายและขยาย NEWS_HEADERS_ เท่านั้น
+// ชีตถูกสร้างเองครั้งแรกที่ Admin เปิดหน้าจัดการ (ensureNewsSheets_) — หน้าร้านอ่านผ่าน getLiveNews_ ซึ่งไม่สร้างชีต
+var NEWS_HEADERS_ = ['News ID', 'Category', 'Title', 'Detail', 'Image URL', 'Link', 'Seq', 'Status', 'Start Date', 'End Date', 'Created At', 'Created By', 'Updated At', 'Updated By'];
+var NEWS_CAT_HEADERS_ = ['Category ID', 'Category Name', 'Status'];
+var NEWS_MAX_ROWS_ = 3000;
+var NEWS_DELETE_MAX_ = 200;
+
+function ensureNewsSheets_(ss) {
+  [['News', NEWS_HEADERS_, [1, 9, 10, 11, 13]], ['NewsCategories', NEWS_CAT_HEADERS_, [1]]].forEach(function(p) {
+    let sh = ss.getSheetByName(p[0]);
+    if (!sh) sh = ss.insertSheet(p[0]);
+    if (sh.getLastRow() === 0) {
+      sh.getRange(1, 1, 1, p[1].length).setValues([p[1]]);
+      sh.setFrozenRows(1);
+      // ID / วันที่ เป็นข้อความ — กัน Sheets แปลงเป็น Date/ตัวเลขเอง
+      p[2].forEach(function(c) { sh.getRange(1, c, sh.getMaxRows(), 1).setNumberFormat('@'); });
+    } else {
+      const cur = sh.getRange(1, 1, 1, p[1].length).getValues()[0].map(function(h) { return String(h).trim(); });
+      if (cur.join('|') !== p[1].join('|')) throw new Error('หัวคอลัมน์ชีต ' + p[0] + ' ไม่ตรงกับที่ระบบกำหนด — แก้ให้ตรงหรือเปลี่ยนชื่อชีตเดิมก่อน');
+    }
+  });
+}
+
+function newsStr_(v) { return (v === null || v === undefined) ? '' : String(v); }
+
+function newsRowToObj_(r) {
+  const start = bannerDateStr_(r[8]), end = bannerDateStr_(r[9]);
+  const seq = parseInt(r[6], 10);
+  return {
+    id: newsStr_(r[0]).trim(), category: newsStr_(r[1]), title: newsStr_(r[2]), detail: newsStr_(r[3]),
+    imageUrl: newsStr_(r[4]), link: newsStr_(r[5]), seq: isNaN(seq) ? 0 : seq,
+    status: newsStr_(r[7]) === 'Inactive' ? 'Inactive' : 'Active',
+    startDate: start, endDate: end, schedule: bannerScheduleState_(start, end),
+    createdAt: newsStr_(r[10]), createdBy: newsStr_(r[11]), updatedAt: newsStr_(r[12]), updatedBy: newsStr_(r[13])
+  };
+}
+
+function newsSort_(a, b) {
+  if (a.seq !== b.seq) return a.seq - b.seq;
+  return a.createdAt < b.createdAt ? 1 : (a.createdAt > b.createdAt ? -1 : 0);
+}
+
+// หน้าร้าน: เฉพาะข่าวที่เปิดใช้งานและอยู่ในช่วงเวลา — ไม่ส่งข้อมูลผู้สร้าง/ผู้แก้ไข ไม่สร้างชีต
+function getLiveNews_(ss) {
+  const sh = ss.getSheetByName('News');
+  if (!sh || sh.getLastRow() < 2) return [];
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, NEWS_HEADERS_.length).getValues();
+  return rows.map(newsRowToObj_)
+    .filter(function(n) { return n.id && n.title && n.status === 'Active' && n.schedule === 'live'; })
+    .sort(newsSort_).slice(0, 30)
+    .map(function(n) { return { id: n.id, category: n.category, title: n.title, detail: n.detail.slice(0, 600), imageUrl: n.imageUrl, link: n.link, startDate: n.startDate, endDate: n.endDate }; });
+}
+
+function newsList(secureUser, ss) {
+  if (secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
+  ensureNewsSheets_(ss);
+  const nsh = ss.getSheetByName('News'), csh = ss.getSheetByName('NewsCategories');
+  const news = nsh.getLastRow() < 2 ? [] : nsh.getRange(2, 1, nsh.getLastRow() - 1, NEWS_HEADERS_.length).getValues().map(newsRowToObj_).filter(function(n) { return n.id; }).sort(newsSort_);
+  const cats = csh.getLastRow() < 2 ? [] : csh.getRange(2, 1, csh.getLastRow() - 1, 3).getValues()
+    .map(function(r) { return { id: newsStr_(r[0]).trim(), name: newsStr_(r[1]), status: newsStr_(r[2]) === 'Inactive' ? 'Inactive' : 'Active' }; })
+    .filter(function(c) { return c.id; });
+  const used = {};
+  news.forEach(function(n) { used[n.category] = (used[n.category] || 0) + 1; });
+  cats.forEach(function(c) { c.used = used[c.name] || 0; });
+  return { status: 'success', data: { news: news, categories: cats } };
+}
+
+function newsLinkOk_(v) { return /^https?:\/\/[^\s<>"']+$/i.test(v) || /^#[A-Za-z0-9_-]{1,40}$/.test(v); }
+
+function saveNews(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error('ไม่มีสิทธิ์จัดการข่าวสาร');
+    payload = payload || {};
+    ensureNewsSheets_(ss);
+    const t = function(v) { return (v === null || v === undefined) ? '' : String(v).trim(); };
+    const f = { id: t(payload.id), category: t(payload.category), title: t(payload.title), detail: t(payload.detail), imageUrl: t(payload.imageUrl), link: t(payload.link), status: t(payload.status) || 'Active', startDate: t(payload.startDate), endDate: t(payload.endDate) };
+    if (!f.title) throw new Error('กรุณากรอกหัวข้อ');
+    if (f.title.length > 150) throw new Error('หัวข้อยาวเกินไป (สูงสุด 150 ตัวอักษร)');
+    if (f.detail.length > 5000) throw new Error('รายละเอียดยาวเกินไป (สูงสุด 5000 ตัวอักษร)');
+    if (f.imageUrl.length > 1000 || f.link.length > 1000) throw new Error('ลิงก์ยาวเกินไป');
+    if (f.imageUrl && !/^https?:\/\/[^\s<>"']+$/i.test(f.imageUrl)) throw new Error('ลิงก์รูปต้องขึ้นต้นด้วย http:// หรือ https://');
+    if (f.link && !newsLinkOk_(f.link)) throw new Error('ลิงก์ปลายทางต้องขึ้นต้นด้วย http:// https:// หรือเป็น #เส้นทางในระบบ');
+    if (f.status !== 'Active' && f.status !== 'Inactive') throw new Error('สถานะไม่ถูกต้อง');
+    [['startDate', 'วันที่เริ่ม'], ['endDate', 'วันที่สิ้นสุด']].forEach(function(p) { if (f[p[0]] && !bannerDateValid_(f[p[0]])) throw new Error(p[1] + 'ไม่ถูกต้อง (รูปแบบ ปปปป-ดด-วว)'); });
+    if (f.startDate && f.endDate && f.startDate > f.endDate) throw new Error('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม');
+    const seq = payload.seq === undefined || payload.seq === '' || payload.seq === null ? 0 : Number(payload.seq);
+    if (!Number.isInteger(seq) || seq < 0 || seq > 9999) throw new Error('ลำดับต้องเป็นจำนวนเต็ม 0-9999');
+    if (!f.category) throw new Error('กรุณาเลือกหมวดหมู่');
+    const csh = ss.getSheetByName('NewsCategories');
+    const catNames = csh.getLastRow() < 2 ? [] : csh.getRange(2, 2, csh.getLastRow() - 1, 1).getValues().map(function(r) { return newsStr_(r[0]); });
+    if (catNames.indexOf(f.category) === -1) throw new Error('ไม่พบหมวดหมู่นี้ในระบบ — สร้างหมวดหมู่ก่อน');
+
+    const sh = ss.getSheetByName('News');
+    const now = Utilities.formatDate(new Date(), 'GMT+7', 'yyyy-MM-dd HH:mm');
+    const clean = [sanitizeSheetText_(f.category), sanitizeSheetText_(f.title), sanitizeSheetText_(f.detail), sanitizeSheetText_(f.imageUrl), sanitizeSheetText_(f.link)];
+    const last = sh.getLastRow();
+    if (f.id) {
+      const ids = last < 2 ? [] : sh.getRange(2, 1, last - 1, 1).getValues().map(function(r) { return newsStr_(r[0]).trim(); });
+      const idx = ids.indexOf(f.id);
+      if (idx === -1) throw new Error('ไม่พบข่าวนี้ (อาจถูกลบไปแล้ว) กรุณาโหลดหน้าใหม่');
+      const row = idx + 2;
+      sh.getRange(row, 2, 1, 5).setValues([clean]);
+      sh.getRange(row, 7, 1, 2).setValues([[seq, f.status]]);
+      sh.getRange(row, 9, 1, 2).setNumberFormat('@').setValues([[f.startDate, f.endDate]]);
+      sh.getRange(row, 13, 1, 2).setNumberFormat('@').setValues([[now, secureUser.Username]]);
+      logAudit(secureUser.Username, 'NEWS_UPDATE', 'Updated news ' + f.id + ': ' + f.title.slice(0, 80));
+      return { status: 'success', id: f.id };
+    }
+    if (last - 1 >= NEWS_MAX_ROWS_) throw new Error('จำนวนข่าวถึงขีดจำกัด (' + NEWS_MAX_ROWS_ + ') — ลบข่าวเก่าก่อน');
+    const id = generateId('NEWS');
+    const row = last + 1;
+    sh.getRange(row, 1, 1, 14).setNumberFormat('@');
+    sh.getRange(row, 1, 1, 14).setValues([[id, clean[0], clean[1], clean[2], clean[3], clean[4], seq, f.status, f.startDate, f.endDate, now, secureUser.Username, '', '']]);
+    sh.getRange(row, 7).setNumberFormat('0');
+    logAudit(secureUser.Username, 'NEWS_INSERT', 'Added news ' + id + ': ' + f.title.slice(0, 80));
+    return { status: 'success', id: id };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function newsIdList_(payload) {
+  const ids = payload && Array.isArray(payload.ids) ? payload.ids.map(function(v) { return String(v).trim(); }).filter(Boolean) : [];
+  if (ids.length === 0) throw new Error('ไม่ได้เลือกรายการ');
+  if (ids.length > NEWS_DELETE_MAX_) throw new Error('ลบได้ครั้งละไม่เกิน ' + NEWS_DELETE_MAX_ + ' รายการ');
+  return ids;
+}
+
+function deleteNews(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error('ไม่มีสิทธิ์จัดการข่าวสาร');
+    const ids = newsIdList_(payload);
+    ensureNewsSheets_(ss);
+    const sh = ss.getSheetByName('News');
+    const last = sh.getLastRow();
+    let deleted = 0;
+    if (last >= 2) {
+      const have = sh.getRange(2, 1, last - 1, 1).getValues().map(function(r) { return newsStr_(r[0]).trim(); });
+      for (let i = have.length - 1; i >= 0; i--) { // ลบจากล่างขึ้นบน แถวไม่เลื่อน
+        if (ids.indexOf(have[i]) !== -1) { sh.deleteRow(i + 2); deleted++; }
+      }
+    }
+    logAudit(secureUser.Username, 'NEWS_DELETE', 'Deleted ' + deleted + ' news: ' + ids.slice(0, 10).join(','));
+    return { status: 'success', deleted: deleted };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setNewsSeq(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error('ไม่มีสิทธิ์จัดการข่าวสาร');
+    ensureNewsSheets_(ss);
+    const id = payload && payload.id ? String(payload.id).trim() : '';
+    const seq = Number(payload && payload.seq);
+    if (!id) throw new Error('ไม่พบรหัสข่าว');
+    if (!Number.isInteger(seq) || seq < 0 || seq > 9999) throw new Error('ลำดับต้องเป็นจำนวนเต็ม 0-9999');
+    const sh = ss.getSheetByName('News');
+    const last = sh.getLastRow();
+    const have = last < 2 ? [] : sh.getRange(2, 1, last - 1, 1).getValues().map(function(r) { return newsStr_(r[0]).trim(); });
+    const idx = have.indexOf(id);
+    if (idx === -1) throw new Error('ไม่พบข่าวนี้ (อาจถูกลบไปแล้ว)');
+    sh.getRange(idx + 2, 7).setNumberFormat('0').setValue(seq);
+    return { status: 'success' };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function saveNewsCategory(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error('ไม่มีสิทธิ์จัดการข่าวสาร');
+    payload = payload || {};
+    ensureNewsSheets_(ss);
+    const id = payload.id ? String(payload.id).trim() : '';
+    const name = payload.name ? String(payload.name).trim() : '';
+    const status = payload.status ? String(payload.status).trim() : 'Active';
+    if (!name) throw new Error('กรุณากรอกชื่อหมวดหมู่');
+    if (name.length > 60) throw new Error('ชื่อหมวดหมู่ยาวเกินไป (สูงสุด 60 ตัวอักษร)');
+    if (status !== 'Active' && status !== 'Inactive') throw new Error('สถานะไม่ถูกต้อง');
+    const sh = ss.getSheetByName('NewsCategories');
+    const last = sh.getLastRow();
+    const rows = last < 2 ? [] : sh.getRange(2, 1, last - 1, 3).getValues();
+    const clean = sanitizeSheetText_(name);
+    let at = -1;
+    rows.forEach(function(r, i) {
+      if (newsStr_(r[0]).trim() === id && id) at = i;
+      else if (newsStr_(r[1]).trim().toLowerCase() === name.toLowerCase()) throw new Error('มีหมวดหมู่ชื่อนี้อยู่แล้ว');
+    });
+    if (id && at === -1) throw new Error('ไม่พบหมวดหมู่นี้ (อาจถูกลบไปแล้ว)');
+    if (at === -1) {
+      const newId = generateId('NCAT');
+      const row = last + 1;
+      sh.getRange(row, 1, 1, 3).setNumberFormat('@').setValues([[newId, clean, status]]);
+      logAudit(secureUser.Username, 'NEWS_CAT_INSERT', 'Added news category: ' + name);
+      return { status: 'success', id: newId };
+    }
+    const oldName = newsStr_(rows[at][1]);
+    sh.getRange(at + 2, 2, 1, 2).setValues([[clean, status]]);
+    if (oldName !== clean) { // เปลี่ยนชื่อหมวด → ข่าวที่อยู่ในหมวดนี้ตามไปด้วย
+      const nsh = ss.getSheetByName('News');
+      const nl = nsh.getLastRow();
+      if (nl >= 2) {
+        const cats = nsh.getRange(2, 2, nl - 1, 1).getValues();
+        let changed = false;
+        const out = cats.map(function(r) { if (newsStr_(r[0]) === oldName) { changed = true; return [clean]; } return r; });
+        if (changed) nsh.getRange(2, 2, nl - 1, 1).setValues(out);
+      }
+    }
+    logAudit(secureUser.Username, 'NEWS_CAT_UPDATE', 'Updated news category: ' + oldName + ' -> ' + name);
+    return { status: 'success', id: id };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteNewsCategories(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') throw new Error('ไม่มีสิทธิ์จัดการข่าวสาร');
+    const ids = newsIdList_(payload);
+    ensureNewsSheets_(ss);
+    const csh = ss.getSheetByName('NewsCategories'), nsh = ss.getSheetByName('News');
+    const cl = csh.getLastRow();
+    const rows = cl < 2 ? [] : csh.getRange(2, 1, cl - 1, 3).getValues();
+    const nl = nsh.getLastRow();
+    const used = nl < 2 ? [] : nsh.getRange(2, 2, nl - 1, 1).getValues().map(function(r) { return newsStr_(r[0]); });
+    const blocked = [];
+    rows.forEach(function(r) { if (ids.indexOf(newsStr_(r[0]).trim()) !== -1 && used.indexOf(newsStr_(r[1])) !== -1) blocked.push(newsStr_(r[1])); });
+    if (blocked.length) throw new Error('ลบไม่ได้ — ยังมีข่าวอยู่ในหมวด: ' + blocked.slice(0, 5).join(', ') + ' (ย้ายหรือลบข่าวก่อน)');
+    let deleted = 0;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (ids.indexOf(newsStr_(rows[i][0]).trim()) !== -1) { csh.deleteRow(i + 2); deleted++; }
+    }
+    logAudit(secureUser.Username, 'NEWS_CAT_DELETE', 'Deleted ' + deleted + ' news categories');
+    return { status: 'success', deleted: deleted };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
   } finally {
     lock.releaseLock();
   }

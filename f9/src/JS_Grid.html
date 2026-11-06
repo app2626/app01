@@ -22,6 +22,12 @@ window.app.grid = {
         if (table === 'Products' && !readonly) { bulkBtn.classList.remove('hidden'); bulkBtn.classList.add('flex'); }
         else { bulkBtn.classList.add('hidden'); bulkBtn.classList.remove('flex'); }
       }
+      // ปุ่มนำเข้า CSV เฉพาะหน้า Products / Branches / Channels / Members (Admin — server ตรวจสิทธิ์ซ้ำ)
+      const impBtn = document.getElementById('gridImportBtn');
+      if (impBtn) {
+        if (['Products', 'Branches', 'Channels', 'Members'].includes(table) && !readonly) { impBtn.classList.remove('hidden'); impBtn.classList.add('flex'); }
+        else { impBtn.classList.add('hidden'); impBtn.classList.remove('flex'); }
+      }
       // ปุ่ม Export CSV หน้า Orders และ Products — สลับ hidden/flex เป็นคู่ ห้ามให้สอง class อยู่พร้อมกัน
       const exBtn = document.getElementById('gridExportBtn');
       if(exBtn) {
@@ -591,6 +597,11 @@ window.app.grid = {
       }
     },
     // 5B.3 — export ตามที่กรอง/ค้น/เรียงอยู่ (filteredDataList ไม่ใช่ dataList) เป็น CSV ที่ Excel เปิดภาษาไทยถูก (BOM)
+    // ปุ่ม "นำเข้า CSV" — สินค้าใช้ตัวนำเข้าเฉพาะ (หลาย SKU/ฟิลด์ร่วมของรุ่น) ตารางอื่นใช้ตัวนำเข้ากลาง window.app.importer
+    handleImportClick: function() {
+      if (this.tableName === 'Products') return window.app.productGroup.openImport();
+      return window.app.importer.open(this.tableName);
+    },
     exportCSV: function() {
       if (this.filteredDataList.length === 0) return Swal.fire('ไม่มีข้อมูล', 'ไม่มีรายการให้ export ตามตัวกรองปัจจุบัน', 'warning');
       const cols = this.columns.filter(c => c.type !== 'hidden').map(c => c.key);

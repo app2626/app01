@@ -54,7 +54,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 
   <?!= include('CSS'); ?>
   <?!= include('TailwindCSS'); ?>
@@ -595,6 +595,9 @@
               
               <!-- แถบสินค้าที่ดูล่าสุด (Recently Viewed) -->
               <div id="posRecentlyViewed" class="hidden mb-2 shrink-0"></div>
+
+              <!-- ชั้น "ยอดนิยมตอนนี้" (รุ่นที่ถูกจองมากสุด — pos.renderPopularShelf; ซ่อนเมื่อมีคำค้น/ตัวกรอง/หน้า 2+) -->
+              <div id="posPopular" class="hidden mb-3 shrink-0"></div>
 
               <!-- 6B — category tiles + sub-chips รุ่น + filter chips (render โดย pos.renderStoreHeader) -->
               <div class="lg:flex-1 lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-6">
@@ -1260,6 +1263,9 @@
           <button class="hidden w-full sm:w-auto items-center justify-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-800 font-bold border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors text-sm shadow-sm" id="gridBulkQuickBtn" onclick="window.app.productGroup.openBulkQuickEdit()">
              <i class="fas fa-bolt text-amber-600"></i> แก้ไขราคา/สต๊อกด่วน
           </button>
+          <button class="hidden w-full sm:w-auto items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 font-bold border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-colors text-sm shadow-sm" id="gridImportBtn" onclick="window.app.grid.handleImportClick()">
+             <i class="fas fa-file-import"></i> นำเข้า CSV
+          </button>
           <button class="w-full sm:w-auto btn-enterprise btn-enterprise-primary" id="gridAddBtn" onclick="window.app.grid.handleAddClick()">
              <i class="fas fa-plus" id="gridAddBtnIcon"></i> <span id="gridAddBtnLabel">เพิ่มข้อมูล</span>
           </button>
@@ -1717,6 +1723,8 @@
   <?!= include('JS_ProductGroup'); ?>
   <?!= include('JS_Grid'); ?>
   <?!= include('JS_Settings'); ?>
+  <?!= include('JS_Import'); ?>
+  <?!= include('JS_Cms'); ?>
   <?!= include('JS_Boot'); ?>
 </body>
 </html>

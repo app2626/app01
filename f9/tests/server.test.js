@@ -193,6 +193,339 @@ t('B: delete requires matching type; correct delete works', () => {
   const r = api('DELETE_SETTINGS_ITEM', { type: 'herobanner', rowIndex: bnRow, bannerId: bnId }, admin); eq(r.status, 'success', JSON.stringify(r)); eq(sheets.UI_Banners.getLastRow(), n - 1);
 });
 t('DELETE_SETTINGS_ITEM bad row rejected', () => eq(api('DELETE_SETTINGS_ITEM', { type: 'banner', rowIndex: 9999 }, admin).status, 'error'));
+// ----- ตั้งเวลาแสดงแบนเนอร์ (Start Date / End Date) -----
+const isoDay = off => { const d = new Date(); d.setDate(d.getDate() + off); const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+t('schedule: legacy 8-column UI_Banners gets Start/End Date headers (idempotent retrofit)', () => {
+  const sh = sheets.UI_Banners; sh.rows[0].length = 8;
+  api('GET_SETTINGS_LIST', {}, admin); api('GET_SETTINGS_LIST', {}, admin);
+  eq(sh.rows[0].slice(6, 10).join('|'), 'Title|Button Text|Start Date|End Date'); eq(sh.rows[0].length, 10);
+});
+t('schedule: invalid / impossible / reversed dates rejected, nothing appended', () => {
+  const n = sheets.UI_Banners.getLastRow(), u = 'https://example.com/sch.png';
+  ['2026-13-01', '2026-02-31', 'tomorrow', '26-1-1'].forEach(d => eq(api('SAVE_SETTINGS_ITEM', { type: 'herobanner', url: u, startDate: d }, admin).status, 'error', d));
+  eq(api('SAVE_SETTINGS_ITEM', { type: 'herobanner', url: u, startDate: '2026-12-31', endDate: '2026-12-01' }, admin).status, 'error');
+  eq(sheets.UI_Banners.getLastRow(), n);
+});
+t('schedule: dates saved as text; storefront hides upcoming/expired, keeps live + unscheduled; settings list shows all with state', () => {
+  const add = (u, s, e, type) => eq(api('SAVE_SETTINGS_ITEM', { type: type || 'herobanner', url: 'https://example.com/' + u + '.png', startDate: s, endDate: e }, admin).status, 'success', u);
+  add('sch-live', isoDay(-1), isoDay(1)); add('sch-open', '', ''); add('sch-today-only', isoDay(0), isoDay(0));
+  add('sch-future', isoDay(2), isoDay(9)); add('sch-past', isoDay(-9), isoDay(-1)); add('sch-endonly-past', '', isoDay(-1)); add('sch-startonly-future', isoDay(3), '');
+  add('sch-popup-future', isoDay(1), isoDay(5), 'popupbanner'); add('sch-grid-past', '', isoDay(-2), 'promogrid');
+  const last = sheets.UI_Banners.rows.find(r => String(r[2]).includes('sch-future')); eq(typeof last[8], 'string'); eq(last[8], isoDay(2)); eq(last[9], isoDay(9));
+  const d = unwrap(api('GET_ALL_DATA', {}, admin)), has = (list, k) => list.some(b => b.url.includes(k));
+  ['sch-live', 'sch-open', 'sch-today-only'].forEach(k => ok(has(d.heroBanners, k), 'store should show ' + k));
+  ['sch-future', 'sch-past', 'sch-endonly-past', 'sch-startonly-future'].forEach(k => ok(!has(d.heroBanners, k), 'store must hide ' + k));
+  ok(!has(d.popupBanners, 'sch-popup-future') && !has(d.gridBanners, 'sch-grid-past'), 'popup/grid also scheduled');
+  const sl = api('GET_SETTINGS_LIST', {}, admin).data, st = k => sl.heroBanners.find(b => b.url.includes(k)).schedule;
+  eq(st('sch-live'), 'live'); eq(st('sch-open'), 'live'); eq(st('sch-future'), 'upcoming'); eq(st('sch-past'), 'expired'); eq(st('sch-startonly-future'), 'upcoming'); eq(st('sch-endonly-past'), 'expired');
+  eq(sl.popupBanners.find(b => b.url.includes('sch-popup-future')).schedule, 'upcoming'); eq(sl.promoGrids.find(b => b.url.includes('sch-grid-past')).schedule, 'expired');
+  eq(sl.heroBanners.find(b => b.url.includes('sch-future')).startDate, isoDay(2));
+});
+t('schedule: editing a banner can set and clear its dates; Date-typed cells are normalised', () => {
+  const sh = sheets.UI_Banners, row = sh.rows.findIndex(r => String(r[2]).includes('sch-past')) + 1, id = sh._get(row, 1);
+  eq(api('SAVE_SETTINGS_ITEM', { type: 'herobanner', rowIndex: row, bannerId: id, url: 'https://example.com/sch-past.png', startDate: '', endDate: '' }, admin).status, 'success');
+  eq(sh._get(row, 9), ''); eq(sh._get(row, 10), '');
+  ok(unwrap(api('GET_ALL_DATA', {}, admin)).heroBanners.some(b => b.url.includes('sch-past')), 'cleared schedule => visible again');
+  // Sheets may turn "2026-11-11" into a real Date cell — must read back identically
+  const dayDate = off => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() + off); return d; };
+  sh._set(row, 9, dayDate(2));
+  ok(!unwrap(api('GET_ALL_DATA', {}, admin)).heroBanners.some(b => b.url.includes('sch-past')), 'Date-typed future start => hidden');
+  eq(api('GET_SETTINGS_LIST', {}, admin).data.heroBanners.find(b => b.url.includes('sch-past')).startDate, isoDay(2));
+  sh._set(row, 9, dayDate(-3));
+  ok(unwrap(api('GET_ALL_DATA', {}, admin)).heroBanners.some(b => b.url.includes('sch-past')), 'Date-typed past start => visible');
+});
+// ----- ยอดนิยม (popularModels) -----
+t('popular: ranks models by booked qty, windows widen 7→30d, ignores cancelled/gift/discount/closed/unknown, caches 30 min, ships names only', () => {
+  const pRows = sheets.Products.rows.length, savedOrders = sheets.Orders.rows.splice(1), ph = sheets.Products.rows[0], oh = ctx.ORDERS_HEADERS_; // isolate: earlier CHECKOUT tests left real orders in the sheet
+  const addP = (sku, model, cat, status) => { const o = { SKU: sku, 'Product Name': model, Model: model, Category: cat, Status: status, Price: 100, Stock: 10, Channel: 'ALL' }; sheets.Products.rows.push(ph.map(h => (h in o ? o[h] : ''))); };
+  const NOW = new Date(), day = n => new Date(NOW.getTime() - n * 86400000);
+  const addO = (sku, qty, ts, status) => { const o = { OrderID: 'POP-' + sheets.Orders.rows.length, Timestamp: ts, SKU: sku, Qty: qty, 'Order Status': status || 'Pending' }; sheets.Orders.rows.push(oh.map(h => (h in o ? o[h] : ''))); };
+  const clear = () => { cache.remove('TABLE_Products'); cache.remove('POPULAR_MODELS_V1'); };
+  try {
+    ['A', 'B', 'C', 'D', 'E'].forEach(k => addP('POP-' + k, 'M-' + k, 'โมบาย', 'เปิด'));
+    addP('POP-GIFT', 'GIFT-M', 'ของแถมแบรนด์', 'เปิด'); addP('POP-X', 'M-X', 'โมบาย', 'ปิด');
+    addO('POP-A', 3, day(1)); addO('POP-A', 2, day(2)); addO('POP-B', 4, day(3)); addO('POP-C', 3, day(4)); addO('POP-D', 1, day(5));
+    addO('POP-C', 100, day(1), 'Cancelled'); addO('POP-GIFT', 99, day(1)); addO('DISCOUNT', 99, day(1)); addO('POP-X', 99, day(1)); addO('NO-SUCH-SKU', 99, day(1));
+    addO('POP-E', 50, day(20));
+    clear();
+    eq(ctx.getPopularModels_(ss, NOW), ['M-A', 'M-B', 'M-C', 'M-D'], '7-day window has 4 models, M-E (20 days ago) excluded');
+    const later = new Date(NOW.getTime() + 10 * 86400000);
+    eq(ctx.getPopularModels_(ss, later), ['M-A', 'M-B', 'M-C', 'M-D'], 'served from cache');
+    cache.remove('POPULAR_MODELS_V1');
+    eq(ctx.getPopularModels_(ss, later), ['M-E', 'M-A', 'M-B', 'M-C', 'M-D'], '7-day window empty (<4) -> widens to 30 days');
+    clear(); const d = unwrap(api('GET_ALL_DATA', {}, sales));
+    ok(Array.isArray(d.popularModels) && d.popularModels.length > 0 && d.popularModels.every(s => typeof s === 'string'), JSON.stringify(d.popularModels));
+    ok(!JSON.stringify(d.popularModels).match(/\d{3,}/), 'no counts/customer data in payload: ' + JSON.stringify(d.popularModels));
+  } finally {
+    sheets.Products.rows.length = pRows; sheets.Orders.rows.length = 1; sheets.Orders.rows.push(...savedOrders); clear();
+  }
+});
+// ----- IMPORT_PRODUCTS (นำเข้า CSV) -----
+t('import: Admin only; dryRun never writes; real run adds only new valid SKUs; reports skipped/rejected', () => {
+  const ph = sheets.Products.rows[0], before = sheets.Products.rows.length;
+  const existing = sheets.Products.rows[1], exSku = existing[ph.indexOf('SKU')];
+  const base = { Model: 'IMP-M1', 'Marketing Model': 'Import One', Capacity: '256GB', Price: '29,900', Category: 'โมบาย', Stock: '5' };
+  const rows = [
+    Object.assign({}, base, { SKU: 'IMP-A', Color: 'Black' }),
+    Object.assign({}, base, { SKU: 'IMP-B', Color: 'White', Stock: '0', Status: 'ปิด' }),
+    { SKU: exSku, Model: 'IMP-M1', Stock: '1' },
+    { SKU: 'IMP-A', Model: 'IMP-M1', Stock: '1' },
+    { SKU: '', Model: 'IMP-M1', Stock: '1' },
+    { SKU: 'IMP-BADSTOCK', Model: 'IMP-M1', Stock: '-3' },
+    { SKU: 'IMP-BADSTATUS', Model: 'IMP-M1', Stock: '1', Status: 'พัง' },
+    { SKU: '=HYPERLINK("x")', Model: 'IMP-M1', Stock: '1' },
+    { SKU: 'IMP-NEWMODEL-NOPRICE', Model: 'IMP-M2', 'Marketing Model': 'x', Capacity: '1', Category: 'โมบาย', Stock: '1' },
+    { SKU: 'IMP-NEWMODEL-NOCAT', Model: 'IMP-M3', 'Marketing Model': 'x', Capacity: '1', Price: '10', Stock: '1' }
+  ];
+  try {
+    eq(api('IMPORT_PRODUCTS', { rows: rows, dryRun: true }, sales).status, 'error', 'Sales must be rejected');
+    const dry = unwrap(api('IMPORT_PRODUCTS', { rows: rows, dryRun: true }, admin));
+    eq([dry.dryRun, dry.created, dry.skippedCount, dry.errorCount, dry.total], [true, 2, 2, 6, 10]);
+    eq(sheets.Products.rows.length, before, 'dryRun must not write');
+    const real = unwrap(api('IMPORT_PRODUCTS', { rows: rows, dryRun: false }, admin));
+    eq([real.created, real.skippedCount, real.errorCount], [2, 2, 6]);
+    eq(sheets.Products.rows.length, before + 2);
+    const get = (sku) => { const r = sheets.Products.rows.find(x => x[ph.indexOf('SKU')] === sku); const o = {}; ph.forEach((h, i) => { o[h] = r ? r[i] : undefined; }); return r ? o : null; };
+    const a = get('IMP-A'), b = get('IMP-B');
+    eq(a.Price, 29900); eq(a.Stock, 5); eq(a.Status, 'เปิด'); eq(a.Channel, 'ALL'); eq(a.Category, 'โมบาย'); eq(a.Model, 'IMP-M1');
+    eq(a['Product Name'], ctx.buildAutoProductName_('IMP-M1', 'Black'), 'Product Name is derived, never typed');
+    ok(a.Display !== '' || a.Processor !== '', 'specs inferred when none given');
+    eq([b.Stock, b.Status, b.Price], [0, 'ปิด', 29900], 'second SKU of same new model shares first row price');
+    eq(get('IMP-BADSTOCK'), null); eq(get('IMP-NEWMODEL-NOPRICE'), null); eq(get('IMP-NEWMODEL-NOCAT'), null);
+    ok(!sheets.Products.rows.some(x => String(x[ph.indexOf('SKU')]).startsWith('=')), 'formula-looking SKU rejected');
+    sheets.Products.rows.slice(before).forEach(r => eq(r.length, ph.length, 'row width'));
+    eq(all.products.length, 6); // GET_ALL_DATA snapshot taken earlier is unaffected
+    ok(unwrap(api('GET_ALL_DATA', {}, admin)).products.some(p => p.SKU === 'IMP-A'), 'cache busted: new SKU visible');
+    ok(sheets.AuditLog.rows.some(r => r.join('|').includes('IMPORT_PRODUCTS')), 'audit log entry written');
+    eq(unwrap(api('IMPORT_PRODUCTS', { rows: rows, dryRun: false }, admin)).created, 0, 're-import adds nothing (idempotent)');
+  } finally { sheets.Products.rows.length = before; cache.remove('TABLE_Products'); }
+});
+t('import: existing Model keeps its shared fields (warns on price/capacity mismatch); formula text in free fields is neutralised', () => {
+  const ph = sheets.Products.rows[0], before = sheets.Products.rows.length, ex = sheets.Products.rows[1];
+  const exModel = ex[ph.indexOf('Model')], exPrice = ex[ph.indexOf('Price')];
+  try {
+    const r = unwrap(api('IMPORT_PRODUCTS', { rows: [{ SKU: 'IMP-EX1', Model: exModel, Color: '=cmd|calc', Price: '1', Capacity: 'ZZ', Stock: '2', 'Image URL': '+evil' }], dryRun: false }, admin));
+    eq([r.created, r.warningCount], [1, 2]);
+    const row = sheets.Products.rows[sheets.Products.rows.length - 1];
+    eq(row[ph.indexOf('Price')], exPrice, 'price taken from the existing model row');
+    ok(!String(row[ph.indexOf('Color')]).startsWith('='), 'Color neutralised: ' + row[ph.indexOf('Color')]);
+    ok(!String(row[ph.indexOf('Image URL')]).startsWith('+'), 'Image URL neutralised');
+    ok(!String(row[ph.indexOf('Product Name')]).startsWith('='), 'Product Name neutralised');
+  } finally { sheets.Products.rows.length = before; cache.remove('TABLE_Products'); }
+});
+t('import: scientific-notation SKU/Model (Excel 8.65E+13) rejected with a clear reason; ="..." and leading-apostrophe text forms are unwrapped; SKU values written as strings', () => {
+  const ph = sheets.Products.rows[0], before = sheets.Products.rows.length;
+  const base = { Model: 'SCI-M', 'Marketing Model': 'Sci', Capacity: '1', Price: '10', Category: 'โมบาย', Stock: '1' };
+  const rows = [
+    Object.assign({}, base, { SKU: '8.65E+13' }),
+    Object.assign({}, base, { SKU: '1E+13' }),
+    Object.assign({}, base, { SKU: 'OK-1', Model: '3.2E+9' }),
+    Object.assign({}, base, { SKU: '="86500000000001"' }),
+    Object.assign({}, base, { SKU: "'86500000000002" }),
+    Object.assign({}, base, { SKU: 'e+13x' }),
+    Object.assign({}, base, { SKU: 'ABC-E+13' })
+  ];
+  try {
+    const dry = unwrap(api('IMPORT_PRODUCTS', { rows: rows, dryRun: true }, admin));
+    eq([dry.created, dry.errorCount], [4, 3], JSON.stringify(dry.errors));
+    ok(dry.errors.every(e => /เลขวิทยาศาสตร์/.test(e.reason)), 'reason must explain scientific notation: ' + JSON.stringify(dry.errors));
+    ok(unwrap(api('IMPORT_PRODUCTS', { rows: rows, dryRun: false }, admin)).created === 4);
+    const col = (h) => sheets.Products.rows.slice(before).map(r => r[ph.indexOf(h)]);
+    eq(col('SKU').sort(), ['86500000000001', '86500000000002', 'ABC-E+13', 'e+13x'].sort(), 'wrapped/apostrophe forms stored as plain digits');
+    ok(col('SKU').every(v => typeof v === 'string'), 'SKU values written as strings');
+  } finally { sheets.Products.rows.length = before; cache.remove('TABLE_Products'); }
+});
+// ----- IMPORT_RECORDS (สาขา / ช่องทางขาย / สมาชิก) -----
+const importSnap = (names) => { const snap = {}; names.forEach(n => { snap[n] = sheets[n].rows.length; }); return () => { names.forEach(n => { sheets[n].rows.length = snap[n]; cache.remove('TABLE_' + n); }); }; };
+const imp = (table, rows, dryRun, who) => api('IMPORT_RECORDS', { table: table, rows: rows, dryRun: dryRun === true }, who || admin);
+t('import records: Admin only, unknown/forbidden tables rejected (Orders/Products/Members-secret paths unreachable)', () => {
+  eq(imp('Branches', [{ 'Branch Code': 'X1', 'Branch Name': 'x', Channel: 'c' }], true, sales).status, 'error');
+  ['Orders', 'Products', 'AuditLog', 'Settings', '__proto__', 'constructor', '', undefined].forEach(tb => eq(imp(tb, [{ a: 1 }], true).status, 'error', 'table ' + tb));
+});
+t('import branches: adds new codes only; Channel/Name required; dup + in-file dup skipped; sci-notation/formula codes rejected; code stored as text', () => {
+  const restore = importSnap(['Branches']); const bh = sheets.Branches.rows[0], before = sheets.Branches.rows.length;
+  const exCode = sheets.Branches.rows[1][bh.indexOf('Branch Code')], exChannel = sheets.Branches.rows[1][bh.indexOf('Channel')];
+  const rows = [
+    { Channel: exChannel, 'Branch Code': 'IMPB1', 'Branch Name': 'Import B1', Area: 'A', Province: 'กทม' },
+    { Channel: 'NEW-CH', 'Branch Code': '="86500000000001"', 'Branch Name': 'Import B2' },
+    { Channel: exChannel, 'Branch Code': exCode, 'Branch Name': 'dup of existing' },
+    { Channel: exChannel, 'Branch Code': 'IMPB1', 'Branch Name': 'dup in file' },
+    { Channel: exChannel, 'Branch Code': '8.65E+13', 'Branch Name': 'sci' },
+    { Channel: exChannel, 'Branch Code': '=cmd', 'Branch Name': 'formula id' },
+    { Channel: '', 'Branch Code': 'IMPB-NOCH', 'Branch Name': 'no channel' },
+    { Channel: exChannel, 'Branch Code': 'IMPB-NONAME', 'Branch Name': '' },
+    { Channel: '=evil', 'Branch Code': 'IMPB3', 'Branch Name': '+bad' }
+  ];
+  try {
+    const dry = unwrap(imp('Branches', rows, true));
+    eq([dry.created, dry.skippedCount, dry.errorCount], [3, 2, 4], JSON.stringify(dry.errors));
+    ok(dry.warnings.some(w => /NEW-CH/.test(w.reason)), 'unknown channel warning');
+    eq(sheets.Branches.rows.length, before, 'dryRun must not write');
+    const real = unwrap(imp('Branches', rows, false));
+    eq([real.created, real.skippedCount, real.errorCount], [3, 2, 4]);
+    const added = sheets.Branches.rows.slice(before).map(r => { const o = {}; bh.forEach((h, i) => { o[h] = r[i]; }); return o; });
+    eq(added.map(o => o['Branch Code']), ['IMPB1', '86500000000001', 'IMPB3']);
+    ok(added.every(o => typeof o['Branch Code'] === 'string'), 'codes are strings');
+    ok(!added.some(o => String(o.Channel).startsWith('=') || String(o['Branch Name']).startsWith('+')), 'free text neutralised');
+    ok(unwrap(api('GET_ALL_DATA', {}, admin)).branches.some(b => b['Branch Code'] === 'IMPB1'), 'cache busted');
+    eq(unwrap(imp('Branches', rows, false)).created, 0, 're-import idempotent');
+  } finally { restore(); }
+});
+t('import channels: blank ID auto-numbers after the highest CH-nn; explicit IDs kept; dup ID skipped; duplicate name warned', () => {
+  const restore = importSnap(['Channels']); const ch = sheets.Channels.rows[0], before = sheets.Channels.rows.length;
+  const ids = sheets.Channels.rows.slice(1).map(r => String(r[ch.indexOf('Channel ID')]));
+  const maxN = Math.max(0, ...ids.map(v => { const m = /^CH-(\d+)$/.exec(v); return m ? parseInt(m[1], 10) : 0; }));
+  const exName = sheets.Channels.rows[1][ch.indexOf('Channel Name')], exId = sheets.Channels.rows[1][ch.indexOf('Channel ID')];
+  const pad = n => String(n).padStart(2, '0');
+  try {
+    const r = unwrap(imp('Channels', [
+      { 'Channel ID': '', 'Channel Name': 'Imp One', Description: 'd1' },
+      { 'Channel ID': '', 'Channel Name': '' },
+      { 'Channel Name': 'Imp Two' },
+      { 'Channel ID': 'CUSTOM-9', 'Channel Name': 'Imp Custom' },
+      { 'Channel ID': exId, 'Channel Name': 'dup id' },
+      { 'Channel ID': '', 'Channel Name': exName }
+    ], false));
+    eq([r.created, r.skippedCount, r.errorCount, r.warningCount], [4, 1, 1, 1], JSON.stringify([r.errors, r.warnings]));
+    const added = sheets.Channels.rows.slice(before).map(x => x[ch.indexOf('Channel ID')]);
+    eq(added, ['CH-' + pad(maxN + 1), 'CH-' + pad(maxN + 2), 'CUSTOM-9', 'CH-' + pad(maxN + 3)]);
+  } finally { restore(); }
+});
+t('import members: roles/branches validated; passwords hashed (login works); blank => random shown once only on real run; hashes pass through; never logged', () => {
+  const restore = importSnap(['Members']); const mh = sheets.Members.rows[0], before = sheets.Members.rows.length;
+  const branch = sheets.Branches.rows[1][sheets.Branches.rows[0].indexOf('Branch Code')];
+  const knownHash = ctx.hashPassword('Known-Pass-1');
+  const rows = [
+    { Username: 'imp.sales', Password: 'Secret-123', Role: 'sales', Name: 'Imp Sales', 'Branch Code': branch, 'Accessible Menus': 'pos, orders' },
+    { Username: 'imp.mgr', Password: '', Role: 'Manager', Name: 'Imp Mgr', 'Branch Code': 'ALL' },
+    { Username: 'imp.admin', Password: knownHash, Role: 'Admin', Name: 'Imp Admin', 'Branch Code': '', 'Accessible Menus': '*' },
+    { Username: 'IMP.SALES', Role: 'Sales', Name: 'case dup', 'Branch Code': branch },
+    { Username: 'admin', Role: 'Sales', Name: 'dup existing', 'Branch Code': branch },
+    { Username: 'imp.badrole', Role: 'Owner', Name: 'x', 'Branch Code': branch },
+    { Username: 'imp.nobranch', Role: 'Sales', Name: 'x' },
+    { Username: 'imp.ghostbranch', Role: 'Sales', Name: 'x', 'Branch Code': 'NOPE-999' },
+    { Username: 'imp.shortpw', Password: 'abc', Role: 'Sales', Name: 'x', 'Branch Code': branch },
+    { Username: 'bad name!', Role: 'Sales', Name: 'x', 'Branch Code': branch },
+    { Username: 'imp.badmenu', Role: 'Sales', Name: 'x', 'Branch Code': branch, 'Accessible Menus': 'pos;<script>' },
+    { Username: 'imp.noname', Role: 'Sales', Name: '', 'Branch Code': branch }
+  ];
+  try {
+    const dry = unwrap(imp('Members', rows, true));
+    eq([dry.created, dry.skippedCount, dry.errorCount, dry.generatedCount], [3, 2, 7, 1], JSON.stringify([dry.errors, dry.skipped]));
+    ok(dry.generatedPasswords === undefined && !JSON.stringify(dry).includes('Secret-123'), 'dryRun must not generate or echo passwords');
+    ok(dry.warnings.some(w => /Admin/.test(w.reason)) && dry.warnings.some(w => /ALL/.test(w.reason)), 'admin / ALL warnings');
+    eq(sheets.Members.rows.length, before, 'dryRun must not write');
+    const real = unwrap(imp('Members', rows, false));
+    eq([real.created, real.errorCount], [3, 7]);
+    eq(real.generatedPasswords.length, 1); eq(real.generatedPasswords[0].username, 'imp.mgr'); eq(real.generatedPasswords[0].password.length, 16);
+    const row = (u) => { const r = sheets.Members.rows.find(x => x[mh.indexOf('Username')] === u); const o = {}; mh.forEach((h, i) => { o[h] = r[i]; }); return o; };
+    const s1 = row('imp.sales'), m1 = row('imp.mgr'), a1 = row('imp.admin');
+    eq([s1.Role, s1['Accessible Menus'], s1['Branch Code']], ['Sales', 'pos,orders', branch]);
+    eq([m1.Role, a1['Branch Code'], a1.Password], ['Manager', 'ALL', knownHash], 'blank branch => ALL for Admin; given hash kept');
+    ok(/^[a-f0-9]{64}$/.test(s1.Password) && s1.Password !== 'Secret-123', 'plain password stored hashed');
+    ok(api('LOGIN', { username: 'imp.sales', password: 'Secret-123' }).status !== 'error', 'imported password logs in');
+    ok(api('LOGIN', { username: 'imp.mgr', password: real.generatedPasswords[0].password }).status !== 'error', 'generated password logs in');
+    ok(api('LOGIN', { username: 'imp.admin', password: 'Known-Pass-1' }).status !== 'error', 'hash-imported password logs in');
+    const log = JSON.stringify(sheets.AuditLog.rows);
+    ok(!log.includes('Secret-123') && !log.includes(real.generatedPasswords[0].password), 'no password in AuditLog');
+    ok(!JSON.stringify(unwrap(api('GET_ALL_DATA', {}, admin)).members).includes('Password'), 'members payload still strips Password');
+    ok(unwrap(imp('Members', rows, false)).generatedPasswords === undefined, 're-import generates nothing');
+  } finally { restore(); }
+});
+// ----- NEWS (ข่าวสาร) -----
+const newsSnap = () => { const had = { News: !!sheets.News, NewsCategories: !!sheets.NewsCategories }; return () => { Object.keys(had).forEach(n => { if (!had[n]) delete sheets[n]; }); cache.removeAll && cache.removeAll(); }; };
+const newsLoad = () => unwrap(api('NEWS_LIST', {}, admin)).data;
+t('news: every action is Admin-only; NEWS_LIST auto-creates both sheets with the fixed headers', () => {
+  const restore = newsSnap();
+  try {
+    ['NEWS_LIST', 'NEWS_SAVE', 'NEWS_DELETE', 'NEWS_SET_SEQ', 'NEWS_CAT_SAVE', 'NEWS_CAT_DELETE'].forEach(a => eq(api(a, { ids: ['x'], id: 'x', seq: 1, name: 'n', title: 't' }, sales).status, 'error', a));
+    ok(!sheets.News, 'sales must not create the sheets');
+    const d = newsLoad();
+    eq([d.news.length, d.categories.length], [0, 0]);
+    eq(sheets.News.rows[0], ctx.NEWS_HEADERS_); eq(sheets.NewsCategories.rows[0], ctx.NEWS_CAT_HEADERS_);
+  } finally { restore(); }
+});
+t('news: categories — name required/unique (case-insensitive), rename cascades to news, delete blocked while in use', () => {
+  const restore = newsSnap();
+  try {
+    newsLoad();
+    eq(api('NEWS_CAT_SAVE', { name: '  ' }, admin).status, 'error');
+    const a = unwrap(api('NEWS_CAT_SAVE', { name: 'SAMSUNG' }, admin));
+    eq(api('NEWS_CAT_SAVE', { name: 'samsung' }, admin).status, 'error', 'dup name');
+    unwrap(api('NEWS_CAT_SAVE', { name: 'We are family' }, admin));
+    const n = unwrap(api('NEWS_SAVE', { category: 'SAMSUNG', title: 'ข่าวหนึ่ง' }, admin));
+    const del = api('NEWS_CAT_DELETE', { ids: [a.id] }, admin);
+    ok(del.status === 'error' && /SAMSUNG/.test(del.message), 'in-use category must not be deleted: ' + JSON.stringify(del));
+    unwrap(api('NEWS_CAT_SAVE', { id: a.id, name: 'SAMSUNG GALAXY', status: 'Active' }, admin));
+    eq(newsLoad().news[0].category, 'SAMSUNG GALAXY', 'rename cascades');
+    unwrap(api('NEWS_DELETE', { ids: [n.id] }, admin));
+    eq(unwrap(api('NEWS_CAT_DELETE', { ids: [a.id] }, admin)).deleted, 1);
+    eq(newsLoad().categories.map(c => c.name), ['We are family']);
+  } finally { restore(); }
+});
+t('news: save validation — title/category required, category must exist, links http(s)/#route only, dates/seq/status checked, nothing written on failure', () => {
+  const restore = newsSnap();
+  try {
+    newsLoad(); unwrap(api('NEWS_CAT_SAVE', { name: 'A' }, admin));
+    const bad = (o, re) => { const r = api('NEWS_SAVE', Object.assign({ category: 'A', title: 'T' }, o), admin); ok(r.status === 'error' && (!re || re.test(r.message)), JSON.stringify(o) + ' => ' + JSON.stringify(r)); };
+    bad({ title: '' }, /หัวข้อ/); bad({ category: '' }, /หมวดหมู่/); bad({ category: 'ZZZ' }, /ไม่พบหมวดหมู่/);
+    bad({ link: 'javascript:alert(1)' }); bad({ imageUrl: 'data:image/png;base64,AAAA' }); bad({ link: 'ftp://x.y' });
+    bad({ startDate: '2026-13-40' }); bad({ startDate: '2026-05-02', endDate: '2026-05-01' }, /ก่อน/);
+    bad({ seq: -1 }); bad({ seq: 1.5 }); bad({ seq: 10000 }); bad({ status: 'Deleted' });
+    bad({ title: 'x'.repeat(151) }); bad({ detail: 'x'.repeat(5001) });
+    eq(newsLoad().news.length, 0, 'failed saves must not write');
+    unwrap(api('NEWS_SAVE', { category: 'A', title: 'ok', link: '#pos', imageUrl: 'https://x.y/a.png' }, admin));
+    eq(newsLoad().news.length, 1);
+  } finally { restore(); }
+});
+t('news: create/edit/seq/order; formula text neutralised; creator+updater recorded; dates stored as text; audit has no body text', () => {
+  const restore = newsSnap();
+  try {
+    newsLoad(); unwrap(api('NEWS_CAT_SAVE', { name: 'A' }, admin));
+    const a = unwrap(api('NEWS_SAVE', { category: 'A', title: '=HYPERLINK("x")', detail: '+evil', seq: 5, startDate: '2026-01-01', endDate: '2099-12-31' }, admin));
+    const b = unwrap(api('NEWS_SAVE', { category: 'A', title: 'B', seq: 1 }, admin));
+    let list = newsLoad().news;
+    eq(list.map(n => n.id), [b.id, a.id], 'ordered by Seq asc');
+    ok(String(sheets.News.rows[1][2]).startsWith("'=") && String(sheets.News.rows[1][3]).startsWith("'+"), 'formula guard: ' + sheets.News.rows[1].slice(2, 4));
+    eq([list[1].createdBy, list[1].updatedBy], ['admin', ''], 'created by admin, not yet updated');
+    unwrap(api('NEWS_SET_SEQ', { id: a.id, seq: 0 }, admin));
+    eq(newsLoad().news.map(n => n.id), [a.id, b.id], 'seq edit re-orders');
+    eq(api('NEWS_SET_SEQ', { id: a.id, seq: 'abc' }, admin).status, 'error');
+    eq(api('NEWS_SET_SEQ', { id: 'ghost', seq: 1 }, admin).status, 'error');
+    unwrap(api('NEWS_SAVE', { id: b.id, category: 'A', title: 'B2', seq: 1, status: 'Inactive' }, admin));
+    list = newsLoad().news; const b2 = list.find(n => n.id === b.id);
+    eq([b2.title, b2.status, b2.updatedBy], ['B2', 'Inactive', 'admin']);
+    ok(typeof sheets.News.rows[1][8] === 'string', 'start date stored as text');
+    eq(api('NEWS_SAVE', { id: 'ghost', category: 'A', title: 'x' }, admin).status, 'error', 'unknown id must not create');
+    ok(!JSON.stringify(sheets.AuditLog.rows).includes('+evil'), 'detail text not copied into AuditLog');
+  } finally { restore(); }
+});
+t('news: storefront (GET_ALL_DATA) gets only Active + in-window news, without creator/audit fields; bulk delete works and is capped', () => {
+  const restore = newsSnap();
+  try {
+    newsLoad(); unwrap(api('NEWS_CAT_SAVE', { name: 'A' }, admin));
+    const mk = (o) => unwrap(api('NEWS_SAVE', Object.assign({ category: 'A', title: 'n' }, o), admin)).id;
+    const live = mk({ title: 'live', seq: 2 }), live2 = mk({ title: 'live-first', seq: 1 });
+    mk({ title: 'off', status: 'Inactive' }); mk({ title: 'future', startDate: '2099-01-01' }); mk({ title: 'old', endDate: '2000-01-01' });
+    const pub = unwrap(api('GET_ALL_DATA', {}, sales)).news;
+    eq(pub.map(n => n.title), ['live-first', 'live']);
+    ok(pub.every(n => !('createdBy' in n) && !('updatedBy' in n) && !('status' in n)), 'no internal fields');
+    eq(unwrap(api('NEWS_DELETE', { ids: [live, live2, 'ghost'] }, admin)).deleted, 2);
+    eq(unwrap(api('GET_ALL_DATA', {}, sales)).news.length, 0);
+    eq(api('NEWS_DELETE', { ids: [] }, admin).status, 'error');
+    eq(api('NEWS_DELETE', { ids: Array.from({ length: 201 }, (_, i) => 'x' + i) }, admin).status, 'error', 'cap');
+  } finally { restore(); }
+});
+t('import: empty / >1000 rows rejected; malformed payload never throws', () => {
+  eq(api('IMPORT_PRODUCTS', { rows: [] }, admin).status, 'error');
+  eq(api('IMPORT_PRODUCTS', {}, admin).status, 'error');
+  const many = Array.from({ length: 1001 }, (_, i) => ({ SKU: 'X' + i, Model: 'X', Stock: '1' }));
+  const r = api('IMPORT_PRODUCTS', { rows: many, dryRun: true }, admin);
+  ok(r.status === 'error' && /1000/.test(r.message), JSON.stringify(r).slice(0, 160));
+  const odd = unwrap(api('IMPORT_PRODUCTS', { rows: [null, 5, 'x', {}, { SKU: { a: 1 }, Model: ['m'] }], dryRun: true }, admin));
+  eq([odd.created, odd.errorCount], [0, 5]);
+});
+t('popular: no Orders sheet data => empty list, never throws', () => { const o = sheets.Orders.rows.splice(1); cache.remove('POPULAR_MODELS_V1'); try { eq(ctx.getPopularModels_(ss, new Date()), []); } finally { sheets.Orders.rows.push(...o); cache.remove('POPULAR_MODELS_V1'); } });
 t('VALIDATE_COUPON unknown code', () => { const r = api('VALIDATE_COUPON', { code: 'NOPE', total: 1000 }, sales); ok(r && (r.valid === false || r.status === 'error' || r.success === false), JSON.stringify(r)); });
 let invId;
 t('SAVE_INVOICE', () => { const r = api('SAVE_INVOICE', { data: { invoiceNo: 'INV-T1', invoiceDate: '=1+1', customerName: 'x', itemsJson: JSON.stringify([{ desc: 'ของ', qty: 1, price: 100 }]) } }, sales); eq(r.status, 'success', JSON.stringify(r)); invId = r.invoiceId || r.id; });
@@ -203,6 +536,16 @@ t('APPROVE_INVOICE by Sales blocked', () => { let blocked = false; try { const r
 t('APPROVE_INVOICE by admin', () => { const r = api('APPROVE_INVOICE', { invoiceId: invId }, admin); ok(r.status !== 'error', JSON.stringify(r)); });
 t('DELETE_INVOICE', () => { const r = api('DELETE_INVOICE', { invoiceId: invId }, admin); ok(r.status !== 'error', JSON.stringify(r)); });
 t('CLEAR_CACHE admin', () => { const r = api('CLEAR_CACHE', {}, admin); ok(r && r.status !== 'error', JSON.stringify(r)); });
+t('BULK_UPDATE_PRODUCTS applies the exact payload the quick-edit modal sends (SKU/Price/Stock Qty) and the API-style keys', () => {
+  const ph = sheets.Products.rows[0], row = sheets.Products.rows[1], sku = row[ph.indexOf('SKU')], si = ph.indexOf('Stock'), pi = ph.indexOf('Price'), oldStock = row[si], oldPrice = row[pi];
+  try {
+    const a = unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: sku, Price: 1234, 'Original Price': '', 'Stock Qty': 77, Status: 'เปิด' }] }, admin));
+    eq([a.updatedCount, row[si], row[pi]], [1, 77, 1234], 'client-shaped payload must change the sheet');
+    const b = unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ sku: sku, price: 1500, stock: 55 }] }, admin));
+    eq([b.updatedCount, row[si], row[pi]], [1, 55, 1500], 'API-shaped payload still works');
+    eq(unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: 'NO-SUCH', Price: 1 }, null, 7] }, admin)).updatedCount, 0);
+  } finally { row[si] = oldStock; row[pi] = oldPrice; cache.remove('TABLE_Products'); }
+});
 t('BULK_UPDATE_PRODUCTS admin', () => { const r = api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: 'SKU-S24U', Stock: 77 }], rows: [{ SKU: 'SKU-S24U', Stock: 77 }] }, admin); ok(r && typeof r === 'object', JSON.stringify(r).slice(0, 150)); });
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
 
