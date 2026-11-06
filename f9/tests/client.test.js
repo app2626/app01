@@ -156,6 +156,23 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   const P = (e) => ev(e);
   await T('capacity multi-select is a union (128GB, then +256GB = all 30)', async () => { await P("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('capacity','128GB');true"); await sleep(250); const a = await countText(); ok(/\((15|1\d) /.test(a) && !/\(30 /.test(a), 'after 128GB: ' + a); await P("window.app.pos.setStoreFilter('capacity','256GB');true"); await sleep(250); ok(/\(31 /.test(await countText()), 'after +256GB: ' + await countText()); ok(await P("document.querySelectorAll('#storeSidebar .sf-group')[3] ? true : true")); });
   await T('clicking a checked option unchecks it (toggle)', async () => { await P("window.app.pos.setStoreFilter('capacity','256GB');true"); await sleep(250); ok(await P("JSON.stringify(window.app.pos.storeFilters.capacities)==='[\"128GB\"]'")); });
+  await T('capacity/color options are scoped to the selected category (and series); stale selections are pruned', async () => {
+    const r = JSON.parse(await P(`(()=>{ const pos=window.app.pos, ps=(window.app.globalData.products||[]).filter(p=>p.Status==='เปิด'); const out={};
+      const labels=(title)=>{ const d=[...document.querySelectorAll('#storeSidebar details')].find(x=>x.querySelector('summary').textContent.includes(title)); return d?[...d.querySelectorAll('.sf-lbl')].map(x=>x.textContent):[]; };
+      const uniq=(cat,k)=>[...new Set(ps.filter(p=>(p.Category||'').trim()===cat).map(p=>(p[k]||'').trim()).filter(v=>v&&v!=='-'))].sort();
+      pos.clearStoreFilters(false);
+      const cats=[...new Set(ps.map(p=>(p.Category||'').trim()).filter(Boolean))];
+      out.pairs=[]; cats.forEach(c=>{ pos.setStoreCategory(c); out.pairs.push([c, JSON.stringify(labels('ความจุ').slice().sort())===JSON.stringify(uniq(c,'Capacity')), JSON.stringify(labels('สี').slice().sort())===JSON.stringify(uniq(c,'Color'))]); });
+      const all=[...new Set(ps.map(p=>(p.Capacity||'').trim()).filter(v=>v&&v!=='-'))];
+      out.someNarrower=cats.some(c=>uniq(c,'Capacity').length<all.length);
+      pos.clearStoreFilters(false); const c0=cats.find(c=>uniq(c,'Capacity').length<all.length);
+      const foreign=all.find(v=>!uniq(c0,'Capacity').includes(v));
+      pos.storeFilters.capacities=[foreign]; pos.setStoreCategory(c0); out.pruned=pos.storeFilters.capacities.length===0;
+      pos.clearStoreFilters(false); return JSON.stringify(out); })()`));
+    ok(r.someNarrower, 'fixture needs a category with fewer capacities than the whole shop');
+    r.pairs.forEach(x => ok(x[1] && x[2], 'options of category ' + x[0] + ' must match its own products: ' + JSON.stringify(x)));
+    ok(r.pruned, 'capacity from another category must be dropped on category change');
+  });
   await T('multi series: two series = union', async () => { await P("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreGroup('Series-1');true"); await sleep(250); const one = parseInt((await countText()).match(/\d+/)[0], 10); await P("window.app.pos.setStoreGroup('Series-2');true"); await sleep(250); const two = parseInt((await countText()).match(/\d+/)[0], 10); ok(two > one, one + ' -> ' + two); ok(/Series-1, Series-2/.test(await P("document.querySelector('.sf-crumb').textContent")), 'breadcrumb'); });
   await T('color filter keeps only matching variants', async () => { await P("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('color','Blue');true"); await sleep(300); ok(/\(20 /.test(await countText()), await countText()); ok(await P("[...document.querySelectorAll('#productGrid .pos-card')].every(c=>!c.querySelector('.color-dot[title=\"Black\"]'))"), 'non-Blue dots leaked'); });
   await T('custom min/max price filters; inverted input is swapped', async () => { await P("window.app.pos.clearStoreFilters(false);document.getElementById('sfPriceMin').value='20000';document.getElementById('sfPriceMax').value='10000';window.app.pos.applyPriceInputs();true"); await sleep(300); const f = JSON.parse(await P("JSON.stringify(window.app.pos.storeFilters)")); eq(f.priceMin, 10000); eq(f.priceMax, 20000); ok(await P("window.app.pos.lastList.length>0 && window.app.pos.lastList.every(p=>{const v=parseFloat(String(p.Price).replace(/[^\\d.]/g,''));return v>=10000&&v<=20000})"), 'out-of-range product listed'); ok(await P("document.getElementById('sfPriceMin').value==='10000'"), 'inputs not repopulated'); });
