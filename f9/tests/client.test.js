@@ -360,6 +360,25 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     r.cards.forEach((c, i) => { ok(c.startsWith((i + 1) + '|'), 'rank order ' + c); ok(c.includes(r.skus[i]), 'cheapest in-stock variant expected ' + r.skus[i] + ' in ' + c); });
     ok(r.fewHidden && r.back && r.searchHidden && r.afterSearch && r.catHidden && r.afterClear && r.page2Hidden && r.page1 && r.soldOutSkipped && r.nullOk && r.weirdOk, JSON.stringify(r));
   });
+  await T('news shelf: cards from globalData.news (escaped), hidden when empty/searching/filtering/page 2+, click opens detail with safe link, bad data never throws', async () => {
+    const r = JSON.parse(await P(`(()=>{ const a=window.app,pos=a.pos,g=a.globalData,saved=g.news; const out={};
+      const el=()=>document.getElementById('posNews'), shown=()=>!el().classList.contains('hidden');
+      g.news=[{id:'N1',category:'<b>cat</b>',title:'<img src=x onerror=1>ข่าวหนึ่ง',detail:'บรรทัด1\\nบรรทัด2',imageUrl:'',link:'https://example.com/a'},{id:'N2',category:'',title:'ข่าวสอง',detail:'',imageUrl:'',link:'javascript:alert(1)'}];
+      pos.filter(); out.shown=shown(); out.cards=el().querySelectorAll('.sf-news-card').length; out.noInjected=!el().querySelector('.sf-news-title img, .sf-news-cat b');
+      out.titleText=el().querySelector('.sf-news-title').textContent;
+      const sb=document.getElementById('searchProduct'); sb.value='zzz'; pos.filter(); out.searchHidden=!shown(); sb.value=''; pos.filter(); out.afterSearch=shown();
+      pos.storePage=2; pos.renderNewsShelf(); out.page2Hidden=!shown(); pos.storePage=1; pos.renderNewsShelf(); out.page1=shown();
+      Swal.close(); pos.openNews('ghost'); out.ghostOk=!Swal.isVisible();
+      pos.openNews('N1'); out.modalTitle=(Swal.getTitle()||{}).textContent; out.confirmShown=Swal.getConfirmButton().style.display!=='none'; out.detailInjected=!!Swal.getHtmlContainer().querySelector('img[src="x"]');
+      Swal.close(); pos.openNews('N2'); out.badLinkNoConfirm=Swal.getConfirmButton().style.display==='none'; Swal.close();
+      g.news=[];pos.filter(); out.emptyHidden=!shown(); g.news=null; pos.filter(); out.nullOk=!shown(); g.news=[null,{},{id:'x'}]; pos.filter(); out.junkOk=!shown();
+      g.news=saved; pos.clearStoreFilters(true); pos.filter(); return JSON.stringify(out); })()`));
+    ok(r.shown && r.cards === 2 && r.noInjected, JSON.stringify(r));
+    eq(r.titleText, '<img src=x onerror=1>ข่าวหนึ่ง', 'title shown as text');
+    ok(r.searchHidden && r.afterSearch && r.page2Hidden && r.page1 && r.emptyHidden && r.nullOk && r.junkOk && r.ghostOk, JSON.stringify(r));
+    eq(r.modalTitle, '<img src=x onerror=1>ข่าวหนึ่ง', 'modal title is text, not HTML');
+    ok(r.confirmShown && !r.detailInjected && r.badLinkNoConfirm, JSON.stringify(r));
+  });
   await T('csv import: parser handles quotes/BOM/CRLF/newlines; file -> preview -> confirm adds only new SKUs', async () => {
     const pr = JSON.parse(await P(`(()=>{const pg=window.app.productGroup;const a=pg.parseCsv('\\uFEFFa,b\\r\\n"x,1","he said ""hi"""\\r\\n"l1\\nl2",z\\r\\n');return JSON.stringify({a:a,bad:pg.parseCsv('a,"b'),empty:pg.parseCsv('')})})()`));
     eq(JSON.stringify(pr.a), JSON.stringify([['a', 'b'], ['x,1', 'he said "hi"'], ['l1\nl2', 'z']]));

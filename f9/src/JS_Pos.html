@@ -1264,6 +1264,7 @@ window.app.pos = {
       this.renderProducts(list);
       this.syncUrl();
       this.renderPopularShelf();
+      this.renderNewsShelf();
     },
     // 6B — มี filter storefront ตัวใดตัวหนึ่ง active อยู่ไหม (ใช้โชว์ปุ่มล้างตัวกรอง + เลือก empty state)
     storeFiltersActive: function() {
@@ -1343,6 +1344,53 @@ window.app.pos = {
       html += '</div>';
       el.classList.remove('hidden');
       el.innerHTML = html;
+    },
+
+    // ข่าวสารร้าน: globalData.news (server กรองเฉพาะ Active + อยู่ในช่วงวันที่ และไม่ส่งข้อมูลผู้สร้าง)
+    // โชว์เฉพาะหน้าแรกที่ยังไม่ค้น/ไม่กรอง/ไม่ใช่หน้า 2+ เหมือนชั้นยอดนิยม — กดการ์ดเปิดรายละเอียดเต็ม
+    renderNewsShelf: function() {
+      const el = document.getElementById('posNews');
+      if (!el) return;
+      const esc = window.app.esc;
+      const searchEl = document.getElementById('searchProduct');
+      const idle = !(searchEl && searchEl.value.trim() !== '') && !this.storeFiltersActive() && (this.storePage || 1) === 1;
+      const g = window.app.globalData || {};
+      const list = idle && Array.isArray(g.news) ? g.news.filter(n => n && n.id && n.title).slice(0, 12) : [];
+      const sig = JSON.stringify(list.map(n => [n.id, n.title, n.imageUrl]));
+      if (el.dataset.sig === sig) return;
+      el.dataset.sig = sig;
+      if (!list.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      let html = '<div class="flex items-center gap-2 mb-1.5 px-0.5"><span class="text-[12px] font-black text-slate-800 flex items-center gap-1.5"><i class="fas fa-newspaper text-[#FF6B00]"></i> ข่าวสาร</span></div>';
+      html += '<div class="sf-news-row custom-scrollbar">';
+      list.forEach(n => {
+        const img = n.imageUrl ? '<img src="' + esc(window.app.formatImageUrl(n.imageUrl)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.display=\'none\';">' : '<span class="sf-news-noimg"><i class="fas fa-newspaper"></i></span>';
+        html += '<button type="button" class="sf-news-card" data-news-id="' + esc(n.id) + '" onclick="window.app.pos.openNews(this.getAttribute(\'data-news-id\'))">'
+          + '<span class="sf-news-img">' + img + '</span>'
+          + (n.category ? '<span class="sf-news-cat">' + esc(n.category) + '</span>' : '')
+          + '<span class="sf-news-title">' + esc(n.title) + '</span></button>';
+      });
+      html += '</div>';
+      el.classList.remove('hidden');
+      el.innerHTML = html;
+    },
+    // เปิดรายละเอียดข่าว (ข้อความล้วน — ผ่าน esc ทุกช่อง); ลิงก์ http(s) เปิดแท็บใหม่, #route ไปหน้านั้นในแอป
+    openNews: function(id) {
+      const n = ((window.app.globalData || {}).news || []).find(x => x && x.id === id);
+      if (!n) return;
+      const esc = window.app.esc;
+      const link = String(n.link || '');
+      const internal = /^#[A-Za-z0-9_-]{1,40}$/.test(link), external = /^https?:\/\/[^\s<>"']+$/i.test(link);
+      const html = (n.imageUrl ? '<img src="' + esc(window.app.formatImageUrl(n.imageUrl)) + '" alt="" style="max-width:100%;max-height:260px;border-radius:12px;margin:0 auto 12px;display:block;object-fit:contain" onerror="this.onerror=null;this.style.display=\'none\';">' : '')
+        + (n.category ? '<div style="font-size:11px;font-weight:800;color:#FF6B00;margin-bottom:6px">' + esc(n.category) + '</div>' : '')
+        + '<div style="text-align:left;white-space:pre-line;font-size:13px;line-height:1.6">' + esc(n.detail || '') + '</div>';
+      Swal.fire({
+        title: esc(n.title), html: html, showCloseButton: true,
+        showConfirmButton: internal || external, confirmButtonText: 'ดูเพิ่มเติม', showCancelButton: true, cancelButtonText: 'ปิด'
+      }).then(r => {
+        if (!r.isConfirmed) return;
+        if (internal) window.location.hash = link;
+        else if (external) window.open(link, '_blank', 'noopener');
+      });
     },
 
     renderStoreHeader: function() {
@@ -1430,6 +1478,7 @@ window.app.pos = {
       this.renderProducts(this.lastList);
       this.syncUrl();
       this.renderPopularShelf();
+      this.renderNewsShelf();
       const row = document.getElementById('productGrid');
       if (row) { row.scrollTop = 0; if (row.scrollIntoView && window.innerWidth < 1024) row.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
     },
