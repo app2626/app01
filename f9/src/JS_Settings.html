@@ -1,0 +1,844 @@
+<script>
+// Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
+  // รอบ 9 — หน้า "ตั้งค่าระบบ" รวม 6 หน้า settings เดิมเป็น tab ภายในหน้าเดียว (UI reorganization เท่านั้น —
+  // เนื้อหาแต่ละ tab คือ settingsManager.init(type) เดิม render ลง container ของ tab; backend ไม่เปลี่ยน)
+window.app.systemSettings = {
+    pendingTab: '',   // ตั้งโดย route() ตอน redirect จาก hash เก่า เพื่อเปิด tab ที่ตรงกัน
+    activeTab: '',
+    // id = hash/type เดิมทั้ง 6 — ใช้เป็นทั้ง redirect map ใน route() และ alias สิทธิ์ใน checkMenuAccess
+    tabs: [
+      { id: 'bookingsettings', icon: 'fa-clock',           label: 'เวลารับจอง' },
+      { id: 'herobanners',     icon: 'fa-images',          label: 'Hero Banners' },
+      { id: 'promogrids',      icon: 'fa-th-large',        label: 'Promo Grid' },
+      { id: 'popupbanners',    icon: 'fa-window-maximize', label: 'Popup' },
+      { id: 'loginbg',         icon: 'fa-image',           label: 'พื้นหลัง Login' },
+      { id: 'autosetup',       icon: 'fa-database',        label: 'ฐานข้อมูล' }
+    ],
+
+    init: function() {
+      const content = document.getElementById('page-content');
+      if (!content) return;
+      const startTab = this.tabs.some(t => t.id === this.pendingTab) ? this.pendingTab : 'bookingsettings';
+      this.pendingTab = '';
+      // tab bar สไตล์ sub-chips ของ POS (เส้นใต้ตัว active) — icon/label เป็น literal จาก tabs ข้างบน ไม่ใช่ข้อมูลผู้ใช้
+      const barHtml = this.tabs.map(t =>
+        `<button type="button" role="tab" id="ssTab-${t.id}" class="px-1 pb-2 text-sm whitespace-nowrap border-b-2 transition-colors border-transparent text-slate-500 hover:text-indigo-600" onclick="window.app.systemSettings.openTab('${t.id}')"><i class="fas ${t.icon} mr-1.5 text-[11px] opacity-70"></i>${t.label}</button>`
+      ).join('');
+      content.innerHTML = `
+        <div class="space-y-6 animate-fade-in-up">
+          <div class="bg-white border border-slate-200 shadow-sm rounded-3xl px-6 pt-5">
+            <h3 class="text-lg font-extrabold text-slate-800 mb-4"><i class="fas fa-sliders-h text-indigo-500 mr-2"></i> ตั้งค่าระบบ</h3>
+            <div class="flex gap-5 overflow-x-auto custom-scrollbar" role="tablist">${barHtml}</div>
+          </div>
+          <div id="ssTabContent"></div>
+        </div>`;
+      this.openTab(startTab);
+    },
+
+    openTab: function(tabId) {
+      this.activeTab = tabId;
+      this.tabs.forEach(t => {
+        const btn = document.getElementById('ssTab-' + t.id);
+        if (!btn) return;
+        const active = t.id === tabId;
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        btn.classList.toggle('border-indigo-600', active);
+        btn.classList.toggle('text-indigo-600', active);
+        btn.classList.toggle('font-bold', active);
+        btn.classList.toggle('border-transparent', !active);
+        btn.classList.toggle('text-slate-500', !active);
+      });
+      // render เฉพาะ tab ที่เปิด — เรียก logic เดิมของหน้าเดิมลง container ของ tab
+      window.app.settingsManager.init(tabId, 'ssTabContent');
+    }
+  };
+
+window.app.settingsManager = {
+    currentType: '',
+    data: null,
+    containerId: 'page-content',
+
+    // containerId (optional) — รอบ 9: หน้า systemsettings ส่ง container ของ tab มา; จำค่าไว้เพราะ
+    // save/delete เรียกซ้ำด้วย this.init(this.currentType) โดยไม่ส่ง container
+    init: async function(type, containerId) {
+      this.currentType = type;
+      if (containerId) this.containerId = containerId;
+      // เข้า/รีเฟรช tab ใหม่ทุกครั้ง — ล้างไฟล์รูปที่เลือกค้างจากการดูครั้งก่อน (banner-*, loginBg, newBanner) กัน URL เก่าเผลอทับของใหม่ตอนบันทึก
+      Object.keys(window.app.pendingImageUploads).forEach(k => { if (k !== 'gridImage') delete window.app.pendingImageUploads[k]; });
+      const content = document.getElementById(this.containerId);
+      if(!content) return;
+      
+      if (type === 'autosetup') {
+        // ถ้าโหลด settings ไม่ได้ (เช่นยังไม่เคย Auto Setup จึงไม่มีชีต UI_Banners) ต้อง render ต่อด้วยค่าว่าง
+        // — ปุ่ม Auto Setup ต้องกดได้เสมอ ห้าม block ด้วย error
+        this.data = {};
+        try {
+          const res = await window.app.api('GET_SETTINGS_LIST');
+          if (res && res.status === 'success') this.data = res.data;
+          else console.warn('GET_SETTINGS_LIST:', res && res.message);
+        } catch(e) { console.warn('GET_SETTINGS_LIST:', e.message); }
+        this.render();
+        return;
+      }
+      
+      window.app.showLoading('กำลังโหลดข้อมูล...');
+      try {
+        const res = await window.app.api('GET_SETTINGS_LIST');
+        Swal.close();
+        if (res && res.status === 'success') {
+          this.data = res.data;
+          this.render();
+        } else {
+          Swal.fire('ข้อผิดพลาด', res ? res.message : 'ไม่สามารถโหลดข้อมูลได้', 'error');
+        }
+      } catch(e) {
+        Swal.close();
+        Swal.fire('ข้อผิดพลาด', e.message || 'ไม่สามารถโหลดข้อมูลได้', 'error');
+      }
+    },
+    
+    render: function() {
+      const content = document.getElementById(this.containerId);
+      if(!content || !this.data) return;
+      
+      let html = '';
+      
+      if (this.currentType === 'autosetup') {
+        html = `
+          <div class="max-w-2xl mx-auto space-y-6 animate-fade-in-up">
+          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <div class="p-6 bg-slate-50 border-b border-slate-100">
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-signature text-indigo-500 mr-2"></i> ชื่อเว็บแอป</h3>
+              <p class="text-xs text-slate-500 mt-1">ชื่อที่แสดงบนแท็บเบราว์เซอร์ หน้า Login และเมนู — เปลี่ยนได้จากหน้านี้โดยไม่ต้องแก้โค้ด เผื่อนำโปรเจกต์นี้ไปทำสำเนาใช้กับร้าน/แบรนด์อื่น</p>
+            </div>
+            <div class="p-8 space-y-4">
+              <div class="flex items-center gap-4">
+                <div class="w-20 h-20 shrink-0 bg-slate-100 border border-slate-200 rounded-xl overflow-hidden flex items-center justify-center">
+                  <img id="webAppLogoPreview" src="${window.app.esc(window.app.formatImageUrl((this.data.keyValueSettings && this.data.keyValueSettings.LogoUrl) || ''))}" class="w-full h-full object-contain" onerror="this.style.display='none'">
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">โลโก้เว็บแอป</label>
+                  <p class="text-[11px] text-slate-400 mb-2">แสดงแทนไอคอนเริ่มต้นที่หน้า Login / แถบเมนู / ส่วนท้ายหน้า — เว้นว่างได้ถ้าไม่มี (ใช้ไอคอนเริ่มต้นต่อไป)</p>
+                  <button type="button" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm" onclick="document.getElementById('webAppLogoFile').click()"><i class="fas fa-upload mr-1"></i> อัปโหลดโลโก้</button>
+                  <input type="file" id="webAppLogoFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'webAppLogo', function(localUrl){ const p=document.getElementById('webAppLogoPreview'); if(p){ p.src=localUrl; p.style.display=''; } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
+                </div>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">ชื่อเว็บแอป</label>
+                <input type="text" id="webAppNameInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.SystemName) || '')}" placeholder="เช่น Mobile Pre Booking System">
+              </div>
+              <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button onclick="window.app.settingsManager.saveAppName()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกชื่อเว็บแอป</button>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <div class="p-6 bg-slate-50 border-b border-slate-100">
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-headset text-indigo-500 mr-2"></i> ข้อมูลติดต่อร้าน</h3>
+              <p class="text-xs text-slate-500 mt-1">แสดงที่ส่วนท้ายของทุกหน้า — เว้นว่างช่องไหน ช่องนั้นจะไม่แสดง</p>
+            </div>
+            <div class="p-8 space-y-4">
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider" for="contactPhoneInput">เบอร์โทร</label>
+                <input type="text" id="contactPhoneInput" maxlength="40" inputmode="tel" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" placeholder="เช่น 02-123-4567 หรือ 081-234-5678" value="${window.app.esc(((this.data.keyValueSettings || {}).ContactPhone || '').replace(/^'+/, ''))}">
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider" for="contactLineInput">LINE</label>
+                <input type="text" id="contactLineInput" maxlength="120" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" placeholder="LINE ID เช่น @mystore หรือวางลิงก์ LINE แบบ https" value="${window.app.esc(((this.data.keyValueSettings || {}).ContactLine || '').replace(/^'+/, ''))}">
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider" for="contactHoursInput">เวลาทำการ</label>
+                <input type="text" id="contactHoursInput" maxlength="120" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" placeholder="เช่น ทุกวัน 10:00 - 21:00 น." value="${window.app.esc(((this.data.keyValueSettings || {}).ContactHours || '').replace(/^'+/, ''))}">
+              </div>
+              <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button type="button" onclick="window.app.settingsManager.saveContactInfo(this)" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกข้อมูลติดต่อ</button>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <div class="p-6 bg-slate-50 border-b border-slate-100">
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-database text-indigo-500 mr-2"></i> สร้างฐานข้อมูลครั้งแรก (Auto Setup)</h3>
+              <p class="text-xs text-slate-500 mt-1">ใช้สำหรับการตั้งค่า Google Sheets และข้อมูลเริ่มต้นระบบทั้งหมด (ตาราง, สินค้าตัวอย่าง, บัญชีแอดมิน)</p>
+            </div>
+            <div class="p-8 space-y-6 text-center">
+              <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-50 mb-2">
+                 <i class="fas fa-database text-4xl text-indigo-600"></i>
+              </div>
+              <div class="text-slate-600 text-sm max-w-md mx-auto space-y-3">
+                 <p class="font-bold text-slate-800">คำเตือนสำหรับระบบ!</p>
+                 <p>หากคุณกดดำเนินการ ระบบจะสร้างแผ่นงานที่จำเป็นสำหรับระบบขายของแบรนด์นี้ หากมีตารางเดิมอยู่แล้ว จะทำการตรวจสอบความสมบูรณ์และเสริมตารางที่หายไป</p>
+                 <p class="text-slate-500">ใช้เมื่อ<strong>ติดตั้งระบบครั้งแรก</strong> หรือเมื่อระบบเวอร์ชันใหม่<strong>มีตาราง/คอลัมน์เพิ่ม</strong>แล้วต้องการเติมส่วนที่หายไป — ข้อมูลเดิมไม่ถูกลบ</p>
+              </div>
+              
+              <div class="pt-6 border-t border-slate-100 flex justify-center">
+                <button type="button" class="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all" onclick="window.app.initDB()">
+                    <i class="fas fa-cogs mr-2"></i> เริ่มการดำเนินการ Auto Setup
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <div class="p-6 bg-slate-50 border-b border-slate-100">
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-folder text-indigo-500 mr-2"></i> โฟลเดอร์เก็บรูปอัปโหลด (Drive Folder ID)</h3>
+              <p class="text-xs text-slate-500 mt-1">กำหนดโฟลเดอร์ Google Drive ปลายทางของรูปที่อัปโหลดจากปุ่ม "อัปโหลดรูป" — เว้นว่างเพื่อใช้โฟลเดอร์อัตโนมัติ</p>
+            </div>
+            <div class="p-8 space-y-4">
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Drive Folder ID หรือลิงก์โฟลเดอร์</label>
+                <input type="text" id="driveFolderIdInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.DriveFolderId) || '')}" placeholder="เช่น 1AbCdEfGhIjKlMnOpQrStUvWxYz หรือ https:\/\/drive.google.com/drive/folders/...">
+                <p class="text-[11px] text-slate-400 leading-relaxed">เปิดโฟลเดอร์ใน Google Drive แล้วคัดลอกลิงก์มาวางได้เลย ระบบจะดึง ID ให้อัตโนมัติ — เว้นว่างเพื่อใช้โฟลเดอร์อัตโนมัติ (MPOS Product Images)</p>
+              </div>
+              <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button onclick="window.app.settingsManager.saveDriveFolderId()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกโฟลเดอร์</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <div class="p-6 bg-slate-50 border-b border-slate-100">
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-building text-indigo-500 mr-2"></i> ข้อมูลบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)</h3>
+              <p class="text-xs text-slate-500 mt-1">ค่าเริ่มต้นของโลโก้/ชื่อบริษัท/ที่อยู่/อีเมล ที่จะขึ้นในหน้าสร้างใบเสนอราคา/ใบแจ้งหนี้ทุกครั้ง (แก้ไขเพิ่มเติมเฉพาะใบได้ที่หน้านั้น)</p>
+            </div>
+            <div class="p-8 space-y-4">
+              <div class="flex items-center gap-4">
+                <div class="w-20 h-20 shrink-0 bg-slate-100 border border-slate-200 rounded-xl overflow-hidden flex items-center justify-center">
+                  <img id="invCompanyLogoPreview" src="${window.app.esc(window.app.formatImageUrl((this.data.keyValueSettings && this.data.keyValueSettings.InvoiceLogoUrl) || ''))}" class="w-full h-full object-contain" onerror="this.style.display='none'">
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">โลโก้บริษัท</label>
+                  <button type="button" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm" onclick="document.getElementById('invCompanyLogoFile').click()"><i class="fas fa-upload mr-1"></i> อัปโหลดโลโก้</button>
+                  <input type="file" id="invCompanyLogoFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'invoiceLogo', function(localUrl){ const p=document.getElementById('invCompanyLogoPreview'); if(p){ p.src=localUrl; p.style.display=''; } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
+                </div>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">ชื่อบริษัท</label>
+                <input type="text" id="invCompanyNameInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.InvoiceCompanyName) || '')}" placeholder="เช่น บริษัท ทีจี เซลลูล่าร์เวิลด์ จำกัด">
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">ที่อยู่บริษัท</label>
+                <textarea id="invCompanyAddressInput" rows="2" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm resize-none" placeholder="ที่อยู่สำหรับออกเอกสาร">${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.InvoiceCompanyAddress) || '')}</textarea>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">อีเมลติดต่อ</label>
+                <input type="text" id="invCompanyEmailInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.InvoiceCompanyEmail) || '')}" placeholder="เช่น info@company.com">
+              </div>
+              <div class="space-y-2 pt-2 border-t border-slate-100">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">ชื่อผู้อนุมัติ (ประทับในเอกสารเมื่อกดอนุมัติ)</label>
+                <input type="text" id="approverNameInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.ApproverName) || '')}" placeholder="เช่น นายสมชาย ใจดี (ผู้จัดการฝ่ายขาย)">
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="w-24 h-16 shrink-0 bg-slate-100 border border-slate-200 rounded-xl overflow-hidden flex items-center justify-center">
+                  <img id="approverSignPreview" src="${window.app.esc(window.app.formatImageUrl((this.data.keyValueSettings && this.data.keyValueSettings.ApproverSignatureUrl) || ''))}" class="w-full h-full object-contain" onerror="this.style.display='none'">
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">รูปลายเซ็นผู้อนุมัติ (ประทับอัตโนมัติเมื่อกดอนุมัติเอกสาร)</label>
+                  <button type="button" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm" onclick="document.getElementById('approverSignFile').click()"><i class="fas fa-upload mr-1"></i> อัปโหลดลายเซ็น</button>
+                  <input type="file" id="approverSignFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'approverSign', function(localUrl){ const p=document.getElementById('approverSignPreview'); if(p){ p.src=localUrl; p.style.display=''; } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
+                </div>
+              </div>
+              <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button onclick="window.app.settingsManager.saveCompanyInfo()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกข้อมูลบริษัท</button>
+              </div>
+            </div>
+          </div>
+          </div>
+        `;
+      } else if (this.currentType === 'bookingsettings') {
+        const start = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.ReserveStart) || '');
+        const end = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.ReserveEnd) || '');
+        const campaignTitle = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.FlashCampaignTitle) || '');
+        const lowStockThreshold = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.LowStockThreshold) || '3');
+        const webhookUrl = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.WebhookUrl) || '');
+        
+        html = `
+          <div class="max-w-2xl mx-auto bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden animate-fade-in-up">
+            <div class="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-clock text-indigo-500 mr-2"></i> ตั้งเวลารับจอง & แคมเปญ Pre Booking</h3>
+                <p class="text-xs text-slate-500 mt-1">กำหนดวันเวลาเริ่มต้น-สิ้นสุด ชื่อแคมเปญ Pre Booking เกณฑ์เตือนสต๊อกต่ำ และ Webhook แจ้งเตือนออเดอร์</p>
+              </div>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <i class="fas fa-bolt mr-1 animate-pulse"></i> แคมเปญ & แจ้งเตือน
+              </span>
+            </div>
+            
+            <div class="p-8 space-y-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-2">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
+                    <i class="fas fa-play text-emerald-500 mr-1.5 text-[10px]"></i> วันเวลาเริ่มการจอง (Start Booking)
+                  </label>
+                  <input type="datetime-local" id="reserveStartInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${start}">
+                </div>
+                
+                <div class="space-y-2">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
+                    <i class="fas fa-stop text-rose-500 mr-1.5 text-[10px]"></i> วันเวลาสิ้นสุดการจอง (End Booking)
+                  </label>
+                  <input type="datetime-local" id="reserveEndInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${end}">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2 border-t border-slate-100">
+                <div class="md:col-span-2 space-y-2">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
+                    <i class="fas fa-bolt text-amber-500 mr-1.5 text-xs"></i> ชื่อแคมเปญบนแถบ Pre Booking (FlashCampaignTitle)
+                  </label>
+                  <input type="text" id="flashCampaignTitleInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${campaignTitle}" placeholder="เช่น Pre Booking รอบ 12:00 - 18:00 น. • ผ่อน 0% สูงสุด 36 เดือน">
+                </div>
+                <div class="space-y-2">
+                  <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
+                    <i class="fas fa-boxes text-rose-500 mr-1.5 text-xs"></i> เตือนสต๊อกต่ำ (ชิ้น)
+                  </label>
+                  <input type="number" id="lowStockThresholdInput" min="1" max="100" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-extrabold text-rose-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${lowStockThreshold}">
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center">
+                  <i class="fas fa-bell text-emerald-600 mr-1.5 text-xs"></i> Webhook URL แจ้งเตือนออเดอร์ใหม่ & สต๊อกใกล้หมด (Discord / Slack / Google Chat / Make)
+                </label>
+                <input type="url" id="webhookUrlInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${webhookUrl}" placeholder="https:\/\/discord.com/api/webhooks/... หรือ Webhook URL อื่นๆ (เว้นว่างหากไม่ใช้งาน)">
+                <p class="text-[11px] text-slate-400">เมื่อมีการจองสำเร็จ ระบบจะยิง JSON (text, content, orderId, netTotal, lowStockWarnings) ไปยัง URL นี้อัตโนมัติ</p>
+              </div>
+              
+              <div class="bg-amber-50/60 border border-amber-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <h4 class="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center"><i class="fas fa-broom mr-1.5"></i> ล้างแคชข้อมูล</h4>
+                  <p class="text-[11px] text-slate-500 mt-1">ใช้หลังแก้ไขชีต Products / Promotions / Coupons ตรงๆ ใน Google Sheets เพื่อให้หน้า Pre Booking เห็นข้อมูลล่าสุดทันที (ปกติแคชค้าง 6 ชั่วโมง)</p>
+                </div>
+                <button type="button" onclick="window.app.settingsManager.clearCache()" class="shrink-0 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center"><i class="fas fa-sync-alt mr-2"></i> ล้างแคชตอนนี้</button>
+              </div>
+
+              <div class="bg-indigo-50/50 border border-indigo-100/50 rounded-2xl p-5 space-y-3">
+                <h4 class="text-xs font-bold text-indigo-800 uppercase tracking-wider flex items-center"><i class="fas fa-info-circle mr-1.5"></i> คำแนะนำการทำงานของระบบ</h4>
+                <ul class="text-xs text-slate-600 space-y-2 pl-5 list-disc leading-relaxed">
+                  <li>ระบบจะเริ่มเปิดให้จองสินค้าหน้า Pre Booking เมื่อเวลาปัจจุบันถึงวันเริ่มจอง</li>
+                  <li>หากเวลาปัจจุบันเลยวันสิ้นสุดการจองที่ตั้งค่าไว้ หน้า Pre Booking จะ <strong class="text-rose-600 font-bold">ปิดการทำงานทั้งหมด</strong> โดยจะไม่สามารถค้นหา/คลิกเลือกสินค้าเพื่อใส่ตะกร้า และปุ่มดำเนินการข้อมูลลูกค้าจะถูกล็อกทันที</li>
+                  <li>จะมีแถบเวลานับถอยหลัง (Countdown Timer) พร้อมชื่อแคมเปญ Pre Booking แสดงให้เห็นเวลาเหลือจอง ณ ขณะนั้นเพื่อกระตุ้นยอดขาย</li>
+                </ul>
+              </div>
+              
+              <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button onclick="window.app.settingsManager.saveBookingSettings()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกข้อมูลตั้งค่า</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (this.currentType === 'loginbg') {
+        const bgUrl = window.app.esc(this.data.loginBg || '');
+        const previewUrl = window.app.esc(window.app.formatImageUrl(this.data.loginBg || ''));
+        
+        html = `
+          <div class="max-w-2xl mx-auto bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden animate-fade-in-up">
+            <div class="p-6 bg-slate-50 border-b border-slate-100">
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-image text-indigo-500 mr-2"></i> ตั้งค่ารูปพื้นหลังหน้าล็อกอิน (Login BG)</h3>
+              <p class="text-xs text-slate-500 mt-1">กำหนดลิ้งก์รูปภาพที่จะแสดงในพื้นหลังของหน้าจอเข้าสู่ระบบ</p>
+            </div>
+            <div class="p-8 space-y-6">
+              <div class="h-[240px] w-full rounded-2xl border border-slate-200 bg-slate-100 flex items-center justify-center overflow-hidden relative group">
+                <img id="loginBgPreview" src="${previewUrl}" class="max-h-full max-w-full object-cover w-full h-full transition-transform duration-300 group-hover:scale-105" onerror="this.src='https:\/\/via.placeholder.com/600x300?text=No+Preview+Available'">
+                <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span class="text-white text-xs font-bold bg-slate-900/80 px-3 py-1.5 rounded-full"><i class="fas fa-search-plus mr-1"></i> ภาพตัวอย่าง</span>
+                </div>
+              </div>
+              
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">ลิงก์รูปภาพ (Image URL)</label>
+                <div class="flex gap-2">
+                  <input type="text" id="loginBgUrlInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${bgUrl}" placeholder="วาง URL ของรูปภาพ เช่น https:\/\/images.unsplash.com/... หรือ Google Drive link" oninput="document.getElementById('loginBgPreview').src = window.app.formatImageUrl(this.value)">
+                  <button type="button" id="loginBgUpBtn" class="px-4 py-3 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('loginBgFile').click()"><i class="fas fa-upload mr-1"></i> อัปโหลด</button>
+                  <input type="file" id="loginBgFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'loginBg', function(localUrl){ const p=document.getElementById('loginBgPreview'); if(p) p.src=localUrl; window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึกข้อมูล'); })">
+                </div>
+              </div>
+              
+              <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button onclick="window.app.settingsManager.testImage('loginBgUrlInput')" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm"><i class="fas fa-eye mr-2"></i> พรีวิวภาพ</button>
+                <button onclick="window.app.settingsManager.saveLoginBg()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center"><i class="fas fa-save mr-2"></i> บันทึกข้อมูล</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        let title = '';
+        let desc = '';
+        let list = [];
+        let typeKey = '';
+        
+        if (this.currentType === 'herobanners') {
+          title = 'ตั้งค่ารูปภาพภาพสไลด์หน้าแรก (Hero Banners)';
+          desc = 'จัดการรูปภาพโปรโมชั่นแบบสไลด์ (Slide Carousel) ที่อยู่ส่วนบนสุดของหน้าขายสินค้า — ใส่หัวข้อ/คำโปรยได้เพื่อโชว์ข้อความทับภาพ (เว้นว่างทั้งคู่ = ไม่มีข้อความ)';
+          list = this.data.heroBanners || [];
+          typeKey = 'herobanner';
+        } else if (this.currentType === 'promogrids') {
+          title = 'ตั้งค่าตารางโปรโมชั่น (Promo Grid)';
+          desc = 'จัดการรูปภาพตารางแบนเนอร์โปรโมชั่นที่แสดงด้านล่างของหน้าจอขายสินค้า';
+          list = this.data.promoGrids || [];
+          typeKey = 'promogrid';
+        } else if (this.currentType === 'popupbanners') {
+          title = 'ตั้งค่าป๊อปอัปแจ้งเตือน (Popup Banner)';
+          desc = 'จัดการรูปภาพโฆษณา / ป้ายประกาศป๊อปอัปที่จะแสดงเมื่อเข้าสู่หน้าขายสินค้า — ใส่หัวข้อ/คำอธิบาย/ปุ่มกดได้ (เว้นว่างทั้ง 3 ช่อง = โชว์รูปเปล่าๆ แบบเดิม)';
+          list = this.data.popupBanners || [];
+          typeKey = 'popupbanner';
+        }
+        
+        // ฟอร์มเพิ่มใหม่: การ์ดแบบเดียวกับฟอร์มแก้ไข (inline, hidden ไว้ก่อน) แทน SweetAlert modal เดิม
+        // — สลับ visibility ด้วย classList.toggle ล้วนๆ เหมือนปุ่ม "แก้ไข" ของแต่ละการ์ด ไม่พึ่ง Swal.fire({html:...})
+        const hasContentSection = (typeKey === 'promogrid' || typeKey === 'herobanner' || typeKey === 'popupbanner');
+        const addFormHtml = `
+          <div id="bannerAddForm" class="hidden col-span-full bg-white border-2 border-indigo-200 rounded-2xl shadow-sm p-5 space-y-5">
+            <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0"><i class="fas fa-plus text-xs"></i></div>
+              <h4 class="text-sm font-bold text-slate-800">เพิ่มแบนเนอร์ใหม่</h4>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide"><i class="fas fa-image text-indigo-400 w-3 text-center"></i> รูปภาพ (Image URL) *</label>
+              <div class="flex gap-2">
+                <input type="text" id="newBannerUrl" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="https:\/\/...">
+                <button type="button" id="newBannerUpBtn" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('newBannerFile').click()"><i class="fas fa-upload"></i></button>
+                <input type="file" id="newBannerFile" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'newBanner', function(localUrl){ const pv=document.getElementById('newBannerPreview'); if(pv){ pv.src=localUrl; pv.classList.remove('hidden'); } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
+              </div>
+              <img id="newBannerPreview" class="hidden h-16 w-16 object-cover rounded-lg border border-slate-200 shadow-sm">
+            </div>
+
+            ${hasContentSection ? `
+            <div class="space-y-3 p-3.5 bg-slate-50/70 rounded-xl border border-slate-100">
+              <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide"><i class="fas fa-align-left text-indigo-400 w-3 text-center"></i> เนื้อหา</label>
+              ${(typeKey === 'herobanner' || typeKey === 'popupbanner') ? `
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 mb-1">หัวข้อ (Title)</label>
+                <input type="text" id="newBannerTitle" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="เช่น โปรโมชั่นพิเศษเดือนนี้!">
+              </div>
+              ` : ''}
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 mb-1">${typeKey === 'popupbanner' ? 'คำอธิบาย (Description)' : (typeKey === 'herobanner' ? 'คำโปรย (Subtitle)' : 'รายละเอียด (Details)')}</label>
+                <textarea id="newBannerDetails" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none" rows="2" placeholder="${typeKey === 'herobanner' ? 'คำโปรยใต้หัวข้อ (ขึ้นบรรทัดใหม่ได้, เว้นว่างได้)' : 'รายละเอียดแคมเปญ'}"></textarea>
+              </div>
+              ${typeKey === 'popupbanner' ? `
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 mb-1">ปุ่มกด (Button Text, ไม่บังคับ)</label>
+                <input type="text" id="newBannerButtonText" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="เช่น ดูโปรโมชั่น (เว้นว่าง = ปุ่มปิดเฉยๆ)">
+              </div>
+              ` : ''}
+            </div>
+            ` : ''}
+
+            <div class="space-y-1.5">
+              <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide"><i class="fas fa-link text-indigo-400 w-3 text-center"></i> ลิงก์ปลายทาง (Target Link)</label>
+              <input type="text" id="newTargetLink" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="" placeholder="URL ให้คลิก (ปล่อยว่างได้)">
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button type="button" onclick="window.app.settingsManager.cancelAddItem()" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition-colors">ยกเลิก</button>
+              <button type="button" onclick="window.app.settingsManager.addItem('${typeKey}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors flex items-center" title="เพิ่มแบนเนอร์ใหม่"><i class="fas fa-save mr-1"></i> บันทึก</button>
+            </div>
+          </div>
+        `;
+
+        let cardsHtml = '';
+        if (list.length === 0) {
+          cardsHtml = `
+            <div class="col-span-full py-12 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
+              <i class="fas fa-images text-slate-300 text-5xl mb-4"></i>
+              <p class="text-sm font-bold text-slate-400">ยังไม่มีข้อมูลรูปภาพในระบบ</p>
+            </div>
+          `;
+        } else {
+          // แกลเลอรีสะอาด: การ์ดโชว์แค่รูป + แถบปุ่ม — ฟอร์มแก้ไขซ่อนไว้ กางเฉพาะใบที่กด "แก้ไข" (id เดิมทุกตัว ห้ามเปลี่ยน — saveItem อ้างอิงอยู่)
+          list.forEach(item => {
+            this._bannerIds[typeKey + ':' + item.rowIndex] = item.id || '';
+            const previewUrl = window.app.esc(window.app.formatImageUrl(item.url));
+            const hasLink = !!(item.targetLink && item.targetLink.trim());
+            cardsHtml += `
+              <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-all duration-300">
+                <div class="h-[160px] bg-slate-100 overflow-hidden relative group">
+                  <img id="bannerImg-${item.rowIndex}" src="${previewUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https:\/\/via.placeholder.com/300x150?text=Invalid+Image+URL'">
+                  <div class="absolute top-2 left-2 px-2 py-0.5 bg-slate-900/70 text-white text-[10px] font-bold rounded-lg pointer-events-none">#${item.rowIndex}</div>
+                  ${hasLink ? '<div class="absolute top-2 right-2 w-6 h-6 bg-white/90 text-indigo-600 rounded-lg flex items-center justify-center shadow-sm pointer-events-none" title="มีลิงก์ปลายทาง"><i class="fas fa-link text-[10px]"></i></div>' : ''}
+                </div>
+                <div class="flex items-center justify-between px-3 py-2 border-t border-slate-100">
+                  <button onclick="const f=document.getElementById('bannerEdit-${item.rowIndex}'); if(f) f.classList.toggle('hidden'); this.querySelector('i').classList.toggle('fa-chevron-up'); this.querySelector('i').classList.toggle('fa-pen');" class="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-1.5" aria-label="แก้ไขแบนเนอร์นี้"><i class="fas fa-pen text-[10px]"></i> แก้ไข</button>
+                  <button onclick="window.app.settingsManager.deleteItem('${typeKey}', ${item.rowIndex}, '${window.app.escAttrJs(item.id || '')}')" class="w-8 h-8 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center" title="ลบภาพ" aria-label="ลบรูปภาพ"><i class="fas fa-trash text-xs"></i></button>
+                </div>
+                <div id="bannerEdit-${item.rowIndex}" class="hidden p-4 pt-4 border-t border-slate-100 bg-slate-50/60 space-y-4">
+                  <div class="space-y-1.5">
+                    <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide"><i class="fas fa-image text-indigo-400 w-3 text-center"></i> รูปภาพ (Image URL)</label>
+                    <div class="flex gap-2">
+                      <input type="text" id="bannerUrl-${item.rowIndex}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="${window.app.esc(item.url)}" placeholder="URL">
+                      <button type="button" id="bannerUpBtn-${item.rowIndex}" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('bannerFile-${item.rowIndex}').click()"><i class="fas fa-upload"></i></button>
+                      <input type="file" id="bannerFile-${item.rowIndex}" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'banner-${item.rowIndex}', function(localUrl){ const img=document.getElementById('bannerImg-${item.rowIndex}'); if(img) img.src=localUrl; window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก'); })">
+                    </div>
+                  </div>
+
+                  ${(typeKey === 'promogrid' || typeKey === 'herobanner' || typeKey === 'popupbanner') ? `
+                  <div class="space-y-3 p-3.5 bg-white rounded-xl border border-slate-200">
+                    <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide"><i class="fas fa-align-left text-indigo-400 w-3 text-center"></i> เนื้อหา</label>
+                    ${(typeKey === 'herobanner' || typeKey === 'popupbanner') ? `
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-400 mb-1">หัวข้อ (Title)</label>
+                      <input type="text" id="bannerTitle-${item.rowIndex}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="${window.app.esc(item.title || '')}" placeholder="เช่น โปรโมชั่นพิเศษเดือนนี้!">
+                    </div>
+                    ` : ''}
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-400 mb-1">${typeKey === 'popupbanner' ? 'คำอธิบาย (Description)' : (typeKey === 'herobanner' ? 'คำโปรย (Subtitle)' : 'รายละเอียด (Details)')}</label>
+                      <textarea id="bannerDetails-${item.rowIndex}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none" rows="2" placeholder="${typeKey === 'herobanner' ? 'คำโปรยใต้หัวข้อ (ขึ้นบรรทัดใหม่ได้, เว้นว่างได้)' : 'รายละเอียดแคมเปญ'}">${window.app.esc(item.details || '')}</textarea>
+                    </div>
+                    ${typeKey === 'popupbanner' ? `
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-400 mb-1">ปุ่มกด (Button Text, ไม่บังคับ)</label>
+                      <input type="text" id="bannerButtonText-${item.rowIndex}" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="${window.app.esc(item.buttonText || '')}" placeholder="เช่น ดูโปรโมชั่น (เว้นว่าง = ปุ่มปิดเฉยๆ)">
+                    </div>
+                    ` : ''}
+                  </div>
+                  ` : ''}
+
+                  <div class="space-y-1.5">
+                    <label class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide"><i class="fas fa-link text-indigo-400 w-3 text-center"></i> ลิงก์ปลายทาง (Target Link)</label>
+                    <input type="text" id="targetLink-${item.rowIndex}" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" value="${window.app.esc(item.targetLink || '')}" placeholder="URL ให้คลิก (ปล่อยว่างได้)">
+                  </div>
+
+                  <div class="flex justify-end pt-3 border-t border-slate-200">
+                    <button onclick="window.app.settingsManager.saveItem('${typeKey}', ${item.rowIndex}, 'bannerUrl-${item.rowIndex}', 'targetLink-${item.rowIndex}'${(typeKey === 'promogrid' || typeKey === 'herobanner' || typeKey === 'popupbanner') ? `, 'bannerDetails-${item.rowIndex}'` : ', null'}${(typeKey === 'herobanner' || typeKey === 'popupbanner') ? `, 'bannerTitle-${item.rowIndex}'` : ''}${typeKey === 'popupbanner' ? `, 'bannerButtonText-${item.rowIndex}'` : ''})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors flex items-center" title="บันทึกแก้ไข"><i class="fas fa-save mr-1"></i> บันทึก</button>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        }
+        
+        html = `
+          <div class="space-y-6 animate-fade-in-up">
+            <div class="bg-white border border-slate-200 shadow-sm rounded-3xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-images text-indigo-500 mr-2"></i> ${title}</h3>
+                <p class="text-xs text-slate-500 mt-1">${desc}</p>
+              </div>
+              <button onclick="const f=document.getElementById('bannerAddForm'); if(f){ f.classList.remove('hidden'); f.scrollIntoView({behavior:'smooth', block:'center'}); }" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors flex items-center w-full sm:w-auto justify-center">
+                <i class="fas fa-plus mr-2"></i> เพิ่มแบนเนอร์ใหม่
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              ${addFormHtml}
+              ${cardsHtml}
+            </div>
+          </div>
+        `;
+      }
+      
+      content.innerHTML = html;
+    },
+    
+    testImage: function(inputId) {
+      const url = document.getElementById(inputId).value;
+      if (!url || url.trim() === '') return Swal.fire('คำแนะนำ', 'กรุณากรอกลิงก์รูปภาพก่อนดูตัวอย่าง', 'info');
+      Swal.fire({
+        title: 'รูปภาพพรีวิว',
+        imageUrl: window.app.formatImageUrl(url),
+        imageAlt: 'Preview',
+        // จำกัดขนาดกล่องพรีวิวไว้ — เดิมไม่ตั้งค่า imageWidth ทำให้ Swal ยืดตามขนาดจริงของรูป (เช่น แบนเนอร์ 1920px) จนแทบเต็มจอ
+        imageWidth: 480,
+        width: 560,
+        confirmButtonColor: '#254d71',
+        confirmButtonText: 'ปิด'
+      });
+    },
+    
+    saveLoginBg: async function() {
+      let url = document.getElementById('loginBgUrlInput').value.trim();
+      const hasPendingImage = !!window.app.pendingImageUploads.loginBg;
+      // 5B.5 — ปุ่มที่เพิ่งถูกกดคือ activeElement; disabled + spinner ระหว่างรอ API
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        if (hasPendingImage) url = await window.app.flushImageUpload('loginBg');
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: 'loginbg', url: url });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'บันทึกภาพพื้นหลังสำเร็จ', showConfirmButton: false, timer: 1500 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+    
+    _bannerIds: {}, // 'type:rowIndex' → ID ของแบนเนอร์ที่แสดงอยู่ — ส่งกลับตอนบันทึกให้ server ยืนยันว่าแถวไม่ได้ขยับ
+    saveItem: async function(type, rowIndex, inputId, targetLinkId, detailsId, titleId, buttonTextId) {
+      let url = document.getElementById(inputId).value.trim();
+      const targetLink = targetLinkId ? document.getElementById(targetLinkId).value.trim() : '';
+      const details = detailsId ? document.getElementById(detailsId).value.trim() : '';
+      const title = titleId ? document.getElementById(titleId).value.trim() : '';
+      const buttonText = buttonTextId ? document.getElementById(buttonTextId).value.trim() : '';
+      const stateKey = 'banner-' + rowIndex;
+      const hasPendingImage = !!window.app.pendingImageUploads[stateKey];
+      if (!url && !hasPendingImage) return Swal.fire('แจ้งเตือน', 'กรุณากรอกลิงก์รูปภาพ', 'warning');
+
+      // 5B.5 — disabled + spinner ระหว่างรอ API
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        if (hasPendingImage) url = await window.app.flushImageUpload(stateKey);
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, rowIndex: rowIndex, bannerId: (this._bannerIds[type + ':' + rowIndex] || ''), url: url, targetLink: targetLink, details: details, title: title, buttonText: buttonText });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จ', showConfirmButton: false, timer: 1200 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+    
+    // ยกเลิกฟอร์มเพิ่มใหม่: ซ่อนการ์ด + เคลียร์ค่าที่กรอกไว้กันเผลอเห็นข้อมูลเก่าตอนเปิดใหม่ในเรนเดอร์เดียวกัน
+    cancelAddItem: function() {
+      const f = document.getElementById('bannerAddForm');
+      if (f) f.classList.add('hidden');
+      delete window.app.pendingImageUploads.newBanner;
+      const urlEl = document.getElementById('newBannerUrl'); if (urlEl) urlEl.value = '';
+      const linkEl = document.getElementById('newTargetLink'); if (linkEl) linkEl.value = '';
+      const detailsEl = document.getElementById('newBannerDetails'); if (detailsEl) detailsEl.value = '';
+      const titleEl = document.getElementById('newBannerTitle'); if (titleEl) titleEl.value = '';
+      const btnTextEl = document.getElementById('newBannerButtonText'); if (btnTextEl) btnTextEl.value = '';
+      const pv = document.getElementById('newBannerPreview'); if (pv) pv.classList.add('hidden');
+    },
+
+    addItem: async function(type) {
+      let url = document.getElementById('newBannerUrl').value.trim();
+      const targetLink = document.getElementById('newTargetLink').value.trim();
+      const detailsEl = document.getElementById('newBannerDetails');
+      const details = detailsEl ? detailsEl.value.trim() : '';
+      const titleEl = document.getElementById('newBannerTitle');
+      const title = titleEl ? titleEl.value.trim() : '';
+      const btnTextEl = document.getElementById('newBannerButtonText');
+      const buttonText = btnTextEl ? btnTextEl.value.trim() : '';
+      const hasPendingImage = !!window.app.pendingImageUploads.newBanner;
+      if (!url && !hasPendingImage) return Swal.fire('แจ้งเตือน', 'กรุณากรอกลิงก์รูปภาพ', 'warning');
+
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        if (hasPendingImage) url = await window.app.flushImageUpload('newBanner');
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: type, url: url, targetLink: targetLink, details: details, title: title, buttonText: buttonText });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'เพิ่มรูปภาพสำเร็จ', showConfirmButton: false, timer: 1200 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+
+    deleteItem: async function(type, rowIndex, bannerId) {
+      const confirm = await Swal.fire({
+        title: 'ยืนยันการลบรูปภาพ?',
+        text: 'ต้องการลบรูปภาพแบนเนอร์แถวที่ ' + rowIndex + ' ใช่หรือไม่?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        confirmButtonText: 'ลบรูปภาพ',
+        cancelButtonText: 'ยกเลิก'
+      });
+      
+      if (confirm.isConfirmed) {
+        window.app.showLoading('กำลังลบข้อมูล...');
+        try {
+          const res = await window.app.api('DELETE_SETTINGS_ITEM', { type: type, rowIndex: rowIndex, bannerId: bannerId || '' });
+          if(res && res.status==='success') {
+            await window.app.refreshGlobalData();
+            Swal.fire({ icon: 'success', title: 'ลบรูปภาพสำเร็จ', showConfirmButton: false, timer: 1200 });
+            this.init(this.currentType);
+          } else {
+            Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          }
+        } catch(e) {
+          Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        }
+      }
+    },
+    
+    clearCache: async function() {
+      try {
+        const res = await window.app.api('CLEAR_CACHE', {});
+        if (!res || res.status !== 'success') return Swal.fire('ล้างแคชไม่สำเร็จ', (res && res.message) ? res.message : 'เกิดข้อผิดพลาด', 'error');
+        try {
+          const fresh = await window.app.api('GET_ALL_DATA', {});
+          if (fresh && fresh.status === 'success') window.app.globalData = fresh;
+        } catch (e2) { /* โหลดใหม่ไม่ได้ก็ไม่เป็นไร รีเฟรชหน้าเองได้ */ }
+        Swal.fire('สำเร็จ', 'ล้างแคชเรียบร้อย หน้า Pre Booking จะใช้ข้อมูลล่าสุดจากชีต', 'success');
+      } catch (e) {
+        Swal.fire('ระบบขัดข้อง', 'ล้างแคชไม่สำเร็จ กรุณาลองใหม่', 'error');
+      }
+    },
+    saveBookingSettings: async function() {
+      const start = document.getElementById('reserveStartInput').value;
+      const end = document.getElementById('reserveEndInput').value;
+      const campaignTitle = (document.getElementById('flashCampaignTitleInput')?.value || '').trim();
+      const lowStockThreshold = (document.getElementById('lowStockThresholdInput')?.value || '3').trim() || '3';
+      const webhookUrl = (document.getElementById('webhookUrlInput')?.value || '').trim();
+      
+      if (!start || !end) {
+        return Swal.fire('แจ้งเตือน', 'กรุณาระบุวันเวลาให้ครบถ้วน', 'warning');
+      }
+      
+      if (new Date(start) >= new Date(end)) {
+        return Swal.fire('แจ้งเตือน', 'วันเวลาเริ่มจองต้องมาก่อนวันเวลาสิ้นสุดการจอง', 'warning');
+      }
+
+      // 5B.5 — disabled + spinner ระหว่างรอ API
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', {
+          type: 'bookingsettings',
+          settings: {
+            ReserveStart: start,
+            ReserveEnd: end,
+            FlashCampaignTitle: campaignTitle,
+            LowStockThreshold: lowStockThreshold,
+            WebhookUrl: webhookUrl
+          }
+        });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'บันทึกเวลาการจองสำเร็จ', showConfirmButton: false, timer: 1500 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+
+    saveContactInfo: async function(btn) {
+      const phone = document.getElementById('contactPhoneInput').value.trim();
+      const line = document.getElementById('contactLineInput').value.trim();
+      const hours = document.getElementById('contactHoursInput').value.trim();
+      if (phone && !/^[0-9+\-\s().#,]{5,40}$/.test(phone)) { Swal.fire('เบอร์โทรไม่ถูกต้อง', 'ใช้ได้เฉพาะตัวเลข เว้นวรรค และเครื่องหมาย + - ( )', 'warning'); return; }
+      if (line && /^(javascript|data|vbscript):/i.test(line)) { Swal.fire('LINE ไม่ถูกต้อง', 'ใส่ LINE ID หรือลิงก์ https เท่านั้น', 'warning'); return; }
+      if (/^[a-z][a-z0-9+.-]*:/i.test(line) && !/^https?:\/\//i.test(line)) { Swal.fire('LINE ไม่ถูกต้อง', 'ถ้าใส่เป็นลิงก์ ต้องขึ้นต้นด้วย https://', 'warning'); return; }
+      const restoreBtn = window.app.buttonBusy(btn || document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { ContactPhone: phone, ContactLine: line, ContactHours: hours } });
+        if (res && res.status === 'success') {
+          await window.app.refreshGlobalData();
+          window.app.renderFooterContact();
+          Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลติดต่อแล้ว', timer: 1500, showConfirmButton: false });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch (e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally { restoreBtn(); }
+    },
+
+    saveAppName: async function() {
+      const val = document.getElementById('webAppNameInput').value.trim();
+      if (!val) { Swal.fire('กรอกไม่ครบ', 'กรุณากรอกชื่อเว็บแอป', 'warning'); return; }
+      let logoUrl = (this.data.keyValueSettings && this.data.keyValueSettings.LogoUrl) || '';
+      const hasPendingLogo = !!window.app.pendingImageUploads.webAppLogo;
+
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        if (hasPendingLogo) logoUrl = await window.app.flushImageUpload('webAppLogo');
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', {
+          type: 'bookingsettings',
+          settings: { SystemName: val, LogoUrl: logoUrl }
+        });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          // ชื่อในแท็บ/หน้า login ฝัง server-side ตอน doGet — ต้องโหลดหน้าใหม่ทั้งหน้าถึงจะเห็นผลจริง ไม่ใช่แค่ refreshGlobalData
+          Swal.fire({ icon: 'success', title: 'บันทึกชื่อเว็บแอปสำเร็จ', text: 'รีเฟรชหน้าเว็บเพื่อให้ชื่อใหม่แสดงผลทุกจุด', showConfirmButton: false, timer: 2000 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+
+    saveDriveFolderId: async function() {
+      let val = document.getElementById('driveFolderIdInput').value.trim();
+      const idMatch = val.match(/folders\/([a-zA-Z0-9_-]+)/);
+      if (idMatch && idMatch[1]) val = idMatch[1];
+
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', {
+          type: 'bookingsettings',
+          settings: { DriveFolderId: val }
+        });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'บันทึกโฟลเดอร์สำเร็จ', showConfirmButton: false, timer: 1500 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    },
+
+    saveCompanyInfo: async function() {
+      const name = document.getElementById('invCompanyNameInput').value.trim();
+      const address = document.getElementById('invCompanyAddressInput').value.trim();
+      const email = document.getElementById('invCompanyEmailInput').value.trim();
+      const approverNameEl = document.getElementById('approverNameInput');
+      const approverName = approverNameEl ? approverNameEl.value.trim() : '';
+      let logoUrl = (this.data.keyValueSettings && this.data.keyValueSettings.InvoiceLogoUrl) || '';
+      let signUrl = (this.data.keyValueSettings && this.data.keyValueSettings.ApproverSignatureUrl) || '';
+      const hasPendingImage = !!window.app.pendingImageUploads.invoiceLogo;
+      const hasPendingSign = !!window.app.pendingImageUploads.approverSign;
+
+      const restoreBtn = window.app.buttonBusy(document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        if (hasPendingImage) logoUrl = await window.app.flushImageUpload('invoiceLogo');
+        if (hasPendingSign) signUrl = await window.app.flushImageUpload('approverSign');
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', {
+          type: 'bookingsettings',
+          settings: { InvoiceCompanyName: name, InvoiceCompanyAddress: address, InvoiceCompanyEmail: email, InvoiceLogoUrl: logoUrl, ApproverSignatureUrl: signUrl, ApproverName: approverName }
+        });
+        if(res && res.status==='success') {
+          await window.app.refreshGlobalData();
+          Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลบริษัทสำเร็จ', showConfirmButton: false, timer: 1500 });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch(e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally {
+        restoreBtn();
+      }
+    }
+  };
+</script>

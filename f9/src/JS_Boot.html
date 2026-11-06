@@ -1,0 +1,29 @@
+<script>
+// Global listeners + app bootstrap. MUST be included last (after every window.app.* module).
+// 5B.4 — กด Esc ปิด modal ที่เปิดอยู่บนสุดก่อน (ทีละชั้น) แล้วค่อยปิด cart drawer
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  // 6B — filter popover เป็นชั้นบนสุดของหน้า POS: ปิดก่อนทุก modal
+  if (window.app.pos && window.app.pos.openPopover) { window.app.pos.closeFilterPopovers(); return; }
+  const popup = document.getElementById('popupBannerModal');
+  if (popup && !popup.classList.contains('hidden')) { window.app.closePopupBanner(); return; }
+  const modalOrder = ['formModal', 'checkoutModal', 'addToCartModal'];
+  for (let i = 0; i < modalOrder.length; i++) {
+    const el = document.getElementById(modalOrder[i]);
+    if (el && !el.classList.contains('hidden')) { window.app.hideModal(modalOrder[i]); return; }
+  }
+  const drawer = document.getElementById('cartDrawer');
+  if (drawer && !drawer.classList.contains('translate-x-full')) window.app.pos.toggleCart();
+});
+
+// 6B — คลิกนอก chip/popover (นอก .store-pop-wrap) = ปิด filter popover ที่เปิดอยู่
+document.addEventListener('click', function(e) {
+  if (!window.app.pos || !window.app.pos.openPopover) return;
+  if (e.target && e.target.closest && e.target.closest('.store-pop-wrap')) return;
+  window.app.pos.closeFilterPopovers();
+});
+
+document.addEventListener('DOMContentLoaded', () => { if (!window.app.initialized) { window.app.initialized = true; window.app.init(); } });
+window.onload = () => { if (!window.app.initialized) { window.app.initialized = true; window.app.init(); } };
+
+</script>

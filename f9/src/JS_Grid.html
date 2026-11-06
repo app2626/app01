@@ -1,0 +1,613 @@
+<script>
+// Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
+window.app.grid = {
+    tableName: '', idField: '', columns: [], dataList: [], filteredDataList: [], currentPage: 1, pageSize: 20, isReadonly: false, sortCol: '', sortAsc: true,
+    init: async function(table, idCol, cols, readonly=false) {
+      this.tableName = table; this.idField = idCol; this.columns = cols; this.isReadonly = readonly;
+      const content = document.getElementById('page-content');
+      const tmpl = document.getElementById('tmpl-datagrid');
+      if(content && tmpl) content.innerHTML = tmpl.innerHTML;
+      const btn = document.getElementById('gridAddBtn');
+      if(btn) btn.style.display = (readonly || table==='Orders') ? 'none' : 'flex';
+      // ปุ่มเพิ่มข้อมูลของ Products เปิดฟอร์มเพิ่มสินค้าแบบหลาย SKU แทนฟอร์มแถวเดียวทั่วไป (ดู grid.handleAddClick)
+      const addBtnIcon = document.getElementById('gridAddBtnIcon');
+      const addBtnLabel = document.getElementById('gridAddBtnLabel');
+      if (addBtnIcon && addBtnLabel) {
+        if (table === 'Products') { addBtnIcon.className = 'fas fa-layer-group'; addBtnLabel.textContent = 'เพิ่มสินค้าใหม่ (หลาย SKU)'; }
+        else { addBtnIcon.className = 'fas fa-plus'; addBtnLabel.textContent = 'เพิ่มข้อมูล'; }
+      }
+      // ปุ่มแก้ไขราคา & สต๊อกด่วน (Bulk Quick Edit) เฉพาะหน้า Products
+      const bulkBtn = document.getElementById('gridBulkQuickBtn');
+      if (bulkBtn) {
+        if (table === 'Products' && !readonly) { bulkBtn.classList.remove('hidden'); bulkBtn.classList.add('flex'); }
+        else { bulkBtn.classList.add('hidden'); bulkBtn.classList.remove('flex'); }
+      }
+      // ปุ่ม Export CSV หน้า Orders และ Products — สลับ hidden/flex เป็นคู่ ห้ามให้สอง class อยู่พร้อมกัน
+      const exBtn = document.getElementById('gridExportBtn');
+      if(exBtn) {
+        if (table === 'Orders' || table === 'Products') { exBtn.classList.remove('hidden'); exBtn.classList.add('flex'); }
+        else { exBtn.classList.add('hidden'); exBtn.classList.remove('flex'); }
+      }
+      // ตัวกรอง ประเภทการจอง/สถานะออเดอร์/Category — เฉพาะหน้า Orders
+      const filterBar = document.getElementById('gridFilterBar');
+      if (filterBar) {
+        if (table === 'Orders') { filterBar.classList.remove('hidden'); filterBar.classList.add('flex'); this.setupOrdersFilters(); }
+        else { filterBar.classList.add('hidden'); filterBar.classList.remove('flex'); }
+      }
+
+      let h = '<tr>';
+      this.columns.forEach(c => {
+        if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-left text-[11px] font-bold text-black uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-indigo-100 transition-colors ${c.resp || ''}">${c.label} <i class="fas fa-sort text-indigo-300 ml-1"></i></th>`;
+      });
+      if(!readonly) h += `<th class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-right text-[11px] font-bold text-black uppercase tracking-wider whitespace-nowrap">จัดการ</th>`;
+      h += '</tr>'; 
+      const head = document.getElementById('dataGridHead');
+      if(head) head.innerHTML = h; 
+      this.loadData();
+    },
+    // ตัวกรองหน้า Orders — ประเภทการจอง (Reservation Status), สถานะออเดอร์ (Order Status), Category (จาก SKU ผ่านชีต Products)
+    setupOrdersFilters: function() {
+      // ตัวเลือกต้องตรงกับค่าที่เก็บจริงในชีต (เหมือน options ของฟอร์มแก้ไข 'Reservation Status' ด้านบน)
+      const resEl = document.getElementById('gridFilterResStatus');
+      if (resEl) {
+        resEl.innerHTML = '<option value="">ประเภทการจอง: ทั้งหมด</option>'
+          + '<option value="จอง T (มีการจอง)">จอง T (มีการจอง)</option>'
+          + '<option value="จอง F (สวมสิทธิ์การจอง)">จอง F (สวมสิทธิ์การจอง)</option>';
+      }
+      // สถานะออเดอร์ — flow เดียวกับที่ orderTimelineHtml/ฟอร์มแก้ไขใช้ (ชีต OrderStatus ถ้ามี ≥2 แถว ไม่งั้น fallback)
+      const stEl = document.getElementById('gridFilterOrderStatus');
+      if (stEl) {
+        const options = window.app.getOrderStatusFlow().concat(['Cancelled']);
+        stEl.innerHTML = '<option value="">สถานะออเดอร์: ทั้งหมด</option>'
+          + options.map(o => '<option value="' + window.app.esc(o) + '">' + window.app.esc(o) + '</option>').join('');
+      }
+      // Category — จากชีต Products ผูกกับ SKU ของแต่ละแถว Order (แถว DISCOUNT ไม่มี SKU สินค้าจริง จึงไม่เข้าเงื่อนไขนี้)
+      const products = window.app.globalData.products || [];
+      this.skuCategoryMap = {};
+      const seenCat = {}; const cats = [];
+      products.forEach(p => {
+        if (p.SKU) this.skuCategoryMap[p.SKU] = (p['Category'] || '').toString().trim();
+        const c = (p['Category'] || '').toString().trim();
+        if (c && !seenCat[c]) { seenCat[c] = true; cats.push(c); }
+      });
+      const catEl = document.getElementById('gridFilterCategory');
+      if (catEl) {
+        catEl.innerHTML = '<option value="">Category: ทั้งหมด</option>'
+          + cats.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      }
+    },
+    loadData: async function() {
+      window.app.showLoading(); 
+      try {
+        const res = await window.app.api('GET_TABLE', { tableName: this.tableName }); 
+        Swal.close();
+        if(res && res.status === 'success') {
+          this.dataList = res.data;
+          // เดิมตั้ง filteredDataList = dataList ตรงๆ ไม่ผ่าน filter() — เรียก loadData() ซ้ำหลัง save/delete สำเร็จ (ยังอยู่หน้าเดิม)
+          // จะล้างคำค้น/ตัวกรอง Orders (gridFilterResStatus ฯลฯ) ที่ผู้ใช้ตั้งไว้เงียบๆ ทั้งที่ UI ยังโชว์ค่าที่เลือกอยู่
+          this.filter();
+        }
+        else { this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลได้'); }
+      } catch(e) { Swal.close(); this.renderLoadError(e.message); }
+    },
+    // error state มาตรฐาน (5A.4) — แสดงในตารางพร้อมปุ่มลองใหม่ แทนการเด้ง Swal อย่างเดียว
+    renderLoadError: function(msg) {
+      const tbody = document.getElementById('dataGridBody');
+      if (!tbody) { Swal.fire('Error', msg, 'error'); return; }
+      tbody.innerHTML = '<tr><td colspan="' + this.visibleColCount() + '">' + window.app.emptyState({
+        icon: 'fa-exclamation-triangle',
+        title: 'โหลดข้อมูลไม่สำเร็จ',
+        subtitle: msg,
+        actionLabel: 'ลองใหม่',
+        onclick: 'window.app.grid.loadData()'
+      }) + '</td></tr>';
+    },
+    renderPage: function(page) {
+      this.currentPage = page;
+      const totalPages = Math.ceil(this.filteredDataList.length / this.pageSize) || 1;
+      if (this.currentPage > totalPages) this.currentPage = totalPages;
+      if (this.currentPage < 1) this.currentPage = 1;
+      const start = (this.currentPage - 1) * this.pageSize;
+      const pageData = this.filteredDataList.slice(start, start + this.pageSize);
+      this.renderTable(pageData, start);
+      
+      const pgContainer = document.getElementById('gridPagination');
+      if (pgContainer) {
+        pgContainer.innerHTML = `<div class="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-slate-100 bg-white rounded-b-2xl gap-3">
+          <div class="text-xs font-medium text-slate-500">แสดง ${this.filteredDataList.length === 0 ? 0 : start + 1} ถึง ${Math.min(start + this.pageSize, this.filteredDataList.length)} จากทั้งหมด ${this.filteredDataList.length} รายการ</div>
+          <div class="flex items-center space-x-2">
+            <button onclick="window.app.grid.renderPage(${this.currentPage - 1})" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-xs font-bold transition-colors" ${this.currentPage === 1 ? 'disabled' : ''}>ก่อนหน้า</button>
+            <span class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-50 rounded-lg border border-slate-100">หน้า ${this.currentPage} / ${totalPages}</span>
+            <button onclick="window.app.grid.renderPage(${this.currentPage + 1})" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-xs font-bold transition-colors" ${this.currentPage === totalPages ? 'disabled' : ''}>ถัดไป</button>
+          </div>
+        </div>`;
+      }
+    },
+    // จำนวนคอลัมน์ที่แสดงจริง (ใช้เป็น colspan ของ empty/error state)
+    visibleColCount: function() {
+      return this.columns.filter(c => c.type !== 'hidden').length + (this.isReadonly ? 0 : 1);
+    },
+    renderTable: function(data, startOffset) {
+      startOffset = startOffset || 0;
+      const tbody = document.getElementById('dataGridBody'); if(!tbody) return;
+      if (data.length === 0) {
+        const searchEl = document.getElementById('gridSearch');
+        const hasSearch = !!(searchEl && searchEl.value.trim() !== '');
+        let hasFilter = hasSearch;
+        let clearAction = "document.getElementById('gridSearch').value='';window.app.grid.filter()";
+        if (this.tableName === 'Orders') {
+          const resEl = document.getElementById('gridFilterResStatus');
+          const stEl = document.getElementById('gridFilterOrderStatus');
+          const catEl = document.getElementById('gridFilterCategory');
+          const hasSelectFilter = !!((resEl && resEl.value) || (stEl && stEl.value) || (catEl && catEl.value));
+          hasFilter = hasSearch || hasSelectFilter;
+          clearAction = "document.getElementById('gridSearch').value='';"
+            + "var r=document.getElementById('gridFilterResStatus'); if(r) r.value='';"
+            + "var s=document.getElementById('gridFilterOrderStatus'); if(s) s.value='';"
+            + "var c=document.getElementById('gridFilterCategory'); if(c) c.value='';"
+            + "window.app.grid.filter()";
+        }
+        tbody.innerHTML = '<tr><td colspan="' + this.visibleColCount() + '">' + window.app.emptyState({
+          icon: hasFilter ? 'fa-search' : 'fa-inbox',
+          title: hasFilter ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีข้อมูลในตารางนี้',
+          subtitle: hasFilter ? 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อแสดงข้อมูลทั้งหมด' : 'เมื่อมีการบันทึกข้อมูลใหม่ รายการจะแสดงที่นี่',
+          actionLabel: hasFilter ? 'ล้างตัวกรอง' : '',
+          onclick: hasFilter ? clearAction : ''
+        }) + '</td></tr>';
+        return;
+      }
+      let tbodyHtml = '';
+      data.forEach((row, index) => {
+        // ตำแหน่งจริงใน filteredDataList — index ภายในหน้าเคยทำให้เปิดแก้ผิดเรคอร์ดเมื่ออยู่หน้า 2+ หรือหลังค้นหา/เรียงลำดับ
+        const absIndex = startOffset + index;
+        let tr = '<tr class="hover:bg-slate-50 transition-colors">';
+        this.columns.forEach(c => {
+          if(c.type==='hidden') return; let val = window.app.esc(row[c.key] || '');
+          if(c.key==='Password') val = '********';
+          else if(c.key==='Contact Number' || c.key==='เบอร์โทรศัพท์' || c.key==='Phone') {
+              if (String(val).length === 10) val = String(val).substring(0,3) + '-' + String(val).substring(3,6) + '-' + String(val).substring(6,10);
+          }
+          else if(c.key==='ID Card_Passport' || c.key==='ID Card / Passport') {
+              if (String(val).length === 13) val = String(val).substring(0,1) + '-' + String(val).substring(1,5) + '-' + String(val).substring(5,10) + '-' + String(val).substring(10,12) + '-' + String(val).substring(12,13);
+          }
+          else if(c.key==='Order Status' || c.key==='Status') { 
+              let clr = val==='เปิด'||val==='Completed'?'emerald':(val==='Pending'?'amber':'slate'); 
+              val=`<span class="px-2.5 py-1 rounded-md text-[10px] font-bold bg-${clr}-100 text-${clr}-700 border border-${clr}-200">${val}</span>`; 
+          }
+          if(c.key==='Image URL' && val.length>30) val = val.substring(0,30)+'...';
+          // Orders: ติด icon หน้าชื่อสินค้าให้แถวส่วนลด/ของแถม อ่านบิลหลายแถวต่อ OrderID ง่ายขึ้น
+          // ของแถมดูจาก Unit Price=0 + Row Total=0 (processGift เขียนแบบนี้เสมอ) — ตัวเลขจากชีตอาจมี comma
+          if(this.tableName === 'Orders' && c.key === 'Product Name') {
+            const num = (k) => parseFloat(String(row[k] === undefined || row[k] === null ? '' : row[k]).replace(/,/g, '')) || 0;
+            if(row.SKU === 'DISCOUNT') val = '<i class="fas fa-tag text-rose-500 mr-1.5" title="ส่วนลด" aria-label="ส่วนลด"></i>' + val;
+            else if(num('Unit Price') === 0 && num('Row Total') === 0) val = '<i class="fas fa-gift text-emerald-500 mr-1.5" title="ของแถม" aria-label="ของแถม"></i>' + val;
+          }
+          tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-[11px] text-slate-700 whitespace-nowrap ${c.resp || ''}">${val}</td>`;
+        });
+        if(!this.isReadonly) {
+            let act = `<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm" onclick="window.app.grid.editForm(${absIndex})" title="แก้ไข" aria-label="แก้ไขรายการ"><i class="fas fa-edit"></i></button>`;
+            if (this.tableName === 'Orders') {
+                const safeOrderId = window.app.esc(String(row.OrderID || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+                act += `<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm ml-2" onclick="window.app.grid.reprintOrder('${safeOrderId}')" title="พิมพ์ใบจอง" aria-label="พิมพ์ใบจอง"><i class="fas fa-print"></i></button>`;
+            }
+            if (!(window.app.user.Role === 'Manager' && this.tableName === 'Orders')) {
+                const safeId = window.app.esc(String(row[this.idField] || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+                act+=`<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm ml-2" onclick="window.app.grid.deleteRecord('${safeId}')" title="ลบ" aria-label="ลบรายการ"><i class="fas fa-trash"></i></button>`;
+            }
+            tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-right whitespace-nowrap">${act}</td>`;
+        }
+        tr += '</tr>'; 
+        tbodyHtml += tr;
+      });
+      tbody.innerHTML = tbodyHtml;
+    },
+    filter: function() {
+      const input = document.getElementById('gridSearch'); if(!input) return;
+      const term = input.value.toLowerCase();
+      let list = this.dataList.filter(row => JSON.stringify(Object.values(row)).toLowerCase().includes(term));
+      if (this.tableName === 'Orders') {
+        const resEl = document.getElementById('gridFilterResStatus');
+        const stEl = document.getElementById('gridFilterOrderStatus');
+        const catEl = document.getElementById('gridFilterCategory');
+        const resVal = resEl ? resEl.value : '';
+        const stVal = stEl ? stEl.value : '';
+        const catVal = catEl ? catEl.value : '';
+        if (resVal) {
+          // Reservation Status ถูกเขียนแค่แถวแรกของแต่ละ OrderID เท่านั้น (processCheckout, Code.js) — แถวของแถม/ส่วนลดอื่นในบิลเดียวกันเป็นค่าว่าง
+          // ต้อง join กลับด้วย OrderID เหมือน bookingSummary/branchBookingSummary/allBookingSummary ไม่งั้นกรองแล้วเหลือแค่แถวแรกของบิล ซ่อนแถวที่เหลือไปทั้งตารางและ CSV export
+          const orderResStatusMap = {};
+          this.dataList.forEach(o => { if (o['Reservation Status'] && o['Reservation Status'].toString().trim() !== '') orderResStatusMap[o.OrderID] = o['Reservation Status']; });
+          list = list.filter(row => (row['Reservation Status'] || orderResStatusMap[row.OrderID] || '').toString().trim() === resVal);
+        }
+        if (stVal) list = list.filter(row => (row['Order Status'] || '').toString().trim() === stVal);
+        if (catVal) list = list.filter(row => (this.skuCategoryMap || {})[row.SKU] === catVal);
+      }
+      this.filteredDataList = list;
+      // เดิม filter() ไม่ apply sortCol/sortAsc ที่ผู้ใช้ตั้งไว้ต่อ — เรียง แล้วพิมพ์ค้นหา/เปลี่ยนตัวกรอง ทำให้ลำดับ sort หายเงียบๆ
+      this.applyCurrentSort();
+      this.renderPage(1);
+    },
+    // แยกออกจาก sortColumn เพื่อให้ filter()/loadData() เรียก apply sort เดิมซ้ำได้ ไม่ต้องคัดลอก comparator
+    applyCurrentSort: function() {
+      if (!this.sortCol) return;
+      const colKey = this.sortCol;
+      this.filteredDataList.sort((a,b) => {
+        let valA = a[colKey] !== undefined && a[colKey] !== null ? a[colKey] : '';
+        let valB = b[colKey] !== undefined && b[colKey] !== null ? b[colKey] : '';
+        if(typeof valA === 'string') valA = valA.toLowerCase();
+        if(typeof valB === 'string') valB = valB.toLowerCase();
+        if (valA < valB) return this.sortAsc ? -1 : 1;
+        if (valA > valB) return this.sortAsc ? 1 : -1;
+        return 0;
+      });
+    },
+    sortColumn: function(colKey) {
+      if(this.sortCol === colKey) this.sortAsc = !this.sortAsc;
+      else { this.sortCol = colKey; this.sortAsc = true; }
+      this.applyCurrentSort();
+      this.renderPage(1);
+    },
+    // 5A.3 — Order status timeline (read-only visual) แสดงหัว modal แก้ไข/ดูออเดอร์
+    // flow อ่านจากชีต OrderStatus (เรียงตามแถว, ตัด Cancelled ออก) ถ้าชีตว่างใช้ flow มาตรฐาน
+    orderTimelineHtml: function(data) {
+      const stList = (window.app.globalData.orderStatuses || []).filter(s => s && (s['Status Name'] || '').toString().trim() !== '');
+      const fallbackColors = { 'Pending': '#f59e0b', 'Confirmed': '#366891', 'Paid': '#10b981', 'Delivered': '#1e293b', 'Completed': '#10b981', 'Cancelled': '#f43f5e' };
+      const colorOf = (name) => {
+        const row = stList.find(s => (s['Status Name'] || '').toString().trim() === name);
+        const c = row && row['Color Code'] ? row['Color Code'].toString().trim() : '';
+        return c || fallbackColors[name] || '#366891';
+      };
+      const current = (data['Order Status'] || 'Pending').toString().trim();
+
+      // Cancelled = สถานะแดงแยก ไม่อยู่ใน flow
+      if (current === 'Cancelled') {
+        return '<div class="sm:col-span-2 md:col-span-3"><div class="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">'
+          + '<div class="w-8 h-8 shrink-0 rounded-full text-white flex items-center justify-center" style="background:' + window.app.esc(colorOf('Cancelled')) + '"><i class="fas fa-ban"></i></div>'
+          + '<div><p class="text-sm font-bold text-rose-600">Cancelled — ออเดอร์นี้ถูกยกเลิก</p>'
+          + '<p class="text-[11px] text-rose-400">รายการนี้ไม่อยู่ในขั้นตอนการดำเนินการ</p></div>'
+          + '</div></div>';
+      }
+
+      let flow = window.app.getOrderStatusFlow();
+      // สถานะปัจจุบันไม่อยู่ใน flow (เช่นระบบเก่าใช้ Completed) — ต่อท้ายเป็น step สุดท้ายให้ timeline ยังสะท้อนความจริง
+      let curIdx = flow.indexOf(current);
+      if (curIdx === -1) { flow = flow.concat([current]); curIdx = flow.length - 1; }
+
+      let html = '<div class="sm:col-span-2 md:col-span-3"><div class="bg-slate-50 border border-slate-100 rounded-xl px-4 py-4 overflow-x-auto">'
+        + '<div class="flex items-start min-w-max w-full">';
+      flow.forEach((name, i) => {
+        const color = window.app.esc(colorOf(name));
+        const label = window.app.esc(name);
+        if (i > 0) {
+          const lineColor = i <= curIdx ? color : '#e2e8f0';
+          html += '<div class="h-0.5 flex-1 min-w-[28px] mx-1.5 rounded self-start mt-3.5" style="background:' + lineColor + '"></div>';
+        }
+        let circle = '';
+        if (i < curIdx) {
+          circle = '<div class="w-7 h-7 rounded-full text-white flex items-center justify-center text-[10px]" style="background:' + color + '"><i class="fas fa-check"></i></div>';
+        } else if (i === curIdx) {
+          circle = '<div class="w-7 h-7 rounded-full text-white flex items-center justify-center text-[10px] font-bold" style="background:' + color + ';box-shadow:0 0 0 4px ' + color + '33"><i class="fas fa-circle text-[6px]"></i></div>';
+        } else {
+          circle = '<div class="w-7 h-7 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center"><i class="fas fa-circle text-[6px] text-slate-200"></i></div>';
+        }
+        const labelClass = i === curIdx ? 'text-slate-800' : (i < curIdx ? 'text-slate-600' : 'text-slate-400');
+        html += '<div class="flex flex-col items-center shrink-0 gap-1.5">' + circle + '<span class="text-[10px] font-bold ' + labelClass + '">' + label + '</span></div>';
+      });
+      html += '</div></div></div>';
+      return html;
+    },
+    openForm: function(data = null) {
+      const f = document.getElementById('dynamicForm'); if(!f) return;
+      this.editingData = data; // จำไว้ให้ saveForm รู้ว่ากำลังแก้ไขของเดิมหรือสร้างใหม่ (ใช้กันสร้างรหัสซ้ำทับของเดิม)
+      delete window.app.pendingImageUploads.gridImage; // เปิดฟอร์มใหม่ทุกครั้ง — ล้างไฟล์รูปที่ค้างจากฟอร์มก่อนหน้า (ถ้ามี)
+      let fHtml = '';
+
+      if (this.tableName === 'Orders' && data) fHtml += this.orderTimelineHtml(data);
+      if (this.tableName === 'Orders') fHtml += '<datalist id="customerList">' + [...new Set(this.dataList.map(o=>o['Customer Name']))].filter(Boolean).map(c=>'<option value="' + window.app.esc(c) + '">').join('') + '</datalist>';
+      
+      let grouped = {};
+      let noGroup = [];
+      
+      window.app.globalData.products.forEach(p => {
+          if(p.Category==='โมบาย') {
+              const group = p['Product Group'] ? p['Product Group'].trim() : '';
+              const opt = `<option value="${window.app.esc(p.SKU + ' / ' + p['Product Name'])}">`;
+              if (group) {
+                  if (!grouped[group]) grouped[group] = [];
+                  grouped[group].push(opt);
+              } else {
+                  noGroup.push(opt);
+              }
+          }
+      });
+      
+      let datalistOpts = [];
+      for (const group in grouped) {
+          datalistOpts.push(`<option value="${window.app.esc(group)}">`);
+          datalistOpts.push(...new Set(grouped[group]));
+      }
+      datalistOpts.push(...new Set(noGroup));
+      
+      fHtml += `<datalist id="targetList">${datalistOpts.join('')}</datalist>`;
+
+      this.columns.forEach(c => {
+        let val = data ? (data[c.key] || '') : ''; let inp = '';
+        const escVal = window.app.esc(val); // ใช้ escVal ทุกจุดที่แทรก val ลงใน HTML attribute
+        let dis = (c.key==='Order Status' && window.app.user.Role==='Sales') ? 'disabled' : '';
+        if (this.tableName === 'Orders' && window.app.user.Role === 'Manager' && c.key !== 'Order Status') dis = 'disabled';
+        // กันแก้ไข ID ของแถวที่มีอยู่แล้ว — saveRecord (Code.js) หาแถวที่จะอัปเดตโดยค้นหาค่า ID ที่ส่งมาใหม่ในชีต
+        // ถ้าเปลี่ยนค่า ID ตอนแก้ไข ระบบจะหาแถวเดิมไม่เจอ กลายเป็นสร้างแถวใหม่ซ้อนแทนที่จะอัปเดต (ค่าเดิมค้างเป็นขยะ)
+        if (data && c.key === this.idField) dis = 'disabled';
+        let inputClass = 'w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white shadow-sm transition-all';
+        if(dis) inputClass += ' opacity-70 cursor-not-allowed';
+
+        if(c.type==='hidden') { 
+            fHtml += '<input type="hidden" id="field_' + c.key + '" value="' + escVal + '">'; return;
+        }
+        else if(c.type.startsWith('multi_select_')) {
+            let currentVals = val ? val.split(',').map(s=>s.trim()) : [];
+            let safeKey = c.key.replace(/\s+/g, '');
+            let allVal = c.type === 'multi_select_channel' ? 'ALL' : '*';
+            let allLabel = c.type === 'multi_select_channel' ? 'เลือกทุกช่องทาง (ALL)' : 'ให้สิทธิ์เข้าถึงทั้งหมด (*)';
+            if(c.type === 'multi_select_brand_gifts' || c.type === 'multi_select_channel_gifts') allLabel = 'แจกทุกชิ้นในหมวดนี้ (*)';
+            
+            let isAll = currentVals.includes(allVal) || val === 'ALL' || val === '*';
+            
+            let opts = [];
+            if(c.type === 'multi_select_channel') {
+                opts = [...new Set(window.app.globalData.channels.map(x=>x['Channel Name']))].filter(Boolean).map(n => ({id: n, label: n}));
+            } else if (c.type === 'multi_select_menu') {
+                // ข้ามแถวหัวข้อ (isCategory) ที่ไม่มี id — ถ้าหลุดเข้า opts จะทำ opt.id.toLowerCase() พังทั้งฟอร์ม (ปุ่มแก้ไข Members เงียบ)
+                // ข้าม 'systemsettings' เสมอ — saveSettingsItem/deleteSettingsItem/uploadImage ล็อก Admin-only ทุกจุดไม่มีข้อยกเว้น
+                // ให้สิทธิ์เมนูนี้กับ role อื่นจึงเปิดหน้าได้แต่กดบันทึก/อัปโหลดอะไรไม่ได้เลย (UI หลอกลวง) — อย่าเสนอเป็นตัวเลือกให้เลือกได้
+                window.app.menuConfig.forEach(m => {
+                    if(m.isParent) {
+                        if (m.id) opts.push({id: m.id, label: `[กลุ่ม] ${m.label}`});
+                        m.children.forEach(child => { if (!child.isCategory && child.id && child.id !== 'systemsettings') opts.push({id: child.id, label: `--- ${child.label}`}); });
+                    } else if (!m.isCategory && m.id) {
+                        opts.push({id: m.id, label: m.label});
+                    }
+                });
+            } else {
+                let targetCat = c.type === 'multi_select_brand_gifts' ? 'ของแถมแบรนด์' : 'ของแถมช่องทาง';
+                opts = window.app.globalData.products.filter(p => p.Category === targetCat && p.Status === 'เปิด').map(p => ({id: p['Product Name'], label: p['Product Name']}));
+            }
+            
+            inp = `<div class="max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 mt-1 shadow-inner">`;
+            
+            inp += `<label class="flex items-center space-x-3 cursor-pointer p-2 bg-white rounded-lg border border-slate-100 hover:bg-indigo-50 transition-colors shadow-sm">
+                       <input type="checkbox" class="chk-group-${safeKey} w-5 h-5 text-indigo-600 bg-slate-100 border-slate-300 rounded focus:ring-indigo-500" value="${allVal}" onchange="if(this.checked) document.querySelectorAll('.chk-group-${safeKey}').forEach(cb=>{if(cb!==this)cb.checked=false})" ${isAll?'checked':''}> 
+                       <span class="text-[11px] font-bold text-indigo-600">${allLabel}</span>
+                    </label>`;
+                    
+            opts.forEach(opt => {
+                // สิทธิ์เมนู/ช่องทางต้องเทียบตรงตัวทั้งคำ — substring เคยทำให้ค่า 'promotions' ติ๊ก 'autopromotions' ให้เกินสิทธิ์
+                // ของแถม (brand/channel gifts) คงเทียบแบบ keyword ตาม semantics ของ GiftMappings
+                let matchExact = (c.type === 'multi_select_menu' || c.type === 'multi_select_channel');
+                let isChecked = !isAll && currentVals.some(cv => matchExact
+                    ? String(opt.id || '').toLowerCase() === cv.toLowerCase()
+                    : String(opt.id || '').toLowerCase().includes(cv.toLowerCase()));
+                inp += `<label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                           <input type="checkbox" class="chk-group-${safeKey} w-5 h-5 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500" value="${window.app.esc(opt.id)}" onchange="if(this.checked) { let allCb = document.querySelector('.chk-group-${safeKey}[value=\\'${allVal}\\']'); if(allCb) allCb.checked=false; }" ${isChecked?'checked':''}>
+                           <span class="text-[11px] font-normal text-slate-700">${window.app.esc(opt.label)}</span>
+                        </label>`;
+            });
+            inp += `</div>`;
+        }
+        else if(c.type==='select') { inp='<select class="'+inputClass+'" id="field_' + c.key + '" ' + dis + '>' + c.options.map(opt=>'<option value="' + window.app.esc(opt) + '" ' + (val===opt?'selected':'') + '>' + window.app.esc(opt) + '</option>').join('') + '</select>'; }
+        else if(c.type==='product_select') {
+          if (data && data.SKU === 'DISCOUNT') {
+            inp = '<input type="text" class="' + inputClass + ' bg-slate-100" id="field_' + c.key + '" value="' + escVal + '" readonly>';
+          } else {
+            inp='<select class="'+inputClass+'" id="field_' + c.key + '" onchange="window.app.grid.onProductChange(this)" ' + dis + '>';
+            window.app.globalData.products.forEach(p=>{ 
+              if(p.Status==='เปิด'||val===p['Product Name']) inp+='<option value="' + window.app.esc(p['Product Name']) + '" data-sku="' + window.app.esc(p.SKU) + '" data-price="' + parseFloat((p.Price||0).toString().replace(/,/g,'')) + '" ' + (val===p['Product Name']?'selected':'') + '>' + window.app.esc(p['Product Name']) + ' (SKU: ' + window.app.esc(p.SKU) + ')</option>';
+            }); 
+            inp+='</select>';
+          }
+        }
+        else if(c.type==='datalist') inp='<input type="text" class="'+inputClass+'" id="field_' + c.key + '" value="' + escVal + '" list="' + c.listId + '" ' + dis + '>';
+        else if(c.type==='readonly') inp='<input type="text" class="'+inputClass+' bg-slate-100" id="field_' + c.key + '" value="' + escVal + '" readonly ' + dis + '>';
+        else if(c.type==='password') inp='<input type="password" class="'+inputClass+'" id="field_' + c.key + '" placeholder="' + (data?'เว้นว่างถ้าไม่ต้องการเปลี่ยน':'รหัสผ่านใหม่') + '" ' + dis + '>';
+        else if(c.type==='number') {
+          let numDis = '';
+          if (data && data.SKU === 'DISCOUNT' && c.key === 'Qty') {
+            numDis = 'readonly bg-slate-100';
+          }
+          // ค่าจากชีตเป็น display string อาจมี comma (เช่น "46,900") — input type=number ปฏิเสธค่าที่มี comma ทำให้ช่องโชว์ว่าง ต้องล้างก่อน
+          let numVal = String(val === null || val === undefined ? '' : val).replace(/[^\d.\-]/g, '');
+          inp='<input type="number" class="'+inputClass + ' ' + numDis +'" id="field_' + c.key + '" value="' + window.app.esc(numVal) + '" onkeyup="' + (c.onchange||'') + '" onchange="' + (c.onchange||'') + '" ' + (numDis?'readonly':'') + ' ' + dis + '>';
+        }
+        else if(this.tableName === 'GiftMappings' && c.key === 'Target Mobile (SKU or Group)') inp=`<div class="relative"><input type="text" class="${inputClass} pr-8" id="field_${c.key}" value="${escVal}" list="targetList" placeholder="เช่น SKU-123, S24-Series หรือ *" ${dis}><button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none" onclick="document.getElementById('field_${c.key}').value=''"><i class="fas fa-times"></i></button></div>`;
+        else if((this.tableName === 'GiftMappings' && c.key === 'Mapping ID') || (this.tableName === 'Channels' && c.key === 'Channel ID') || (this.tableName === 'Promotions' && c.key === 'Promo ID') || (this.tableName === 'AutoPromotions' && c.key === 'Rule ID')) {
+          // สร้างรหัสอัตโนมัติเฉพาะตอนเพิ่มแถวใหม่ (ไล่จากรหัสสูงสุดที่มีอยู่จริงในตาราง) — ล็อกไม่ให้พิมพ์เอง กันรหัสชนกัน/พิมพ์ผิดรูปแบบ
+          const autoIdFormats = { 'Mapping ID': { prefix: 'GM-', pad: 3 }, 'Channel ID': { prefix: 'CH-', pad: 2 }, 'Promo ID': { prefix: 'P-', pad: 3 }, 'Rule ID': { prefix: 'AP-', pad: 3 } };
+          const fmt = autoIdFormats[c.key];
+          let idVal = val;
+          if (!data) {
+            let maxNum = 0;
+            const re = new RegExp('^' + fmt.prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\d+)$');
+            (this.dataList || []).forEach(r => {
+              const mMatch = String(r[c.key] || '').match(re);
+              if (mMatch) maxNum = Math.max(maxNum, parseInt(mMatch[1], 10));
+            });
+            idVal = fmt.prefix + String(maxNum + 1).padStart(fmt.pad, '0');
+          }
+          inp = '<input type="text" class="' + inputClass + ' bg-slate-100" id="field_' + c.key + '" value="' + window.app.esc(idVal) + '" readonly>';
+        }
+        else if(c.key === 'Image URL' && window.app.user.Role === 'Admin' && !dis) {
+            // ช่อง Image URL แบบมีรูปพรีวิวใต้ช่อง (อัปเดตสดตาม URL ที่พิมพ์/วาง)
+            const hasVal = String(val).trim() && String(val).trim() !== '-';
+            const previewSrc = hasVal ? window.app.esc(window.app.formatImageUrl(val)) : '';
+            inp = `<div class="space-y-2">
+                     <div class="flex gap-2">
+                       <input type="text" class="${inputClass}" id="field_${c.key}" value="${escVal}" placeholder="วางลิงก์รูป (URL)" oninput="const pv=document.getElementById('gridImgPreview'); if(pv){ if(this.value.trim()){ pv.src=window.app.formatImageUrl(this.value); pv.classList.remove('hidden'); } else { pv.classList.add('hidden'); } }">
+                       <button type="button" id="gridImgUploadBtn" class="px-3 py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap" onclick="document.getElementById('gridImgFileInput').click()"><i class="fas fa-upload mr-1"></i> อัปโหลดรูป</button>
+                       <input type="file" id="gridImgFileInput" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, 'gridImage', function(localUrl){ const pv=document.getElementById('gridImgPreview'); if(pv){ pv.src=localUrl; pv.classList.remove('hidden'); } window.app.toast('เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึกข้อมูล'); })">
+                     </div>
+                     <img id="gridImgPreview" src="${previewSrc}" alt="ตัวอย่างรูปสินค้า" class="h-16 w-16 object-cover rounded-lg border border-slate-200 shadow-sm ${hasVal ? '' : 'hidden'}" onerror="this.classList.add('hidden')">
+                   </div>`;
+        }
+        else inp='<input type="' + c.type + '" class="'+inputClass+'" id="field_' + c.key + '" value="' + escVal + '" ' + dis + '>';
+        
+        fHtml += '<div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">' + c.label + '</label>' + inp + '</div>';
+      });
+      f.innerHTML = fHtml;
+      if(document.getElementById('formModalTitle')) document.getElementById('formModalTitle').innerText = data ? 'จัดการแก้ไขข้อมูลเอกสาร' : 'ลงทะเบียนบันทึกข้อมูลใหม่'; 
+      window.app.showModal('formModal');
+    },
+    onProductChange: function(sel) {
+      const o = sel.options[sel.selectedIndex]; if(!o) return;
+      const sku = document.getElementById('field_SKU'); const pr = document.getElementById('field_Unit Price');
+      if(sku) sku.value=o.getAttribute('data-sku'); if(pr) pr.value=o.getAttribute('data-price'); this.calcOrderTotal();
+    },
+    calcOrderTotal: function() {
+      const elQty = document.getElementById('field_Qty');
+      const elPrice = document.getElementById('field_Unit Price');
+      const t = document.getElementById('field_Row Total'); 
+      if(!elQty || !elPrice || !t) return;
+      const q = parseFloat(elQty.value||0); const p = parseFloat(elPrice.value||0);
+      t.value=q*p;
+    },
+    // Products เปิดฟอร์มแก้ไขแบบหลาย SKU (แก้ไขทั้ง Model เดียวกันในหน้าเดียว) แทนฟอร์มแถวเดียวทั่วไป
+    editForm: function(index) {
+      const row = this.filteredDataList[index];
+      if (this.tableName === 'Products') { window.app.productGroup.openEdit(row['Model']); return; }
+      this.openForm(row);
+    },
+    // ปุ่ม "เพิ่มข้อมูล" ของ Products เปิดฟอร์มเพิ่มสินค้าแบบหลาย SKU แทนฟอร์มแถวเดียวทั่วไป
+    handleAddClick: function() {
+      if (this.tableName === 'Products') window.app.productGroup.open();
+      else this.openForm();
+    },
+    // รีปริ้นใบจอง (พิมพ์ย้อนหลัง) — Orders 1 ออเดอร์ = หลายแถวในชีต (สินค้าหลัก+ของแถม+ส่วนลด) ต้องรวมกลับเป็น pay object เดียวให้ printReceipt ใช้ได้
+    // ใช้ this.dataList (ทั้งตาราง ไม่ผ่านค้นหา/แบ่งหน้า) แทนการยิง GET_TABLE ใหม่ — ข้อมูลที่โหลดไว้แล้วครบพอ
+    reprintOrder: function(orderId) {
+      const rows = this.dataList.filter(r => r.OrderID === orderId);
+      if (rows.length === 0) return Swal.fire('ไม่พบข้อมูล', 'ไม่พบรายการของออเดอร์นี้ในตารางที่โหลดไว้', 'warning');
+      const firstNonEmpty = (field) => { const r = rows.find(r => r[field] && String(r[field]).trim() !== ''); return r ? r[field] : ''; };
+      const num = (row, key) => parseFloat(String(row[key] === undefined || row[key] === null ? '' : row[key]).replace(/,/g, '')) || 0;
+
+      const cart = []; const discounts = [];
+      rows.forEach(row => {
+        if (row.SKU === 'DISCOUNT') {
+          discounts.push({ name: row['Product Name'], value: Math.abs(num(row, 'Row Total')) });
+        } else {
+          const isGift = num(row, 'Unit Price') === 0 && num(row, 'Row Total') === 0;
+          cart.push({ SKU: row.SKU, 'Product Name': row['Product Name'], Price: row['Unit Price'], qty: parseInt(row.Qty, 10) || 0, isGiftLine: isGift });
+        }
+      });
+
+      const pay = {
+        cart: cart,
+        customerName: firstNonEmpty('Customer Name'),
+        contactPhone: firstNonEmpty('Contact Number'),
+        email: firstNonEmpty('Email'),
+        idCard: firstNonEmpty('ID Card_Passport'),
+        branch: firstNonEmpty('Branch Code') || rows[0]['Branch Code'],
+        bkStaffName: firstNonEmpty('Staff'),
+        receiptNo: firstNonEmpty('Receipt No'),
+        depositAmount: firstNonEmpty('Deposit'),
+        discounts: discounts,
+        discount: discounts.reduce((s, d) => s + d.value, 0)
+      };
+      window.app.printReceipt(orderId, pay);
+    },
+    saveForm: async function() {
+      // 5B.5 — disabled + spinner ระหว่างรอ API (กัน double-click ก่อน modal ปิด)
+      const btnSave = document.querySelector('#formModal [onclick="window.app.grid.saveForm()"]');
+      if (btnSave && btnSave.disabled) return;
+      const restoreBtn = window.app.buttonBusy(btnSave) || function(){};
+
+      const pay = {};
+
+      this.columns.forEach(c => { 
+        if (c.type.startsWith('multi_select_')) {
+           let safeKey = c.key.replace(/\s+/g, '');
+           let checked = Array.from(document.querySelectorAll(`.chk-group-${safeKey}:checked`)).map(el => el.value);
+           if(c.type === 'multi_select_channel' && checked.includes('ALL')) pay[c.key] = 'ALL';
+           else if(checked.includes('*')) pay[c.key] = '*';
+           else pay[c.key] = checked.join(', ');
+        } else {
+           const el=document.getElementById('field_' + c.key); 
+           if(el) pay[c.key]=el.value; 
+        }
+      });
+
+      // ส่ง _rowIndex ของแถวเดิมไปด้วยตอนแก้ไข (ไม่ใช่ Orders — มี field '_rowIndex' hidden ของตัวเองอยู่แล้วในคอลัมน์ config) ให้ saveRecord (Code.js)
+      // ใช้ชี้แถวที่จะอัปเดตตรงๆ แทนการไล่เทียบค่า ID เฉยๆ — กันกรณี ID ที่พิมพ์แก้ไขบังเอิญไปชนกับแถวอื่น
+      if (this.editingData && this.tableName !== 'Orders') pay._rowIndex = this.editingData._rowIndex;
+
+      // กันสร้างรายการใหม่ด้วยรหัสที่มีอยู่แล้ว — saveRecord ฝั่ง server เจอรหัสซ้ำจะ "อัปเดตทับ" ของเดิมเงียบๆ
+      // (เช่น เพิ่มสินค้าใหม่แต่พิมพ์ SKU เดิม = สินค้าเดิมถูกเขียนทับหาย) — บล็อกไว้ตั้งแต่ฝั่งฟอร์ม (server เพิ่ง throw ด้วยเหมือนกันแล้ว เป็นแค่ fast-path UX)
+      if (!this.editingData && this.tableName !== 'Orders') {
+        const newIdVal = String(pay[this.idField] || '').trim();
+        if (newIdVal && this.dataList.some(r => String(r[this.idField] || '').trim() === newIdVal)) {
+          restoreBtn();
+          Swal.fire('รหัสซ้ำ', 'มีรายการที่ใช้ ' + window.app.esc(this.idField) + ' "' + window.app.esc(newIdVal) + '" อยู่แล้ว — หากต้องการแก้ไขรายการเดิม กรุณากดปุ่มแก้ไขที่รายการนั้นแทน', 'warning');
+          return;
+        }
+      }
+
+      if (window.app.pendingImageUploads.gridImage) {
+        try {
+          const uploadedUrl = await window.app.flushImageUpload('gridImage');
+          if (uploadedUrl) pay['Image URL'] = uploadedUrl;
+        } catch (e) {
+          restoreBtn();
+          Swal.fire('ผิดพลาด', e.message || 'อัปโหลดรูปไม่สำเร็จ', 'error');
+          return;
+        }
+      }
+
+      window.app.hideModal('formModal');
+      setTimeout(async () => {
+         window.app.showLoading('กำลังบันทึกข้อมูล...');
+         try {
+           let res;
+           if(this.tableName==='Orders') res = await window.app.api('UPDATE_FULL_ORDER', { data: pay });
+           else res = await window.app.api('SAVE_RECORD', { tableName: this.tableName, idField: this.idField, data: pay });
+           if(res && res.status==='success'){
+             await window.app.refreshGlobalData();
+             if (res.generatedPassword) {
+               // สมาชิกใหม่เว้นรหัสผ่านว่าง — server สุ่มรหัสผ่านให้ ต้องโชว์ครั้งเดียวตอนนี้เพราะจะไม่ถูกส่งกลับมาอีก (rule 5)
+               Swal.fire({ icon: 'success', title: 'สร้างสมาชิกสำเร็จ', html: 'รหัสผ่านที่สุ่มให้: <b>' + window.app.esc(res.generatedPassword) + '</b><br><span class="text-xs text-slate-500">กรุณาบันทึกไว้และแจ้งพนักงาน — จะไม่แสดงซ้ำอีก</span>' });
+             } else {
+               Swal.fire({ icon: 'success', title: 'อัปเดตข้อมูลเสร็จสิ้น', showConfirmButton: false, timer: 1500 });
+             }
+             this.loadData();
+           } else Swal.fire('ผิดพลาด',res ? res.message : 'Error', 'error');
+         } catch(e) { Swal.fire('ผิดพลาด', e.message || 'Error', 'error'); }
+         finally { restoreBtn(); }
+      }, 350);
+    },
+    deleteRecord: async function(id) {
+      if((await Swal.fire({ title: 'คุณต้องการลบข้อมูลนี้?', text: "การดำเนินการนี้ไม่สามารถย้อนกลับได้ประจำระบบล็อกไฟล์", icon: 'warning', showCancelButton: true, confirmButtonColor: '#e11d48', confirmButtonText: 'ลบถาวร', cancelButtonText: 'ยกเลิก' })).isConfirmed){
+        window.app.showLoading('กำลังลบข้อมูล...');
+        try {
+          const res = await window.app.api('DELETE_RECORD', { tableName:this.tableName, idField:this.idField, idValue:id });
+          if(res && res.status==='success') { await window.app.refreshGlobalData(); Swal.fire({ icon: 'success', title: 'ลบข้อมูลสำเร็จแล้ว', showConfirmButton: false, timer: 1200 }); this.loadData(); } else Swal.fire('Error',res ? res.message : 'Error','error');
+        } catch(e) { Swal.fire('Error', e.message || 'Error', 'error'); }
+      }
+    },
+    // 5B.3 — export ตามที่กรอง/ค้น/เรียงอยู่ (filteredDataList ไม่ใช่ dataList) เป็น CSV ที่ Excel เปิดภาษาไทยถูก (BOM)
+    exportCSV: function() {
+      if (this.filteredDataList.length === 0) return Swal.fire('ไม่มีข้อมูล', 'ไม่มีรายการให้ export ตามตัวกรองปัจจุบัน', 'warning');
+      const cols = this.columns.filter(c => c.type !== 'hidden').map(c => c.key);
+      const escCell = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+      let csv = "\uFEFF" + cols.map(escCell).join(',') + '\r\n'; // BOM นำหน้าให้ Excel เปิดภาษาไทยถูก (escape ไว้ ไม่ฝังตัวอักษรล่องหนในซอร์ส)
+      this.filteredDataList.forEach(row => { csv += cols.map(k => escCell(row[k])).join(',') + '\r\n'; });
+      // ชื่อไฟล์ใช้วันที่ local — ห้าม toISOString (UTC ทำให้วันเลื่อนถอยหลังในโซน +7)
+      const d = new Date();
+      const fname = this.tableName.toLowerCase() + '_' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '.csv';
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+  };
+</script>

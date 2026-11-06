@@ -1,0 +1,407 @@
+<script>
+// Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
+window.app.invoice = {
+     list: [],
+     currentId: null,      // Invoice ID ของเอกสารที่เปิดอยู่ (null = เอกสารใหม่ยังไม่บันทึก)
+     currentStatus: null,
+     init: function() {
+        // ห้ามใช้ flag กันรันซ้ำ — ทุกครั้งที่เข้าหน้า template ถูกฉีดใหม่ ต้อง init ใหม่เสมอ
+        // (เดิมมี this.initialized ทำให้เข้าหน้าครั้งที่ 2 ตารางว่าง/เลขที่เอกสารไม่ถูกสร้าง)
+        this.currentId = null;
+        this.currentStatus = null;
+        this.addRow();
+        this.loadList();
+
+        const whtInput = document.getElementById('invWhtPct');
+        if(whtInput) {
+           whtInput.addEventListener('input', function() {
+              const p = document.getElementById('invWhtPctPrint');
+              if(p) p.innerText = this.value + '%';
+           });
+        }
+
+        const d = new Date();
+        const yy = d.getFullYear().toString().slice(-2);
+        const mm = (d.getMonth()+1).toString().padStart(2,'0');
+        const dd = d.getDate().toString().padStart(2,'0');
+        const rand = Math.floor(Math.random() * 1000).toString().padStart(3,'0');
+
+        const invNoEl = document.getElementById('invNoInput');
+        if(invNoEl) invNoEl.value = 'INV-' + yy + mm + dd + '-' + rand;
+
+        const dateEl = document.getElementById('invDateInput');
+        if(dateEl) {
+           dateEl.value = d.getFullYear() + '-' + mm + '-' + dd;
+        }
+
+        // เติมโลโก้/ชื่อบริษัท/ที่อยู่/อีเมล จากค่าที่ตั้งไว้ใน ตั้งค่าระบบ → ฐานข้อมูล (แก้เพิ่มเติมเฉพาะใบนี้ได้ตามปกติ)
+        const settings = window.app.globalData.settings || {};
+        const logoEl = document.getElementById('invLogoImg');
+        if(logoEl && settings.InvoiceLogoUrl) logoEl.src = window.app.formatImageUrl(settings.InvoiceLogoUrl);
+        const nameEl = document.getElementById('invCompanyNameField');
+        if(nameEl && settings.InvoiceCompanyName) nameEl.value = settings.InvoiceCompanyName;
+        const addrEl = document.getElementById('invCompanyAddressField');
+        if(addrEl && settings.InvoiceCompanyAddress) addrEl.value = settings.InvoiceCompanyAddress;
+        const emailEl = document.getElementById('invCompanyEmailField');
+        if(emailEl && settings.InvoiceCompanyEmail) emailEl.value = settings.InvoiceCompanyEmail;
+        // ชื่อผู้อนุมัติจากตั้งค่าระบบ — prefill ช่องลายเซ็นให้เอกสารใหม่ (แก้เฉพาะใบได้; ตราประทับตอนอนุมัติใช้ค่าจาก Settings เสมอ)
+        const approverEl = document.getElementById('invApproverName');
+        if(approverEl && settings.ApproverName) approverEl.value = settings.ApproverName;
+     },
+     changeLogo: function(input) {
+        if(input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.getElementById('invLogoImg');
+                if(img) img.src = e.target.result;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+     },
+     addRow: function(item) {
+        const tbody = document.getElementById('invTbody');
+        if(!tbody) return;
+        const tr = document.createElement('tr');
+        tr.className = "border-b border-slate-100 hover:bg-slate-50";
+        tr.innerHTML = `
+           <td class="p-2 text-center text-slate-500 font-bold inv-row-num text-sm">1</td>
+           <td class="p-2"><input type="text" class="inv-desc w-full border-none outline-none focus:bg-white text-sm p-1 placeholder-slate-300" placeholder="รายละเอียด"></td>
+           <td class="p-2"><input type="number" class="inv-qty w-full border-none outline-none focus:bg-white text-center text-sm p-1" value="1" min="1" onchange="window.app.invoice.calc()" onkeyup="window.app.invoice.calc()"></td>
+           <td class="p-2"><input type="number" class="inv-price w-full border-none outline-none focus:bg-white text-right text-sm p-1" value="0" min="0" onchange="window.app.invoice.calc()" onkeyup="window.app.invoice.calc()"></td>
+           <td class="p-2 text-right font-bold text-slate-800 text-sm"><span class="inv-line-total">0.00</span></td>
+           <td class="p-2 text-center no-print"><button onclick="window.app.invoice.removeRow(this)" class="text-rose-400 hover:text-rose-600" aria-label="ลบรายการนี้"><i class="fas fa-times"></i></button></td>
+        `;
+        // เติมค่าจากเอกสารที่เปิดจากรายการ (openDoc) — ตั้งผ่าน .value ตรง ๆ ห้ามฝังใน innerHTML (กัน XSS)
+        if (item) {
+           tr.querySelector('.inv-desc').value = item.desc || '';
+           tr.querySelector('.inv-qty').value = item.qty || 0;
+           tr.querySelector('.inv-price').value = item.price || 0;
+        }
+        tbody.appendChild(tr);
+        this.updateRowNumbers();
+        this.calc();
+     },
+     removeRow: function(btn) {
+        btn.closest('tr').remove();
+        this.updateRowNumbers();
+        this.calc();
+     },
+     updateRowNumbers: function() {
+        document.querySelectorAll('.inv-row-num').forEach((td, i) => td.innerText = i + 1);
+     },
+     calc: function() {
+        let sub = 0;
+        document.querySelectorAll('#invTbody tr').forEach(tr => {
+            const q = parseFloat(tr.querySelector('.inv-qty').value) || 0;
+            const p = parseFloat(tr.querySelector('.inv-price').value) || 0;
+            const t = q * p;
+            const lt = tr.querySelector('.inv-line-total');
+            if(lt) lt.innerText = t.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+            sub += t;
+        });
+        
+        const subTotalEl = document.getElementById('invSubTotal');
+        if(subTotalEl) subTotalEl.innerText = sub.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        
+        let vat = 0;
+        const vatChk = document.getElementById('invVatChk');
+        if(vatChk && vatChk.checked) {
+            vat = sub * 0.07;
+        }
+        const vatEl = document.getElementById('invVat');
+        if(vatEl) vatEl.innerText = vat.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        
+        const whtInput = document.getElementById('invWhtPct');
+        let whtPct = whtInput ? parseFloat(whtInput.value) || 0 : 0;
+        let wht = sub * (whtPct / 100);
+        const whtEl = document.getElementById('invWht');
+        if(whtEl) whtEl.innerText = '-' + wht.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+        
+        let net = sub + vat - wht;
+        const netEl = document.getElementById('invNet');
+        if(netEl) netEl.innerText = net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+     },
+
+     // ===== เก็บลงชีต + รายการเอกสาร + workflow อนุมัติ (2026-07-11) =====
+     loadList: async function() {
+        const tbody = document.getElementById('invListTbody');
+        if(!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> กำลังโหลด...</td></tr>';
+        try {
+           const res = await window.app.api('GET_INVOICES', {});
+           if(res && res.status === 'success') {
+              this.list = res.data || [];
+              this.renderList();
+           } else {
+              tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-rose-500">โหลดรายการไม่สำเร็จ: ' + window.app.esc(res ? res.message : 'Error') + ' <button onclick="window.app.invoice.loadList()" class="underline font-bold">ลองใหม่</button></td></tr>';
+           }
+        } catch(e) {
+           tbody.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-rose-500">โหลดรายการไม่สำเร็จ: ' + window.app.esc(e.message || 'Error') + ' <button onclick="window.app.invoice.loadList()" class="underline font-bold">ลองใหม่</button></td></tr>';
+        }
+     },
+     renderList: function() {
+        const tbody = document.getElementById('invListTbody');
+        if(!tbody) return;
+        const esc = window.app.esc, escJs = window.app.escAttrJs;
+        const role = window.app.user ? window.app.user.Role : '';
+        const username = window.app.user ? window.app.user.Username : '';
+        const isApprover = (role === 'Admin' || role === 'Manager');
+        const searchEl = document.getElementById('invListSearch');
+        const term = searchEl ? searchEl.value.trim().toLowerCase() : '';
+
+        let rows = this.list.slice().reverse(); // แถวล่างสุดของชีต = ใหม่สุด → แสดงใหม่สุดก่อน
+        if(term) {
+           rows = rows.filter(r =>
+              ((r['Invoice No'] || '') + ' ' + (r['Customer Name'] || '') + ' ' + (r['Requested By'] || '') + ' ' + (r['Type'] || '') + ' ' + (r['Status'] || ''))
+              .toLowerCase().indexOf(term) !== -1);
+        }
+        if(rows.length === 0) {
+           tbody.innerHTML = '<tr><td colspan="9" class="p-6 text-center text-slate-400">' + (term ? 'ไม่พบเอกสารที่ค้นหา' : 'ยังไม่มีเอกสารที่บันทึกไว้ — กรอกฟอร์มด้านล่างแล้วกด "บันทึก/ส่งขออนุมัติ"') + '</td></tr>';
+           return;
+        }
+        tbody.innerHTML = rows.map(r => {
+           const id = r['Invoice ID'];
+           const approved = r['Status'] === 'อนุมัติแล้ว';
+           const badge = approved
+              ? '<span class="inline-block px-2 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700"><i class="fas fa-check-circle mr-1"></i>อนุมัติแล้ว</span>'
+              : '<span class="inline-block px-2 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700"><i class="fas fa-clock mr-1"></i>รออนุมัติ</span>';
+           const net = (parseFloat((r['Net Total'] || '0').toString().replace(/,/g,'')) || 0).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+           let actions = '<button onclick="window.app.invoice.openDoc(\'' + escJs(id) + '\')" class="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors" aria-label="เปิดเอกสาร" title="เปิดเอกสาร"><i class="fas fa-folder-open"></i></button>';
+           if(isApprover && !approved) {
+              actions += ' <button onclick="window.app.invoice.approve(\'' + escJs(id) + '\')" class="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" aria-label="อนุมัติเอกสาร" title="อนุมัติ"><i class="fas fa-stamp"></i></button>';
+           }
+           if(role === 'Admin' || (r['Requested By'] === username && !approved)) {
+              actions += ' <button onclick="window.app.invoice.del(\'' + escJs(id) + '\')" class="w-9 h-9 inline-flex items-center justify-center rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" aria-label="ลบเอกสาร" title="ลบ"><i class="fas fa-trash"></i></button>';
+           }
+           return '<tr class="border-b border-slate-100 hover:bg-slate-50">' +
+              '<td class="p-3 font-bold text-slate-800">' + esc(r['Invoice No'] || '-') + '</td>' +
+              '<td class="p-3 text-slate-600">' + esc((r['Type'] || '').replace(/\s*\(.*\)$/, '')) + '</td>' +
+              '<td class="p-3 text-slate-600">' + esc(r['Invoice Date'] || '-') + '</td>' +
+              '<td class="p-3 text-slate-600">' + esc(r['Customer Name'] || '-') + '</td>' +
+              '<td class="p-3 text-right font-bold text-slate-800">' + net + '</td>' +
+              '<td class="p-3 text-center">' + badge + '</td>' +
+              '<td class="p-3 text-slate-600">' + esc(r['Requested By'] || '-') + '</td>' +
+              '<td class="p-3 text-slate-600">' + esc(r['Approved By'] || '-') + '</td>' +
+              '<td class="p-3 text-center whitespace-nowrap">' + actions + '</td>' +
+           '</tr>';
+        }).join('');
+     },
+     collect: function() {
+        const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+        const spanNum = id => { const el = document.getElementById(id); return el ? (parseFloat(el.innerText.replace(/,/g,'')) || 0) : 0; };
+        const items = [];
+        document.querySelectorAll('#invTbody tr').forEach(tr => {
+           const desc = tr.querySelector('.inv-desc').value.trim();
+           const qty = parseFloat(tr.querySelector('.inv-qty').value) || 0;
+           const price = parseFloat(tr.querySelector('.inv-price').value) || 0;
+           if(desc !== '' || price > 0) items.push({ desc: desc, qty: qty, price: price });
+        });
+        const vatChk = document.getElementById('invVatChk');
+        const logoEl = document.getElementById('invLogoImg');
+        const logoSrc = logoEl ? logoEl.src : '';
+        return {
+           invoiceId: this.currentId || '',
+           invoiceNo: val('invNoInput'),
+           type: val('invType'),
+           invoiceDate: val('invDateInput'),
+           custName: val('invCustName'),
+           custAddress: val('invCustAddress'),
+           custPhone: val('invCustPhone'),
+           custEmail: val('invCustEmail'),
+           custTaxId: val('invCustTaxId'),
+           jobName: val('invJobName'),
+           payTerms: val('invPayTerms'),
+           remarks: val('invRemarks'),
+           itemsJson: JSON.stringify(items),
+           vatEnabled: !!(vatChk && vatChk.checked),
+           whtPct: parseFloat(val('invWhtPct')) || 0,
+           subTotal: spanNum('invSubTotal'),
+           vat: spanNum('invVat'),
+           wht: Math.abs(spanNum('invWht')),
+           netTotal: spanNum('invNet'),
+           companyName: val('invCompanyNameField'),
+           companyAddress: val('invCompanyAddressField'),
+           companyEmail: val('invCompanyEmailField'),
+           logoUrl: /^https?:\/\//.test(logoSrc) ? logoSrc : ''
+        };
+     },
+     save: async function() {
+        if(this.currentStatus === 'อนุมัติแล้ว') {
+           Swal.fire('แก้ไขไม่ได้', 'เอกสารนี้อนุมัติแล้ว — กด "สร้างใหม่" เพื่อออกเอกสารฉบับใหม่', 'warning');
+           return;
+        }
+        const data = this.collect();
+        if(!data.invoiceNo) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาระบุเลขที่เอกสาร', 'warning'); return; }
+        let items = [];
+        try { items = JSON.parse(data.itemsJson); } catch(e) {}
+        if(!items.length) { Swal.fire('ข้อมูลไม่ครบ', 'กรุณาเพิ่มรายการอย่างน้อย 1 รายการ (ระบุรายละเอียดหรือราคา)', 'warning'); return; }
+
+        const restore = window.app.buttonBusy(document.getElementById('invSaveBtn'), 'กำลังบันทึก...');
+        if(restore === null) return;
+        try {
+           const res = await window.app.api('SAVE_INVOICE', { data: data });
+           if(res && res.status === 'success') {
+              this.currentId = res.invoiceId;
+              this.currentStatus = 'รออนุมัติ';
+              Swal.fire({ icon: 'success', title: 'บันทึกเอกสารแล้ว', text: 'สถานะ: รออนุมัติ', showConfirmButton: false, timer: 1800 });
+              this.loadList();
+           } else {
+              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+           }
+        } catch(e) {
+           Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        } finally {
+           restore();
+        }
+     },
+     newDoc: function() {
+        // re-render ทั้งหน้า (template ถูกฉีดใหม่ + init รีเซ็ตทุกฟิลด์/เลขที่เอกสารใหม่)
+        window.app.route();
+     },
+     openDoc: function(invoiceId) {
+        const row = this.list.find(r => r['Invoice ID'] === invoiceId);
+        if(!row) { Swal.fire('ไม่พบเอกสาร', 'กรุณารีเฟรชรายการแล้วลองใหม่', 'error'); return; }
+        const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v || ''; };
+        set('invNoInput', row['Invoice No']);
+        set('invType', row['Type']);
+        set('invDateInput', row['Invoice Date']);
+        set('invCustName', row['Customer Name']);
+        set('invCustAddress', row['Customer Address']);
+        set('invCustPhone', row['Customer Phone']);
+        set('invCustEmail', row['Customer Email']);
+        set('invCustTaxId', row['Customer TaxID']);
+        set('invJobName', row['Job Name']);
+        set('invPayTerms', row['Payment Terms']);
+        set('invRemarks', row['Remarks']);
+        set('invCompanyNameField', row['Company Name']);
+        set('invCompanyAddressField', row['Company Address']);
+        set('invCompanyEmailField', row['Company Email']);
+        const logoEl = document.getElementById('invLogoImg');
+        if(logoEl && row['Logo Url']) logoEl.src = window.app.formatImageUrl(row['Logo Url']);
+
+        const tbody = document.getElementById('invTbody');
+        if(tbody) tbody.innerHTML = '';
+        let items = [];
+        try { items = JSON.parse(row['Items JSON'] || '[]'); } catch(e) {}
+        if(items.length) items.forEach(it => this.addRow(it)); else this.addRow();
+
+        const vatChk = document.getElementById('invVatChk');
+        if(vatChk) vatChk.checked = (row['VAT Enabled'] === 'TRUE');
+        set('invWhtPct', (parseFloat((row['WHT Percent'] || '0').toString().replace(/,/g,'')) || 0));
+        const whtPrint = document.getElementById('invWhtPctPrint');
+        if(whtPrint) whtPrint.innerText = (parseFloat((row['WHT Percent'] || '0').toString().replace(/,/g,'')) || 0) + '%';
+        this.calc();
+
+        this.currentId = invoiceId;
+        this.currentStatus = row['Status'] || 'รออนุมัติ';
+        this.renderStamp(row);
+        this.applyLockState();
+        const paper = document.getElementById('invoice-paper');
+        if(paper) paper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+     },
+     updateSaveBtn: function() {
+        const btn = document.getElementById('invSaveBtn');
+        if(!btn) return;
+        const locked = (this.currentStatus === 'อนุมัติแล้ว');
+        btn.disabled = locked;
+        btn.classList.toggle('opacity-50', locked);
+        btn.classList.toggle('cursor-not-allowed', locked);
+     },
+     // เอกสาร "อนุมัติแล้ว" ต้องดูได้อย่างเดียวจริงๆ ไม่ใช่แค่กดบันทึกไม่ได้ — ล็อกทุกช่องกรอก/ปุ่มแก้ไขใน #invoice-paper
+     // เรียกทุกครั้งที่เปิดเอกสาร (ไม่ใช่แค่ตอน locked) เพราะสลับดูเอกสารอื่นที่ยังไม่อนุมัติต้องปลดล็อกกลับด้วย (element เดิมถูกใช้ซ้ำ ไม่ได้ re-render ทั้งฟอร์ม)
+     applyLockState: function() {
+        const locked = (this.currentStatus === 'อนุมัติแล้ว');
+        const paper = document.getElementById('invoice-paper');
+        if(paper) {
+           paper.querySelectorAll('input, select, textarea, button').forEach(el => { el.disabled = locked; });
+        }
+        const logoBox = document.getElementById('invLogoBox');
+        if(logoBox) logoBox.classList.toggle('pointer-events-none', locked);
+        this.updateSaveBtn();
+     },
+     renderStamp: function(row) {
+        const stamp = document.getElementById('invApproveStamp');
+        const nameInput = document.getElementById('invApproverName');
+        if(!stamp || !nameInput) return;
+        const approved = row && row['Status'] === 'อนุมัติแล้ว';
+        if(approved) {
+           nameInput.classList.add('hidden');
+           stamp.classList.remove('hidden');
+           const n = document.getElementById('invStampName');
+           if(n) n.innerText = row['Approved By'] || '';
+           const dt = document.getElementById('invStampDate');
+           if(dt) dt.innerText = row['Approved At'] ? ('· ' + row['Approved At']) : '';
+           const img = document.getElementById('invStampImg');
+           const sig = (window.app.globalData.settings || {}).ApproverSignatureUrl;
+           if(img) {
+              if(sig) { img.src = window.app.formatImageUrl(sig); img.style.display = ''; }
+              else img.style.display = 'none';
+           }
+        } else {
+           nameInput.classList.remove('hidden');
+           stamp.classList.add('hidden');
+        }
+     },
+     approve: async function(invoiceId) {
+        const row = this.list.find(r => r['Invoice ID'] === invoiceId);
+        const confirm = await Swal.fire({
+           title: 'ยืนยันการอนุมัติ?',
+           html: 'อนุมัติเอกสาร <b>' + window.app.esc(row ? row['Invoice No'] : invoiceId) + '</b><br><span class="text-sm text-slate-500">ลายเซ็นผู้อนุมัติจะถูกประทับในเอกสาร และแก้ไขเอกสารไม่ได้อีก</span>',
+           icon: 'question',
+           showCancelButton: true,
+           confirmButtonText: 'อนุมัติ',
+           cancelButtonText: 'ยกเลิก'
+        });
+        if(!confirm.isConfirmed) return;
+        window.app.showLoading('กำลังอนุมัติ...');
+        try {
+           const res = await window.app.api('APPROVE_INVOICE', { invoiceId: invoiceId });
+           Swal.close();
+           if(res && res.status === 'success') {
+              Swal.fire({ icon: 'success', title: 'อนุมัติแล้ว', showConfirmButton: false, timer: 1500 });
+              if(this.currentId === invoiceId) {
+                 this.currentStatus = 'อนุมัติแล้ว';
+                 this.renderStamp({ 'Status': 'อนุมัติแล้ว', 'Approved By': res.approvedBy, 'Approved At': res.approvedAt });
+                 this.applyLockState();
+              }
+              this.loadList();
+           } else {
+              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+           }
+        } catch(e) {
+           Swal.close();
+           Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        }
+     },
+     del: async function(invoiceId) {
+        const row = this.list.find(r => r['Invoice ID'] === invoiceId);
+        const confirm = await Swal.fire({
+           title: 'ลบเอกสารนี้?',
+           html: 'ลบเอกสาร <b>' + window.app.esc(row ? row['Invoice No'] : invoiceId) + '</b> ถาวร',
+           icon: 'warning',
+           showCancelButton: true,
+           confirmButtonText: 'ลบ',
+           cancelButtonText: 'ยกเลิก',
+           confirmButtonColor: '#e11d48'
+        });
+        if(!confirm.isConfirmed) return;
+        window.app.showLoading('กำลังลบ...');
+        try {
+           const res = await window.app.api('DELETE_INVOICE', { invoiceId: invoiceId });
+           Swal.close();
+           if(res && res.status === 'success') {
+              window.app.toast('ลบเอกสารแล้ว');
+              // เดิมไม่เรียก applyLockState() — ถ้าเอกสารที่ลบ (ตัวที่เปิดอยู่) สถานะ "อนุมัติแล้ว" อยู่ก่อน ฟอร์ม #invoice-paper ทุก input/select/textarea/button
+              // จะค้าง disabled ต่อไปทั้งที่ currentStatus ถูกล้างเป็น null แล้ว (updateSaveBtn() อย่างเดียวไม่ปลดล็อกฟอร์ม) จนกว่าจะกด "สร้างใหม่"
+              if(this.currentId === invoiceId) { this.currentId = null; this.currentStatus = null; this.applyLockState(); }
+              this.loadList();
+           } else {
+              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+           }
+        } catch(e) {
+           Swal.close();
+           Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        }
+     }
+  };
+</script>

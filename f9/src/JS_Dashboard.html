@@ -1,0 +1,733 @@
+<script>
+// Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
+window.app.dashboard = {
+    rawOrders: [], filteredOrders: [], charts: {}, refreshTimer: null,
+    
+    slider: {
+        index: 0, count: 0, timer: null,
+        init: function(data) {
+            this.count = data.length; this.index = 0;
+            let track = document.getElementById('sliderTrack'); let dots = document.getElementById('sliderDots');
+            if(!track || !dots) return;
+            
+            let trackHtml = ''; let dotsHtml = '';
+            data.forEach((item, i) => {
+                let img = window.app.esc(window.app.formatImageUrl(item.url, 'w1600'));
+                let linkTag = item.link ? `<a href="${window.app.esc(item.link)}" target="_blank" class="block w-full h-full relative">` : `<div class="w-full h-full relative">`;
+                let endLinkTag = item.link ? `</a>` : `</div>`;
+                // ตัวหนังสือทับภาพ — หัวข้อ (Title) + คำโปรย (Details/Subtitle) แยกกัน 2 บรรทัด (พอร์ตแนวคิดจาก pbzf8's HeroBanner.jsx title/subtitle ตรงๆ, 2026-09-19 เปลี่ยนจากรวมช่องเดียวเป็นแยก 2 ช่องตามตัวอย่างจริงที่ i7 Store)
+                // ใช้ gradient-caption แบบเดียวกับ promo grid (renderBanners ด้านล่าง) เพื่อความสม่ำเสมอ — Title คอลัมน์เดียวกับที่ Popup ใช้ (เพิ่มไว้แล้ววันนี้) แค่ใช้ซ้ำ ไม่ต้องเพิ่มคอลัมน์ใหม่
+                const heroTitleHtml = item.title ? `<h2 class="text-white text-lg md:text-2xl font-black drop-shadow-md leading-tight break-words">${window.app.esc(item.title)}</h2>` : '';
+                const heroSubtitleHtml = item.details ? `<p class="text-white/90 text-sm md:text-base font-medium drop-shadow-md leading-relaxed whitespace-pre-wrap break-words mt-1">${window.app.esc(item.details)}</p>` : '';
+                let textOverlay = (item.title || item.details) ? `<div class="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end pointer-events-none">${heroTitleHtml}${heroSubtitleHtml}</div>` : '';
+                trackHtml += `<div class="w-full h-full shrink-0 skeleton">${linkTag}<img src="${img}" loading="eager" fetchpriority="high" class="w-full h-full object-cover opacity-0 transition-opacity duration-500" onload="this.style.opacity=1; var s=this.closest('.skeleton'); if(s) s.classList.remove('skeleton');">${textOverlay}${endLinkTag}</div>`;
+                dotsHtml += `<button onclick="window.app.dashboard.slider.goTo(${i})" class="h-2.5 rounded-full transition-all duration-300 focus:outline-none ${i===0?'bg-white w-8 shadow-sm':'bg-white/50 w-2.5 hover:bg-white/80'}"></button>`;
+            });
+            track.innerHTML = trackHtml; dots.innerHTML = dotsHtml;
+            this.startAuto();
+        },
+        updateDOM: function() {
+            let track = document.getElementById('sliderTrack'); let dots = document.getElementById('sliderDots');
+            if(track) track.style.transform = `translateX(-${this.index * 100}%)`;
+            if(dots) {
+                Array.from(dots.children).forEach((dot, i) => {
+                    dot.className = i === this.index ? "h-2.5 rounded-full transition-all duration-300 focus:outline-none bg-white w-8 shadow-sm" : "h-2.5 rounded-full transition-all duration-300 focus:outline-none bg-white/50 w-2.5 hover:bg-white/80";
+                });
+            }
+        },
+        next: function() { this.index = (this.index + 1) % this.count; this.updateDOM(); this.startAuto(); },
+        prev: function() { this.index = (this.index - 1 + this.count) % this.count; this.updateDOM(); this.startAuto(); },
+        goTo: function(idx) { this.index = idx; this.updateDOM(); this.startAuto(); },
+        startAuto: function() {
+            if(this.timer) clearInterval(this.timer);
+            if(this.count > 1) { this.timer = setInterval(() => { this.next(); }, 5000); }
+        }
+    },
+
+    renderBanners: function() {
+        const heroData = window.app.globalData.heroBanners || [];
+        const gridData = window.app.globalData.gridBanners || [];
+
+        const heroWrap = document.getElementById('dashHeroWrap');
+        if(heroData.length > 0) {
+            if(heroWrap) heroWrap.classList.remove('hidden');
+            this.slider.init(heroData);
+        } else {
+            if(heroWrap) heroWrap.classList.add('hidden');
+        }
+
+        const gridWrap = document.getElementById('dashPromoGridWrap');
+        const gridBox = document.getElementById('dashPromoGrid');
+        if(gridData.length > 0) {
+            if(gridWrap) gridWrap.classList.remove('hidden');
+            let html = '';
+            gridData.forEach((item, idx) => {
+                let formattedUrl = window.app.esc(window.app.formatImageUrl(item.url, 'w1000'));
+                let baseClass = "rounded-3xl overflow-hidden shadow-sm group relative bg-white border border-slate-100 h-[160px] md:h-[200px] skeleton";
+                if(idx === 0 && gridData.length >= 3) baseClass += " md:col-span-2 md:row-span-2 md:h-full";
+
+                let linkTag = item.link ? `<a href="${window.app.esc(item.link)}" target="_blank" class="block w-full h-full relative">` : `<div class="w-full h-full relative">`;
+                let endLinkTag = item.link ? `</a>` : `</div>`;
+                let textOverlay = item.details ? `<div class="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end max-h-full overflow-y-auto custom-scrollbar"><p class="text-white text-sm md:text-base font-bold drop-shadow-md text-shadow-sm leading-relaxed whitespace-pre-wrap break-words">${window.app.esc(item.details)}</p></div>` : '';
+
+                html += `<div class="${baseClass}">${linkTag}<img src="${formattedUrl}" loading="eager" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 opacity-0" style="transition: opacity .5s, transform .7s;" onload="this.style.opacity=1; var s=this.closest('.skeleton'); if(s) s.classList.remove('skeleton');">${textOverlay}${endLinkTag}</div>`;
+            });
+            if(gridBox) gridBox.innerHTML = html;
+        } else {
+            if(gridWrap) gridWrap.classList.add('hidden');
+        }
+    },
+
+    init: async function() {
+      if(window.app.user.Role === 'Sales') {
+        document.querySelectorAll('.admin-filter').forEach(el => el.style.display = 'none');
+      }
+      window.app.showLoading('กำลังโหลดข้อมูล...');
+      
+      try {
+        const res = await window.app.api('GET_ADVANCED_DASHBOARD', {});
+        Swal.close();
+        if(res && res.status === 'success') {
+          this.rawOrders = res.data.orders.map(o => {
+             let bInfo = window.app.globalData.branches.find(b => b['Branch Code'] === o['Branch Code']) || {};
+             let pInfo = window.app.globalData.products.find(p => p.SKU == o.SKU) || {};
+             o.Mall = bInfo.Mall || '-'; o.Region = bInfo.Region || '-'; o.Province = bInfo.Province || '-'; o['Type Name'] = bInfo['Type Name'] || '-'; o.Area = bInfo.Area || '-';
+             o.Category = pInfo.Category || '-'; o.Model = pInfo.Model || '-'; o.Capacity = pInfo.Capacity || '-';
+             return o;
+          });
+          
+          this.renderBanners();
+          this.lastBuiltAt = res.data.builtAt || Date.now(); this.updateFreshness();
+
+          const bSel = document.getElementById('dashBranch'); const sSel = document.getElementById('dashSales');
+          if(bSel && sSel) {
+            let bHtml = '<option value="ALL">ทุกสาขา</option>';
+            [...new Set(window.app.globalData.branches.map(b => b['Branch Code']))].forEach(b => { if(b) bHtml += '<option value="' + window.app.esc(b) + '">' + window.app.esc(b) + '</option>'; });
+            bSel.innerHTML = bHtml;
+            
+            let sHtml = '<option value="ALL">ทุกคน</option>';
+            res.data.members.forEach(m => { if(m.Name && (m.Role === 'Sales' || m.Role === 'Manager')) sHtml += '<option value="' + window.app.esc(m.Name) + '">' + window.app.esc(m.Name) + '</option>'; });
+            sSel.innerHTML = sHtml;
+          }
+          
+          const now = new Date();
+          const dStart = document.getElementById('dashStartDate');
+          const dEnd = document.getElementById('dashEndDate');
+          // ห้ามใช้ toISOString() สร้างค่าวันที่ — เป็น UTC ทำให้วันเลื่อนถอยหลัง 1 วันในโซน UTC+7
+          const toLocalKey = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+          if(dStart) dStart.value = toLocalKey(new Date(now.getFullYear(), now.getMonth(), 1));
+          if(dEnd) dEnd.value = toLocalKey(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+          this.applyFilters(); this.startAutoRefresh();
+        } else {
+          this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูล Dashboard ได้');
+        }
+      } catch(err) {
+        Swal.close(); console.error(err);
+        this.renderLoadError(err.message);
+      }
+    },
+    // error state มาตรฐาน (5A.4) พร้อมปุ่มลองใหม่ — ห้ามเงียบเฉยตาม error contract
+    renderLoadError: function(msg) {
+      const emptyEl = document.getElementById('dashEmptyState');
+      if (!emptyEl) { Swal.fire('Error', msg, 'error'); return; }
+      emptyEl.innerHTML = window.app.emptyState({
+        icon: 'fa-exclamation-triangle',
+        title: 'โหลดข้อมูลไม่สำเร็จ',
+        subtitle: msg,
+        actionLabel: 'ลองใหม่',
+        onclick: 'window.app.dashboard.init()'
+      });
+      emptyEl.classList.remove('hidden');
+    },
+    // ดึงข้อมูล Dashboard ใหม่ — force=true (ปุ่มรีเฟรช) ข้ามแคชฝั่ง server; ตัวจับเวลา 30 วิ ใช้แคชปกติ (ลดภาระชีต)
+    reloadData: async function(force) {
+      const stat = document.getElementById('dashSyncStatus'); if(stat) { stat.classList.remove('bg-slate-100','text-slate-600'); stat.classList.add('bg-emerald-50','text-emerald-600'); }
+      let ok = false;
+      try {
+        const res = await window.app.api('GET_ADVANCED_DASHBOARD', force ? { refresh: true } : {});
+        if(res && res.status === 'success') {
+          this.rawOrders = res.data.orders.map(o => {
+             let bInfo = window.app.globalData.branches.find(b => b['Branch Code'] === o['Branch Code']) || {};
+             let pInfo = window.app.globalData.products.find(p => p.SKU == o.SKU) || {};
+             o.Mall = bInfo.Mall || '-'; o.Region = bInfo.Region || '-'; o.Province = bInfo.Province || '-'; o['Type Name'] = bInfo['Type Name'] || '-'; o.Area = bInfo.Area || '-';
+             o.Category = pInfo.Category || '-'; o.Model = pInfo.Model || '-'; o.Capacity = pInfo.Capacity || '-';
+             return o;
+          });
+          this.lastBuiltAt = res.data.builtAt || Date.now();
+          this.applyFilters();
+          ok = true;
+        }
+      } catch(e) {}
+      setTimeout(() => { if(stat) { stat.classList.remove('bg-emerald-50','text-emerald-600'); stat.classList.add('bg-slate-100','text-slate-600'); } }, 1500);
+      this.updateFreshness();
+      return ok;
+    },
+    // ปุ่ม "รีเฟรช": ข้ามแคช server + แจ้งผล
+    refreshNow: async function(btn) {
+      const restore = window.app.buttonBusy ? (window.app.buttonBusy(btn) || function(){}) : function(){};
+      try {
+        const ok = await this.reloadData(true);
+        window.app.toast(ok ? 'อัปเดตข้อมูลล่าสุดแล้ว' : 'อัปเดตไม่สำเร็จ กรุณาลองใหม่', ok ? 'success' : 'warning');
+      } finally { restore(); }
+    },
+    updateFreshness: function() {
+      const el = document.getElementById('dashFreshness'); if(!el) return;
+      const t = this.lastBuiltAt ? new Date(this.lastBuiltAt) : new Date();
+      el.textContent = 'ข้อมูลเมื่อ ' + t.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    },
+    startAutoRefresh: function() {
+      if(this.refreshTimer) clearInterval(this.refreshTimer);
+      this.refreshTimer = setInterval(() => {
+        if(window.app.currentRoute !== 'dashboard') return;
+        this.reloadData(false);
+      }, 30000);
+    },
+    resetFilters: function() { 
+      ['dashStartDate','dashEndDate','dashBranch','dashSales'].forEach(id=>{
+        const el = document.getElementById(id);
+        if(el) el.value = id.includes('Date') ? '' : 'ALL';
+      });
+      this.applyFilters(); 
+    },
+    applyFilters: function() {
+      const elSD = document.getElementById('dashStartDate'); const elED = document.getElementById('dashEndDate');
+      const elB = document.getElementById('dashBranch'); const elS = document.getElementById('dashSales');
+      const sD = elSD ? elSD.value : ''; const eD = elED ? elED.value : '';
+      const b = elB ? elB.value : 'ALL'; const s = elS ? elS.value : 'ALL';
+
+      this.filteredOrders = this.rawOrders.filter(o => {
+        if (sD && new Date(o.Timestamp) < new Date(sD + "T00:00:00")) return false;
+        if (eD && new Date(o.Timestamp) > new Date(eD + "T23:59:59")) return false;
+        if (b !== 'ALL' && o['Branch Code'] !== b) return false;
+        if (s !== 'ALL' && o['Staff'] !== s) return false;
+        return true;
+      });
+      // ช่วง/ตัวกรองที่เลือกไม่มีออเดอร์ — แสดง empty state มาตรฐาน (5A.4) เหนือ KPI (KPI ยังแสดงค่า 0 ตามจริง)
+      const emptyEl = document.getElementById('dashEmptyState');
+      if (emptyEl) {
+        if (this.filteredOrders.length === 0) {
+          const hasAnyOrder = this.rawOrders.length > 0;
+          emptyEl.innerHTML = window.app.emptyState({
+            icon: 'fa-calendar-times',
+            title: hasAnyOrder ? 'ไม่มีออเดอร์ในช่วงที่เลือก' : 'ยังไม่มีออเดอร์ในระบบ',
+            subtitle: hasAnyOrder ? 'ลองขยายช่วงวันที่ หรือล้างตัวกรองเพื่อดูออเดอร์ทั้งหมด' : 'เมื่อมีการคีย์ออเดอร์แรก ข้อมูลสรุปจะแสดงที่นี่',
+            actionLabel: hasAnyOrder ? 'ล้างตัวกรอง' : '',
+            onclick: hasAnyOrder ? 'window.app.dashboard.resetFilters()' : ''
+          });
+          emptyEl.classList.remove('hidden');
+        } else {
+          emptyEl.classList.add('hidden');
+          emptyEl.innerHTML = '';
+        }
+      }
+      this.updateKPIs(); this.renderCharts(); this.renderPromotionsTable(); this.renderGiftsTable(); this.renderInterestsTable(); this.renderExecutiveRoiAndStockCards();
+    },
+    updateKPIs: function() {
+      let t = 0; let u = new Set(); let completedOrders = new Set();
+      let resT = 0; let resF = 0;
+      let totalMobiles = 0; let totalAccessories = 0;
+      const orderResStatusMap = {};
+      this.filteredOrders.forEach(o => { if(o['Reservation Status'] && o['Reservation Status'].trim() !== '') { orderResStatusMap[o.OrderID] = o['Reservation Status']; } });
+
+      // "อัตราปิดการขาย" = สัดส่วนออเดอร์ที่ถึงสถานะสุดท้ายของ flow ปัจจุบัน (getOrderStatusFlow) — เดิม hardcode ตรวจ 'Completed'
+      // ซึ่งไม่ใช่ค่าที่ processCheckout เขียนจริง (เริ่ม 'Pending' เสมอ) และไม่อยู่ใน flow มาตรฐาน Pending→Confirmed→Paid→Delivered เลย
+      // ทำให้ KPI นี้เป็น 0% เสมอในระบบที่ยังไม่ได้ตั้งชื่อสถานะ "Completed" เองในชีต OrderStatus
+      const orderFlow = window.app.getOrderStatusFlow();
+      const terminalStatus = orderFlow[orderFlow.length - 1];
+
+      this.filteredOrders.forEach(o => {
+        if (!window.app.isOrderCancelled(o)) {
+            let rTotal = parseFloat((o['Row Total'] || '0').toString().replace(/,/g,''));
+            t += isNaN(rTotal) ? 0 : rTotal;
+            u.add(o.OrderID);
+            if (o['Order Status'] === terminalStatus) completedOrders.add(o.OrderID);
+            
+            let isMobile = o.Category === 'โมบาย';
+            // 6C.3 — "อุปกรณ์เสริม" แยกเป็น 3 หมวดย่อย (อุปกรณ์เสริม/สมาร์ทวอทช์/หูฟัง) แต่ KPI นี้ยังรวมเป็นยอดเดียว
+            let isAcc = ['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category);
+            if (isMobile || isAcc) {
+                let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
+                if(isMobile) totalMobiles += qty;
+                if(isAcc) totalAccessories += qty;
+                
+                let rStatus = o['Reservation Status'] || orderResStatusMap[o.OrderID] || '';
+                if(rStatus.includes('จอง T')) resT += qty;
+                if(rStatus.includes('จอง F')) resF += qty;
+            }
+        }
+      });
+      
+      if(document.getElementById('dashKpiTotal')) document.getElementById('dashKpiTotal').innerText = '฿' + t.toLocaleString();
+      if(document.getElementById('dashKpiMobiles')) document.getElementById('dashKpiMobiles').innerText = totalMobiles; 
+      if(document.getElementById('dashKpiAccessories')) document.getElementById('dashKpiAccessories').innerText = totalAccessories; 
+      if(document.getElementById('dashKpiResT')) document.getElementById('dashKpiResT').innerText = resT;
+      if(document.getElementById('dashKpiResF')) document.getElementById('dashKpiResF').innerText = resF;
+      if(document.getElementById('dashKpiConv')) document.getElementById('dashKpiConv').innerText = (u.size>0 ? ((completedOrders.size/u.size)*100).toFixed(1) : 0) + '%';
+      if(document.getElementById('dashKpiAov')) document.getElementById('dashKpiAov').innerText = '฿' + (u.size>0 ? (t/u.size) : 0).toLocaleString();
+    },
+    renderCharts: function() {
+      if (typeof ChartDataLabels !== 'undefined') {
+          Chart.register(ChartDataLabels);
+          Chart.defaults.set('plugins.datalabels', {
+              color: window.app.chartTheme().datalabel,
+              font: { family: 'Sarabun', weight: 'bold', size: 10 },
+              align: 'end',
+              anchor: 'end',
+              offset: 4,
+              formatter: function(value) { return value > 0 ? value.toLocaleString() : ''; }
+          });
+      }
+      const validCategories = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'];
+      const isDevice = (o) => o && o.Category && validCategories.includes(o.Category.toString().trim());
+
+      // เก็บ key แยกจาก label ที่โชว์ — label เป็น th-TH locale string (D/M/YYYY ไม่เติม 0 นำหน้า) เรียงตามตัวอักษรตรงๆ ไม่ได้
+      // (เช่น "10/1/2569" < "2/1/2569" แบบ string แต่ผิดลำดับวันที่จริง) ต้อง sort ด้วย key YYYY-MM-DD ตาม rule 1 แล้วค่อย map กลับเป็น label
+      const trendData = {};
+      this.filteredOrders.forEach(o => {
+        if(!window.app.isOrderCancelled(o) && isDevice(o)) {
+          const dt = new Date(o.Timestamp);
+          const dKey = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+          if (!trendData[dKey]) trendData[dKey] = { label: dt.toLocaleDateString('th-TH'), qty: 0 };
+          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); trendData[dKey].qty += (isNaN(qty) ? 0 : qty);
+        }
+      });
+      const sortedDayKeys = Object.keys(trendData).sort();
+      this.createChart('chartSalesTrend', 'line', sortedDayKeys.map(k => trendData[k].label), sortedDayKeys.map(k => trendData[k].qty), 'จำนวนเครื่อง', '#254d71');
+
+      // กลุ่มรุ่นสินค้า (ตัดข้อมูลก่อนความจุ) — owner request 2026-07-24, แทนที่ตำแหน่งกราฟ "โมบาย" เดิมที่ย้ายไปอยู่คู่กับกราฟ "สมาร์ทวอทช์ & หูฟัง" แล้ว
+      // ใช้หลักการเดียวกับ bookingSummary.stripCapacity (JS.html บรรทัด ~2899): ตัดข้อความ Model ที่ตำแหน่งซึ่งพบค่า Capacity ของแถวนั้นๆ เพื่อรวมทุกความจุของรุ่นเดียวกันเข้าเป็นกลุ่มเดียว
+      const stripCapacityGroup = (modelText, cap) => {
+        const mt = (modelText || '').toString().trim();
+        const c = (cap || '').toString().trim();
+        if (!c || c === '-') return mt;
+        const idx = mt.toUpperCase().indexOf(c.toUpperCase());
+        return idx === -1 ? mt : (mt.substring(0, idx).trim() || mt);
+      };
+      const groupData = {};
+      this.filteredOrders.forEach(o => {
+        if(window.app.isOrderCancelled(o) || (o.Category || '').toString().trim() !== 'โมบาย') return;
+        let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
+        const g = stripCapacityGroup(mName, o.Capacity);
+        let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
+        groupData[g] = (groupData[g] || 0) + qty;
+      });
+      let sortedGroups = Object.keys(groupData).sort((a,b) => groupData[b] - groupData[a]);
+      this.createChart('chartModelGroupStripped', 'bar', sortedGroups, sortedGroups.map(g => groupData[g]), 'จำนวนเครื่อง', '#7c3aed');
+
+      // การวิเคราะห์โมเดลสินค้ายอดนิยม — แยกเป็น 2 กราฟตามหมวดหมู่ (owner request 2026-07-24, แทนที่กราฟ "เปรียบเทียบยอดจองรายสัปดาห์" ที่ไม่ได้ใช้แล้ว):
+      // โมบาย แยกกราฟเดี่ยว, ส่วนสมาร์ทวอทช์+หูฟังรวมกันอยู่อีกกราฟหนึ่ง (ไม่รวม "อุปกรณ์เสริม" ทั่วไป)
+      // จัดกลุ่มด้วย Model อย่างเดียว (เดิมรวม Capacity ต่อท้ายด้วย ทำให้ความจุต่างกันของรุ่นเดียวกันแยกเป็นคนละแท่ง — owner request 2026-09-19 ให้เหลือคอลัมน์ Model เดียว)
+      const buildModelAdvancedChart = (canvasId, categories) => {
+        const modelsData = {};
+        let grandTotalQty = 0;
+        this.filteredOrders.forEach(o => {
+          if(window.app.isOrderCancelled(o) || !isDevice(o)) return;
+          if(!categories.includes((o.Category || '').toString().trim())) return;
+          let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
+          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
+          modelsData[mName] = (modelsData[mName] || 0) + qty;
+          grandTotalQty += qty;
+        });
+        let sortedModels = Object.keys(modelsData).sort((a,b) => modelsData[b] - modelsData[a]).slice(0, 15);
+
+        if(this.charts[canvasId]) this.charts[canvasId].destroy();
+        const ctxModel = document.getElementById(canvasId);
+        if(ctxModel) {
+          this.charts[canvasId] = new Chart(ctxModel.getContext('2d'), {
+              type: 'bar',
+              data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
+              options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
+          });
+          window.app.chartExportButtons(canvasId);
+        }
+      };
+      buildModelAdvancedChart('chartModelAdvancedMobile', ['โมบาย']);
+      buildModelAdvancedChart('chartModelAdvancedWatchEarphone', ['สมาร์ทวอทช์', 'หูฟัง']);
+
+      // Promotions summary is rendered as a table via renderPromotionsTable()
+
+      const buildCountChart = (field, canvasId, colorHex) => {
+          const counts = {};
+          this.filteredOrders.forEach(o => {
+            if (!window.app.isOrderCancelled(o) && isDevice(o) && o[field] && o[field] !== '-') {
+              let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); counts[o[field]] = (counts[o[field]] || 0) + (isNaN(qty) ? 0 : qty);
+            }
+          });
+          let labels = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+          let data = labels.map(l => counts[l]);
+          this.createChart(canvasId, 'bar', labels, data, 'จำนวนเครื่อง', colorHex);
+      };
+      
+      buildCountChart('Mall', 'chartMall', '#17a2b8'); buildCountChart('Region', 'chartRegion', '#10b981');
+      buildCountChart('Province', 'chartProvince', '#f59e0b'); buildCountChart('Type Name', 'chartType', '#8b5cf6');
+
+      const branchCounts = {};
+      this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o)) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); branchCounts[o['Branch Code']] = (branchCounts[o['Branch Code']] || 0) + (isNaN(qty) ? 0 : qty); } });
+      let sortedBranches = Object.keys(branchCounts).sort((a,b)=>branchCounts[b]-branchCounts[a]).slice(0, 10);
+      this.createChart('chartTopBranches', 'bar', sortedBranches, sortedBranches.map(b=>branchCounts[b]), 'จำนวนเครื่องรวม', '#254d71');
+
+      const salesCounts = {};
+      this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o) && o['Staff']) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); salesCounts[o['Staff']] = (salesCounts[o['Staff']] || 0) + (isNaN(qty) ? 0 : qty); } });
+      let sortedSales = Object.keys(salesCounts).sort((a,b)=>salesCounts[b]-salesCounts[a]).slice(0, 10);
+      this.createChart('chartSalesRank', 'bar', sortedSales, sortedSales.map(s=>salesCounts[s]), 'จำนวนเครื่อง', '#2563eb', true);
+
+      // Gifts summary is rendered as a table via renderGiftsTable()
+
+      // Data for Channel vs Model (Split Mobile and Accessories)
+      const channelModelDataMobile = {};
+      const channelModelDataAcc = {};
+      const allChannelsMobile = new Set();
+      const allChannelsAcc = new Set();
+      
+      // จัดกลุ่มด้วย Model อย่างเดียว (เดิมรวม Capacity ต่อท้ายด้วย — owner request 2026-09-19 ให้เหลือคอลัมน์ Model เดียว)
+      this.filteredOrders.forEach(o => {
+        if(window.app.isOrderCancelled(o) || !isDevice(o)) return;
+        let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
+
+        let ch = o.Channel || 'Unknown';
+        let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
+        
+        if (o.Category === 'โมบาย') {
+            allChannelsMobile.add(ch);
+            if(!channelModelDataMobile[mName]) channelModelDataMobile[mName] = { total: 0, channels: {} };
+            channelModelDataMobile[mName].total += qty;
+            channelModelDataMobile[mName].channels[ch] = (channelModelDataMobile[mName].channels[ch] || 0) + qty;
+        } else if (['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category)) {
+            allChannelsAcc.add(ch);
+            if(!channelModelDataAcc[mName]) channelModelDataAcc[mName] = { total: 0, channels: {} };
+            channelModelDataAcc[mName].total += qty;
+            channelModelDataAcc[mName].channels[ch] = (channelModelDataAcc[mName].channels[ch] || 0) + qty;
+        }
+      });
+      
+      const renderStackedChart = (canvasId, dataMap, channelsSet) => {
+          let topModels = Object.keys(dataMap).sort((a,b) => dataMap[b].total - dataMap[a].total).slice(0, 15);
+          let datasets = [];
+          let colorsChannel = ['#254d71', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#14b8a6', '#f43f5e', '#64748b'];
+          let chIdx = 0;
+          
+          Array.from(channelsSet).forEach(ch => {
+             let dataPoints = topModels.map(m => dataMap[m].channels[ch] || 0);
+             if (dataPoints.some(v => v > 0)) {
+                 datasets.push({
+                     label: ch,
+                     data: dataPoints,
+                     backgroundColor: colorsChannel[chIdx % colorsChannel.length],
+                     borderRadius: 4
+                 });
+                 chIdx++;
+             }
+          });
+          
+          if(this.charts[canvasId]) this.charts[canvasId].destroy();
+          const ctx = document.getElementById(canvasId);
+          if(ctx) {
+            this.charts[canvasId] = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: { labels: topModels, datasets: datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: { stacked: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' },
+                        y: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Sarabun', size: 10 } } }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { font: { family: 'Sarabun' } } },
+                        datalabels: {
+                            color: '#fff',
+                            font: { family: 'Sarabun', weight: 'bold', size: 10 },
+                            anchor: 'center',
+                            align: 'center',
+                            formatter: (val) => val > 0 ? val : ''
+                        }
+                    }
+                }
+            });
+            window.app.chartExportButtons(canvasId);
+          }
+      };
+
+      renderStackedChart('chartChannelModelMobile', channelModelDataMobile, allChannelsMobile);
+      renderStackedChart('chartChannelModelAcc', channelModelDataAcc, allChannelsAcc);
+    },
+    renderPromotionsTable: function() {
+      const tbody = document.getElementById('tablePromotionsBody'); if(!tbody) return;
+      const promoData = {}; const promoProcessed = new Set(); let totalPromos = 0;
+      const isDevice = (o) => { const validCat = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง']; return o.Category && validCat.includes(o.Category.toString().trim()); };
+      this.filteredOrders.forEach(o => {
+        if(!window.app.isOrderCancelled(o) && !promoProcessed.has(o.OrderID)) {
+           let orderItems = this.filteredOrders.filter(x => x.OrderID === o.OrderID);
+           if(orderItems.some(x => isDevice(x))) {
+               let firstRow = orderItems[0];
+               if(firstRow && firstRow.Promo && firstRow.Promo !== '-') { promoData[firstRow.Promo] = (promoData[firstRow.Promo] || 0) + 1; totalPromos++; }
+           }
+           promoProcessed.add(o.OrderID);
+        }
+      });
+      const sorted = Object.keys(promoData).sort((a,b) => promoData[b]-promoData[a]);
+      if(sorted.length===0){ tbody.innerHTML='<tr><td colspan="3" class="text-center p-6 text-slate-400">ไม่มีข้อมูลโปรโมชั่น</td></tr>'; return; }
+      let html = '';
+      sorted.forEach(k => {
+          let p = totalPromos > 0 ? ((promoData[k]/totalPromos)*100).toFixed(1) : '0.0';
+          html +='<tr class="hover:bg-slate-50 transition-colors"><td class="py-4 px-4 text-slate-700 font-medium whitespace-nowrap">'+window.app.esc(k)+'</td><td class="py-4 px-4 text-center font-black text-pink-600 whitespace-nowrap">'+promoData[k]+'</td><td class="py-4 px-4 text-center whitespace-nowrap"><div class="flex items-center gap-2 justify-end"><span class="text-xs text-slate-500 w-8 text-right">'+p+'%</span><div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="bg-pink-500 h-full rounded-full" style="width:'+p+'%"></div></div></div></td></tr>';
+      });
+      tbody.innerHTML = html;
+    },
+
+    renderGiftsTable: function() {
+      const tbody = document.getElementById('tableGiftsBody'); if(!tbody) return;
+      const giftCounts = {}; let totalGifts = 0;
+      const isGift = (o) => o.Category && o.Category.toString().trim().includes('ของแถม');
+      this.filteredOrders.forEach(o => {
+         if(!window.app.isOrderCancelled(o) && isGift(o)) {
+            let name = o['Product Name'] || '';
+            let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
+            giftCounts[name] = (giftCounts[name] || 0) + qty; totalGifts += qty;
+         }
+      });
+      const sorted = Object.keys(giftCounts).sort((a,b) => giftCounts[b]-giftCounts[a]);
+      if(sorted.length===0){ tbody.innerHTML='<tr><td colspan="3" class="text-center p-6 text-slate-400">ไม่มีข้อมูลของแถม</td></tr>'; return; }
+      let html = '';
+      sorted.forEach(k => {
+          let p = totalGifts > 0 ? ((giftCounts[k]/totalGifts)*100).toFixed(1) : '0.0';
+          html +='<tr class="hover:bg-slate-50 transition-colors"><td class="py-4 px-4 text-slate-700 font-medium whitespace-nowrap">'+window.app.esc(k)+'</td><td class="py-4 px-4 text-center font-black text-emerald-600 whitespace-nowrap">'+giftCounts[k]+'</td><td class="py-4 px-4 text-center whitespace-nowrap"><div class="flex items-center gap-2 justify-end"><span class="text-xs text-slate-500 w-8 text-right">'+p+'%</span><div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full rounded-full" style="width:'+p+'%"></div></div></div></td></tr>';
+      });
+      tbody.innerHTML = html;
+    },
+
+    renderInterestsTable: function() {
+      const tbody = document.getElementById('tableInterestsBody'); if(!tbody) return;
+      let tbodyHtml = ''; let counts = {}; let totalInterests = 0; const ordersById = {};
+      this.filteredOrders.forEach(o => {
+        if(!window.app.isOrderCancelled(o)) {
+           if(!ordersById[o.OrderID]) ordersById[o.OrderID] = [];
+           ordersById[o.OrderID].push(o);
+        }
+      });
+      
+      const validCat = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'];
+      Object.values(ordersById).forEach(orderLines => {
+         let hasDevice = orderLines.some(x => x.Category && validCat.includes(x.Category.toString().trim()));
+         if(hasDevice) {
+             let firstRow = orderLines.find(r => r['Customer Interests'] && r['Customer Interests'].trim() !== ""); 
+             if(firstRow) {
+                 firstRow['Customer Interests'].split(',').forEach(i => {
+                    let interest = i.trim();
+                    if (interest) { counts[interest] = (counts[interest] || 0) + 1; totalInterests++; }
+                 });
+             }
+         }
+      });
+      const sorted = Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+      if(sorted.length===0){ tbody.innerHTML='<tr><td colspan="3" class="text-center p-6 text-slate-400">ไม่มีข้อมูลความสนใจ</td></tr>'; return; }
+      sorted.forEach(k => { 
+          let p = ((counts[k]/totalInterests)*100).toFixed(1); 
+          tbodyHtml +='<tr class="hover:bg-slate-50 transition-colors"><td class="py-4 px-4 text-slate-700 font-medium whitespace-nowrap">'+window.app.esc(k)+'</td><td class="py-4 px-4 text-center font-black text-indigo-600 whitespace-nowrap">'+counts[k]+'</td><td class="py-4 px-4 text-center whitespace-nowrap"><div class="flex items-center gap-2 justify-end"><span class="text-xs text-slate-500 w-8 text-right">'+p+'%</span><div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="bg-indigo-500 h-full rounded-full" style="width:'+p+'%"></div></div></div></td></tr>'; 
+      });
+      tbody.innerHTML = tbodyHtml;
+    },
+
+    // 8. การ์ดวิเคราะห์ประสิทธิภาพโปรโมชัน (Promo ROI), ของแถมยอดนิยม (Top Gifts) และแจ้งเตือนสินค้าสต๊อกใกล้หมด (Low Stock Watch)
+    renderExecutiveRoiAndStockCards: function() {
+      const wrap = document.getElementById('dashPromoGiftAnalyticsWrap');
+      if (!wrap) return;
+      const esc = window.app.esc;
+      const settings = window.app.globalData.settings || {};
+      const lowThreshold = parseInt(settings.LowStockThreshold || '5', 10) || 5;
+
+      // 1) วิเคราะห์โปรโมชันที่สร้างยอดขายสูงสุด (Revenue & Order Count by Promo)
+      const promoStats = {};
+      const orderGroups = {};
+      this.filteredOrders.forEach(o => {
+        if (!window.app.isOrderCancelled(o)) {
+          if (!orderGroups[o.OrderID]) orderGroups[o.OrderID] = [];
+          orderGroups[o.OrderID].push(o);
+        }
+      });
+      Object.values(orderGroups).forEach(lines => {
+        const net = lines.reduce((s, r) => s + (parseFloat(String(r['Row Total'] || 0).replace(/,/g, '')) || 0), 0);
+        const discLines = lines.filter(r => r.SKU === 'DISCOUNT' || (parseFloat(String(r['Row Total'] || 0).replace(/,/g, '')) || 0) < 0);
+        const pName = discLines.length > 0
+          ? discLines.map(d => d['Product Name']).filter(Boolean).join(' + ')
+          : ((lines[0] && lines[0].Promo && lines[0].Promo !== '-') ? lines[0].Promo : 'ราคาปกติ Pre Booking (ไม่ใช้คูปอง)');
+        if (!promoStats[pName]) promoStats[pName] = { count: 0, revenue: 0 };
+        promoStats[pName].count += 1;
+        promoStats[pName].revenue += Math.max(0, net);
+      });
+      const topPromos = Object.entries(promoStats).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5);
+
+      // 2) ของแถมที่ถูกเลือกมากที่สุด
+      const giftStats = {};
+      this.filteredOrders.forEach(o => {
+        if (!window.app.isOrderCancelled(o) && o.Category && String(o.Category).includes('ของแถม')) {
+          const gName = o['Product Name'] || o.SKU;
+          const q = parseInt(String(o.Qty || 1).replace(/,/g, ''), 10) || 1;
+          giftStats[gName] = (giftStats[gName] || 0) + q;
+        }
+      });
+      const topGifts = Object.entries(giftStats).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+      // 3) สินค้าสต๊อกใกล้หมด (Low Stock Alert)
+      const lowStockProducts = (window.app.globalData.products || [])
+        .filter(p => p.Status === 'เปิด' && !(p.Category || '').includes('ของแถม'))
+        .map(p => ({ sku: p.SKU, name: p['Product Name'] || p.Model, stock: parseInt(String(p.Stock || 0).replace(/,/g, ''), 10) || 0 }))
+        .filter(p => p.stock <= lowThreshold)
+        .sort((a, b) => a.stock - b.stock)
+        .slice(0, 6);
+
+      wrap.innerHTML = `
+        <div class="chart-card flex flex-col">
+          <h6 class="flex items-center justify-between"><span class="flex items-center gap-2"><i class="fas fa-ranking-star text-amber-500"></i>ท็อปแคมเปญ & คูปองทำเงินสูงสุด (ROI)</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold">Top 5</span></h6>
+          <div class="space-y-2.5 mt-2 flex-1">
+            ${topPromos.length ? topPromos.map(([name, st], idx) => `
+              <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-5 h-5 rounded-md bg-slate-900 text-[#FF6B00] text-[10px] font-black flex items-center justify-center shrink-0">${idx + 1}</span>
+                  <div class="min-w-0">
+                    <div class="text-xs font-bold text-slate-800 truncate" title="${esc(name)}">${esc(name)}</div>
+                    <div class="text-[10px] text-slate-500">${st.count} ออเดอร์</div>
+                  </div>
+                </div>
+                <div class="text-xs font-black text-emerald-600 shrink-0 tabular-nums">฿${Math.round(st.revenue).toLocaleString()}</div>
+              </div>
+            `).join('') : '<div class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลแคมเปญในช่วงที่เลือก</div>'}
+          </div>
+        </div>
+
+        <div class="chart-card flex flex-col">
+          <h6 class="flex items-center justify-between"><span class="flex items-center gap-2"><i class="fas fa-gifts text-[#E11D48]"></i>ของแถมที่ปิดการขายดีที่สุด</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold">Most Claimed</span></h6>
+          <div class="space-y-2.5 mt-2 flex-1">
+            ${topGifts.length ? topGifts.map(([gName, qty], idx) => `
+              <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-5 h-5 rounded-md bg-rose-100 text-[#E11D48] text-[10px] font-black flex items-center justify-center shrink-0">${idx + 1}</span>
+                  <span class="text-xs font-bold text-slate-800 truncate" title="${esc(gName)}">${esc(gName)}</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black shrink-0">${qty} ชิ้น</span>
+              </div>
+            `).join('') : '<div class="text-xs text-slate-400 text-center py-6">ยังไม่มีการเบิกของแถมในช่วงที่เลือก</div>'}
+          </div>
+        </div>
+
+        <div class="chart-card flex flex-col">
+          <h6 class="flex items-center justify-between"><span class="flex items-center gap-2"><i class="fas fa-triangle-exclamation text-rose-500"></i>เฝ้าระวังสต๊อกใกล้หมด (≤ ${lowThreshold} ชิ้น)</span><span class="text-[10px] px-2 py-0.5 rounded-full ${lowStockProducts.length ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'} font-bold">${lowStockProducts.length} SKU</span></h6>
+          <div class="space-y-2 mt-2 flex-1">
+            ${lowStockProducts.length ? lowStockProducts.map(item => `
+              <div class="flex items-center justify-between gap-2 p-2 rounded-xl ${item.stock === 0 ? 'bg-rose-50 border border-rose-200' : 'bg-amber-50/70 border border-amber-200'}">
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-slate-800 truncate">${esc(item.name)}</div>
+                  <div class="text-[10px] text-slate-500 font-mono">${esc(item.sku)}</div>
+                </div>
+                <span class="px-2 py-0.5 rounded-lg ${item.stock === 0 ? 'bg-rose-600 text-white' : 'bg-amber-500 text-white'} text-[11px] font-black shrink-0">${item.stock === 0 ? 'หมดสต๊อก' : ('เหลือ ' + item.stock)}</span>
+              </div>
+            `).join('') : '<div class="text-xs text-emerald-600 font-bold text-center py-6"><i class="fas fa-check-circle mr-1"></i>สต๊อกสินค้าทุกรุ่นอยู่ในเกณฑ์ปลอดภัย</div>'}
+          </div>
+        </div>
+      `;
+    },
+
+    createChart: function(id, type, lbls, data, lblName='Data', col=null, isHoriz=false) {
+      if(window.app.dashboard.charts[id]) window.app.dashboard.charts[id].destroy();
+      const el = document.getElementById(id); if(!el) return;
+      const ctx = el.getContext('2d');
+      
+      const themeColor = col || '#254d71';
+      let datasetConfig = {
+        label: lblName,
+        data: data,
+        borderWidth: type === 'line' ? 2.5 : 0,
+        borderRadius: type === 'bar' ? (isHoriz ? [0, 8, 8, 0] : [8, 8, 0, 0]) : 0
+      };
+      
+      if (type === 'line') {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, hexToRgba(themeColor, 0.18));
+        gradient.addColorStop(1, hexToRgba(themeColor, 0.0));
+        
+        datasetConfig.borderColor = themeColor;
+        datasetConfig.backgroundColor = gradient;
+        datasetConfig.fill = true;
+        datasetConfig.tension = 0.4;
+        datasetConfig.pointBackgroundColor = '#ffffff';
+        datasetConfig.pointBorderColor = themeColor;
+        datasetConfig.pointBorderWidth = 2;
+        datasetConfig.pointRadius = 4;
+        datasetConfig.pointHoverRadius = 6;
+      } else {
+        datasetConfig.backgroundColor = themeColor;
+      }
+      
+      function hexToRgba(hex, alpha) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+
+      window.app.dashboard.charts[id] = new Chart(ctx, {
+        type: type,
+        data: {
+          labels: lbls,
+          datasets: [datasetConfig]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: isHoriz ? 'y' : 'x',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              titleFont: { family: 'Sarabun', size: 12, weight: '700' },
+              bodyFont: { family: 'Sarabun', size: 11, weight: '400' },
+              padding: 10,
+              cornerRadius: 10,
+              displayColors: false,
+              titleColor: '#ffffff',
+              bodyColor: '#e2e8f0'
+            }
+          },
+          scales: {
+            y: {
+              grid: { color: window.app.chartTheme().grid, drawBorder: false },
+              ticks: {
+                color: window.app.chartTheme().text,
+                font: { family: 'Sarabun', size: 10, weight: '500' }
+              },
+              grace: '15%'
+            },
+            x: {
+              grid: { display: false, drawBorder: false },
+              ticks: {
+                color: window.app.chartTheme().text,
+                font: { family: 'Sarabun', size: 10, weight: '500' }
+              },
+              grace: '15%'
+            }
+          }
+        }
+      });
+      window.app.chartExportButtons(id);
+    },
+    exportCSV: function() {
+      if(window.app.dashboard.filteredOrders.length===0) return Swal.fire('ไม่มีข้อมูล', '', 'warning');
+      const headers = Object.keys(window.app.dashboard.filteredOrders[0]); 
+      let csvContent = "\uFEFF" + headers.join(",") + "\r\n";
+      window.app.dashboard.filteredOrders.forEach(row => {
+        // เดิมเช็ค truthy (row[h] ? ... : "") ทำให้ค่า 0 ที่ถูกต้อง (เช่น Unit Price ของแถม, Deposit ของจอง F) กลายเป็นช่องว่างในไฟล์ export
+        csvContent += headers.map(h => '"' + ((row[h] !== undefined && row[h] !== null) ? row[h].toString().replace(/"/g, '""') : "") + '"').join(",") + "\r\n";
+      });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const lnk = document.createElement("a");
+      lnk.href = url;
+      // ชื่อไฟล์ต้องเป็นวันที่ local — toISOString เป็น UTC ทำให้วันเลื่อนถอยหลังช่วงก่อน 7 โมงเช้า (โซน +7)
+      const _d = new Date();
+      lnk.download = 'Report_' + _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0') + '.csv';
+      document.body.appendChild(lnk); 
+      lnk.click(); 
+      document.body.removeChild(lnk);
+    }
+  };
+</script>

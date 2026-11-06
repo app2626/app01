@@ -1,0 +1,480 @@
+<script>
+// Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
+    // พอร์ตมาจากโปรเจกต์ f8 (ฟีเจอร์ "เพิ่ม/แก้ไขสินค้าแบบหลาย SKU", 2026-09-19) — ตรงกับฟังก์ชันฝั่ง server saveProductGroup/updateProductGroup ใน Code.js
+  // ใช้ Category options ของ f9 เอง (6 หมวด รวม สมาร์ทวอทช์/หูฟัง) ไม่ใช้ 4 หมวดของ f8 ต้นทาง
+window.app.productGroup = {
+    variantRows: [],
+    rowSeq: 0,
+    editingModel: null, // null = โหมดเพิ่มสินค้าใหม่/append; ไม่ null = โหมดแก้ไขสินค้าเดิมทั้งกลุ่ม (มาจาก openEdit)
+
+    open: function() {
+      this.variantRows = [];
+      this.rowSeq = 0;
+      this.editingModel = null;
+      document.getElementById('pgModel').value = '';
+      document.getElementById('pgModel').disabled = false;
+      document.getElementById('pgMarketingModel').value = '';
+      document.getElementById('pgCapacity').value = '';
+      document.getElementById('pgProductGroup').value = '';
+      document.getElementById('pgUnit').value = 'เครื่อง';
+      document.getElementById('pgCategory').value = 'โมบาย';
+      document.getElementById('pgStatus').value = 'เปิด';
+      document.getElementById('pgPrice').value = '';
+      document.getElementById('pgOriginalPrice').value = '';
+      document.getElementById('pgImageUrl').value = '';
+      ['pgDisplay', 'pgProcessor', 'pgRam', 'pgRearCamera', 'pgFrontCamera', 'pgBattery', 'pgOs', 'pgConnectivity', 'pgWarranty'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      const pv = document.getElementById('pgImgPreview');
+      if (pv) { pv.src = ''; pv.classList.add('hidden'); }
+      delete window.app.pendingImageUploads['productGroupImage'];
+      document.getElementById('pgModalTitle').innerHTML = '<i class="fas fa-layer-group text-emerald-600 mr-2"></i>เพิ่มสินค้าใหม่ (หลายสี/ความจุ)';
+      document.getElementById('pgSaveBtnLabel').textContent = 'บันทึกสินค้า';
+
+      const channelsWrap = document.getElementById('pgChannelChecks');
+      if (channelsWrap) {
+        const names = [...new Set((window.app.globalData.channels || []).map(c => c['Channel Name']))].filter(Boolean);
+        channelsWrap.innerHTML = names.map(n =>
+          `<label class="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50">
+             <input type="checkbox" class="pgChannelChk" value="${window.app.escAttrJs(n)}"> ${window.app.esc(n)}
+           </label>`
+        ).join('');
+      }
+
+      const wrap = document.getElementById('pgVariantRows');
+      if (wrap) wrap.innerHTML = '';
+      // เผื่อมีไฟล์ค้างจากรอบก่อน (เปิดฟอร์ม เลือกรูป แล้วกด "ยกเลิก" โดยไม่บันทึก) — ล้างทิ้งกันสับสน
+      Object.keys(window.app.pendingImageUploads).forEach(k => {
+        if (k.indexOf('pgVariantImage_') === 0) delete window.app.pendingImageUploads[k];
+      });
+      this.setAppendMode(false); // เริ่มฟอร์มใหม่ทุกครั้งในโหมด "สร้างสินค้าใหม่" ก่อน — checkModelExists() จะสลับเองถ้าพิมพ์ Model ที่มีอยู่แล้ว
+      this.addVariantRow();
+      this.addVariantRow();
+      window.app.showModal('productGroupModal');
+    },
+
+    // ชื่อสินค้า (Product Name) ไม่ให้กรอกเองอีกต่อไป — สร้างอัตโนมัติจาก Model + สี ของแต่ละแถว (ตัดส่วนที่ว่างทิ้ง)
+    computeProductName: function(model, color) {
+      return [model, color].map(s => (s || '').toString().trim()).filter(Boolean).join(' ');
+    },
+    updateRowNamePreview: function(id) {
+      const rowEl = document.getElementById('pgRow-' + id);
+      if (!rowEl) return;
+      const model = document.getElementById('pgModel').value;
+      const color = rowEl.querySelector('.pgColor').value;
+      const preview = rowEl.querySelector('.pgNamePreview');
+      if (preview) preview.textContent = this.computeProductName(model, color) || 'กรอก Model เพื่อสร้างชื่อสินค้า';
+    },
+    updateAllNamePreviews: function() {
+      this.variantRows.forEach(id => this.updateRowNamePreview(id));
+    },
+    // ช่อง Model เรียกทั้งเช็คว่ามีสินค้านี้อยู่แล้วหรือไม่ และรีเฟรชพรีวิวชื่อสินค้าของทุกแถว (Model เปลี่ยน = ชื่อของทุก SKU เปลี่ยนตาม)
+    onModelInput: function() {
+      this.checkModelExists();
+      this.updateAllNamePreviews();
+    },
+
+    // แก้ไขสินค้าเดิมทั้งกลุ่ม (ทุก SKU ของ Model นี้) — เรียกจากปุ่ม "แก้ไข" บนแถว Products (ดู grid.editForm)
+    // Model ถูกล็อกแก้ไม่ได้ในฟอร์มนี้เสมอ (กันแถวเดิมหลุดกลุ่ม/ชนกับ Model อื่นโดยไม่ตั้งใจ) — ฟิลด์ร่วมอื่นแก้ไขได้ตามปกติ
+    // บันทึกแล้วจะลบ SKU เดิมทั้งหมดของ Model นี้แล้วเขียนชุดใหม่ทั้งหมดแทน (เพิ่ม/ลบ/แก้ SKU ได้อิสระในหน้าเดียว)
+    openEdit: function(model) {
+      model = (model || '').toString().trim();
+      const rows = (window.app.grid.dataList || []).filter(r => (r['Model'] || '').toString().trim() === model);
+      if (rows.length === 0) return Swal.fire('ผิดพลาด', 'ไม่พบสินค้า Model นี้ในข้อมูลที่โหลดไว้ กรุณารีเฟรชหน้าแล้วลองใหม่', 'error');
+
+      this.variantRows = [];
+      this.rowSeq = 0;
+      this.editingModel = model;
+
+      const first = rows[0];
+      document.getElementById('pgModel').value = model;
+      document.getElementById('pgModel').disabled = true;
+      document.getElementById('pgMarketingModel').value = first['Marketing Model'] || '';
+      document.getElementById('pgCapacity').value = first['Capacity'] || '';
+      document.getElementById('pgProductGroup').value = first['Product Group'] || '';
+      document.getElementById('pgUnit').value = first['Unit'] || '';
+      document.getElementById('pgCategory').value = first['Category'] || 'โมบาย';
+      document.getElementById('pgStatus').value = first['Status'] || 'เปิด';
+      document.getElementById('pgPrice').value = (first['Price'] || '').toString().replace(/,/g, '');
+      document.getElementById('pgOriginalPrice').value = (first['Original Price'] || '').toString().replace(/,/g, '');
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+      setVal('pgDisplay', first['Display']);
+      setVal('pgProcessor', first['Processor']);
+      setVal('pgRam', first['RAM']);
+      setVal('pgRearCamera', first['Rear Camera']);
+      setVal('pgFrontCamera', first['Front Camera']);
+      setVal('pgBattery', first['Battery']);
+      setVal('pgOs', first['OS']);
+      setVal('pgConnectivity', first['Connectivity']);
+      setVal('pgWarranty', first['Warranty']);
+      const defaultImg = first['Image URL'] || '';
+      document.getElementById('pgImageUrl').value = defaultImg;
+      const pv = document.getElementById('pgImgPreview');
+      if (pv) {
+        if (defaultImg.trim()) { pv.src = window.app.formatImageUrl(defaultImg); pv.classList.remove('hidden'); }
+        else { pv.src = ''; pv.classList.add('hidden'); }
+      }
+      delete window.app.pendingImageUploads['productGroupImage'];
+      document.getElementById('pgModalTitle').innerHTML = '<i class="fas fa-edit text-emerald-600 mr-2"></i>แก้ไขสินค้า: ' + window.app.esc(model);
+      document.getElementById('pgSaveBtnLabel').textContent = 'บันทึกการแก้ไข';
+
+      // โหมดแก้ไขจริง ไม่ใช่ append จากฟอร์ม add — ฟิลด์ร่วมแก้ไขได้ตามปกติ ไม่ล็อก
+      this.setAppendMode(false);
+      document.querySelectorAll('.pgSharedField').forEach(f => f.disabled = false);
+
+      const existingChannels = (first['Channel'] || '').toString().split(',').map(s => s.trim());
+      const channelsWrap = document.getElementById('pgChannelChecks');
+      if (channelsWrap) {
+        const names = [...new Set((window.app.globalData.channels || []).map(c => c['Channel Name']))].filter(Boolean);
+        channelsWrap.innerHTML = names.map(n =>
+          `<label class="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs cursor-pointer has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50">
+             <input type="checkbox" class="pgChannelChk" value="${window.app.escAttrJs(n)}" ${existingChannels.includes(n) ? 'checked' : ''}> ${window.app.esc(n)}
+           </label>`
+        ).join('');
+      }
+
+      const wrap = document.getElementById('pgVariantRows');
+      if (wrap) wrap.innerHTML = '';
+      Object.keys(window.app.pendingImageUploads).forEach(k => {
+        if (k.indexOf('pgVariantImage_') === 0) delete window.app.pendingImageUploads[k];
+      });
+
+      rows.forEach(r => {
+        this.addVariantRow();
+        const id = this.variantRows[this.variantRows.length - 1];
+        const rowEl = document.getElementById('pgRow-' + id);
+        rowEl.querySelector('.pgColor').value = r['Color'] || '';
+        rowEl.querySelector('.pgSku').value = r['SKU'] || '';
+        rowEl.querySelector('.pgStock').value = (r['Stock'] || '').toString().replace(/,/g, '');
+        const imgVal = r['Image URL'] || '';
+        rowEl.querySelector('.pgImage').value = imgVal;
+        const rowPv = document.getElementById('pgImgPreview_' + id);
+        if (rowPv && imgVal.trim()) { rowPv.src = window.app.formatImageUrl(imgVal); rowPv.classList.remove('hidden'); }
+        this.updateRowNamePreview(id); // ตั้งค่า color/capacity ผ่าน .value ตรงๆ ไม่ยิง oninput เอง ต้องรีเฟรชพรีวิวเองอีกที
+      });
+
+      window.app.showModal('productGroupModal');
+    },
+
+    // พิมพ์/แก้ Model แล้วเช็คทันทีว่าตรงกับสินค้าที่มีอยู่แล้วหรือไม่ (เทียบแบบ trim ตรงตัว เหมือน server)
+    // ถ้าตรง = โหมด "เพิ่ม SKU ให้สินค้าเดิม" (ฟิลด์ร่วมล็อกไว้ ใช้ค่าจากสินค้าเดิมเสมอ ไม่ต้องกรอกซ้ำ)
+    // window.app.grid.dataList คือข้อมูล Products ทั้งหมดที่โหลดไว้แล้ว (มีค่าเสมอเพราะ modal นี้เปิดได้จากหน้า Products เท่านั้น)
+    checkModelExists: function() {
+      const model = document.getElementById('pgModel').value.trim();
+      if (!model) return this.setAppendMode(false);
+      const existing = (window.app.grid.dataList || []).find(r => (r['Model'] || '').toString().trim() === model);
+      this.setAppendMode(!!existing, existing);
+    },
+
+    setAppendMode: function(isAppend, existingRow) {
+      this.appendMode = isAppend;
+      const notice = document.getElementById('pgAppendNotice');
+      const noticeText = document.getElementById('pgAppendNoticeText');
+      const fields = document.querySelectorAll('.pgSharedField');
+      const channelChecks = document.querySelectorAll('.pgChannelChk');
+      if (isAppend) {
+        if (existingRow) {
+          document.getElementById('pgMarketingModel').value = existingRow['Marketing Model'] || '';
+          document.getElementById('pgCapacity').value = existingRow['Capacity'] || '';
+          document.getElementById('pgProductGroup').value = existingRow['Product Group'] || '';
+          document.getElementById('pgCategory').value = existingRow['Category'] || 'โมบาย';
+          document.getElementById('pgUnit').value = existingRow['Unit'] || '';
+          document.getElementById('pgStatus').value = existingRow['Status'] || 'เปิด';
+          document.getElementById('pgPrice').value = (existingRow['Price'] || '').toString().replace(/,/g, '');
+          document.getElementById('pgOriginalPrice').value = (existingRow['Original Price'] || '').toString().replace(/,/g, '');
+          document.getElementById('pgImageUrl').value = existingRow['Image URL'] || '';
+          const setValAp = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+          setValAp('pgDisplay', existingRow['Display']);
+          setValAp('pgProcessor', existingRow['Processor']);
+          setValAp('pgRam', existingRow['RAM']);
+          setValAp('pgRearCamera', existingRow['Rear Camera']);
+          setValAp('pgFrontCamera', existingRow['Front Camera']);
+          setValAp('pgBattery', existingRow['Battery']);
+          setValAp('pgOs', existingRow['OS']);
+          setValAp('pgConnectivity', existingRow['Connectivity']);
+          setValAp('pgWarranty', existingRow['Warranty']);
+          const existingChannels = (existingRow['Channel'] || '').toString().split(',').map(s => s.trim());
+          channelChecks.forEach(chk => { chk.checked = existingChannels.includes(chk.value); });
+        }
+        if (notice) { notice.classList.remove('hidden'); notice.classList.add('flex'); }
+        if (noticeText) noticeText.textContent = 'พบสินค้า "' + document.getElementById('pgModel').value.trim() + '" อยู่ในระบบแล้ว — ระบบจะเพิ่ม SKU ใหม่ด้านล่างเข้าไปในสินค้านี้ (ข้อมูลร่วมใช้ตามสินค้าเดิม ไม่ต้องแก้ไข, SKU เดิมจะไม่ถูกแตะต้อง)';
+        fields.forEach(f => f.disabled = true);
+        channelChecks.forEach(c => c.disabled = true);
+      } else {
+        if (notice) { notice.classList.add('hidden'); notice.classList.remove('flex'); }
+        fields.forEach(f => f.disabled = false);
+        channelChecks.forEach(c => c.disabled = false);
+      }
+    },
+
+    addVariantRow: function() {
+      const id = ++this.rowSeq;
+      this.variantRows.push(id);
+      const wrap = document.getElementById('pgVariantRows');
+      if (!wrap) return;
+      const stateKey = 'pgVariantImage_' + id;
+      const row = document.createElement('div');
+      row.id = 'pgRow-' + id;
+      row.className = 'border border-slate-200 rounded-xl p-3 bg-slate-50/50';
+      row.innerHTML =
+        '<div class="flex flex-wrap gap-2 items-center">' +
+          '<input type="text" class="pg-input pgSku flex-1 min-w-[110px]" placeholder="SKU *">' +
+          '<input type="text" class="pg-input pgColor flex-1 min-w-[110px]" placeholder="สี เช่น Titanium Black" oninput="window.app.productGroup.updateRowNamePreview(' + id + ')">' +
+          '<input type="number" class="pg-input pgStock w-24" placeholder="สต๊อก *">' +
+          '<img id="pgImgPreview_' + id + '" src="" alt="รูป SKU นี้" class="h-9 w-9 object-cover rounded-lg border border-slate-200 shadow-sm hidden flex-shrink-0" onerror="this.classList.add(\'hidden\')">' +
+          '<input type="text" class="pg-input pgImage flex-1 min-w-[160px] text-xs" placeholder="รูปภาพเฉพาะ SKU นี้ (เว้นว่าง = ใช้รูปเริ่มต้น)" oninput="const pv=document.getElementById(\'pgImgPreview_' + id + '\'); if(pv){ if(this.value.trim()){ pv.src=window.app.formatImageUrl(this.value); pv.classList.remove(\'hidden\'); } else { pv.classList.add(\'hidden\'); } }">' +
+          '<button type="button" class="px-2.5 py-2 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap flex-shrink-0" onclick="document.getElementById(\'pgImgFile_' + id + '\').click()"><i class="fas fa-upload"></i></button>' +
+          '<input type="file" id="pgImgFile_' + id + '" class="hidden" accept="image/png,image/jpeg,image/webp,image/gif" onchange="window.app.selectImageForUpload(this, \'' + stateKey + '\', function(localUrl){ const pv=document.getElementById(\'pgImgPreview_' + id + '\'); const tx=document.querySelector(\'#pgRow-' + id + ' .pgImage\'); if(pv){ pv.src=localUrl; pv.classList.remove(\'hidden\'); } if(tx) tx.value=\'\'; window.app.toast(\'เลือกรูปแล้ว — จะอัปโหลดขึ้น Drive ตอนกดบันทึก\'); })">' +
+          '<button type="button" class="text-rose-400 hover:text-rose-600 px-1 flex-shrink-0" onclick="window.app.productGroup.removeVariantRow(' + id + ')"><i class="fas fa-trash"></i></button>' +
+          '<span class="pgNamePreview text-[10px] text-slate-400 italic truncate max-w-[220px]" title="ชื่อสินค้าที่จะบันทึก (Model + สี)"></span>' +
+        '</div>';
+      wrap.appendChild(row);
+      this.updateRowNamePreview(id);
+    },
+
+    removeVariantRow: function(id) {
+      const idx = this.variantRows.indexOf(id);
+      if (idx > -1) this.variantRows.splice(idx, 1);
+      const row = document.getElementById('pgRow-' + id);
+      if (row) row.remove();
+      delete window.app.pendingImageUploads['pgVariantImage_' + id];
+      if (this.variantRows.length === 0) this.addVariantRow();
+    },
+
+    autoFillSpecs: function() {
+      const model = (document.getElementById('pgModel').value || '').trim();
+      const marketingModel = (document.getElementById('pgMarketingModel').value || '').trim();
+      const group = (document.getElementById('pgProductGroup').value || '').trim();
+      const cap = (document.getElementById('pgCapacity').value || '').trim();
+      const cat = document.getElementById('pgCategory').value || 'โมบาย';
+      const price = document.getElementById('pgPrice').value || '0';
+      if (!model && !marketingModel) {
+        return Swal.fire('แจ้งเตือน', 'กรุณากรอก Model หรือ Marketing Model ก่อนดึงสเปคอัตโนมัติ', 'info');
+      }
+      const specs = window.app.pos.getDeviceSpecs({
+        'Model': model,
+        'Marketing Model': marketingModel,
+        'Product Group': group,
+        'Capacity': cap,
+        'Category': cat,
+        'Price': price
+      }, true);
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el && !el.disabled) el.value = val || ''; };
+      setVal('pgDisplay', specs.display);
+      setVal('pgProcessor', specs.chipset);
+      setVal('pgRam', specs.memory);
+      setVal('pgRearCamera', specs.rearCamera);
+      setVal('pgFrontCamera', specs.frontCamera);
+      setVal('pgBattery', specs.battery);
+      setVal('pgOs', specs.osAi);
+      setVal('pgConnectivity', specs.connectivity);
+      setVal('pgWarranty', specs.buildWarranty);
+      window.app.toast('ดึงข้อมูลสเปคตามชื่อรุ่นเรียบร้อย สามารถปรับแก้เพิ่มเติมได้ก่อนบันทึก');
+    },
+
+    save: async function() {
+      const getVal = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+      const shared = {
+        'Model': document.getElementById('pgModel').value.trim(),
+        'Marketing Model': document.getElementById('pgMarketingModel').value.trim(),
+        'Capacity': document.getElementById('pgCapacity').value.trim(),
+        'Product Group': document.getElementById('pgProductGroup').value.trim(),
+        'Unit': document.getElementById('pgUnit').value.trim(),
+        'Category': document.getElementById('pgCategory').value,
+        'Status': document.getElementById('pgStatus').value,
+        'Image URL': document.getElementById('pgImageUrl').value.trim(),
+        'Display': getVal('pgDisplay'),
+        'Processor': getVal('pgProcessor'),
+        'RAM': getVal('pgRam'),
+        'Rear Camera': getVal('pgRearCamera'),
+        'Front Camera': getVal('pgFrontCamera'),
+        'Battery': getVal('pgBattery'),
+        'OS': getVal('pgOs'),
+        'Connectivity': getVal('pgConnectivity'),
+        'Warranty': getVal('pgWarranty')
+      };
+      const priceRaw = document.getElementById('pgPrice').value.trim();
+      if (priceRaw === '' || isNaN(Number(priceRaw)) || Number(priceRaw) < 0) return Swal.fire('ผิดพลาด', 'กรุณาระบุราคาให้ถูกต้อง', 'error');
+      shared['Price'] = Number(priceRaw);
+
+      const origPriceRaw = document.getElementById('pgOriginalPrice').value.trim();
+      shared['Original Price'] = origPriceRaw === '' ? '' : Number(origPriceRaw);
+
+      const checkedChannels = Array.from(document.querySelectorAll('.pgChannelChk:checked')).map(c => c.value);
+      shared['Channel'] = checkedChannels.length ? checkedChannels.join(',') : 'ALL';
+
+      if (!shared['Model']) return Swal.fire('ผิดพลาด', 'กรุณาระบุ Model', 'error');
+      if (!shared['Marketing Model']) return Swal.fire('ผิดพลาด', 'กรุณาระบุ Marketing Model', 'error');
+      if (!shared['Capacity']) return Swal.fire('ผิดพลาด', 'กรุณาระบุความจุ', 'error');
+
+      const variants = this.variantRows.map(id => {
+        const row = document.getElementById('pgRow-' + id);
+        if (!row) return null;
+        return {
+          _rowId: id,
+          color: row.querySelector('.pgColor').value.trim(),
+          sku: row.querySelector('.pgSku').value.trim(),
+          stock: row.querySelector('.pgStock').value,
+          image: row.querySelector('.pgImage').value.trim()
+        };
+      }).filter(Boolean);
+
+      if (variants.length === 0) return Swal.fire('ผิดพลาด', 'กรุณาเพิ่มอย่างน้อย 1 SKU', 'error');
+      for (const v of variants) {
+        if (!v.sku) return Swal.fire('ผิดพลาด', 'กรุณาระบุ SKU ให้ครบทุกแถว', 'error');
+        if (v.stock === '' || !Number.isInteger(Number(v.stock)) || Number(v.stock) < 0) return Swal.fire('ผิดพลาด', 'สต๊อกของ SKU ' + v.sku + ' ไม่ถูกต้อง', 'error');
+      }
+
+      window.app.showLoading();
+      try {
+        const uploadedUrl = await window.app.flushImageUpload('productGroupImage');
+        if (uploadedUrl) shared['Image URL'] = uploadedUrl;
+        // อัปโหลดรูปเฉพาะ SKU ของแต่ละแถว (ถ้ามีไฟล์ค้างของแถวนั้น) — เว้นว่าง = ใช้รูปเริ่มต้นของสินค้าตามที่กรอกด้านบน
+        for (const v of variants) {
+          const uploadedRowUrl = await window.app.flushImageUpload('pgVariantImage_' + v._rowId);
+          if (uploadedRowUrl) v.image = uploadedRowUrl;
+          delete v._rowId;
+        }
+        const isEditing = !!this.editingModel;
+        const action = isEditing ? 'UPDATE_PRODUCT_GROUP' : 'SAVE_PRODUCT_GROUP';
+        const apiPayload = isEditing
+          ? { originalModel: this.editingModel, shared: shared, variants: variants }
+          : { shared: shared, variants: variants };
+        const res = await window.app.api(action, apiPayload);
+        window.app.hideLoading();
+        if (res && res.status === 'success') {
+          window.app.hideModal('productGroupModal');
+          window.app.toast(isEditing
+            ? 'บันทึกการแก้ไขสินค้า "' + shared['Model'] + '" สำเร็จ (' + res.skuCount + ' SKU)'
+            : (res.appended
+              ? 'เพิ่ม SKU ใหม่ ' + res.skuCount + ' รายการเข้าสินค้า "' + shared['Model'] + '" สำเร็จ'
+              : 'เพิ่มสินค้า "' + shared['Model'] + '" (' + res.skuCount + ' SKU) สำเร็จ'));
+          await window.app.refreshGlobalData();
+          window.app.grid.loadData();
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ', 'error');
+        }
+      } catch (e) {
+        window.app.hideLoading();
+        Swal.fire('ผิดพลาด', e.message, 'error');
+      }
+    },
+
+    // ============================================================================
+    // 6. BULK QUICK PRICE & STOCK EDITOR (แก้ไขราคา Flash Sale & สต๊อกแบบตารางด่วน)
+    // ============================================================================
+    openBulkQuickEdit: function() {
+      const products = (window.app.globalData && window.app.globalData.products) || [];
+      const tbody = document.getElementById('bulkQuickTableBody');
+      if (!tbody) return;
+      const searchEl = document.getElementById('bulkQuickSearchInput');
+      if (searchEl) searchEl.value = '';
+      let html = '';
+      products.forEach((p, idx) => {
+        const sku = window.app.esc(p.SKU || '');
+        const name = window.app.esc(p['Product Name'] || '');
+        const brand = window.app.esc(p.Brand || '-');
+        const cat = window.app.esc(p.Category || '-');
+        const price = parseFloat(String(p.Price || 0).replace(/,/g, '')) || 0;
+        const origPrice = parseFloat(String(p['Original Price'] || 0).replace(/,/g, '')) || '';
+        const stock = parseInt(String(p['Stock Qty'] || 0).replace(/,/g, ''), 10) || 0;
+        const status = (p.Status || 'เปิด') === 'ปิด' ? 'ปิด' : 'เปิด';
+        const searchBlob = window.app.esc((String(p.SKU || '') + ' ' + String(p['Product Name'] || '') + ' ' + String(p.Brand || '') + ' ' + String(p.Category || '')).toLowerCase());
+        html += `<tr class="bulk-quick-row hover:bg-amber-50/40 transition-colors" data-sku="${sku}" data-search="${searchBlob}" data-orig-price="${price}" data-orig-full="${origPrice}" data-orig-stock="${stock}" data-orig-status="${status}">
+          <td class="px-3 py-2 font-mono text-[11px] font-bold text-slate-600 whitespace-nowrap">${sku}</td>
+          <td class="px-3 py-2 font-bold text-slate-800 text-xs">${name}</td>
+          <td class="px-3 py-2 text-[11px] text-slate-500 whitespace-nowrap">${brand} / ${cat}</td>
+          <td class="px-3 py-2 text-right">
+            <input type="number" class="bulk-inp-price w-28 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-right font-extrabold text-rose-600 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400" value="${price}">
+          </td>
+          <td class="px-3 py-2 text-right">
+            <input type="number" class="bulk-inp-orig w-28 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-right font-semibold text-slate-600 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400" value="${origPrice}" placeholder="-">
+          </td>
+          <td class="px-3 py-2 text-right">
+            <input type="number" class="bulk-inp-stock w-20 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-right font-extrabold ${stock <= 3 ? 'text-rose-600 bg-rose-50/40 border-rose-200' : 'text-emerald-700'} text-xs focus:outline-none focus:ring-2 focus:ring-amber-400" value="${stock}">
+          </td>
+          <td class="px-3 py-2 text-center">
+            <select class="bulk-inp-status px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold ${status === 'เปิด' ? 'text-emerald-600' : 'text-slate-400'} focus:outline-none focus:ring-2 focus:ring-amber-400">
+              <option value="เปิด" ${status === 'เปิด' ? 'selected' : ''}>เปิด</option>
+              <option value="ปิด" ${status === 'ปิด' ? 'selected' : ''}>ปิด</option>
+            </select>
+          </td>
+        </tr>`;
+      });
+      tbody.innerHTML = html;
+      window.app.showModal('bulkQuickEditModal');
+    },
+
+    filterBulkQuickRows: function() {
+      const q = (document.getElementById('bulkQuickSearchInput')?.value || '').trim().toLowerCase();
+      document.querySelectorAll('#bulkQuickTableBody .bulk-quick-row').forEach(tr => {
+        const blob = tr.getAttribute('data-search') || '';
+        tr.style.display = (!q || blob.includes(q)) ? '' : 'none';
+      });
+    },
+
+    adjustVisibleBulkStock: function(delta) {
+      document.querySelectorAll('#bulkQuickTableBody .bulk-quick-row').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const inp = tr.querySelector('.bulk-inp-stock');
+        if (!inp) return;
+        const cur = parseInt(inp.value, 10) || 0;
+        inp.value = Math.max(0, cur + delta);
+      });
+      window.app.toast('ปรับสต๊อกรายการที่แสดงผล ' + (delta > 0 ? '+' + delta : delta) + ' ชิ้นแล้ว (กดบันทึกเพื่อยืนยัน)');
+    },
+
+    saveBulkQuickEdit: async function() {
+      const updates = [];
+      document.querySelectorAll('#bulkQuickTableBody .bulk-quick-row').forEach(tr => {
+        const sku = tr.getAttribute('data-sku');
+        const newPrice = parseFloat(tr.querySelector('.bulk-inp-price')?.value || 0) || 0;
+        const rawOrig = (tr.querySelector('.bulk-inp-orig')?.value || '').trim();
+        const newOrig = rawOrig === '' ? '' : (parseFloat(rawOrig) || 0);
+        const newStock = Math.max(0, parseInt(tr.querySelector('.bulk-inp-stock')?.value || 0, 10) || 0);
+        const newStatus = tr.querySelector('.bulk-inp-status')?.value || 'เปิด';
+
+        const oldPrice = parseFloat(tr.getAttribute('data-orig-price') || 0) || 0;
+        const oldOrigRaw = tr.getAttribute('data-orig-full') || '';
+        const oldOrig = oldOrigRaw === '' ? '' : (parseFloat(oldOrigRaw) || 0);
+        const oldStock = parseInt(tr.getAttribute('data-orig-stock') || 0, 10) || 0;
+        const oldStatus = tr.getAttribute('data-orig-status') || 'เปิด';
+
+        if (newPrice !== oldPrice || String(newOrig) !== String(oldOrig) || newStock !== oldStock || newStatus !== oldStatus) {
+          updates.push({
+            SKU: sku,
+            Price: newPrice,
+            'Original Price': newOrig,
+            'Stock Qty': newStock,
+            Status: newStatus
+          });
+        }
+      });
+
+      if (updates.length === 0) {
+        window.app.toast('ไม่มีรายการที่เปลี่ยนแปลง', 'warning');
+        return;
+      }
+
+      window.app.showLoading('กำลังบันทึกการแก้ไขด่วน ' + updates.length + ' SKU...');
+      try {
+        const res = await window.app.api('BULK_UPDATE_PRODUCTS', { updates: updates });
+        window.app.hideLoading();
+        if (res && res.status === 'success') {
+          window.app.hideModal('bulkQuickEditModal');
+          window.app.toast('อัปเดตราคาและสต๊อกสำเร็จ ' + (res.updatedCount || updates.length) + ' SKU');
+          await window.app.refreshGlobalData();
+          if (window.app.grid && window.app.grid.tableName === 'Products') {
+            window.app.grid.loadData();
+          }
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ', 'error');
+        }
+      } catch (e) {
+        window.app.hideLoading();
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      }
+    }
+  };
+</script>

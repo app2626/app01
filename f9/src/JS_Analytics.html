@@ -1,0 +1,233 @@
+<script>
+// Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
+window.app.analytics = {
+    chart: null,
+    init: async function() {
+      const content = document.getElementById('page-content');
+      const tmpl = document.getElementById('tmpl-analytics');
+      if(content && tmpl) content.innerHTML = tmpl.innerHTML;
+      
+      window.app.showLoading('กำลังโหลดข้อมูล...');
+      try {
+        const res = await window.app.api('GET_TABLE', { tableName: 'Orders' });
+        Swal.close();
+        if(res && res.status === 'success') {
+           this.render(res.data);
+        } else {
+           this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลยอดขายได้');
+        }
+      } catch(e) {
+        Swal.close(); this.renderLoadError(e.message);
+      }
+    },
+    renderLoadError: function(msg) {
+      const content = document.getElementById('analytics-content');
+      if (!content) { Swal.fire('Error', msg, 'error'); return; }
+      content.innerHTML = '<div class="bg-white border border-slate-200 rounded-2xl shadow-sm">' + window.app.emptyState({
+        icon: 'fa-exclamation-triangle',
+        title: 'โหลดข้อมูลไม่สำเร็จ',
+        subtitle: msg,
+        actionLabel: 'ลองใหม่',
+        onclick: 'window.app.analytics.init()'
+      }) + '</div>';
+    },
+    render: function(orders) {
+      // กัน async race: ผู้ใช้อาจสลับหน้าไปแล้วก่อนข้อมูลโหลดเสร็จ — element ปลายทางไม่อยู่ ห้ามเขียนทับ
+      const analyticsEl = document.getElementById('analytics-content');
+      if (!analyticsEl) return;
+      const settings = window.app.globalData.settings || {};
+      const startStr = settings.ReserveStart;
+      const endStr = settings.ReserveEnd;
+      if(!startStr || !endStr) {
+         const canSetup = window.app.user && window.app.user.Role === 'Admin';
+         analyticsEl.innerHTML = '<div class="bg-white border border-slate-200 rounded-2xl shadow-sm">' + window.app.emptyState({
+           icon: 'fa-clock',
+           title: 'ยังไม่ได้ตั้งค่าช่วงเวลาการจอง',
+           subtitle: 'กรุณาตั้งค่า วันเริ่ม-วันสิ้นสุดการจอง ในเมนู "ตั้งเวลารับจองสินค้า" ก่อนใช้งานหน้านี้',
+           actionLabel: canSetup ? 'ไปตั้งค่าช่วงเวลาการจอง' : '',
+           onclick: canSetup ? "location.hash='bookingsettings'" : ''
+         }) + '</div>';
+         return;
+      }
+      
+      const startDate = new Date(startStr);
+      const endDate = new Date(endStr);
+      const now = new Date();
+      
+      const formatTh = (d) => { const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return `${d.getDate()} ${m[d.getMonth()]} ${(d.getFullYear()+543).toString().substring(2)}`; };
+      const rangeEl = document.getElementById('analyticsDateRange');
+      if (rangeEl) rangeEl.innerText = `(${formatTh(startDate)} - ${formatTh(endDate)})`;
+
+      // นับจำนวนวันตามปฏิทิน (ไม่สนใจเวลา) — ReserveStart/ReserveEnd กรอกผ่าน datetime-local จึงแทบไม่มีวันตรง 00:00 พร้อมกัน
+      // เดิมใช้ Math.ceil ของผลต่างเป็นมิลลิวินาทีตรงๆ ทำให้ totalDays ปัดขึ้นเกินจำนวนวันจริง 1 วันเกือบทุกกรณี
+      const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      const totalDays = Math.max(1, Math.round((endDateOnly - startDateOnly) / (1000 * 60 * 60 * 24)));
+      let currentDays = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
+      if (now > endDate) currentDays = totalDays;
+      
+      const validOrders = orders.filter(o => !window.app.isOrderCancelled(o) && o.Timestamp);
+      let totalMobile = 0;
+      let totalAcc = 0;
+      
+      const dailyMobile = {};
+      const dailyAcc = {};
+      
+      const products = window.app.globalData.products || [];
+      const getCat = (sku) => {
+         const p = products.find(x => x.SKU === sku);
+         return p ? (p.Category || '').toString().trim() : '';
+      };
+
+      // แปลงวันที่เป็น key รูปแบบ YYYY-MM-DD (local time) — รองรับทั้ง ISO และ display string จาก sheet
+      const toDateKey = (dt) => dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+      const startKey = toDateKey(startDate);
+      const endKey = toDateKey(endDate);
+      const nowKey = toDateKey(now);
+
+      validOrders.forEach(o => {
+          let cat = getCat(o.SKU);
+          if (cat.includes('ของแถม')) return;
+
+          let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10);
+          if(isNaN(qty)) qty = 0;
+          let tsObj = new Date(o.Timestamp);
+          if (isNaN(tsObj)) return;
+          let d = toDateKey(tsObj);
+          if (d < startKey || d > endKey) return; // นอกช่วงการจอง — ตัดออกทั้ง KPI และกราฟให้ตรงกัน
+          
+          if (cat === 'โมบาย') {
+             totalMobile += qty;
+             dailyMobile[d] = (dailyMobile[d] || 0) + qty;
+          } else if (['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(cat)) {
+             totalAcc += qty;
+             dailyAcc[d] = (dailyAcc[d] || 0) + qty;
+          }
+      });
+      
+      const totalSales = totalMobile + totalAcc;
+      const avgPerDayMobile = currentDays > 0 ? (totalMobile / currentDays) : 0;
+      const avgPerDayAcc = currentDays > 0 ? (totalAcc / currentDays) : 0;
+      
+      const forecastedTotal = Math.round((avgPerDayMobile + avgPerDayAcc) * totalDays);
+      
+      const tTot = document.getElementById('anKpiTotal'); if(tTot) tTot.innerText = totalSales.toLocaleString();
+      const tMob = document.getElementById('anKpiMobile'); if(tMob) tMob.innerText = totalMobile.toLocaleString();
+      const tAcc = document.getElementById('anKpiAcc'); if(tAcc) tAcc.innerText = totalAcc.toLocaleString();
+      const tFor = document.getElementById('anKpiForecast'); if(tFor) tFor.innerText = forecastedTotal.toLocaleString();
+      
+      let labels = [];
+      let actualMobile = [];
+      let forecastMobile = [];
+      let actualAcc = [];
+      let forecastAcc = [];
+      
+      let cumMobile = 0;
+      let cumAcc = 0;
+      let projectedMobile = 0;
+      let projectedAcc = 0;
+      
+      let dailyMobileArr = [];
+      let dailyAccArr = [];
+      
+      let lastActualIdx = -1;
+      for(let i=0; i<=totalDays; i++) {
+         let d = new Date(startDateOnly.getTime() + (i * 24*60*60*1000));
+         let dStr = toDateKey(d);
+         labels.push(dStr);
+
+         let dMob = dailyMobile[dStr] || 0;
+         let dAcc = dailyAcc[dStr] || 0;
+
+         if (dStr <= nowKey) {
+            lastActualIdx = i;
+            cumMobile += dMob;
+            cumAcc += dAcc;
+            
+            dailyMobileArr.push(dMob);
+            dailyAccArr.push(dAcc);
+            
+            projectedMobile = cumMobile;
+            projectedAcc = cumAcc;
+            
+            actualMobile.push(cumMobile);
+            forecastMobile.push(null);
+            
+            actualAcc.push(cumAcc);
+            forecastAcc.push(null);
+         } else {
+            actualMobile.push(null);
+            
+            let pMob = Math.round(avgPerDayMobile);
+            let pAcc = Math.round(avgPerDayAcc);
+            
+            dailyMobileArr.push(pMob);
+            dailyAccArr.push(pAcc);
+            
+            projectedMobile += avgPerDayMobile;
+            forecastMobile.push(Math.round(projectedMobile)); 
+            
+            actualAcc.push(null);
+            projectedAcc += avgPerDayAcc;
+            forecastAcc.push(Math.round(projectedAcc));
+         }
+      }
+      
+      if(lastActualIdx > -1 && lastActualIdx < totalDays) {
+          // Connect the dashed line to the last point of the solid line
+          forecastMobile[lastActualIdx] = actualMobile[lastActualIdx];
+          forecastAcc[lastActualIdx] = actualAcc[lastActualIdx];
+      }
+      
+      const ctx = document.getElementById('chartAnalytics');
+      if(!ctx) return;
+      if(this.chart) this.chart.destroy();
+      
+      if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+      
+      this.chart = new Chart(ctx.getContext('2d'), {
+         type: 'line',
+         data: {
+            labels: labels,
+            datasets: [
+               { label: 'โมบาย (Actual)', data: actualMobile, dailyData: dailyMobileArr, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6 },
+               { label: 'โมบาย (Forecast)', data: forecastMobile, dailyData: dailyMobileArr, borderColor: '#93c5fd', borderDash: [5, 5], tension: 0.4, borderWidth: 3, pointRadius: 0, pointHoverRadius: 4 },
+               { label: 'อุปกรณ์เสริม (Actual)', data: actualAcc, dailyData: dailyAccArr, borderColor: '#ec4899', backgroundColor: 'rgba(236, 72, 153, 0.1)', fill: true, tension: 0.4, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6 },
+               { label: 'อุปกรณ์เสริม (Forecast)', data: forecastAcc, dailyData: dailyAccArr, borderColor: '#f9a8d4', borderDash: [5, 5], tension: 0.4, borderWidth: 3, pointRadius: 0, pointHoverRadius: 4 }
+            ]
+         },
+         options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { 
+               datalabels: { 
+                  display: true, 
+                  align: 'top', 
+                  color: function(ctx) { return ctx.dataset.borderColor; },
+                  font: { size: 9, weight: 'bold' },
+                  formatter: function(value, ctx) {
+                     if (value === null) return '';
+                     if (ctx.dataset.label.includes('Forecast')) return ''; // ซ่อนตัวเลขบนเส้นฟอแคช
+                     let daily = ctx.dataset.dailyData[ctx.dataIndex];
+                     if (daily === 0 && ctx.dataset.label.includes('Actual')) return '';
+                     return '+' + daily;
+                  }
+               }, 
+               legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+               tooltip: {
+                  callbacks: {
+                     label: function(ctx) {
+                        let val = ctx.raw;
+                        let daily = ctx.dataset.dailyData[ctx.dataIndex];
+                        return `${ctx.dataset.label}: ${val} (รายวัน: +${daily})`;
+                     }
+                  }
+               }
+            },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2,4], color: window.app.chartTheme().grid } }, x: { grid: { display: false } } },
+            interaction: { mode: 'index', intersect: false }
+         }
+      });
+      window.app.chartExportButtons('chartAnalytics');
+    }
+  };
+</script>

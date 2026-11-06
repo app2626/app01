@@ -40,9 +40,8 @@ function page() {
   ix = ix.replace("<?!= JSON.stringify(trackParam || '') ?>", '""');
   ix = ix.replace("<?!= JSON.stringify(deepModel || '') ?>", '""');
   ix = ix.replace("<?!= JSON.stringify(appUrl || '') ?>", '"https://script.google.com/macros/s/TEST/exec"');
-  ix = ix.replace("<?!= include('CSS'); ?>", () => fs.readFileSync(SRC + 'CSS.html', 'utf8'));
-  ix = ix.replace("<?!= include('TailwindCSS'); ?>", () => fs.readFileSync(SRC + 'TailwindCSS.html', 'utf8'));
-  ix = ix.replace("<?!= include('JS'); ?>", () => fs.readFileSync(SRC + 'JS.html', 'utf8'));
+  // resolve every <?!= include('X'); ?> from src/X.html (JS.html core + JS_*.html modules), like HtmlService does
+  ix = ix.replace(/<\?!= include\('([A-Za-z_]+)'\); \?>/g, (_, name) => fs.readFileSync(SRC + name + '.html', 'utf8'));
   return ix.replace('<head>', '<head>' + STUB);
 }
 const server = http.createServer((req, res) => {

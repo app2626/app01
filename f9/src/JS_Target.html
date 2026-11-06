@@ -1,0 +1,209 @@
+<script>
+// Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
+window.app.target = {
+    init: async function() {
+      const content = document.getElementById('page-content');
+      const tmpl = document.getElementById('tmpl-target');
+      if(content && tmpl) content.innerHTML = tmpl.innerHTML;
+      
+      window.app.showLoading('กำลังโหลดข้อมูลเป้าหมาย...');
+      try {
+        const resOrders = await window.app.api('GET_TABLE', { tableName: 'Orders' });
+        const resTarget = await window.app.api('GET_TABLE', { tableName: 'Target' });
+        Swal.close();
+        if(resOrders && resOrders.status === 'success' && resTarget && resTarget.status === 'success') {
+           this.render(resTarget.data, resOrders.data);
+        } else {
+           this.renderLoadError('ไม่พบข้อมูล กรุณาตรวจสอบว่ามีชีต "Target" แล้วหรือไม่');
+        }
+      } catch(e) {
+        Swal.close(); this.renderLoadError(e.message);
+      }
+    },
+    renderLoadError: function(msg) {
+      const tbody = document.getElementById('targetTableBody');
+      if (!tbody) { Swal.fire('Error', msg, 'error'); return; }
+      tbody.innerHTML = '<tr><td colspan="5">' + window.app.emptyState({
+        icon: 'fa-exclamation-triangle',
+        title: 'โหลดข้อมูลไม่สำเร็จ',
+        subtitle: msg,
+        actionLabel: 'ลองใหม่',
+        onclick: 'window.app.target.init()'
+      }) + '</td></tr>';
+    },
+    render: function(targets, orders) {
+      // กัน async race: element อาจถูกเปลี่ยนหน้าไปแล้วระหว่างรอข้อมูล
+      const targetBodyEl = document.getElementById('targetTableBody');
+      if (!targetBodyEl) return;
+      const settings = window.app.globalData.settings || {};
+      const startStr = settings.ReserveStart;
+      const endStr = settings.ReserveEnd;
+      if(!startStr || !endStr) {
+         const canSetup = window.app.user && window.app.user.Role === 'Admin';
+         targetBodyEl.innerHTML = '<tr><td colspan="5">' + window.app.emptyState({
+           icon: 'fa-clock',
+           title: 'ยังไม่ได้ตั้งค่าช่วงเวลาการจอง',
+           subtitle: 'กรุณาตั้งค่า วันเริ่ม-วันสิ้นสุดการจอง ในเมนู "ตั้งเวลารับจองสินค้า" ก่อนใช้งานหน้านี้',
+           actionLabel: canSetup ? 'ไปตั้งค่าช่วงเวลาการจอง' : '',
+           onclick: canSetup ? "location.hash='bookingsettings'" : ''
+         }) + '</td></tr>';
+         return;
+      }
+      
+      const startDate = new Date(startStr);
+      const endDate = new Date(endStr);
+      const now = new Date();
+      
+      const formatTh = (d) => { const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return `${d.getDate()} ${m[d.getMonth()]} ${(d.getFullYear()+543).toString().substring(2)}`; };
+      const rangeEl = document.getElementById('targetDateRange');
+      if (rangeEl) rangeEl.innerText = `(${formatTh(startDate)} - ${formatTh(endDate)})`;
+      
+      // นับจำนวนวันตามปฏิทิน (ไม่สนใจเวลา) — เหมือน analytics.render กัน Math.ceil ปัดเกิน 1 วันเมื่อเวลาเริ่ม/สิ้นสุดไม่ตรง 00:00
+      const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      const totalDays = Math.max(1, Math.round((endDateOnly - startDateOnly) / (1000 * 60 * 60 * 24)));
+      let currentDays = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
+      if (now > endDate) currentDays = totalDays;
+
+      // แปลงวันที่เป็น key YYYY-MM-DD (local time) — เหมือน analytics.render เพื่อกรองออเดอร์ให้อยู่ในช่วงจองเดียวกัน
+      const toDateKey = (dt) => dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+      const startKey = toDateKey(startDate);
+      const endKey = toDateKey(endDate);
+
+      const validOrders = orders.filter(o => {
+          if (window.app.isOrderCancelled(o) || !o.Timestamp) return false;
+          // นอกช่วงเวลาการจอง (ReserveStart/ReserveEnd) — ตัดออก ไม่งั้นยอดจองรวมออเดอร์เก่าข้ามแคมเปญทั้งหมด (Orders sheet ไม่เคยถูกล้าง)
+          const tsObj = new Date(o.Timestamp);
+          if (isNaN(tsObj)) return false;
+          const d = toDateKey(tsObj);
+          return d >= startKey && d <= endKey;
+      });
+      const salesByName = {};
+      let totalMobileQty = 0;
+
+      const products = window.app.globalData.products || [];
+      const getCat = (sku) => {
+         const p = products.find(x => x.SKU === sku);
+         return p ? (p.Category || '').toString().trim() : '';
+      };
+
+      const branches = window.app.globalData.branches || [];
+
+      // หา key ของคอลัมน์ Area ใน Branches แบบไม่สนตัวพิมพ์ (Area / AREA / area)
+      const areaKey = branches.length > 0
+         ? (Object.keys(branches[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area')
+         : 'Area';
+
+      validOrders.forEach(o => {
+          let cat = getCat(o.SKU);
+          if (cat === 'โมบาย') {
+             let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10);
+             if(!isNaN(qty) && qty > 0) {
+                 totalMobileQty += qty;
+                 let staff = (o['Staff'] || '').toString().trim().toUpperCase();
+                 let branchInput = (o['Branch Code'] || '').toString().trim().toUpperCase();
+
+                 if (staff) salesByName[staff] = (salesByName[staff] || 0) + qty;
+
+                 const bInfo = branches.find(b =>
+                     (b['Branch Code'] || '').toString().trim().toUpperCase() === branchInput ||
+                     (b['Branch Name'] || '').toString().trim().toUpperCase() === branchInput
+                 );
+
+                 if (bInfo) {
+                     let area = (bInfo[areaKey] || '').toString().trim().toUpperCase();
+                     let branchName = (bInfo['Branch Name'] || '').toString().trim().toUpperCase();
+                     let branchCode = (bInfo['Branch Code'] || '').toString().trim().toUpperCase();
+
+                     if (area) salesByName[area] = (salesByName[area] || 0) + qty;
+                     if (branchName) salesByName[branchName] = (salesByName[branchName] || 0) + qty;
+                     if (branchCode && branchCode !== branchName) salesByName[branchCode] = (salesByName[branchCode] || 0) + qty;
+                 } else {
+                     // หาสาขาไม่เจอ — นับด้วยค่าที่บันทึกมาตรงๆ เผื่อชื่อใน Target ตรงกับค่านี้
+                     if (branchInput) salesByName[branchInput] = (salesByName[branchInput] || 0) + qty;
+                     salesByName['UNKNOWN AREA'] = (salesByName['UNKNOWN AREA'] || 0) + qty;
+                 }
+             }
+          }
+      });
+      
+      let html = '';
+      if(!targets || targets.length === 0) {
+          html = '<tr><td colspan="5" class="text-center py-8 text-slate-500">ไม่มีข้อมูลในชีต Target</td></tr>';
+      } else {
+          let actualKeys = Object.keys(targets[0]).filter(k => k !== '_rowIndex');
+          
+          let nameKey = actualKeys.find(k => k.toLowerCase() === 'area' || k.includes('Area') || k.includes('สาขา') || k.includes('พนักงาน') || k.includes('ชื่อ') || k.includes('รับเป้า')) || actualKeys[0];
+          let targetKey = actualKeys.find(k => k !== nameKey && (k === 'เป้า' || k.includes('เป้า') || k.toLowerCase().includes('target'))) || actualKeys.find(k => k !== nameKey) || actualKeys[1];
+          
+          
+          let totalTargetSum = 0;
+          let totalActualSum = 0;
+          let totalForecastSum = 0;
+          
+          targets.forEach(t => {
+              let name = (t[nameKey] || '').toString().trim();
+              if(!name) return;
+              
+              // ลบลูกน้ำ (comma) ออกก่อนแปลงเป็นตัวเลข เพื่อป้องกันปัญหาการดึงข้อมูลผิดพลาด
+              let targetValStr = (t[targetKey] || '').toString().replace(/,/g, '').trim();
+              let targetVal = parseFloat(targetValStr) || 0;
+              let upperName = name.toUpperCase();
+              // "ALL" / "ALL BRANCHES" = ยอดรวมโมบายทุกสาขา
+              let actualVal = (upperName === 'ALL' || upperName === 'ALL BRANCHES') ? totalMobileQty : (salesByName[upperName] || 0);
+              
+              let displayName = name;
+              if (window.app.globalData.branches) {
+                  const bInfo = window.app.globalData.branches.find(b => b['Branch Code'] === name || b['Branch Name'] === name);
+                  if (bInfo) displayName = bInfo['Branch Name'];
+              }
+              if (displayName === name && window.app.globalData.members) {
+                  const mInfo = window.app.globalData.members.find(m => m['Username'] === name || m['Name'] === name);
+                  if (mInfo) displayName = mInfo['Name'] || mInfo['Username'];
+              }
+              
+              const eName = window.app.esc(name); const eDisp = window.app.esc(displayName);
+              let nameHtml = displayName === name ? eName : `${eDisp} <span class="text-[10px] text-slate-400 font-normal block md:inline md:ml-1">(${eName})</span>`;
+              
+              let avgPerDay = currentDays > 0 ? (actualVal / currentDays) : 0;
+              let forecastVal = Math.round(avgPerDay * totalDays);
+              let diffVal = actualVal - targetVal;
+              
+              totalTargetSum += targetVal;
+              totalActualSum += actualVal;
+              totalForecastSum += forecastVal;
+              
+              let diffClass = diffVal >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
+              let diffIcon = diffVal >= 0 ? '<i class="fas fa-arrow-up mr-1"></i>' : '<i class="fas fa-arrow-down mr-1"></i>';
+              
+              html += `
+              <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
+                 <td class="py-4 px-4 font-bold text-slate-800">${nameHtml}</td>
+                 <td class="py-4 px-4 text-center text-slate-600">${targetVal.toLocaleString()}</td>
+                 <td class="py-4 px-4 text-center font-bold text-indigo-600">${actualVal.toLocaleString()}</td>
+                 <td class="py-4 px-4 text-center"><span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${diffClass}">${diffIcon}${diffVal > 0 ? '+' : ''}${diffVal.toLocaleString()}</span></td>
+                 <td class="py-4 px-4 text-center font-bold text-amber-500">${forecastVal.toLocaleString()}</td>
+              </tr>
+              `;
+          });
+          
+          let tDiff = totalActualSum - totalTargetSum;
+          let tDiffClass = tDiff >= 0 ? 'text-emerald-600' : 'text-rose-600';
+          let tDiffIcon = tDiff >= 0 ? '<i class="fas fa-arrow-up mr-1"></i>' : '<i class="fas fa-arrow-down mr-1"></i>';
+          html += `
+              <tr class="bg-indigo-50/50 border-t-2 border-indigo-100">
+                 <td class="py-4 px-4 font-black text-indigo-900 text-right">รวมทั้งหมด:</td>
+                 <td class="py-4 px-4 text-center font-black text-indigo-900">${totalTargetSum.toLocaleString()}</td>
+                 <td class="py-4 px-4 text-center font-black text-indigo-700">${totalActualSum.toLocaleString()}</td>
+                 <td class="py-4 px-4 text-center font-black ${tDiffClass}">${tDiffIcon}${tDiff > 0 ? '+' : ''}${tDiff.toLocaleString()}</td>
+                 <td class="py-4 px-4 text-center font-black text-amber-600">${totalForecastSum.toLocaleString()}</td>
+              </tr>
+          `;
+      }
+      
+      targetBodyEl.innerHTML = html;
+      const targetCard = targetBodyEl.closest('.chart-card');
+      if (targetCard) window.app.tableExportButtons(targetCard);
+    }
+  };
+</script>

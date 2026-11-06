@@ -1,7 +1,7 @@
 // ตั้งค่า Tailwind แบบ build ล่วงหน้า (แทน cdn.tailwindcss.com) — ค่า theme ต้องตรงกับที่เคยฝังใน Index.html
 module.exports = {
   darkMode: 'class',
-  content: ['./src/Index.html', './src/JS.html', './src/CSS.html'],
+  content: ['./src/Index.html', './src/JS.html', './src/JS_*.html', './src/CSS.html'],
   // คลาสที่โค้ดประกอบชื่อเองตอนรัน (สแกนไม่เจอ): JS.html `bg-${clr}-100 text-${clr}-700 border-${clr}-200` (emerald/amber/slate)
   // และ `'bg-' + color + '-500'` (indigo/pink/emerald/amber)
   safelist: [
