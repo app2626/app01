@@ -274,6 +274,35 @@ function adminBootstrapAccount(username, password) {
 // LocCode สงวนไว้แทนบัญชี Admin ที่ login ผ่านหน้าแรกร่วมกับสาขา (ไม่ใช่ LocCode สาขาจริง)
 const ADMIN_SESSION_LOCCODE = "__ADMIN__";
 
+// ===== helper ความปลอดภัย =====
+function cacheGet_(k) { try { return CacheService.getScriptCache().get(k); } catch (e) { return null; } }
+function cachePut_(k, v, sec) { try { CacheService.getScriptCache().put(k, String(v), sec); } catch (e) {} }
+function cacheRemove_(k) { try { CacheService.getScriptCache().remove(k); } catch (e) {} }
+
+// กัน formula injection: ข้อความที่ผู้ใช้ส่งมาแล้วขึ้นต้นด้วย = + - @ จะถูกบังคับเป็นข้อความ (ใช้ ' นำหน้าแบบเดียวกับวันที่ในระบบ)
+function sanitizeSheetText_(v) {
+  const t = (v === null || v === undefined) ? "" : String(v);
+  return /^[=+\-@\t\r]/.test(t) ? "'" + t : t;
+}
+
+// OTP 6 หลักจากตัวสุ่มของ UUID (ปลอดภัยกว่า Math.random)
+function secureOtp_() {
+  const hex = Utilities.getUuid().replace(/-/g, "").slice(0, 8);
+  return String(100000 + (parseInt(hex, 16) % 900000));
+}
+
+const OTP_MAX_FAILS = 5;
+const OTP_FAIL_LOCK_SECONDS = 900;      // ใส่ OTP ผิดครบ 5 ครั้ง ล็อก 15 นาที
+const OTP_REQUEST_GAP_SECONDS = 60;     // ขอ OTP ได้ทุก 60 วินาที
+const OTP_REQUEST_MAX_PER_HOUR = 5;
+const MAX_ITEMS_PER_BATCH = 100;
+// Loc. Code กลางที่ "ทุกสาขา" เปลี่ยนสถานะรายการได้ (นอกนั้นเปลี่ยนได้เฉพาะรายการของสาขาตัวเอง) — เทียบแบบไม่สนตัวพิมพ์/ช่องว่างหัวท้าย
+const SHARED_STATUS_LOCCODES = ["SCG01", "In Transit"];
+function isSharedStatusLoc_(locCode) {
+  const t = (locCode || "").toString().trim().toLowerCase();
+  return SHARED_STATUS_LOCCODES.some(function(c) { return c.toLowerCase() === t; });
+}
+
 // ล็อกชั่วคราวเมื่อใส่รหัสผิดติดกัน (นับด้วย CacheService ไม่แตะโครงสร้างชีต)
 const LOGIN_MAX_FAILS = 5;
 const LOGIN_LOCK_SECONDS = 900; // 15 นาที
@@ -461,6 +490,19 @@ function requestPasswordReset(locCode) {
       return { success: false, message: "บัญชีนี้ยังไม่ได้ลงทะเบียนอีเมลไว้ กรุณาติดต่อผู้ดูแลระบบเพื่อรีเซ็ตรหัสผ่าน" };
     }
 
+    // จำกัดความถี่การขอ OTP (กันอีเมลรบกวน/กันการขอซ้ำเพื่อเดา)
+    const reqKey = "otpreq_" + rowLocCode.toLowerCase();
+    const cntKey = "otpcnt_" + rowLocCode.toLowerCase();
+    if (cacheGet_(reqKey)) {
+      return { success: false, message: "ขอรหัส OTP ได้ทุก " + OTP_REQUEST_GAP_SECONDS + " วินาที กรุณารอสักครู่แล้วลองใหม่" };
+    }
+    const reqCount = parseInt(cacheGet_(cntKey), 10) || 0;
+    if (reqCount >= OTP_REQUEST_MAX_PER_HOUR) {
+      return { success: false, message: "ขอรหัส OTP เกินจำนวนครั้งที่กำหนดต่อชั่วโมง กรุณาลองใหม่ภายหลัง หรือติดต่อผู้ดูแลระบบ" };
+    }
+    cachePut_(reqKey, 1, OTP_REQUEST_GAP_SECONDS);
+    cachePut_(cntKey, reqCount + 1, 3600);
+
     let resetsSheet = getPasswordResetsSheet_(ss);
     if (!resetsSheet) {
       resetsSheet = ss.insertSheet("PasswordResets");
@@ -477,7 +519,7 @@ function requestPasswordReset(locCode) {
       }
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = secureOtp_();
     const salt = Utilities.getUuid();
     const otpHash = hashPassword_(otp, salt);
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
@@ -525,6 +567,11 @@ function resetPasswordWithOtp(locCode, otp, newPassword) {
   const resetsSheet = getPasswordResetsSheet_(ss);
   if (!resetsSheet || resetsSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบคำขอรีเซ็ตรหัสผ่าน กรุณาขอ OTP ใหม่" };
 
+  const failKey = "otpfail_" + locCode.toLowerCase();
+  if ((parseInt(cacheGet_(failKey), 10) || 0) >= OTP_MAX_FAILS) {
+    return { success: false, message: "ใส่รหัส OTP ผิดหลายครั้ง ถูกล็อกชั่วคราว 15 นาที กรุณาลองใหม่ภายหลัง" };
+  }
+
   const data = resetsSheet.getRange(2, 1, resetsSheet.getLastRow() - 1, 5).getDisplayValues();
   for (let i = 0; i < data.length; i++) {
     const rowLocCode = (data[i][0] || "").toString().trim();
@@ -539,8 +586,15 @@ function resetPasswordWithOtp(locCode, otp, newPassword) {
     }
 
     if (hashPassword_(otp, salt) !== storedHash) {
-      return { success: false, message: "รหัส OTP ไม่ถูกต้อง" };
+      const fails = (parseInt(cacheGet_(failKey), 10) || 0) + 1;
+      cachePut_(failKey, fails, OTP_FAIL_LOCK_SECONDS);
+      if (fails >= OTP_MAX_FAILS) {
+        resetsSheet.deleteRow(i + 2); // ยกเลิก OTP ฉบับนี้ทันที ต้องขอใหม่
+        return { success: false, message: "ใส่รหัส OTP ผิดหลายครั้ง รหัสนี้ถูกยกเลิกและบัญชีถูกล็อกชั่วคราว 15 นาที" };
+      }
+      return { success: false, message: "รหัส OTP ไม่ถูกต้อง (เหลืออีก " + (OTP_MAX_FAILS - fails) + " ครั้ง)" };
     }
+    cacheRemove_(failKey);
 
     const usersSheet = getUsersSheet_(ss);
     if (!usersSheet || usersSheet.getLastRow() <= 1) return { success: false, message: "ไม่พบบัญชีผู้ใช้" };
@@ -1124,6 +1178,10 @@ function saveBatchRecords(token, payload) {
     return { success: false, message: "บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถบันทึกรายการได้" };
   }
 
+  if (!payload || !Array.isArray(payload.items) || payload.items.length === 0 || payload.items.length > MAX_ITEMS_PER_BATCH) {
+    return { success: false, message: "จำนวนรายการไม่ถูกต้อง (บันทึกได้สูงสุด " + MAX_ITEMS_PER_BATCH + " รายการต่อครั้ง)" };
+  }
+
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000); // รอสูงสุด 15 วินาที
@@ -1175,10 +1233,11 @@ function saveBatchRecords(token, payload) {
     const pendingTransferImeis = getPendingTransferImeis_(ss);
 
     const timestamp = "'" + Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
-    let actD = payload.actDate.split('-');
+    let actD = String(payload.actDate || "").split('-');
     let formattedActDate = payload.actDate;
     if(actD.length === 3) { formattedActDate = "'" + actD[2] + "/" + actD[1] + "/" + actD[0]; }
-    const actEmpName = `${branchLocCode}+${payload.empName}`;
+    const actEmpName = sanitizeSheetText_(`${branchLocCode}+${String(payload.empName || "").trim().slice(0, 100)}`);
+    const batchImeis = new Set();
     const allowedStatus = ["ยังไม่ขาย", "ขายแล้ว"];
 
     let errors = [];
@@ -1188,16 +1247,19 @@ function saveBatchRecords(token, payload) {
       let checkKey = `${branchLocCode}|${item.sku}|${item.imei}`;
       let transferKey = `Warehouse Transfer|${item.sku}|${item.imei}`;
       let itemStatus = allowedStatus.indexOf(item.status) !== -1 ? item.status : "ยังไม่ขาย";
-      if(usedImeis.has(item.imei)) {
+      if(batchImeis.has(item.imei)) {
+        errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ซ้ำกับรายการอื่นในคำขอเดียวกัน`);
+      } else if(usedImeis.has(item.imei)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ถูกทำรายการแอคไปแล้ว`);
       } else if(pendingTransferImeis.has(item.imei)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) อยู่ระหว่างรอรับเข้าโอนย้ายสต๊อก ไม่สามารถบันทึก ACT ได้`);
       } else if(!validStockKeys.has(checkKey) && !validStockKeys.has(transferKey)) {
         errors.push(`รายการที่ ${index + 1} (IMEI: ${item.imei}) ไม่มีในสต๊อกของสาขานี้ (หรือ Warehouse Transfer)`);
       } else {
+        batchImeis.add(item.imei);
         rowsToInsert.push([
           timestamp, formattedActDate, actEmpName, branchLocCode, branchLocName,
-          item.sku, item.desc, item.imei, itemStatus, "", "", "", "", ""
+          item.sku, sanitizeSheetText_(String(item.desc || "").slice(0, 300)), item.imei, itemStatus, "", "", "", "", ""
         ]);
       }
     });
@@ -1215,7 +1277,7 @@ function saveBatchRecords(token, payload) {
   }
 }
 
-function updateStatus(token, rowId, newStatus) {
+function updateStatus(token, rowId, newStatus, expectedImei) {
   const session = requireSession_(token);
   if (session.role === ROLE_VIEWER) {
     return { success: false, message: "บัญชีนี้เป็นบัญชีดูข้อมูลอย่างเดียว ไม่สามารถแก้ไขสถานะได้" };
@@ -1225,26 +1287,51 @@ function updateStatus(token, rowId, newStatus) {
     return { success: false, message: "สถานะไม่ถูกต้อง" };
   }
   rowId = Number(rowId);
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+  } catch (e) {
+    return { success: false, message: "ขณะนี้ระบบกำลังประมวลผลข้อมูลจากผู้ใช้อื่น กรุณาลองใหม่อีกครั้ง" };
+  }
+
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = findSheet(ss, "อยู่ระหว่างดำเนินการ");
     if (!sheet) return { success: false, message: "ไม่พบฐานข้อมูลชีต 'อยู่ระหว่างดำเนินการ'" };
-    // rowId ต้องชี้ไปยังแถวข้อมูลจริงเท่านั้น (แถว 1 คือ header) ป้องกัน rowId ที่ถูกดัดแปลงจาก client ทำให้ header เสียหาย
+    // rowId ต้องชี้ไปยังแถวข้อมูลจริงเท่านั้น (แถว 1 คือ header)
     if (!Number.isInteger(rowId) || rowId < 2 || rowId > sheet.getLastRow()) {
       return { success: false, message: "หมายเลขแถวไม่ถูกต้อง" };
     }
 
-    const rowVals = sheet.getRange(rowId, 6, 1, 4).getDisplayValues()[0]; // sku, desc, imei, oldStatus
-    const oldStatus = rowVals[3] || "";
+    // คอลัมน์ D..I = locCode, locName, sku, desc, imei, status
+    const rowVals = sheet.getRange(rowId, 4, 1, 6).getDisplayValues()[0];
+    const rowLoc = (rowVals[0] || "").toString().trim();
+    const rowSku = rowVals[2];
+    const rowImei = (rowVals[4] || "").toString().trim();
+    const oldStatus = rowVals[5] || "";
+
+    // เปลี่ยนสถานะได้เฉพาะรายการของสาขาตัวเอง หรือรายการที่อยู่ Loc กลาง (SCG01 / In Transit) — Admin ทำได้ทุกรายการ
+    if (session.locCode !== ADMIN_SESSION_LOCCODE && !isSharedStatusLoc_(rowLoc) && rowLoc !== (session.locCode || "").toString().trim()) {
+      return { success: false, message: "เปลี่ยนสถานะได้เฉพาะรายการของสาขาตัวเอง หรือรายการที่อยู่ SCG01 / In Transit เท่านั้น" };
+    }
+    // กันเลขแถวเลื่อน (เช่น Admin ลบแถวระหว่างที่เปิดหน้าไว้) ทำให้ไปแก้ผิดรายการ
+    if (expectedImei !== undefined && expectedImei !== null && expectedImei !== "" &&
+        expectedImei.toString().trim() !== rowImei) {
+      return { success: false, message: "ข้อมูลมีการเปลี่ยนแปลง กรุณารีเฟรชหน้าแล้วลองใหม่" };
+    }
+
     sheet.getRange(rowId, 9).setValue(newStatus);
 
     const branchLocName = session.locCode === ADMIN_SESSION_LOCCODE ? "Admin" : getLocNameByCode_(ss, session.locCode);
     logAccess_(ss, session.locCode, branchLocName, session.role, "UPDATE_STATUS",
-      `IMEI ${rowVals[2]} (${rowVals[0]}): ${oldStatus} -> ${newStatus}`);
+      `IMEI ${rowImei} (${rowSku}): ${oldStatus} -> ${newStatus}`);
 
     return { success: true, message: "อัปเดตสถานะสำเร็จ" };
   } catch(e) {
     return { success: false, message: e.message };
+  } finally {
+    lock.releaseLock();
   }
 }
 

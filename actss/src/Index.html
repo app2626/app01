@@ -1966,7 +1966,7 @@
         });
 
         $(document).on('click', '.btn-change-status', function() {
-            changeStatus($(this).data('rowid'), $(this).data('status'));
+            changeStatus($(this).data('rowid'), $(this).data('status'), String($(this).attr('data-imei') || ''));
         });
 
         $(document).on('click', '.btn-edit-record', function() {
@@ -2834,9 +2834,11 @@
                     unsoldPool.push({ model: mappedModelName, sku: cleanSku, desc: r.desc, area: r.area, locCode: r.locCode, locName: r.locName, imei: r.imei, age: ageDays });
                 }
 
-                var btnManage = (currentRole === ROLE_VIEWER)
-                    ? '<span class="text-muted small"><i class="fas fa-eye"></i> ดูอย่างเดียว</span>'
-                    : '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>';
+                // เปลี่ยนสถานะได้เฉพาะรายการของสาขาตัวเอง หรือ Loc กลาง SCG01 / In Transit (Admin ได้ทุกรายการ) — เซิร์ฟเวอร์ตรวจซ้ำอีกชั้น
+                var canChangeStatus = currentRole !== ROLE_VIEWER && (currentLocCode === '__ADMIN__' || isSharedStatusLoc((r.locCode || '').toString()) || (r.locCode || '').toString().trim() === (currentLocCode || '').toString().trim());
+                var btnManage = canChangeStatus
+                    ? '<button type="button" class="btn btn-sm btn-primary fw-bold btn-change-status" data-rowid="' + r.rowId + '" data-status="' + escapeHtml(r.status) + '" data-imei="' + escapeHtml(r.imei) + '"><i class="fas fa-edit"></i> เปลี่ยนสถานะ</button>'
+                    : '<span class="text-muted small"><i class="fas fa-eye"></i> ดูอย่างเดียว</span>';
                 if (currentLocCode === '__ADMIN__') {
                     btnManage += ' <button type="button" class="btn btn-sm btn-outline-secondary fw-bold btn-edit-record" data-rowid="' + r.rowId + '"><i class="fas fa-pen"></i> แก้ไข</button>' +
                         ' <button type="button" class="btn btn-sm btn-outline-danger fw-bold btn-delete-record" data-rowid="' + r.rowId + '"><i class="fas fa-trash"></i> ลบ</button>';
@@ -3690,7 +3692,11 @@
         }).adminSaveTimeWindow(adminToken, start, end);
     }
 
-    function changeStatus(rowId, currentStatus) {
+    // Loc กลางที่ทุกสาขาเปลี่ยนสถานะได้ (ต้องตรงกับ SHARED_STATUS_LOCCODES ฝั่งเซิร์ฟเวอร์)
+    var SHARED_STATUS_LOCCODES = ['scg01', 'in transit'];
+    function isSharedStatusLoc(code) { return SHARED_STATUS_LOCCODES.indexOf(String(code || '').trim().toLowerCase()) !== -1; }
+
+    function changeStatus(rowId, currentStatus, imei) {
         Swal.fire({
             title: 'เปลี่ยนสเตตัสการขาย',
             input: 'select',
@@ -3699,10 +3705,15 @@
         }).then(function(result) {
             if (result.isConfirmed) {
                 showHUDLoader('กำลังบันทึกและซิงค์ข้อมูลสเตตัสใหม่...');
-                google.script.run.withFailureHandler(handleAuthFailure).withSuccessHandler(function(res) {
+                google.script.run.withFailureHandler(function(err) {
+                    Swal.close();
+                    if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
+                    Swal.fire('ผิดพลาด', 'เปลี่ยนสถานะไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+                }).withSuccessHandler(function(res) {
+                    Swal.close();
                     if(res.success) { Swal.fire('สำเร็จ', 'เปลี่ยนสเตตัสเรียบร้อย', 'success'); loadDataTable(); }
                     else { Swal.fire('ผิดพลาด', res.message, 'error'); }
-                }).updateStatus(currentToken, rowId, result.value);
+                }).updateStatus(currentToken, rowId, result.value, imei);
             }
         });
     }
