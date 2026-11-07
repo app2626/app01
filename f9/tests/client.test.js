@@ -107,8 +107,9 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
       ok(len > 20, 'page looks empty (' + len + ' chars)');
       ok(pageErrors.length === before, pageErrors.slice(before).map(e => e.text).join(' | ').slice(0, 400));
       // ปุ่มนำเข้า CSV ต้องโผล่เฉพาะหน้าสินค้า (Products) เท่านั้น
-      if (['products', 'branches', 'channels', 'members'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !!b&&!b.classList.contains('hidden')})()"), 'import button must show on ' + r);
-      else if (['promotions', 'coupons', 'interests', 'giftmappings', 'autopromotions'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !b||b.classList.contains('hidden')})()"), 'import button must be hidden on ' + r);
+      if (['products', 'branches', 'channels', 'members', 'giftmappings'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !!b&&!b.classList.contains('hidden')})()"), 'import button must show on ' + r);
+      else if (['promotions', 'coupons', 'interests', 'autopromotions'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !b||b.classList.contains('hidden')})()"), 'import button must be hidden on ' + r);
+      if (['products', 'giftmappings'].includes(r)) await shot('grid-' + r);
       await ev("window.Swal && Swal.isVisible && Swal.isVisible() && Swal.close(); true");
     });
   }

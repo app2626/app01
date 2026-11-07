@@ -77,14 +77,14 @@ function setupDatabase(userToken) {
       ["ALL BRANCHES", 1000]
     ],
     "UI_Banners": [
-      ["B-001", "loginbg", "https://images.unsplash.com/photo-1616348436168-de43ad0db179?q=80&w=1000", "Active"],
-      ["B-002", "herobanner", "https://via.placeholder.com/1200x400/4f46e5/ffffff?text=Promo+1", "Active"],
-      ["B-003", "herobanner", "https://via.placeholder.com/1200x400/10b981/ffffff?text=Promo+2", "Active"],
-      ["B-004", "herobanner", "https://via.placeholder.com/1200x400/8b5cf6/ffffff?text=Promo+3", "Active"],
-      ["B-005", "promogrid", "https://via.placeholder.com/600x400/f59e0b/ffffff?text=Grid+1+(Featured)", "Active"],
-      ["B-006", "promogrid", "https://via.placeholder.com/400x400/ec4899/ffffff?text=Grid+2", "Active"],
-      ["B-007", "promogrid", "https://via.placeholder.com/400x400/06b6d4/ffffff?text=Grid+3", "Active"],
-      ["B-008", "popupbanner", "https://via.placeholder.com/800x800/10b981/ffffff?text=Popup+Banner+1", "Active"]
+      ["B-001", "loginbg", "https://images.unsplash.com/photo-1616348436168-de43ad0db179?q=80&w=1000", "เปิด"],
+      ["B-002", "herobanner", "https://via.placeholder.com/1200x400/4f46e5/ffffff?text=Promo+1", "เปิด"],
+      ["B-003", "herobanner", "https://via.placeholder.com/1200x400/10b981/ffffff?text=Promo+2", "เปิด"],
+      ["B-004", "herobanner", "https://via.placeholder.com/1200x400/8b5cf6/ffffff?text=Promo+3", "เปิด"],
+      ["B-005", "promogrid", "https://via.placeholder.com/600x400/f59e0b/ffffff?text=Grid+1+(Featured)", "เปิด"],
+      ["B-006", "promogrid", "https://via.placeholder.com/400x400/ec4899/ffffff?text=Grid+2", "เปิด"],
+      ["B-007", "promogrid", "https://via.placeholder.com/400x400/06b6d4/ffffff?text=Grid+3", "เปิด"],
+      ["B-008", "popupbanner", "https://via.placeholder.com/800x800/10b981/ffffff?text=Popup+Banner+1", "เปิด"]
     ],
     "Products": [
       ["SKU-S24U", "Samsung Galaxy S24 Ultra", "S24 Ultra", "Samsung Galaxy S24 Ultra", "S24-Series", "512GB", "Titanium Black", "https://images.samsung.com/is/image/samsung/p6pim/th/2401/gallery/th-galaxy-s24-s928-sm-s928bzththl-thumb-539325419", 46900, 50, "เครื่อง", "โมบาย", "เปิด", "ALL", "", "6.8\" Dynamic AMOLED 2X 120Hz (QHD+)", "Snapdragon 8 Gen 3 for Galaxy", "12GB LPDDR5X", "200MP + 50MP (5x) + 10MP (3x) + 12MP", "12MP Dual Pixel AF", "5,000 mAh (ชาร์จไว 45W)", "Android 14 (One UI 6.1 + Galaxy AI)", "5G / Wi-Fi 7 / Bluetooth 5.3 / S-Pen", "ศูนย์ไทย 1 ปี"],
@@ -418,7 +418,7 @@ function getPublicConfig() {
     if(sheet) {
        const data = sheet.getDataRange().getValues();
        for(let i=1; i<data.length; i++) {
-         if (data[i][1] === 'loginbg' && data[i][3] === 'Active') {
+         if (data[i][1] === 'loginbg' && statusOn_(data[i][3])) {
            loginBg = data[i][2] ? data[i][2].toString() : null;
            break;
          }
@@ -502,6 +502,8 @@ function apiHandlerInner_(action, payload, userToken) {
           throw new Error("Permission Denied: Admin/Manager only");
         }
         // Coupons: โค้ดส่วนลดเป็นความลับ — อ่านได้เฉพาะ Admin (ฝั่ง POS ตรวจโค้ดผ่าน VALIDATE_COUPON เท่านั้น)
+        // AutoPromotions: Admin เปิดหน้านี้ครั้งแรกหลังอัปเดต → แปลง Active/Inactive เดิมเป็น เปิด/ปิด (idempotent)
+        if (payload.tableName === 'AutoPromotions' && secureUser.Role === 'Admin' && migrateStatusColumn_(ss.getSheetByName('AutoPromotions'), 'Status') > 0) CacheService.getScriptCache().remove('TABLE_AutoPromotions');
         if (payload.tableName === 'Coupons') {
           if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
           ensureCouponsSheet_(ss);
@@ -530,6 +532,7 @@ function apiHandlerInner_(action, payload, userToken) {
         return { status: 'success', data: tableData };
       case 'GET_ALL_DATA': return getAllInitialData(ss, secureUser.Role === 'Admin');
       case 'SAVE_RECORD': return saveRecord(payload.tableName, payload.data, payload.idField, secureUser, ss);
+      case 'DELETE_RECORDS': return deleteRecords(payload, secureUser, ss);
       case 'DELETE_RECORD': return deleteRecord(payload.tableName, payload.idField, payload.idValue, secureUser, ss);
       case 'SAVE_PRODUCT_GROUP': return saveProductGroup(payload, secureUser, ss);
       case 'UPDATE_PRODUCT_GROUP': return updateProductGroup(payload, secureUser, ss);
@@ -731,8 +734,8 @@ function initAutoPromotionsSheet(ss) {
     try {
       sheet = ss.insertSheet("AutoPromotions");
       sheet.appendRow(["Rule ID", "Buy Category", "Get Discount Category", "Discount Percent", "Message Suggest", "Message Apply", "Status", "Channel"]);
-      sheet.appendRow(["AP-001", "โมบาย", "อุปกรณ์เสริม", 10, "ลูกค้าซื้อมือถือแล้ว! เสนอขายอุปกรณ์เสริม (เคส/ฟิล์ม/หัวชาร์จ) ตอนนี้ <strong class='text-rose-900'>รับส่วนลดอุปกรณ์เสริม 10% ทันที</strong>", "ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว", "Active", ""]);
-      sheet.appendRow(["AP-002", "สมาร์ทวอทช์", "อุปกรณ์เสริม", 5, "ลูกค้าซื้อสมาร์ทวอทช์! เสนอขายสายนาฬิกาเพิ่ม รับส่วนลด 5%", "ได้รับส่วนลดสายนาฬิกา 5% เรียบร้อย", "Inactive", ""]);
+      sheet.appendRow(["AP-001", "โมบาย", "อุปกรณ์เสริม", 10, "ลูกค้าซื้อมือถือแล้ว! เสนอขายอุปกรณ์เสริม (เคส/ฟิล์ม/หัวชาร์จ) ตอนนี้ <strong class='text-rose-900'>รับส่วนลดอุปกรณ์เสริม 10% ทันที</strong>", "ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว", "เปิด", ""]);
+      sheet.appendRow(["AP-002", "สมาร์ทวอทช์", "อุปกรณ์เสริม", 5, "ลูกค้าซื้อสมาร์ทวอทช์! เสนอขายสายนาฬิกาเพิ่ม รับส่วนลด 5%", "ได้รับส่วนลดสายนาฬิกา 5% เรียบร้อย", "ปิด", ""]);
       sheet.getRange("A1:H1").setFontWeight("bold").setBackground("#d9ead3");
       SpreadsheetApp.flush();
     } catch(e) {}
@@ -1501,13 +1504,13 @@ function processCheckout(payload, secureUser, ss) {
       let autoRules = getTableDataAsJson(ss.getSheetByName("AutoPromotions"));
       // fallback rule เดียวกับหน้า POS (checkAutoPromotions) กรณีชีต AutoPromotions ว่าง
       if (autoRules.length === 0) {
-        autoRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'Active' }];
+        autoRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'เปิด' }];
       }
       // เพดานส่วนลด Auto Bundle คำนวณครั้งเดียวรวมทั้งออเดอร์ (ไม่ใช่ต่อแถว) — client ปกติส่งแถว 'Auto Bundle' แถวเดียวต่อออเดอร์
       // (ดู JS.html pos.confirmCheckout) แต่ payload เป็น input จาก client ดิบๆ ห้ามเชื่อจำนวนแถว ต้องกันแยกกันส่งหลายแถวแล้วได้ส่วนลดคูณ
       let maxAutoTotal = 0;
       autoRules.forEach(r => {
-        if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
+        if (!statusOn_(r.Status)) return;
         const buyCat = (r['Buy Category'] || '').toString().trim();
         const getCat = (r['Get Discount Category'] || '').toString().trim();
         const pct = parseFloat(r['Discount Percent']) || 0;
@@ -1973,7 +1976,8 @@ function importProducts(payload, secureUser, ss) {
 var IMPORT_RECORD_TABLES_ = {
   Branches: { idField: 'Branch Code', textCols: ['Branch Code'], free: ['Channel', 'Branch Name', 'Area', 'Mall', 'Region', 'Province', 'Type Name'], cache: 'TABLE_Branches' },
   Channels: { idField: 'Channel ID', textCols: ['Channel ID'], free: ['Channel Name', 'Description'], autoId: { prefix: 'CH-', pad: 2 }, cache: 'TABLE_Channels' },
-  Members: { idField: 'Username', textCols: ['Username'], free: ['Name'], ciId: true, cache: 'TABLE_Members' }
+  Members: { idField: 'Username', textCols: ['Username'], free: ['Name'], ciId: true, cache: 'TABLE_Members' },
+  GiftMappings: { idField: 'Mapping ID', textCols: ['Mapping ID'], free: ['Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts'], autoId: { prefix: 'GM-', pad: 3 }, cache: 'TABLE_GiftMappings' }
 };
 var IMPORT_MEMBER_ROLES_ = ['Admin', 'Manager', 'Sales'];
 
@@ -2027,7 +2031,7 @@ function importRecords(payload, secureUser, ss) {
     };
     const knownBranches = {}, knownChannels = {}, knownChannelNames = {};
     if (table === 'Members') colValues('Branches', 'Branch Code').forEach(v => { knownBranches[v] = true; });
-    if (table === 'Branches') {
+    if (table === 'Branches' || table === 'GiftMappings') {
       colValues('Branches', 'Channel').concat(colValues('Channels', 'Channel Name'), colValues('Channels', 'Channel ID')).forEach(v => { knownChannels[v.toLowerCase()] = true; });
     }
     if (table === 'Channels') colValues('Channels', 'Channel Name').forEach(v => { knownChannelNames[v.toLowerCase()] = true; });
@@ -2065,6 +2069,14 @@ function importRecords(payload, secureUser, ss) {
         if (!obj['Channel Name']) return fail('ไม่มี Channel Name');
         if (knownChannelNames[obj['Channel Name'].toLowerCase()]) warn("ชื่อช่องทาง '" + obj['Channel Name'] + "' ซ้ำกับที่มีอยู่แล้ว");
         knownChannelNames[obj['Channel Name'].toLowerCase()] = true;
+      } else if (table === 'GiftMappings') {
+        if (!obj['Target Mobile (SKU or Group)']) return fail('ไม่มี Target Mobile (SKU or Group) — ใส่ SKU/ชื่อสินค้า/กลุ่มสินค้า หรือ * = ทุกรุ่น');
+        if (!obj['Brand Gifts'] && !obj['Channel Gifts']) return fail('ไม่มีของแถม — ต้องมี Brand Gifts หรือ Channel Gifts อย่างน้อยหนึ่งช่อง');
+        const stIn = get('Status').toLowerCase();
+        if (stIn === '' || stIn === 'เปิด' || stIn === 'active') obj['Status'] = 'เปิด';
+        else if (stIn === 'ปิด' || stIn === 'inactive') obj['Status'] = 'ปิด';
+        else return fail("Status ต้องเป็น 'เปิด' หรือ 'ปิด' (หรือเว้นว่าง = เปิด)");
+        obj['Channel'].split(/[,;\n]+/).map(t => t.trim()).filter(t => t && !/^(\*|all|ทั้งหมด)$/i.test(t)).forEach(t => { if (!knownChannels[t.toLowerCase()]) warn("Channel '" + t + "' ยังไม่มีในระบบ — เงื่อนไขนี้จะไม่ตรงกับช่องทางใด ตรวจตัวสะกดอีกครั้ง"); });
       } else if (table === 'Members') {
         if (!/^[A-Za-z0-9._@\-]{3,50}$/.test(id)) return fail('Username ใช้ได้เฉพาะ A-Z a-z 0-9 . _ @ - ความยาว 3-50 ตัวอักษร');
         const roleIn = get('Role').toLowerCase();
@@ -2693,6 +2705,59 @@ function updateProductGroup(payload, secureUser, ss) {
   }
 }
 
+// ลบหลายรายการพร้อมกัน (Admin) — ตารางและคอลัมน์ ID มาจากตารางกำหนดฝั่งนี้เท่านั้น (ไม่เชื่อ idField จาก client)
+// ลบแถวแรกที่ ID ตรงของแต่ละค่า (เหมือน deleteRecord ทีละรายการ); ID ที่ไม่พบรายงานใน notFound; ไม่ลบบัญชีของตัวเอง
+var BULK_DELETE_TABLES_ = {
+  Products: { idField: 'SKU' }, Branches: { idField: 'Branch Code' }, Channels: { idField: 'Channel ID' },
+  Members: { idField: 'Username' }, GiftMappings: { idField: 'Mapping ID' }, AutoPromotions: { idField: 'Rule ID' },
+  Promotions: { idField: 'Promo ID' }
+};
+var BULK_DELETE_MAX_ = 200;
+function deleteRecords(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
+    const table = ((payload && payload.tableName) || '').toString();
+    const spec = Object.prototype.hasOwnProperty.call(BULK_DELETE_TABLES_, table) ? BULK_DELETE_TABLES_[table] : null;
+    if (!spec) return { status: 'error', message: 'ไม่รองรับการลบหลายรายการของตาราง: ' + table };
+    const raw = Array.isArray(payload.idValues) ? payload.idValues : [];
+    const ids = [];
+    const seen = {};
+    raw.forEach(v => { const t = (v === null || v === undefined ? '' : v).toString().trim(); if (t && !seen[t]) { seen[t] = true; ids.push(t); } });
+    if (ids.length === 0) return { status: 'error', message: 'ยังไม่ได้เลือกรายการ' };
+    if (ids.length > BULK_DELETE_MAX_) return { status: 'error', message: 'ลบได้ครั้งละไม่เกิน ' + BULK_DELETE_MAX_ + ' รายการ (เลือกมา ' + ids.length + ')' };
+    const sheet = ss.getSheetByName(table);
+    if (!sheet) return { status: 'error', message: 'ไม่พบชีต ' + table };
+    const data = sheet.getDataRange().getDisplayValues();
+    const idIdx = data[0].map(h => h.toString().trim()).indexOf(spec.idField);
+    if (idIdx === -1) return { status: 'error', message: 'โครงสร้างชีต ' + table + ' ไม่ถูกต้อง (ไม่พบคอลัมน์ ' + spec.idField + ')' };
+    const want = {};
+    ids.forEach(id => { want[id] = true; });
+    const rowsToDelete = [], deletedIds = [], found = {}, protectedIds = [];
+    for (let i = 1; i < data.length; i++) {
+      const v = (data[i][idIdx] || '').toString().trim();
+      if (!want[v] || found[v]) continue;
+      found[v] = true;
+      if (table === 'Members' && v.toLowerCase() === (secureUser.Username || '').toString().toLowerCase()) { protectedIds.push(v); continue; }
+      rowsToDelete.push(i + 1);
+      deletedIds.push(v);
+    }
+    for (let k = rowsToDelete.length - 1; k >= 0; k--) sheet.deleteRow(rowsToDelete[k]);
+    const notFound = ids.filter(id => !found[id]);
+    if (rowsToDelete.length > 0) {
+      const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions", "Members"];
+      if (cacheableTables.includes(table)) CacheService.getScriptCache().remove("TABLE_" + table);
+      logAudit(secureUser.Username, "BULK_DELETE", "Deleted " + rowsToDelete.length + " row(s) from " + table + ": " + deletedIds.slice(0, 10).join(','));
+    }
+    return { status: 'success', deleted: rowsToDelete.length, notFound: notFound, protectedIds: protectedIds };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function deleteRecord(tableName, idField, idValue, secureUser, ss) {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
@@ -2788,6 +2853,7 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
 function getSettingsList(ss) {
   const bannersSheet = ss.getSheetByName("UI_Banners");
   const settingsSheet = ss.getSheetByName("Settings");
+  if (bannersSheet) migrateStatusColumn_(bannersSheet, 'Status'); // ค่าเก่า Active → เปิด (Admin เปิดหน้าแบนเนอร์)
   if (!bannersSheet) return { status: 'error', message: 'UI_Banners sheet not found. Please click Auto Setup to initialize new database structure.' };
   
   ensureBannerColumns_(bannersSheet);
@@ -3025,13 +3091,13 @@ function saveSettingsItem(payload, secureUser, ss) {
       for (let i = 1; i < data.length; i++) {
         if (data[i][1] === 'loginbg') {
           bannersSheet.getRange(i + 1, 3).setValue(url);
-          bannersSheet.getRange(i + 1, 4).setValue('Active');
+          bannersSheet.getRange(i + 1, 4).setValue('เปิด');
           found = true;
           break;
         }
       }
       if (!found) {
-        bannersSheet.appendRow([generateId('BAN'), 'loginbg', url, 'Active', '']);
+        bannersSheet.appendRow([generateId('BAN'), 'loginbg', url, 'เปิด', '']);
       }
       logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Login BG: " + url);
       return { status: 'success' };
@@ -3049,7 +3115,7 @@ function saveSettingsItem(payload, secureUser, ss) {
       const bid = payload.bannerId ? payload.bannerId.toString().trim() : '';
       if (typeAtRow !== type || (idAtRow && idAtRow !== bid)) throw new Error("ข้อมูลแบนเนอร์เปลี่ยนไปแล้ว (อาจมีผู้ดูแลคนอื่นแก้ไข/ลบ) กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
       bannersSheet.getRange(ri, 3).setValue(url);
-      bannersSheet.getRange(ri, 4).setValue('Active');
+      bannersSheet.getRange(ri, 4).setValue('เปิด');
       bannersSheet.getRange(ri, 5).setValue(targetLink);
       bannersSheet.getRange(ri, 6).setValue(details);
       bannersSheet.getRange(ri, 7).setValue(title);
@@ -3057,7 +3123,7 @@ function saveSettingsItem(payload, secureUser, ss) {
       writeBannerDates_(bannersSheet, ri, rawFields.startDate, rawFields.endDate);
       logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Setting " + type + " at row " + ri + ": " + url);
     } else {
-      bannersSheet.appendRow([generateId('BAN'), type, url, 'Active', targetLink, details, title, buttonText]);
+      bannersSheet.appendRow([generateId('BAN'), type, url, 'เปิด', targetLink, details, title, buttonText]);
       writeBannerDates_(bannersSheet, bannersSheet.getLastRow(), rawFields.startDate, rawFields.endDate);
       logAudit(secureUser.Username, "SETTING_INSERT", "Added Setting " + type + ": " + url);
     }
@@ -3405,11 +3471,41 @@ function ensureNewsSheets_(ss) {
     } else {
       const cur = sh.getRange(1, 1, 1, p[1].length).getValues()[0].map(function(h) { return String(h).trim(); });
       if (cur.join('|') !== p[1].join('|')) throw new Error('หัวคอลัมน์ชีต ' + p[0] + ' ไม่ตรงกับที่ระบบกำหนด — แก้ให้ตรงหรือเปลี่ยนชื่อชีตเดิมก่อน');
+      if (p[0] === 'NewsCategories' || p[0] === 'News') migrateStatusColumn_(sh, 'Status'); // ค่าเก่า Active/Inactive → เปิด/ปิด
     }
   });
 }
 
 function newsStr_(v) { return (v === null || v === undefined) ? '' : String(v); }
+
+// สถานะเปิด/ปิด ของ NewsCategories และ AutoPromotions — ค่าที่เก็บคือ 'เปิด'/'ปิด' (เหมือนตารางอื่น); ยังอ่านค่าเก่า Active/Inactive ได้
+function statusOn_(v) { const t = newsStr_(v).trim().toLowerCase(); return t === 'เปิด' || t === 'active'; }
+function statusOff_(v) { const t = newsStr_(v).trim().toLowerCase(); return t === 'ปิด' || t === 'inactive'; }
+// ค่าจาก payload → 'เปิด'/'ปิด' (ว่าง = เปิด); ค่าอื่น = null (ไม่ถูกต้อง)
+function statusFromInput_(v) {
+  const t = newsStr_(v).trim();
+  if (t === '') return 'เปิด';
+  if (statusOn_(t)) return 'เปิด';
+  if (statusOff_(t)) return 'ปิด';
+  return null;
+}
+// แปลงค่าเก่า Active/Inactive ในคอลัมน์ที่กำหนดเป็น เปิด/ปิด (idempotent — เขียนเฉพาะเมื่อมีค่าที่ต้องแก้)
+function migrateStatusColumn_(sheet, headerName) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(h) { return String(h).trim(); });
+  const ci = headers.indexOf(headerName);
+  if (ci === -1) return 0;
+  const rng = sheet.getRange(2, ci + 1, sheet.getLastRow() - 1, 1);
+  const vals = rng.getValues();
+  let changed = 0;
+  vals.forEach(function(r) {
+    const t = newsStr_(r[0]).trim();
+    if (t.toLowerCase() === 'active') { r[0] = 'เปิด'; changed++; }
+    else if (t.toLowerCase() === 'inactive') { r[0] = 'ปิด'; changed++; }
+  });
+  if (changed > 0) rng.setValues(vals);
+  return changed;
+}
 
 function newsRowToObj_(r) {
   const start = bannerDateStr_(r[8]), end = bannerDateStr_(r[9]);
@@ -3417,7 +3513,7 @@ function newsRowToObj_(r) {
   return {
     id: newsStr_(r[0]).trim(), category: newsStr_(r[1]), title: newsStr_(r[2]), detail: newsStr_(r[3]),
     imageUrl: newsStr_(r[4]), link: newsStr_(r[5]), seq: isNaN(seq) ? 0 : seq,
-    status: newsStr_(r[7]) === 'Inactive' ? 'Inactive' : 'Active',
+    status: statusOff_(r[7]) ? 'ปิด' : 'เปิด',
     startDate: start, endDate: end, schedule: bannerScheduleState_(start, end),
     createdAt: newsStr_(r[10]), createdBy: newsStr_(r[11]), updatedAt: newsStr_(r[12]), updatedBy: newsStr_(r[13])
   };
@@ -3434,7 +3530,7 @@ function getLiveNews_(ss) {
   if (!sh || sh.getLastRow() < 2) return [];
   const rows = sh.getRange(2, 1, sh.getLastRow() - 1, NEWS_HEADERS_.length).getValues();
   return rows.map(newsRowToObj_)
-    .filter(function(n) { return n.id && n.title && n.status === 'Active' && n.schedule === 'live'; })
+    .filter(function(n) { return n.id && n.title && n.status === 'เปิด' && n.schedule === 'live'; })
     .sort(newsSort_).slice(0, 30)
     .map(function(n) { return { id: n.id, category: n.category, title: n.title, detail: n.detail.slice(0, 600), imageUrl: n.imageUrl, link: n.link, startDate: n.startDate, endDate: n.endDate }; });
 }
@@ -3445,7 +3541,7 @@ function newsList(secureUser, ss) {
   const nsh = ss.getSheetByName('News'), csh = ss.getSheetByName('NewsCategories');
   const news = nsh.getLastRow() < 2 ? [] : nsh.getRange(2, 1, nsh.getLastRow() - 1, NEWS_HEADERS_.length).getValues().map(newsRowToObj_).filter(function(n) { return n.id; }).sort(newsSort_);
   const cats = csh.getLastRow() < 2 ? [] : csh.getRange(2, 1, csh.getLastRow() - 1, 3).getValues()
-    .map(function(r) { return { id: newsStr_(r[0]).trim(), name: newsStr_(r[1]), status: newsStr_(r[2]) === 'Inactive' ? 'Inactive' : 'Active' }; })
+    .map(function(r) { return { id: newsStr_(r[0]).trim(), name: newsStr_(r[1]), status: statusOff_(r[2]) ? 'ปิด' : 'เปิด' }; })
     .filter(function(c) { return c.id; });
   const used = {};
   news.forEach(function(n) { used[n.category] = (used[n.category] || 0) + 1; });
@@ -3463,14 +3559,14 @@ function saveNews(payload, secureUser, ss) {
     payload = payload || {};
     ensureNewsSheets_(ss);
     const t = function(v) { return (v === null || v === undefined) ? '' : String(v).trim(); };
-    const f = { id: t(payload.id), category: t(payload.category), title: t(payload.title), detail: t(payload.detail), imageUrl: t(payload.imageUrl), link: t(payload.link), status: t(payload.status) || 'Active', startDate: t(payload.startDate), endDate: t(payload.endDate) };
+    const f = { id: t(payload.id), category: t(payload.category), title: t(payload.title), detail: t(payload.detail), imageUrl: t(payload.imageUrl), link: t(payload.link), status: statusFromInput_(payload.status), startDate: t(payload.startDate), endDate: t(payload.endDate) };
     if (!f.title) throw new Error('กรุณากรอกหัวข้อ');
     if (f.title.length > 150) throw new Error('หัวข้อยาวเกินไป (สูงสุด 150 ตัวอักษร)');
     if (f.detail.length > 5000) throw new Error('รายละเอียดยาวเกินไป (สูงสุด 5000 ตัวอักษร)');
     if (f.imageUrl.length > 1000 || f.link.length > 1000) throw new Error('ลิงก์ยาวเกินไป');
     if (f.imageUrl && !/^https?:\/\/[^\s<>"']+$/i.test(f.imageUrl)) throw new Error('ลิงก์รูปต้องขึ้นต้นด้วย http:// หรือ https://');
     if (f.link && !newsLinkOk_(f.link)) throw new Error('ลิงก์ปลายทางต้องขึ้นต้นด้วย http:// https:// หรือเป็น #เส้นทางในระบบ');
-    if (f.status !== 'Active' && f.status !== 'Inactive') throw new Error('สถานะไม่ถูกต้อง');
+    if (f.status === null) throw new Error('สถานะไม่ถูกต้อง');
     [['startDate', 'วันที่เริ่ม'], ['endDate', 'วันที่สิ้นสุด']].forEach(function(p) { if (f[p[0]] && !bannerDateValid_(f[p[0]])) throw new Error(p[1] + 'ไม่ถูกต้อง (รูปแบบ ปปปป-ดด-วว)'); });
     if (f.startDate && f.endDate && f.startDate > f.endDate) throw new Error('วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม');
     const seq = payload.seq === undefined || payload.seq === '' || payload.seq === null ? 0 : Number(payload.seq);
@@ -3576,10 +3672,10 @@ function saveNewsCategory(payload, secureUser, ss) {
     ensureNewsSheets_(ss);
     const id = payload.id ? String(payload.id).trim() : '';
     const name = payload.name ? String(payload.name).trim() : '';
-    const status = payload.status ? String(payload.status).trim() : 'Active';
+    const status = statusFromInput_(payload.status);
     if (!name) throw new Error('กรุณากรอกชื่อหมวดหมู่');
     if (name.length > 60) throw new Error('ชื่อหมวดหมู่ยาวเกินไป (สูงสุด 60 ตัวอักษร)');
-    if (status !== 'Active' && status !== 'Inactive') throw new Error('สถานะไม่ถูกต้อง');
+    if (status === null) throw new Error('สถานะไม่ถูกต้อง');
     const sh = ss.getSheetByName('NewsCategories');
     const last = sh.getLastRow();
     const rows = last < 2 ? [] : sh.getRange(2, 1, last - 1, 3).getValues();

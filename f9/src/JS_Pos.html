@@ -518,9 +518,9 @@ window.app.pos = {
       }
 
       // แสดงการ์ดโปรโมชั่นอัตโนมัติ (Bundle AutoPromotions) เสริมในแถบคูปอง
-      let autoRules = (window.app.globalData.autoPromotions || []).filter(r => (r.Status || '').toString().trim().toLowerCase() === 'active');
+      let autoRules = (window.app.globalData.autoPromotions || []).filter(r => window.app.statusOn(r.Status));
       if (autoRules.length === 0) {
-        autoRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'Active' }];
+        autoRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'เปิด' }];
       }
       autoRules.slice(0, 2).forEach(r => {
         const buyCat = (r['Buy Category'] || 'โมบาย').toString().trim();
@@ -1902,11 +1902,11 @@ window.app.pos = {
       let bundleBadge = '';
       {
         let bRules = (window.app.globalData.autoPromotions || []);
-        if (bRules.length === 0) bRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'Active' }];
+        if (bRules.length === 0) bRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'เปิด' }];
         const myCat = (variant.Category || '').toString().trim();
         let best = null;
         bRules.forEach(r => {
-          if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return;
+          if (!window.app.statusOn(r.Status)) return;
           if ((r['Get Discount Category'] || '').toString().trim() !== myCat) return;
           const badgeChRaw = (r['Channel'] || '').toString().trim();
           const badgeChTokens = badgeChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -2388,11 +2388,11 @@ window.app.pos = {
     // ไม่มีกติกาในชีต = ใช้ค่าเริ่มต้นเดียวกับ checkAutoPromotions (โมบาย -> อุปกรณ์เสริม 10%) แล้วจัดอันดับตามความเข้ากันได้กับสินค้าหลัก
     activeAutoRules_: function() {
       let rules = (window.app.globalData && window.app.globalData.autoPromotions) || [];
-      if (rules.length === 0) rules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'Active' }];
+      if (rules.length === 0) rules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'เปิด' }];
       const chSelEl = document.getElementById('posChannelSelect');
       const currentChannel = (chSelEl ? chSelEl.value : '').toString().trim().toLowerCase();
       return rules.filter(r => {
-        if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return false;
+        if (!window.app.statusOn(r.Status)) return false;
         const raw = (r['Channel'] || '').toString().trim();
         const toks = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
         return raw === '' || raw === '*' || raw.toLowerCase() === 'all' || toks.includes(currentChannel);
@@ -2547,7 +2547,7 @@ window.app.pos = {
             rules = [{
                 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10,
                 'Message Suggest': 'ลูกค้าซื้อมือถือแล้ว! เสนอขายอุปกรณ์เสริม (เคส/ฟิล์ม/หัวชาร์จ) ตอนนี้ <strong class="text-rose-900">รับส่วนลดอุปกรณ์เสริม 10% ทันที</strong> (ระบบคำนวณให้อัตโนมัติ)',
-                'Message Apply': 'ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว', 'Status': 'Active'
+                'Message Apply': 'ลูกค้าได้รับส่วนลดอุปกรณ์เสริม 10% เรียบร้อยแล้ว', 'Status': 'เปิด'
             }];
         }
         
@@ -2555,7 +2555,7 @@ window.app.pos = {
         const chSelEl = document.getElementById('posChannelSelect');
         const currentChannel = (chSelEl ? chSelEl.value : '').toString().trim().toLowerCase();
         let activeRules = rules.filter(r => {
-            if ((r.Status || '').toString().trim().toLowerCase() !== 'active') return false;
+            if (!window.app.statusOn(r.Status)) return false;
             const ruleChRaw = (r['Channel'] || '').toString().trim();
             const ruleChTokens = ruleChRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
             return ruleChRaw === '' || ruleChRaw === '*' || ruleChRaw.toLowerCase() === 'all' || ruleChTokens.includes(currentChannel);

@@ -283,7 +283,11 @@
                    <i class="fas fa-times text-xl"></i>
                  </button>
               </div>
-              <div id="popupBannerContent" class="w-full flex flex-col gap-4 max-h-[80vh] overflow-y-auto custom-scrollbar rounded-2xl">
+              <div class="popup-carousel w-full">
+                <div id="popupBannerContent" class="popup-track"></div>
+                <button type="button" id="popupPrev" class="popup-nav popup-nav-prev" aria-label="ก่อนหน้า" onclick="window.app.popupSlide(-1)"><i class="fas fa-chevron-left"></i></button>
+                <button type="button" id="popupNext" class="popup-nav popup-nav-next" aria-label="ถัดไป" onclick="window.app.popupSlide(1)"><i class="fas fa-chevron-right"></i></button>
+                <div id="popupBannerDots" class="popup-dots"></div>
               </div>
             </div>
           </div>
@@ -1249,52 +1253,50 @@
   </template>
 
   <template id="tmpl-datagrid">
-    <div class="flex flex-col mb-8">
-      <div class="tbleed-head bg-white">
-      <div class="border-b border-slate-200/80 p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div class="relative w-full sm:w-1/2 md:w-1/3">
-           <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
-           <input type="text" class="w-full pl-11 pr-10 py-2.5 bg-slate-100/80 border border-slate-200/50 rounded-xl text-sm font-medium focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none" id="gridSearch" placeholder="พิมพ์เพื่อค้นหาข้อมูล..." onkeyup="window.app.grid.filter()">
-           <button onclick="document.getElementById('gridSearch').value=''; window.app.grid.filter()" aria-label="ล้างคำค้นหา" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"><i class="fas fa-times-circle"></i></button>
-        </div>
-        <div class="flex flex-wrap w-full sm:w-auto items-center gap-2.5">
-          <!-- Export ตามที่กรอง/ค้นอยู่ (filteredDataList) — แสดงในหน้า Orders และ Products -->
-          <button class="hidden w-full sm:w-auto items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 font-bold border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-colors text-sm shadow-sm" id="gridExportBtn" onclick="window.app.grid.exportCSV()">
-             <i class="fas fa-file-csv"></i> Export CSV
+    <div class="cms-page cms-grid mb-8">
+      <div class="cms-head"><h1 id="gridTitle">จัดการข้อมูล</h1><span class="cms-crumb" id="gridCrumb"></span></div>
+      <div class="cms-card">
+        <div class="cms-actions">
+          <button type="button" class="cms-btn cms-btn-green" id="gridAddBtn" onclick="window.app.grid.handleAddClick()">
+            <i class="fas fa-plus" id="gridAddBtnIcon"></i> <span id="gridAddBtnLabel">เพิ่มข้อมูล</span>
           </button>
-          <button class="hidden w-full sm:w-auto items-center justify-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-800 font-bold border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors text-sm shadow-sm" id="gridBulkQuickBtn" onclick="window.app.productGroup.openBulkQuickEdit()">
-             <i class="fas fa-bolt text-amber-600"></i> แก้ไขราคา/สต๊อกด่วน
+          <button type="button" class="cms-btn cms-btn-red hidden" id="gridBulkDeleteBtn" onclick="window.app.grid.deleteSelected()">
+            <i class="fas fa-trash"></i> <span id="gridBulkDeleteLabel">ลบรายการที่เลือก</span>
           </button>
-          <button class="hidden w-full sm:w-auto items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 text-indigo-600 font-bold border border-indigo-100 rounded-xl hover:bg-indigo-100 transition-colors text-sm shadow-sm" id="gridImportBtn" onclick="window.app.grid.handleImportClick()">
-             <i class="fas fa-file-import"></i> นำเข้า CSV
+          <button type="button" class="cms-btn cms-btn-line hidden" id="gridBulkQuickBtn" onclick="window.app.productGroup.openBulkQuickEdit()">
+            <i class="fas fa-bolt"></i> แก้ไขราคา/สต๊อกด่วน
           </button>
-          <button class="w-full sm:w-auto btn-enterprise btn-enterprise-primary" id="gridAddBtn" onclick="window.app.grid.handleAddClick()">
-             <i class="fas fa-plus" id="gridAddBtnIcon"></i> <span id="gridAddBtnLabel">เพิ่มข้อมูล</span>
+          <button type="button" class="cms-btn cms-btn-line hidden" id="gridImportBtn" onclick="window.app.grid.handleImportClick()">
+            <i class="fas fa-file-import"></i> นำเข้า CSV
+          </button>
+          <button type="button" class="cms-btn cms-btn-line hidden" id="gridExportBtn" onclick="window.app.grid.exportCSV()">
+            <i class="fas fa-file-csv"></i> Export CSV
           </button>
         </div>
-      </div>
 
-      <!-- ตัวกรองเพิ่มเติม เฉพาะหน้า Orders (ประเภทการจอง / สถานะออเดอร์ / Category) — ซ่อนไว้เป็นค่าเริ่มต้น, grid.init() สลับ hidden/flex ตามตาราง -->
-      <div id="gridFilterBar" class="hidden w-full flex-wrap items-center gap-3 px-5 pb-4 border-b border-slate-100 bg-white">
-        <select id="gridFilterResStatus" onchange="window.app.grid.filter()" class="px-3 py-2 bg-slate-100/80 border border-slate-200/50 rounded-xl text-xs font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none">
-          <option value="">ประเภทการจอง: ทั้งหมด</option>
-        </select>
-        <select id="gridFilterOrderStatus" onchange="window.app.grid.filter()" class="px-3 py-2 bg-slate-100/80 border border-slate-200/50 rounded-xl text-xs font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none">
-          <option value="">สถานะออเดอร์: ทั้งหมด</option>
-        </select>
-        <select id="gridFilterCategory" onchange="window.app.grid.filter()" class="px-3 py-2 bg-slate-100/80 border border-slate-200/50 rounded-xl text-xs font-bold text-slate-600 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all outline-none">
-          <option value="">Category: ทั้งหมด</option>
-        </select>
-      </div>
-      </div>
+        <!-- ตัวกรองเพิ่มเติม เฉพาะหน้า Orders (ประเภทการจอง / สถานะออเดอร์ / Category) — grid.init() สลับ hidden/flex ตามตาราง -->
+        <div id="gridFilterBar" class="cms-search hidden">
+          <div class="cms-search-h">ตัวกรอง</div>
+          <div class="cms-search-b"><div class="cms-filters">
+            <div class="cms-fl"><label>ประเภทการจอง</label><select id="gridFilterResStatus" onchange="window.app.grid.filter()" class="cms-in"><option value="">ทั้งหมด</option></select></div>
+            <div class="cms-fl"><label>สถานะออเดอร์</label><select id="gridFilterOrderStatus" onchange="window.app.grid.filter()" class="cms-in"><option value="">ทั้งหมด</option></select></div>
+            <div class="cms-fl"><label>Category</label><select id="gridFilterCategory" onchange="window.app.grid.filter()" class="cms-in"><option value="">ทั้งหมด</option></select></div>
+          </div></div>
+        </div>
 
-      <div class="tbleed-body overflow-x-auto custom-scrollbar max-h-[75vh]">
-        <table class="w-full text-left border-collapse whitespace-nowrap" id="dataTable">
-          <thead id="dataGridHead" class="bg-indigo-50 relative z-20"></thead>
-          <tbody id="dataGridBody" class="divide-y divide-slate-100 bg-white relative z-0"></tbody>
-        </table>
+        <div class="cms-bar">
+          <label>แสดง <select class="cms-sel" id="gridPageSize" onchange="window.app.grid.setPageSize(this.value)"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select> แถว</label>
+          <label>ค้นหา : <input type="search" class="cms-quick" id="gridSearch" placeholder="พิมพ์เพื่อค้นหาข้อมูล..." onkeyup="window.app.grid.filter()" oninput="window.app.grid.filter()"></label>
+        </div>
+
+        <div class="cms-wrap custom-scrollbar" style="max-height:75vh;overflow:auto">
+          <table class="cms-table w-full text-left border-collapse whitespace-nowrap" id="dataTable">
+            <thead id="dataGridHead"></thead>
+            <tbody id="dataGridBody"></tbody>
+          </table>
+        </div>
+        <div id="gridPagination" class="cms-foot"></div>
       </div>
-      <div id="gridPagination" class="tbleed-foot"></div>
     </div>
 
     <div id="formModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="ฟอร์มจัดการข้อมูล">

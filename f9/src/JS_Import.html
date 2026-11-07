@@ -28,6 +28,19 @@
           'ช่องทางที่ใช้ในหน้าสั่งจองมาจากค่า Channel ของ <b>สาขา</b> การเพิ่มช่องทางในหน้านี้ไม่ทำให้ขึ้นในหน้าสั่งจองเอง'
         ]
       },
+      GiftMappings: {
+        label: 'ชุดของแถม',
+        requiredHeader: 'Target Mobile (SKU or Group)',
+        headers: ['Mapping ID', 'Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts', 'Status'],
+        example: ['', 'S24-Series', 'Retail', 'adapter, case', 'bag', 'เปิด'],
+        notes: [
+          'ต้องมี <b>Target Mobile (SKU or Group)</b> (SKU/ชื่อสินค้า/กลุ่มสินค้า หรือ * = ทุกรุ่น) และของแถมอย่างน้อยหนึ่งช่อง (<b>Brand Gifts</b> หรือ <b>Channel Gifts</b>)',
+          'เว้น <b>Mapping ID</b> ว่างได้ — ระบบออกเลขให้ต่อจากเลขสูงสุด (GM-001, GM-002, ...)',
+          '<b>Channel</b> เว้นว่างหรือ * = ทุกช่องทาง; หลายช่องทางคั่นด้วยจุลภาค — ชื่อที่ไม่ตรงกับช่องทางในระบบจะมีคำเตือน',
+          '<b>Status</b> เป็น เปิด / ปิด (เว้นว่าง = เปิด)',
+          'ชื่อของแถมหลายรายการคั่นด้วยจุลภาค'
+        ]
+      },
       Members: {
         label: 'สมาชิก',
         requiredHeader: 'Username',

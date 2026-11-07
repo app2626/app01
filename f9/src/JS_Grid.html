@@ -1,14 +1,24 @@
 <script>
 // Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
 window.app.grid = {
+    TITLES: { Products: 'จัดการสินค้า', Branches: 'จัดการสาขา', Channels: 'จัดการช่องทางขาย', Members: 'จัดการสมาชิก', GiftMappings: 'จัดการชุดของแถม', AutoPromotions: 'จัดการโปรโมชั่นอัตโนมัติ', Promotions: 'จัดการส่วนลดและโปรโมชั่น', Interests: 'จัดการความสนใจ', Coupons: 'จัดการโค้ดส่วนลด', Orders: 'รายการจอง', InventoryLog: 'ประวัติสต๊อก', AuditLog: 'ประวัติการใช้งาน' },
+    setPageSize: function(v) { const n = parseInt(v, 10); if (n > 0) { this.pageSize = n; this.renderPage(1); } },
+    BULK_TABLES: ['Products', 'Branches', 'Channels', 'Members', 'GiftMappings', 'AutoPromotions', 'Promotions'],
+    selected: {},
+    canBulk: function() { return !this.isReadonly && this.BULK_TABLES.indexOf(this.tableName) > -1; },
     tableName: '', idField: '', columns: [], dataList: [], filteredDataList: [], currentPage: 1, pageSize: 20, isReadonly: false, sortCol: '', sortAsc: true,
     init: async function(table, idCol, cols, readonly=false) {
-      this.tableName = table; this.idField = idCol; this.columns = cols; this.isReadonly = readonly;
+      this.tableName = table; this.idField = idCol; this.columns = cols; this.isReadonly = readonly; this.selected = {};
       const content = document.getElementById('page-content');
       const tmpl = document.getElementById('tmpl-datagrid');
       if(content && tmpl) content.innerHTML = tmpl.innerHTML;
       const btn = document.getElementById('gridAddBtn');
-      if(btn) btn.style.display = (readonly || table==='Orders') ? 'none' : 'flex';
+      if(btn) btn.style.display = (readonly || table==='Orders') ? 'none' : 'inline-flex';
+      const ttl = this.TITLES[table] || table;
+      const gt = document.getElementById('gridTitle'); if (gt) gt.textContent = ttl;
+      const gc = document.getElementById('gridCrumb'); if (gc) gc.textContent = 'ข้อมูลระบบ > ' + ttl;
+      const delBtn = document.getElementById('gridBulkDeleteBtn');
+      if (delBtn) { const on = this.canBulk(); delBtn.classList.toggle('hidden', !on); }
       // ปุ่มเพิ่มข้อมูลของ Products เปิดฟอร์มเพิ่มสินค้าแบบหลาย SKU แทนฟอร์มแถวเดียวทั่วไป (ดู grid.handleAddClick)
       const addBtnIcon = document.getElementById('gridAddBtnIcon');
       const addBtnLabel = document.getElementById('gridAddBtnLabel');
@@ -22,10 +32,10 @@ window.app.grid = {
         if (table === 'Products' && !readonly) { bulkBtn.classList.remove('hidden'); bulkBtn.classList.add('flex'); }
         else { bulkBtn.classList.add('hidden'); bulkBtn.classList.remove('flex'); }
       }
-      // ปุ่มนำเข้า CSV เฉพาะหน้า Products / Branches / Channels / Members (Admin — server ตรวจสิทธิ์ซ้ำ)
+      // ปุ่มนำเข้า CSV เฉพาะหน้า Products / Branches / Channels / Members / GiftMappings (Admin — server ตรวจสิทธิ์ซ้ำ)
       const impBtn = document.getElementById('gridImportBtn');
       if (impBtn) {
-        if (['Products', 'Branches', 'Channels', 'Members'].includes(table) && !readonly) { impBtn.classList.remove('hidden'); impBtn.classList.add('flex'); }
+        if (['Products', 'Branches', 'Channels', 'Members', 'GiftMappings'].includes(table) && !readonly) { impBtn.classList.remove('hidden'); impBtn.classList.add('flex'); }
         else { impBtn.classList.add('hidden'); impBtn.classList.remove('flex'); }
       }
       // ปุ่ม Export CSV หน้า Orders และ Products — สลับ hidden/flex เป็นคู่ ห้ามให้สอง class อยู่พร้อมกัน
@@ -37,15 +47,16 @@ window.app.grid = {
       // ตัวกรอง ประเภทการจอง/สถานะออเดอร์/Category — เฉพาะหน้า Orders
       const filterBar = document.getElementById('gridFilterBar');
       if (filterBar) {
-        if (table === 'Orders') { filterBar.classList.remove('hidden'); filterBar.classList.add('flex'); this.setupOrdersFilters(); }
-        else { filterBar.classList.add('hidden'); filterBar.classList.remove('flex'); }
+        if (table === 'Orders') { filterBar.classList.remove('hidden'); this.setupOrdersFilters(); }
+        else { filterBar.classList.add('hidden'); }
       }
 
       let h = '<tr>';
+      if (this.canBulk()) h += `<th class="cms-c-chk"><input type="checkbox" id="gridSelAll" aria-label="เลือกทั้งหน้า" onchange="window.app.grid.toggleAll(this.checked)"></th>`;
       this.columns.forEach(c => {
-        if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-left text-[11px] font-bold text-black uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-indigo-100 transition-colors ${c.resp || ''}">${c.label} <i class="fas fa-sort text-indigo-300 ml-1"></i></th>`;
+        if(c.type!=='hidden') h+=`<th onclick="window.app.grid.sortColumn('${c.key}')" class="cms-sortable${this.sortCol === c.key ? (this.sortAsc ? ' cms-asc' : ' cms-desc') : ''} ${c.resp || ''}">${c.label}</th>`;
       });
-      if(!readonly) h += `<th class="sticky top-0 z-20 bg-indigo-50 border-b border-indigo-100 py-3 px-4 text-right text-[11px] font-bold text-black uppercase tracking-wider whitespace-nowrap">จัดการ</th>`;
+      if(!readonly) h += `<th class="cms-c-act">จัดการ</th>`;
       h += '</tr>'; 
       const head = document.getElementById('dataGridHead');
       if(head) head.innerHTML = h; 
@@ -119,19 +130,16 @@ window.app.grid = {
       
       const pgContainer = document.getElementById('gridPagination');
       if (pgContainer) {
-        pgContainer.innerHTML = `<div class="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-slate-100 bg-white rounded-b-2xl gap-3">
-          <div class="text-xs font-medium text-slate-500">แสดง ${this.filteredDataList.length === 0 ? 0 : start + 1} ถึง ${Math.min(start + this.pageSize, this.filteredDataList.length)} จากทั้งหมด ${this.filteredDataList.length} รายการ</div>
-          <div class="flex items-center space-x-2">
-            <button onclick="window.app.grid.renderPage(${this.currentPage - 1})" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-xs font-bold transition-colors" ${this.currentPage === 1 ? 'disabled' : ''}>ก่อนหน้า</button>
-            <span class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-slate-50 rounded-lg border border-slate-100">หน้า ${this.currentPage} / ${totalPages}</span>
-            <button onclick="window.app.grid.renderPage(${this.currentPage + 1})" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-xs font-bold transition-colors" ${this.currentPage === totalPages ? 'disabled' : ''}>ถัดไป</button>
-          </div>
-        </div>`;
+        const cur = this.currentPage;
+        let pg = '<button type="button" class="cms-pg" onclick="window.app.grid.renderPage(' + (cur - 1) + ')"' + (cur <= 1 ? ' disabled' : '') + '>ก่อนหน้า</button>';
+        for (let q = Math.max(1, cur - 2); q <= Math.min(totalPages, cur + 2); q++) pg += '<button type="button" class="cms-pg' + (q === cur ? ' cms-pg-on' : '') + '" onclick="window.app.grid.renderPage(' + q + ')">' + q + '</button>';
+        pg += '<button type="button" class="cms-pg" onclick="window.app.grid.renderPage(' + (cur + 1) + ')"' + (cur >= totalPages ? ' disabled' : '') + '>ถัดไป</button>';
+        pgContainer.innerHTML = '<div>แสดง ' + (this.filteredDataList.length === 0 ? 0 : start + 1) + ' ถึง ' + Math.min(start + this.pageSize, this.filteredDataList.length) + ' จากทั้งหมด ' + this.filteredDataList.length + ' รายการ</div><div class="cms-pager">' + pg + '</div>';
       }
     },
     // จำนวนคอลัมน์ที่แสดงจริง (ใช้เป็น colspan ของ empty/error state)
     visibleColCount: function() {
-      return this.columns.filter(c => c.type !== 'hidden').length + (this.isReadonly ? 0 : 1);
+      return this.columns.filter(c => c.type !== 'hidden').length + (this.isReadonly ? 0 : 1) + (this.canBulk() ? 1 : 0);
     },
     renderTable: function(data, startOffset) {
       startOffset = startOffset || 0;
@@ -166,7 +174,11 @@ window.app.grid = {
       data.forEach((row, index) => {
         // ตำแหน่งจริงใน filteredDataList — index ภายในหน้าเคยทำให้เปิดแก้ผิดเรคอร์ดเมื่ออยู่หน้า 2+ หรือหลังค้นหา/เรียงลำดับ
         const absIndex = startOffset + index;
-        let tr = '<tr class="hover:bg-slate-50 transition-colors">';
+        let tr = '<tr' + (this.canBulk() && this.selected[String(row[this.idField] === undefined || row[this.idField] === null ? '' : row[this.idField])] ? ' class="cms-sel-row"' : '') + '>';
+        if (this.canBulk()) {
+          const rid = String(row[this.idField] === undefined || row[this.idField] === null ? '' : row[this.idField]);
+          tr += `<td class="cms-c-chk"><input type="checkbox" class="grid-sel" aria-label="เลือกรายการ" data-id="${window.app.esc(rid)}" ${this.selected[rid] ? 'checked' : ''} onchange="window.app.grid.toggleOne(this)"></td>`;
+        }
         this.columns.forEach(c => {
           if(c.type==='hidden') return; let val = window.app.esc(row[c.key] || '');
           if(c.key==='Password') val = '********';
@@ -177,8 +189,8 @@ window.app.grid = {
               if (String(val).length === 13) val = String(val).substring(0,1) + '-' + String(val).substring(1,5) + '-' + String(val).substring(5,10) + '-' + String(val).substring(10,12) + '-' + String(val).substring(12,13);
           }
           else if(c.key==='Order Status' || c.key==='Status') { 
-              let clr = val==='เปิด'||val==='Completed'?'emerald':(val==='Pending'?'amber':'slate'); 
-              val=`<span class="px-2.5 py-1 rounded-md text-[10px] font-bold bg-${clr}-100 text-${clr}-700 border border-${clr}-200">${val}</span>`; 
+              let clr = val==='เปิด'||val==='Completed'?'cms-b-green':(val==='Pending'?'cms-b-amber':'cms-b-gray'); 
+              val=`<span class="cms-badge ${clr}">${val}</span>`; 
           }
           if(c.key==='Image URL' && val.length>30) val = val.substring(0,30)+'...';
           // Orders: ติด icon หน้าชื่อสินค้าให้แถวส่วนลด/ของแถม อ่านบิลหลายแถวต่อ OrderID ง่ายขึ้น
@@ -188,24 +200,78 @@ window.app.grid = {
             if(row.SKU === 'DISCOUNT') val = '<i class="fas fa-tag text-rose-500 mr-1.5" title="ส่วนลด" aria-label="ส่วนลด"></i>' + val;
             else if(num('Unit Price') === 0 && num('Row Total') === 0) val = '<i class="fas fa-gift text-emerald-500 mr-1.5" title="ของแถม" aria-label="ของแถม"></i>' + val;
           }
-          tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-[11px] text-slate-700 whitespace-nowrap ${c.resp || ''}">${val}</td>`;
+          tr += `<td class="${c.resp || ''}">${val}</td>`;
         });
         if(!this.isReadonly) {
-            let act = `<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-colors shadow-sm" onclick="window.app.grid.editForm(${absIndex})" title="แก้ไข" aria-label="แก้ไขรายการ"><i class="fas fa-edit"></i></button>`;
+            let act = `<button type="button" class="cms-ico" onclick="window.app.grid.editForm(${absIndex})" title="แก้ไข" aria-label="แก้ไขรายการ"><i class="fas fa-pen"></i></button>`;
             if (this.tableName === 'Orders') {
                 const safeOrderId = window.app.esc(String(row.OrderID || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
-                act += `<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-sm ml-2" onclick="window.app.grid.reprintOrder('${safeOrderId}')" title="พิมพ์ใบจอง" aria-label="พิมพ์ใบจอง"><i class="fas fa-print"></i></button>`;
+                act += `<button type="button" class="cms-ico" onclick="window.app.grid.reprintOrder('${safeOrderId}')" title="พิมพ์ใบจอง" aria-label="พิมพ์ใบจอง"><i class="fas fa-print"></i></button>`;
             }
             if (!(window.app.user.Role === 'Manager' && this.tableName === 'Orders')) {
                 const safeId = window.app.esc(String(row[this.idField] || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
-                act+=`<button class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm ml-2" onclick="window.app.grid.deleteRecord('${safeId}')" title="ลบ" aria-label="ลบรายการ"><i class="fas fa-trash"></i></button>`;
+                act+=`<button type="button" class="cms-ico cms-ico-red" onclick="window.app.grid.deleteRecord('${safeId}')" title="ลบ" aria-label="ลบรายการ"><i class="fas fa-trash"></i></button>`;
             }
-            tr += `<td class="py-2.5 px-4 border-b border-slate-100 text-right whitespace-nowrap">${act}</td>`;
+            tr += `<td class="cms-c-act">${act}</td>`;
         }
         tr += '</tr>'; 
         tbodyHtml += tr;
       });
       tbody.innerHTML = tbodyHtml;
+      this.syncSelection();
+    },
+    // ===== เลือกหลายรายการเพื่อลบ (เฉพาะตารางใน BULK_TABLES; server ตรวจสิทธิ์ Admin ซ้ำ) =====
+    toggleOne: function(el) {
+      const id = el.getAttribute('data-id');
+      if (el.checked) this.selected[id] = true; else delete this.selected[id];
+      this.syncSelection();
+    },
+    toggleAll: function(on) {
+      document.querySelectorAll('#dataGridBody .grid-sel').forEach(cb => {
+        cb.checked = on;
+        const id = cb.getAttribute('data-id');
+        if (on) this.selected[id] = true; else delete this.selected[id];
+      });
+      this.syncSelection();
+    },
+    clearSelection: function() {
+      this.selected = {};
+      document.querySelectorAll('#dataGridBody .grid-sel').forEach(cb => { cb.checked = false; });
+      this.syncSelection();
+    },
+    syncSelection: function() {
+      const n = Object.keys(this.selected).length;
+      const dl = document.getElementById('gridBulkDeleteLabel');
+      if (dl) dl.textContent = 'ลบรายการที่เลือก' + (n ? ' (' + n + ')' : '');
+      document.querySelectorAll('#dataGridBody .grid-sel').forEach(cb => { const tr = cb.closest('tr'); if (tr) tr.classList.toggle('cms-sel-row', cb.checked); });
+      const all = document.getElementById('gridSelAll');
+      if (all) {
+        const boxes = document.querySelectorAll('#dataGridBody .grid-sel');
+        const chk = Array.prototype.filter.call(boxes, b => b.checked).length;
+        all.checked = boxes.length > 0 && chk === boxes.length;
+        all.indeterminate = chk > 0 && chk < boxes.length;
+      }
+    },
+    deleteSelected: async function() {
+      const ids = Object.keys(this.selected);
+      if (!this.canBulk()) return;
+      if (ids.length === 0) { Swal.fire({ icon: 'info', title: 'ยังไม่ได้เลือกรายการ', text: 'ติ๊กเลือกรายการที่ต้องการลบก่อน', confirmButtonText: 'ตกลง' }); return; }
+      const r = await Swal.fire({ title: 'ลบ ' + ids.length + ' รายการที่เลือก?', text: 'การดำเนินการนี้ไม่สามารถย้อนกลับได้', icon: 'warning', showCancelButton: true, confirmButtonColor: '#e11d48', confirmButtonText: 'ลบ ' + ids.length + ' รายการ', cancelButtonText: 'ยกเลิก' });
+      if (!r.isConfirmed) return;
+      window.app.showLoading('กำลังลบ ' + ids.length + ' รายการ...');
+      try {
+        const res = await window.app.api('DELETE_RECORDS', { tableName: this.tableName, idValues: ids });
+        window.app.hideLoading();
+        if (res && res.status === 'success') {
+          this.selected = {};
+          await window.app.refreshGlobalData();
+          let msg = 'ลบแล้ว ' + res.deleted + ' รายการ';
+          if (res.protectedIds && res.protectedIds.length) msg += ' (ข้ามบัญชีของตัวเอง)';
+          if (res.notFound && res.notFound.length) msg += ' · ไม่พบ ' + res.notFound.length + ' รายการ';
+          Swal.fire({ icon: 'success', title: msg, showConfirmButton: false, timer: 1800 });
+          this.loadData();
+        } else Swal.fire('Error', res ? res.message : 'Error', 'error');
+      } catch (e) { window.app.hideLoading(); Swal.fire('Error', e.message || 'Error', 'error'); }
     },
     filter: function() {
       const input = document.getElementById('gridSearch'); if(!input) return;

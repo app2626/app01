@@ -967,6 +967,9 @@ window.app = {
     }
   },
 
+  // สถานะ เปิด/ปิด ของ AutoPromotions (ค่าเก่า Active ยังนับเป็นเปิด)
+  statusOn: function(v) { const t = (v === null || v === undefined ? '' : String(v)).trim().toLowerCase(); return t === 'เปิด' || t === 'active'; },
+
   showPopupBanner: function() {
     if(!this.globalData.popupBanners || this.globalData.popupBanners.length === 0) return;
     if(sessionStorage.getItem('tg_popup_shown')) return;
@@ -983,7 +986,7 @@ window.app = {
                 let img = this.esc(this.formatImageUrl(item.url));
                 let linkTag = item.link ? `<a href="${this.esc(item.link)}" target="_blank" class="block w-full h-full cursor-pointer">` : '';
                 let endLinkTag = item.link ? `</a>` : '';
-                html += `${linkTag}<img src="${img}" class="w-full h-auto object-contain rounded-2xl shadow-lg border border-white/10">${endLinkTag}`;
+                html += `<div class="popup-slide">${linkTag}<img src="${img}" class="w-full h-auto object-contain rounded-2xl shadow-lg border border-white/10">${endLinkTag}</div>`;
                 return;
             }
             // มีหัวข้อ/คำอธิบาย/ปุ่ม CTA อย่างน้อย 1 อย่าง — แสดงเป็นการ์ด (พอร์ตแนวคิดจาก pbzf8's PromoPopupModal.jsx, 2026-09-19)
@@ -992,26 +995,75 @@ window.app = {
                 ? `<a href="${this.esc(item.link)}" target="_blank" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors">${this.esc(item.buttonText)}</a>`
                 : `<button type="button" onclick="window.app.closePopupBanner()" class="text-sm text-slate-400 hover:text-slate-600 font-medium">ปิดหน้าต่างนี้</button>`;
             html += `
-              <div class="w-full bg-white rounded-2xl shadow-lg overflow-hidden">
+              <div class="popup-slide"><div class="w-full bg-white rounded-2xl shadow-lg overflow-hidden">
                 <img src="${img}" class="w-full aspect-video object-cover">
                 <div class="p-6 text-center">
                   ${item.title ? `<h2 class="text-xl font-bold text-slate-800 mb-2">${this.esc(item.title)}</h2>` : ''}
                   ${item.details ? `<p class="text-sm text-slate-500 leading-relaxed mb-5 whitespace-pre-wrap">${this.esc(item.details)}</p>` : ''}
                   ${ctaHtml}
                 </div>
-              </div>
+              </div></div>
             `;
         });
         content.innerHTML = html;
+        this.popupInitCarousel_();
         modal.classList.remove('hidden');
+        this.popupSync_();
         document.body.style.overflow = 'hidden';
         sessionStorage.setItem('tg_popup_shown', 'true');
     }
   },
 
+  // Popup หลายหน้า = สไลด์ไปด้านข้าง (CSS scroll-snap แนวนอน + ลูกศร + จุดบอกตำแหน่ง); มีหน้าเดียวซ่อนตัวควบคุมทั้งหมด
+  popupInitCarousel_: function() {
+    const track = document.getElementById('popupBannerContent');
+    const dots = document.getElementById('popupBannerDots');
+    if (!track || !dots) return;
+    const n = track.children.length;
+    this.popupIdx = 0;
+    track.style.transform = 'translateX(0)';
+    dots.innerHTML = Array.from({length: n}, (_, i) => `<button type="button" class="popup-dot" aria-label="หน้า ${i + 1}" onclick="window.app.popupGo(${i})"></button>`).join('');
+    document.getElementById('popupBannerModal').classList.toggle('popup-multi', n > 1);
+    if (!track._popupBound) {
+      track._popupBound = true;
+      let x0 = null;
+      track.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; window.app.popupStop_(); }, {passive: true});
+      track.addEventListener('touchend', e => {
+        if (x0 === null) return;
+        const dx = e.changedTouches[0].clientX - x0; x0 = null;
+        if (Math.abs(dx) > 40) window.app.popupSlide(dx < 0 ? 1 : -1);
+        window.app.popupAuto_();
+      }, {passive: true});
+      const car = track.parentNode;
+      car.addEventListener('mouseenter', () => window.app.popupStop_());
+      car.addEventListener('mouseleave', () => window.app.popupAuto_());
+    }
+    this.popupAuto_();
+  },
+  popupStop_: function() { if (this.popupTimer) { clearInterval(this.popupTimer); this.popupTimer = null; } },
+  popupAuto_: function() {
+    this.popupStop_();
+    const track = document.getElementById('popupBannerContent');
+    if (track && track.children.length > 1) this.popupTimer = setInterval(() => this.popupSlide(1), 5000);
+  },
+  popupSync_: function() {
+    document.querySelectorAll('#popupBannerDots .popup-dot').forEach((d, k) => d.classList.toggle('active', k === this.popupIdx));
+  },
+  popupGo: function(i) {
+    const track = document.getElementById('popupBannerContent');
+    if (!track) return;
+    const n = track.children.length;
+    if (!n) return;
+    this.popupIdx = ((i % n) + n) % n;
+    track.style.transform = 'translateX(-' + (this.popupIdx * 100) + '%)';
+    this.popupSync_();
+  },
+  popupSlide: function(dir) { this.popupGo((this.popupIdx || 0) + dir); },
+
   closePopupBanner: function() {
     const modal = document.getElementById('popupBannerModal');
     if(modal) {
+        this.popupStop_();
         modal.classList.add('hidden');
         document.body.style.overflow = '';
     }
@@ -1528,7 +1580,7 @@ window.app = {
             { key: 'Discount Percent', label: 'เปอร์เซ็นต์ส่วนลด (%)', type: 'number' },
             { key: 'Message Suggest', label: 'ข้อความเชียร์ขาย (รองรับ HTML)', type: 'text' },
             { key: 'Message Apply', label: 'ข้อความเมื่อได้รับส่วนลด (รองรับ HTML)', type: 'text' },
-            { key: 'Status', label: 'สถานะ', type: 'select', options: ['Active', 'Inactive'] },
+            { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] },
             { key: 'Channel', label: 'ช่องทางที่ร่วมรายการ (เว้นว่าง = ทุกช่องทาง)', type: 'multi_select_channel' }
           ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
         case 'giftmappings': 

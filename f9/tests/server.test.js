@@ -371,6 +371,52 @@ t('import branches: adds new codes only; Channel/Name required; dup + in-file du
     eq(unwrap(imp('Branches', rows, false)).created, 0, 're-import idempotent');
   } finally { restore(); }
 });
+t('import gift mappings: auto-numbers GM-nnn after highest; target + at least one gift required; Status normalised; unknown channel warned; formulas neutralised', () => {
+  const restore = importSnap(['GiftMappings']); const gh = sheets.GiftMappings.rows[0], before = sheets.GiftMappings.rows.length;
+  const T = 'Target Mobile (SKU or Group)';
+  const rows = [
+    { 'Mapping ID': '', [T]: 'ZZ-Series', Channel: 'NOPE-CH', 'Brand Gifts': 'adapter, case', 'Channel Gifts': '', Status: '' },
+    { 'Mapping ID': 'GM-900', [T]: '*', Channel: '', 'Brand Gifts': '', 'Channel Gifts': 'bag', Status: 'ปิด' },
+    { 'Mapping ID': '', [T]: '', Channel: '', 'Brand Gifts': 'x', Status: 'เปิด' },
+    { 'Mapping ID': '', [T]: 'AA', Channel: '', 'Brand Gifts': '', 'Channel Gifts': '', Status: 'เปิด' },
+    { 'Mapping ID': '', [T]: 'BB', Channel: '', 'Brand Gifts': 'x', Status: 'maybe' },
+    { 'Mapping ID': '', [T]: '=evil', Channel: '', 'Brand Gifts': '+bad', Status: 'Inactive' },
+    { 'Mapping ID': 'GM-900', [T]: 'dup', Channel: '', 'Brand Gifts': 'x' }
+  ];
+  try {
+    const dry = unwrap(imp('GiftMappings', rows, true));
+    eq([dry.created, dry.skippedCount, dry.errorCount], [3, 1, 3], JSON.stringify(dry));
+    ok(dry.warnings.some(w => /NOPE-CH/.test(w.reason)), 'unknown channel warning');
+    eq(sheets.GiftMappings.rows.length, before, 'dryRun must not write');
+    unwrap(imp('GiftMappings', rows, false));
+    const added = sheets.GiftMappings.rows.slice(before).map(r => { const o = {}; gh.forEach((h, i) => { o[h] = r[i]; }); return o; });
+    eq(added.map(o => o['Status']), ['เปิด', 'ปิด', 'ปิด']);
+    ok(/^GM-\d{3,}$/.test(added[0]['Mapping ID']) && added[1]['Mapping ID'] === 'GM-900', JSON.stringify(added.map(o => o['Mapping ID'])));
+    ok(!added.some(o => String(o[T]).startsWith('=') || String(o['Brand Gifts']).startsWith('+')), 'free text neutralised');
+    eq(imp('GiftMappings', rows, true, sales).status, 'error', 'Admin only');
+  } finally { restore(); }
+});
+t('bulk delete: Admin only, whitelisted tables, server-side id column, max 200, removes only chosen rows, reports notFound, keeps own account, busts cache', () => {
+  const del = (table, ids, who) => api('DELETE_RECORDS', { tableName: table, idField: 'ignored', idValues: ids }, who || admin);
+  eq(del('Channels', ['x'], sales).status, 'error', 'Admin only');
+  ['Orders', 'Settings', 'AuditLog', '__proto__', ''].forEach(tb => eq(del(tb, ['x']).status, 'error', 'table ' + tb));
+  eq(del('Channels', []).status, 'error', 'empty selection');
+  eq(del('Channels', Array.from({ length: 201 }, (_, i) => 'C' + i)).status, 'error', 'over max');
+  const restore = importSnap(['Channels', 'Members']);
+  try {
+    const rows = [1, 2, 3, 4].map(i => ({ 'Channel ID': 'BD-' + i, 'Channel Name': 'Bulk ' + i, Description: '' }));
+    unwrap(imp('Channels', rows, false));
+    const ch = sheets.Channels.rows[0], idCol = ch.indexOf('Channel ID'), before = sheets.Channels.rows.length;
+    const res = unwrap(del('Channels', ['BD-1', 'BD-3', 'BD-3', 'NOPE']));
+    eq(res.deleted, 2); eq(res.notFound, ['NOPE']);
+    eq(sheets.Channels.rows.length, before - 2);
+    const left = sheets.Channels.rows.slice(1).map(r => r[idCol]);
+    ok(left.indexOf('BD-2') > -1 && left.indexOf('BD-4') > -1 && left.indexOf('BD-1') === -1 && left.indexOf('BD-3') === -1, JSON.stringify(left));
+    ok(!unwrap(api('GET_ALL_DATA', {}, admin)).channels.some(c => c['Channel ID'] === 'BD-1'), 'cache busted');
+    const mh = sheets.Members.rows[0], self = sheets.Members.rows.slice(1).map(r => r[mh.indexOf('Username')]).filter(u => String(u).toLowerCase() === 'admin')[0];
+    ok(self, 'seeded admin present'); const r2 = unwrap(del('Members', [self])); eq(r2.deleted, 0); eq(r2.protectedIds, [self]);
+  } finally { restore(); }
+});
 t('import channels: blank ID auto-numbers after the highest CH-nn; explicit IDs kept; dup ID skipped; duplicate name warned', () => {
   const restore = importSnap(['Channels']); const ch = sheets.Channels.rows[0], before = sheets.Channels.rows.length;
   const ids = sheets.Channels.rows.slice(1).map(r => String(r[ch.indexOf('Channel ID')]));
@@ -463,6 +509,30 @@ t('news: categories — name required/unique (case-insensitive), rename cascades
     eq(newsLoad().categories.map(c => c.name), ['We are family']);
   } finally { restore(); }
 });
+t('status wording: NewsCategories + AutoPromotions store เปิด/ปิด; old Active/Inactive still read and are migrated', () => {
+  const restore = newsSnap();
+  try {
+    const c1 = unwrap(api('NEWS_CAT_SAVE', { name: 'สถานะ-ทดสอบ' }, admin));
+    eq(newsLoad().categories.filter(c => c.id === c1.id)[0].status, 'เปิด', 'default is เปิด');
+    unwrap(api('NEWS_CAT_SAVE', { id: c1.id, name: 'สถานะ-ทดสอบ', status: 'ปิด' }, admin));
+    eq(sheets.NewsCategories.rows.filter(r => r[0] === c1.id)[0][2], 'ปิด', 'stored as ปิด');
+    unwrap(api('NEWS_CAT_SAVE', { id: c1.id, name: 'สถานะ-ทดสอบ', status: 'Active' }, admin));
+    eq(sheets.NewsCategories.rows.filter(r => r[0] === c1.id)[0][2], 'เปิด', 'legacy input normalised');
+    eq(api('NEWS_CAT_SAVE', { id: c1.id, name: 'สถานะ-ทดสอบ', status: 'maybe' }, admin).status, 'error');
+    sheets.NewsCategories.rows.filter(r => r[0] === c1.id)[0][2] = 'Inactive';
+    eq(newsLoad().categories.filter(c => c.id === c1.id)[0].status, 'ปิด', 'legacy Inactive read as ปิด');
+    newsLoad(); // ensureNewsSheets_ migrates
+    eq(sheets.NewsCategories.rows.filter(r => r[0] === c1.id)[0][2], 'ปิด', 'legacy value migrated in sheet');
+  } finally { restore(); }
+  const ap = sheets.AutoPromotions, st = ap.rows[0].indexOf('Status');
+  ok(ap.rows.slice(1).every(r => r[st] === 'เปิด' || r[st] === 'ปิด'), 'seed uses เปิด/ปิด: ' + JSON.stringify(ap.rows.slice(1).map(r => r[st])));
+  const keep = ap.rows[1][st];
+  try {
+    ap.rows[1][st] = 'Active'; ap.rows[2] && (ap.rows[2][st] = 'Inactive');
+    const res = unwrap(api('GET_TABLE', { tableName: 'AutoPromotions' }, admin));
+    eq(res.data.slice(0, 2).map(r => r.Status), ['เปิด', ap.rows[2] ? 'ปิด' : undefined].slice(0, res.data.length >= 2 ? 2 : 1));
+  } finally { ap.rows[1][st] = keep; }
+});
 t('news: save validation — title/category required, category must exist, links http(s)/#route only, dates/seq/status checked, nothing written on failure', () => {
   const restore = newsSnap();
   try {
@@ -494,7 +564,7 @@ t('news: create/edit/seq/order; formula text neutralised; creator+updater record
     eq(api('NEWS_SET_SEQ', { id: 'ghost', seq: 1 }, admin).status, 'error');
     unwrap(api('NEWS_SAVE', { id: b.id, category: 'A', title: 'B2', seq: 1, status: 'Inactive' }, admin));
     list = newsLoad().news; const b2 = list.find(n => n.id === b.id);
-    eq([b2.title, b2.status, b2.updatedBy], ['B2', 'Inactive', 'admin']);
+    eq([b2.title, b2.status, b2.updatedBy], ['B2', 'ปิด', 'admin']);
     ok(typeof sheets.News.rows[1][8] === 'string', 'start date stored as text');
     eq(api('NEWS_SAVE', { id: 'ghost', category: 'A', title: 'x' }, admin).status, 'error', 'unknown id must not create');
     ok(!JSON.stringify(sheets.AuditLog.rows).includes('+evil'), 'detail text not copied into AuditLog');

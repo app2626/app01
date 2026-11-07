@@ -8,7 +8,7 @@
     kind: null,
     PAGE_SIZES: [10, 25, 50, 100],
     TYPE_LABEL: { herobanner: 'แบนเนอร์หลัก (Hero)', promogrid: 'แบนเนอร์โปรโมชัน (Grid)', popupbanner: 'ป๊อปอัป (Popup)' },
-    STATE_LABEL: { live: 'แสดงอยู่', upcoming: 'รอแสดง', expired: 'หมดอายุ', inactive: 'ปิดใช้งาน' },
+    STATE_LABEL: { live: 'แสดงอยู่', upcoming: 'รอแสดง', expired: 'หมดอายุ', inactive: 'ปิด' },
     STATE_CLS: { live: 'cms-b-green', upcoming: 'cms-b-amber', expired: 'cms-b-gray', inactive: 'cms-b-red' },
 
     esc: function(v) { return window.app.esc(v === null || v === undefined ? '' : String(v)); },
@@ -116,12 +116,12 @@
             const res = await window.app.api('NEWS_LIST', {});
             if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'โหลดข่าวสารไม่สำเร็จ');
             st.cats = res.data.categories || [];
-            st.rows = (res.data.news || []).map(function(n) { return Object.assign({ key: n.id, state: n.status === 'Inactive' ? 'inactive' : n.schedule }, n); });
+            st.rows = (res.data.news || []).map(function(n) { return Object.assign({ key: n.id, state: n.status === 'ปิด' ? 'inactive' : n.schedule }, n); });
           },
           filters: [
             { key: 'q', label: 'หัวข้อ', type: 'text', test: function(r, v) { return r.title.toLowerCase().indexOf(v.toLowerCase()) !== -1; } },
             { key: 'cat', label: 'หมวดหมู่', type: 'select', options: function(st) { return (st.cats || []).map(function(c) { return [c.name, c.name]; }); }, test: function(r, v) { return r.category === v; } },
-            { key: 'state', label: 'สถานะ', type: 'select', options: function() { return [['live', 'แสดงอยู่'], ['upcoming', 'รอแสดง'], ['expired', 'หมดอายุ'], ['inactive', 'ปิดใช้งาน']]; }, test: function(r, v) { return r.state === v; } },
+            { key: 'state', label: 'สถานะ', type: 'select', options: function() { return [['live', 'แสดงอยู่'], ['upcoming', 'รอแสดง'], ['expired', 'หมดอายุ'], ['inactive', 'ปิด']]; }, test: function(r, v) { return r.state === v; } },
             { key: 'from', label: 'วันที่เริ่มต้น (ตั้งแต่)', type: 'date', test: function(r, v) { return !!r.startDate && r.startDate >= v; } },
             { key: 'to', label: 'วันที่สิ้นสุด (ถึง)', type: 'date', test: function(r, v) { return !!r.endDate && r.endDate <= v; } },
             { key: 'by', label: 'สร้างโดย', type: 'text', test: function(r, v) { return r.createdBy.toLowerCase().indexOf(v.toLowerCase()) !== -1; } }
@@ -147,13 +147,13 @@
             return res.deleted;
           },
           canEdit: function(st) {
-            if ((st.cats || []).some(function(c) { return c.status !== 'Inactive'; })) return true;
+            if ((st.cats || []).some(function(c) { return c.status !== 'ปิด'; })) return true;
             Swal.fire({ icon: 'info', title: 'ยังไม่มีหมวดหมู่', text: 'ต้องสร้างหมวดหมู่ข่าวก่อนจึงจะเพิ่มข่าวได้', confirmButtonText: 'ไปหน้าจัดการหมวดหมู่', showCancelButton: true, cancelButtonText: 'ปิด' })
               .then(function(r) { if (r.isConfirmed) window.location.hash = '#newscats'; });
             return false;
           },
           editForm: function(r, st) {
-            const cats = (st.cats || []).filter(function(c) { return c.status !== 'Inactive' || (r && r.category === c.name); });
+            const cats = (st.cats || []).filter(function(c) { return c.status !== 'ปิด' || (r && r.category === c.name); });
             const sel = '<select id="cmsCat" class="cms-in">' + cats.map(function(c) { return '<option value="' + self.esc(c.name) + '"' + (r && r.category === c.name ? ' selected' : '') + '>' + self.esc(c.name) + '</option>'; }).join('') + '</select>';
             return self.field('หมวดหมู่', sel)
               + self.field('หัวข้อ *', '<input id="cmsTitle" class="cms-in" maxlength="150" value="' + self.esc(r ? r.title : '') + '">')
@@ -161,9 +161,9 @@
               + self.imageField(r ? r.imageUrl : '')
               + self.field('ลิงก์ (http(s) หรือ #หน้า)', '<input id="cmsLink" class="cms-in" maxlength="1000" value="' + self.esc(r ? r.link : '') + '">')
               + '<div class="cms-two">' + self.field('ลำดับ (Seq)', '<input type="number" min="0" max="9999" id="cmsSeq" class="cms-in" value="' + self.esc(r ? r.seq : 0) + '">')
-              + self.field('สถานะ', '<select id="cmsStatus" class="cms-in"><option value="Active"' + (!r || r.status === 'Active' ? ' selected' : '') + '>ใช้งาน</option><option value="Inactive"' + (r && r.status === 'Inactive' ? ' selected' : '') + '>ปิดใช้งาน</option></select>') + '</div>'
+              + self.field('สถานะ', '<select id="cmsStatus" class="cms-in"><option value="เปิด"' + (!r || r.status !== 'ปิด' ? ' selected' : '') + '>เปิด</option><option value="ปิด"' + (r && r.status === 'ปิด' ? ' selected' : '') + '>ปิด</option></select>') + '</div>'
               + '<div class="cms-two">' + self.field('วันที่เริ่ม', '<input type="date" id="cmsStart" class="cms-in" value="' + self.esc(r ? r.startDate : '') + '">') + self.field('วันที่สิ้นสุด (รวมวันนั้น)', '<input type="date" id="cmsEnd" class="cms-in" value="' + self.esc(r ? r.endDate : '') + '">') + '</div>'
-              + '<p class="cms-hint">ข่าวแสดงหน้าร้านเมื่อสถานะ "ใช้งาน" และอยู่ในช่วงวันที่ · Seq น้อยขึ้นก่อน · เว้นวันที่ว่าง = ไม่จำกัด</p>';
+              + '<p class="cms-hint">ข่าวแสดงหน้าร้านเมื่อสถานะ "เปิด" และอยู่ในช่วงวันที่ · Seq น้อยขึ้นก่อน · เว้นวันที่ว่าง = ไม่จำกัด</p>';
           },
           readForm: function(r) {
             const g = function(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
@@ -186,17 +186,17 @@
           load: async function(st) {
             const res = await window.app.api('NEWS_LIST', {});
             if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'โหลดหมวดหมู่ไม่สำเร็จ');
-            st.rows = (res.data.categories || []).map(function(c) { return Object.assign({ key: c.id, state: c.status === 'Inactive' ? 'inactive' : 'live' }, c); });
+            st.rows = (res.data.categories || []).map(function(c) { return Object.assign({ key: c.id, state: c.status === 'ปิด' ? 'inactive' : 'live' }, c); });
           },
           filters: [
             { key: 'q', label: 'ชื่อหมวดหมู่', type: 'text', test: function(r, v) { return r.name.toLowerCase().indexOf(v.toLowerCase()) !== -1; } },
-            { key: 'state', label: 'สถานะ', type: 'select', options: function() { return [['live', 'ใช้งาน'], ['inactive', 'ปิดใช้งาน']]; }, test: function(r, v) { return r.state === v; } }
+            { key: 'state', label: 'สถานะ', type: 'select', options: function() { return [['live', 'เปิด'], ['inactive', 'ปิด']]; }, test: function(r, v) { return r.state === v; } }
           ],
           columns: [
             { label: 'ID', sort: function(r) { return r.id; }, cell: function(r) { return self.esc(self.shortId(r.id)); } },
             { label: 'ชื่อหมวดหมู่', sort: function(r) { return r.name; }, cell: function(r) { return self.link(r.name, r.id); } },
             { label: 'จำนวนข่าว', sort: function(r) { return r.used; }, cell: function(r) { return self.esc(r.used); } },
-            { label: 'สถานะ', sort: function(r) { return r.state; }, cell: function(r) { return '<span class="cms-badge ' + (r.state === 'live' ? 'cms-b-green' : 'cms-b-red') + '">' + (r.state === 'live' ? 'ใช้งาน' : 'ปิดใช้งาน') + '</span>'; } }
+            { label: 'สถานะ', sort: function(r) { return r.state; }, cell: function(r) { return '<span class="cms-badge ' + (r.state === 'live' ? 'cms-b-green' : 'cms-b-red') + '">' + (r.state === 'live' ? 'เปิด' : 'ปิด') + '</span>'; } }
           ],
           remove: async function(rows) {
             const res = await window.app.api('NEWS_CAT_DELETE', { ids: rows.map(function(r) { return r.id; }) });
@@ -205,7 +205,7 @@
           },
           editForm: function(r) {
             return self.field('ชื่อหมวดหมู่ *', '<input id="cmsName" class="cms-in" maxlength="60" value="' + self.esc(r ? r.name : '') + '">')
-              + self.field('สถานะ', '<select id="cmsStatus" class="cms-in"><option value="Active"' + (!r || r.status === 'Active' ? ' selected' : '') + '>ใช้งาน</option><option value="Inactive"' + (r && r.status === 'Inactive' ? ' selected' : '') + '>ปิดใช้งาน</option></select>')
+              + self.field('สถานะ', '<select id="cmsStatus" class="cms-in"><option value="เปิด"' + (!r || r.status !== 'ปิด' ? ' selected' : '') + '>เปิด</option><option value="ปิด"' + (r && r.status === 'ปิด' ? ' selected' : '') + '>ปิด</option></select>')
               + (r && r.used ? '<p class="cms-hint">เปลี่ยนชื่อแล้วข่าวทั้ง ' + self.esc(r.used) + ' รายการในหมวดนี้จะเปลี่ยนตาม</p>' : '');
           },
           readForm: function(r) {

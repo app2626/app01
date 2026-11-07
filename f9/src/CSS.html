@@ -1551,4 +1551,27 @@
   html.dark .login-card .bg-amber-50 { background: rgba(245, 158, 11, 0.14) !important; border-color: rgba(245, 158, 11, 0.4) !important; color: #fde68a !important; }
   html.dark .login-card .bg-amber-50 span { color: #fde68a !important; }
   html.dark .pos-storefront .pos-card img[src^="data:image/svg"] { filter: brightness(0.5) saturate(0.85); }
+
+  /* หน้าตารางข้อมูลกลาง (grid) ใช้สไตล์เดียวกับหน้าจัดการแบนเนอร์ (.cms-*) */
+  .cms-btn.hidden { display: none !important; }
+  .cms-grid .cms-c-chk input, .cms-grid .cms-c-chk + th input { width: 15px; height: 15px; cursor: pointer; accent-color: #405189; }
+  .cms-grid .cms-wrap { max-height: 75vh; overflow: auto; }
+  .cms-grid .cms-table td { vertical-align: middle; }
+  .cms-grid .cms-pg:disabled { opacity: 0.6; }
+  html.dark .cms-grid .cms-btn-line { color: #93c5fd; background: transparent; border-color: #334155; }
+
+  /* Popup banner carousel: หลายหน้า = สไลด์แนวนอน (scroll-snap) */
+  .popup-carousel { position: relative; }
+  .popup-carousel { overflow: hidden; border-radius: 1rem; }
+  .popup-track { display: flex; transition: transform .5s ease-out; }
+  .popup-slide { flex: 0 0 100%; min-width: 0; max-height: 80vh; overflow-y: auto; box-sizing: border-box; }
+  .popup-nav { display: none; position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 9999px; border: 0; background: rgba(255,255,255,0.9); color: #0f172a; box-shadow: 0 2px 10px rgba(0,0,0,0.3); align-items: center; justify-content: center; cursor: pointer; z-index: 2; }
+    .popup-nav-prev { left: 8px; }
+  .popup-nav-next { right: 8px; }
+  .popup-dots { display: none; justify-content: center; gap: 8px; margin-top: 12px; }
+  .popup-dot { width: 8px; height: 8px; border-radius: 9999px; border: 0; padding: 0; background: rgba(255,255,255,0.45); cursor: pointer; transition: all .2s; }
+  .popup-dot.active { width: 22px; background: #fff; }
+  .popup-multi .popup-nav { display: flex; }
+  .popup-multi .popup-dots { display: flex; }
+  @media (prefers-reduced-motion: reduce) { .popup-track { transition: none; } }
 </style>
