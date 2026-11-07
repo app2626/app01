@@ -1253,6 +1253,12 @@ window.app.pos = {
       });
       // เรียงลำดับ: แนะนำ = ตามลำดับชีต (ไม่แตะ), ราคาต่ำ-สูง / สูง-ต่ำ เรียงก่อน group เพื่อให้ตำแหน่งการ์ดตามราคา variant แรก
       // การ์ดรวมทุก SKU ของรุ่นเดียวกันและโชว์ราคาต่ำสุดของรุ่น — ต้องเรียงด้วยราคาต่ำสุดของรุ่นเช่นกัน ไม่งั้นลำดับการ์ดสลับเมื่อรุ่นมีหลายราคา
+      if (!f.sort) {
+        // ค่าเริ่มต้น: จัดกลุ่มตามหมวด โมบาย > แท็บเล็ต > สมาร์ทวอทช์ > หูฟัง > ของแถมแบรนด์ > ของแถมช่องทาง (stable sort — ภายในหมวดยังคงลำดับตามชีต)
+        const order = ['โมบาย', 'แท็บเล็ต', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'];
+        const rank = (p) => { const i = order.indexOf((p.Category || '').trim()); return i === -1 ? order.length : i; };
+        list.sort((a, b) => rank(a) - rank(b));
+      }
       if (f.sort === 'asc' || f.sort === 'desc') {
         const gKey = (p) => (p.Model && p.Model !== '-') ? 'M:' + p.Model : 'S:' + p.SKU;
         const gMin = {};
@@ -1401,7 +1407,9 @@ window.app.pos = {
       const esc = window.app.esc, escJs = window.app.escAttrJs;
       const f = this.storeFilters;
       const prods = (window.app.globalData.products || []).filter(p => ['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase()));
-      const cats = [...new Set(prods.map(p => (p.Category || '').trim()).filter(Boolean))];
+      const catOrder_ = ['โมบาย', 'แท็บเล็ต', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'];
+      const catRank_ = c => { const i = catOrder_.indexOf(c); return i === -1 ? catOrder_.length : i; };
+      const cats = [...new Set(prods.map(p => (p.Category || '').trim()).filter(Boolean))].sort((a, b) => catRank_(a) - catRank_(b));
       const groupSource = f.category ? prods.filter(p => (p.Category || '').trim() === f.category) : prods;
       const groups = [...new Set(groupSource.map(p => (p['Product Group'] || '').trim()).filter(g => g && g !== '-'))];
       // สี/ความจุ แสดงเฉพาะที่มีจริงในหมวด (และซีรีส์ที่เลือก) ปัจจุบัน — ค่าที่เลือกค้างอยู่แต่ไม่อยู่ในขอบเขตยังโชว์ไว้เพื่อให้กดยกเลิกได้
