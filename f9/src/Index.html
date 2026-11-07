@@ -89,19 +89,19 @@
           <div class="login-chips"><span><i class="fas fa-check"></i>จองสินค้า</span><span><i class="fas fa-check"></i>ใบเสนอราคา</span><span><i class="fas fa-check"></i>ติดตามสถานะ</span></div>
         </div>
         
-        <form id="loginForm" onsubmit="window.app.handleLogin(event)" class="space-y-4">
+        <form id="loginForm" method="post" action="#" autocomplete="on" onsubmit="window.app.handleLogin(event)" class="space-y-4">
           <div>
             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider pl-1">ชื่อผู้ใช้งาน</label>
             <div class="relative">
               <i class="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-              <input type="text" class="w-full pl-11 pr-4 py-3.5 bg-slate-50/60 border border-slate-200/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-medium" id="loginUsername" placeholder="Username" required>
+              <input type="text" class="w-full pl-11 pr-4 py-3.5 bg-slate-50/60 border border-slate-200/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-medium" id="loginUsername" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Username" required>
             </div>
           </div>
           <div>
             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider pl-1">รหัสผ่าน</label>
             <div class="relative">
               <i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-              <input type="password" class="w-full pl-11 pr-4 py-3.5 bg-slate-50/60 border border-slate-200/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-medium" id="loginPassword" placeholder="Password" required>
+              <input type="password" class="w-full pl-11 pr-4 py-3.5 bg-slate-50/60 border border-slate-200/80 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-medium" id="loginPassword" name="password" autocomplete="current-password" placeholder="Password" required>
             </div>
           </div>
           <label class="flex items-center gap-2 pl-1 text-xs font-semibold text-slate-500 cursor-pointer select-none">
