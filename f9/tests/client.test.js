@@ -88,7 +88,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
 
   const login = async (u, p) => {
     await ev(`document.getElementById('loginUsername').value=${JSON.stringify(u)};document.getElementById('loginPassword').value=${JSON.stringify(p)};document.getElementById('loginForm').requestSubmit();true`);
-    await waitFor("!!window.app.user && !!document.getElementById('mainContent') || !!window.app.user", 10000);
+    await waitFor("!!window.app.user && !!document.getElementById('page-content') || !!window.app.user", 10000);
     await sleep(800);
   };
 
@@ -103,7 +103,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await T('route #' + r + ' renders without JS errors', async () => {
       curPhase = 'route:' + r; const before = pageErrors.length;
       await ev(`window.location.hash='#${r}';true`); await sleep(1300);
-      const len = await ev("(document.getElementById('mainContent')||document.querySelector('main')||document.body).innerText.length");
+      const len = await ev("(document.getElementById('page-content')||document.querySelector('main')||document.body).innerText.length");
       ok(len > 20, 'page looks empty (' + len + ' chars)');
       ok(pageErrors.length === before, pageErrors.slice(before).map(e => e.text).join(' | ').slice(0, 400));
       // ปุ่มนำเข้า CSV ต้องโผล่เฉพาะหน้าสินค้า (Products) เท่านั้น
@@ -682,6 +682,84 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   });
   await T('meta: no "Enterprise Portal" in title, og:title + favicon present', async () => { const m = await ev("JSON.stringify({t:document.title,og:!!document.querySelector('meta[property=\"og:title\"]'),ic:!!document.querySelector('link[rel=icon]')})"); const o = JSON.parse(m); ok(!/Enterprise Portal/.test(o.t) && o.og && o.ic, m); });
 
+  console.log('== POPUP CAROUSEL / BULK DELETE / GRID LOOK');
+  await T('popup banners: several popups slide sideways (translateX track, dots, wrap-around, auto-advance, closes cleanly); one popup shows no controls', async () => {
+    await P("window.app.globalData.__popBak=window.app.globalData.popupBanners;window.app.globalData.popupBanners=[{url:'https://x.test/1.png',title:'A',details:'a'},{url:'https://x.test/2.png'},{url:'https://x.test/3.png',title:'C'}];sessionStorage.removeItem('tg_popup_shown');window.app.showPopupBanner();true");
+    await sleep(200);
+    const st = () => P("JSON.stringify({vis:!document.getElementById('popupBannerModal').classList.contains('hidden'),slides:document.querySelectorAll('#popupBannerContent .popup-slide').length,multi:document.getElementById('popupBannerModal').classList.contains('popup-multi'),dots:document.querySelectorAll('#popupBannerDots .popup-dot').length,on:[...document.querySelectorAll('#popupBannerDots .popup-dot')].findIndex(d=>d.classList.contains('active')),tf:document.getElementById('popupBannerContent').style.transform,timer:!!window.app.popupTimer,navShown:getComputedStyle(document.getElementById('popupNext')).display})").then(JSON.parse);
+    let m = await st();
+    ok(m.vis && m.slides === 3 && m.multi && m.dots === 3 && m.on === 0 && m.timer && m.navShown !== 'none', JSON.stringify(m));
+    await P("window.app.popupSlide(1);true"); m = await st(); eq([m.on, m.tf], [1, 'translateX(-100%)']);
+    await P("window.app.popupGo(2);window.app.popupSlide(1);true"); m = await st(); eq([m.on, m.tf], [0, 'translateX(0%)'], 'wraps to first');
+    await P("window.app.popupSlide(-1);true"); m = await st(); eq(m.on, 2, 'wraps to last on previous');
+    await P("document.querySelectorAll('#popupBannerDots .popup-dot')[1].click();true"); m = await st(); eq(m.on, 1, 'dot jumps');
+    await P("window.app.closePopupBanner();true"); m = await st(); ok(!m.vis && !m.timer, 'closed + timer stopped: ' + JSON.stringify(m));
+    await P("window.app.globalData.popupBanners=[{url:'https://x.test/1.png'}];sessionStorage.removeItem('tg_popup_shown');window.app.showPopupBanner();true"); await sleep(150);
+    m = await st(); ok(m.vis && m.slides === 1 && !m.multi && !m.timer && m.navShown === 'none', 'single popup has no controls/timer: ' + JSON.stringify(m));
+    await P("window.app.closePopupBanner();window.app.globalData.popupBanners=window.app.globalData.__popBak;sessionStorage.setItem('tg_popup_shown','true');true");
+  });
+  await T('grid look + bulk delete UI: banner-style page chrome, checkboxes, select-all, count on the red button, delete selected removes only those rows', async () => {
+    const A = (a, pl) => P(`window.app.api(${JSON.stringify(a)},${JSON.stringify(pl)})`);
+    for (let i = 1; i <= 4; i++) await A('SAVE_RECORD', { tableName: 'Channels', idField: 'Channel ID', data: { 'Channel ID': 'UIBD-' + i, 'Channel Name': 'UI bulk ' + i, Description: '' } });
+    await ev("window.location.hash='#channels';true"); await sleep(1500);
+    ok(await ev("!!document.querySelector('.cms-page.cms-grid .cms-card .cms-actions') && !!document.getElementById('gridTitle') && /ช่องทาง/.test(document.getElementById('gridTitle').textContent) && !!document.getElementById('gridPageSize') && !!document.querySelector('#dataGridBody .cms-ico')"), 'banner-style chrome');
+    ok(await ev("!document.getElementById('gridBulkDeleteBtn').classList.contains('hidden')"), 'red delete button visible for Admin on Channels');
+    const rows = () => ev("document.querySelectorAll('#dataGridBody tr').length");
+    const boxes = () => ev("document.querySelectorAll('#dataGridBody .grid-sel').length");
+    const n0 = await rows(); eq(await boxes(), n0, 'one checkbox per row');
+    await ev("(()=>{const b=[...document.querySelectorAll('#dataGridBody .grid-sel')].filter(c=>/^UIBD-[12]$/.test(c.getAttribute('data-id')));b.forEach(c=>{c.checked=true;window.app.grid.toggleOne(c)});return true})()");
+    eq(await ev("document.getElementById('gridBulkDeleteLabel').textContent"), 'ลบรายการที่เลือก (2)');
+    ok(await ev("document.querySelectorAll('#dataGridBody tr.cms-sel-row').length===2"), 'selected rows highlighted');
+    await ev("(()=>{const a=document.getElementById('gridSelAll');a.checked=true;window.app.grid.toggleAll(true);return true})()");
+    eq(await ev("Object.keys(window.app.grid.selected).length"), n0, 'select-all selects the whole page');
+    await ev("window.app.grid.clearSelection();true");
+    eq(await ev("document.getElementById('gridBulkDeleteLabel').textContent"), 'ลบรายการที่เลือก', 'cleared');
+    await ev("(()=>{const b=[...document.querySelectorAll('#dataGridBody .grid-sel')].filter(c=>/^UIBD-[12]$/.test(c.getAttribute('data-id')));b.forEach(c=>{c.checked=true;window.app.grid.toggleOne(c)});window.app.grid.deleteSelected();return true})()"); await sleep(400);
+    await ev("Swal.clickConfirm();true"); await sleep(1800);
+    const left = await ev("JSON.stringify([...document.querySelectorAll('#dataGridBody .grid-sel')].map(c=>c.getAttribute('data-id')).filter(i=>/^UIBD-/.test(i)))");
+    eq(JSON.parse(left), ['UIBD-3', 'UIBD-4'], 'only the two selected rows were deleted');
+    eq(await rows(), n0 - 2);
+    await A('DELETE_RECORDS', { tableName: 'Channels', idValues: ['UIBD-3', 'UIBD-4'] });
+    await ev("window.app.refreshGlobalData().then(()=>true)");
+  });
+  await T('bulk status: เปิดที่เลือก/ปิดที่เลือก buttons only on tables with a Status column; flips only the selected rows', async () => {
+    await ev("window.location.hash='#promotions';true"); await sleep(1500);
+    ok(await ev("!document.getElementById('gridBulkOnBtn').classList.contains('hidden') && !document.getElementById('gridBulkOffBtn').classList.contains('hidden')"), 'buttons visible on Promotions');
+    const st = () => ev("JSON.stringify(window.app.grid.dataList.map(r=>[r['Promo ID'],r.Status]))").then(JSON.parse);
+    const before = await st(); const pick = before[0][0];
+    await ev("(()=>{const c=[...document.querySelectorAll('#dataGridBody .grid-sel')].find(x=>x.getAttribute('data-id')==='" + pick + "');c.checked=true;window.app.grid.toggleOne(c);window.app.grid.setSelectedStatus('ปิด');return true})()"); await sleep(400);
+    await ev("Swal.clickConfirm();true"); await sleep(1800);
+    const after = await st();
+    eq(after.find(r => r[0] === pick)[1], 'ปิด', 'selected row now ปิด');
+    eq(after.filter(r => r[0] !== pick), before.filter(r => r[0] !== pick), 'other rows untouched');
+    await ev("(()=>{const c=[...document.querySelectorAll('#dataGridBody .grid-sel')].find(x=>x.getAttribute('data-id')==='" + pick + "');c.checked=true;window.app.grid.toggleOne(c);window.app.grid.setSelectedStatus('เปิด');return true})()"); await sleep(400);
+    await ev("Swal.clickConfirm();true"); await sleep(1800);
+    eq((await st()).find(r => r[0] === pick)[1], 'เปิด', 'toggled back');
+    await ev("window.location.hash='#channels';true"); await sleep(1300);
+    ok(await ev("document.getElementById('gridBulkOnBtn').classList.contains('hidden') && document.getElementById('gridBulkOffBtn').classList.contains('hidden')"), 'Channels (no Status column): no status buttons');
+  });
+  await T('grid: read-only pages and non-bulk tables have no checkboxes / delete button; page size + pager work', async () => {
+    await ev("window.location.hash='#interests';true"); await sleep(1300);
+    ok(await ev("document.querySelectorAll('#dataGridBody .grid-sel').length===0 && document.getElementById('gridBulkDeleteBtn').classList.contains('hidden') && !document.getElementById('gridSelAll')"), 'Interests: no bulk controls');
+    await ev("window.location.hash='#products';true"); await sleep(1500);
+    await ev("(()=>{const s=document.getElementById('gridPageSize');s.value='10';s.dispatchEvent(new Event('change',{bubbles:true}));return true})()");
+    ok(await ev("document.querySelectorAll('#dataGridBody tr').length<=10 && /จากทั้งหมด/.test(document.getElementById('gridPagination').textContent) && !!document.querySelector('#gridPagination .cms-pg-on')"), 'page size 10 + pager');
+    await ev("(()=>{const s=document.getElementById('gridPageSize');s.value='20';s.dispatchEvent(new Event('change',{bubbles:true}));return true})()");
+  });
+  await T('reload (pull-to-refresh) returns to the page that was open instead of the dashboard; an unknown saved route falls back safely', async () => {
+    await ev("window.location.hash='#branches';true"); await sleep(1200);
+    eq(await ev("sessionStorage.getItem('f9_last_route')"), 'branches', 'route remembered');
+    await send('Page.navigate', { url: 'http://127.0.0.1:8765/' });
+    await waitFor("!!window.app && !!window.app.user && !!document.getElementById('gridTitle')", 20000); await sleep(600);
+    eq(await ev("window.location.hash"), '#branches', 'came back to branches after reload');
+    ok(await ev("/สาขา/.test(document.getElementById('gridTitle').textContent)"), 'branches page rendered');
+    await ev("sessionStorage.setItem('f9_last_route','not-a-real-page');true");
+    await send('Page.navigate', { url: 'http://127.0.0.1:8765/' });
+    await waitFor("!!window.app && !!window.app.user && !!document.getElementById('page-content')", 20000); await sleep(1200);
+    ok(await ev("window.location.hash") === '#dashboard' || await ev("window.location.hash") === '#not-a-real-page', 'bad saved route does not break the app');
+    ok(await ev("!!document.getElementById('page-content') && document.getElementById('page-content').innerText.length > 20"), 'app still usable');
+    await ev("window.Swal && Swal.isVisible() && Swal.close();window.location.hash='#dashboard';true"); await sleep(800);
+  });
   console.log('== SALES USER');
   curPhase = 'sales';
   await ev("window.app.logout ? window.app.logout() : (window.app.user=null,true)"); await sleep(600);

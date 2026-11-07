@@ -44,7 +44,7 @@ const ctx = {
   SpreadsheetApp: { getActiveSpreadsheet: () => ss, flush() {} },
   CacheService: { getScriptCache: () => ({ get: cache.get, put: (k, v) => cache.put(k, v), remove: cache.remove, removeAll() {} }) },
   LockService: { getScriptLock: () => ({ waitLock() {}, tryLock: () => true, releaseLock() {} }) },
-  PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in propsM ? propsM[k] : null), setProperty: (k, v) => { propsM[k] = String(v); } }) },
+  PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in propsM ? propsM[k] : null), setProperty: (k, v) => { propsM[k] = String(v); }, deleteProperty: k => { delete propsM[k]; } }) },
   Session: { getActiveUser: () => ({ getEmail: () => 'tester@example.com' }) },
   Utilities: {
     DigestAlgorithm: { SHA_256: 'sha256' },

@@ -967,6 +967,11 @@ window.app = {
     }
   },
 
+  // จำหน้าล่าสุดต่อแท็บ (sessionStorage — อยู่รอดตอนรีเฟรช/ปัดจอลง ไม่ข้ามไปวันอื่น); อ่านแล้วต้องผ่านการเช็คสิทธิ์ใน route() อีกครั้งเสมอ
+  saveRoute_: function(hash) { try { if (/^[A-Za-z0-9_-]{1,40}$/.test(hash)) sessionStorage.setItem('f9_last_route', hash); } catch (e) {} },
+  savedRoute_: function() { try { const r = sessionStorage.getItem('f9_last_route'); return r && /^[A-Za-z0-9_-]{1,40}$/.test(r) ? r : ''; } catch (e) { return ''; } },
+  clearSavedRoute_: function() { try { sessionStorage.removeItem('f9_last_route'); } catch (e) {} },
+
   // สถานะ เปิด/ปิด ของ AutoPromotions (ค่าเก่า Active ยังนับเป็นเปิด)
   statusOn: function(v) { const t = (v === null || v === undefined ? '' : String(v)).trim().toLowerCase(); return t === 'เปิด' || t === 'active'; },
 
@@ -1323,7 +1328,9 @@ window.app = {
          window.app.globalData = res;
          window.app.preloadBanners();
          // ลิงก์สินค้าที่แชร์ (?p=) ไม่มี hash → พาไปหน้าสั่งจอง (pos) แทน dashboard
-         if(!window.location.hash) window.location.hash = window.__DEEP_MODEL ? '#pos' : '#dashboard';
+         // ปัดจอลงเพื่อรีเฟรช (มือถือ) = โหลด iframe ใหม่ hash หาย → กลับหน้าที่เปิดค้างไว้ (จำไว้ใน sessionStorage) แทนการเริ่มที่ dashboard
+         // ลิงก์สินค้าที่แชร์ (?p=) ยังมาก่อนเสมอ
+         if(!window.location.hash) window.location.hash = window.__DEEP_MODEL ? '#pos' : ('#' + (window.app.savedRoute_() || 'dashboard'));
          window.app.route();
 
          setTimeout(() => { window.app.showPopupBanner(); }, 500);
@@ -1477,6 +1484,7 @@ window.app = {
        return;
     }
     
+    window.app.saveRoute_(hash); // ผ่านการเช็คสิทธิ์แล้วเท่านั้น — จำหน้าปัจจุบันไว้ใช้ตอนรีเฟรช
     document.querySelectorAll('.nav-link').forEach(el => {
        el.classList.remove('bg-indigo-600', 'text-white', 'hover:bg-indigo-700', 'bg-indigo-50', 'text-indigo-600', 'active-link');
        if(el.id.startsWith('nav-desk-')) el.classList.add('text-slate-500', 'hover:bg-indigo-50', 'hover:text-indigo-600');
@@ -1716,7 +1724,7 @@ window.app = {
     if(window.app.dashboard.refreshTimer) clearInterval(window.app.dashboard.refreshTimer);
     if(window.app.dashboard.slider.timer) clearInterval(window.app.dashboard.slider.timer);
     if(window.app.pos && window.app.pos.countdownInterval) clearInterval(window.app.pos.countdownInterval);
-    window.app.user = null; localStorage.removeItem('tg_pos_user'); sessionStorage.removeItem('tg_pos_user'); window.location.hash = ''; window.app.renderLogin();
+    window.app.user = null; window.app.clearSavedRoute_(); localStorage.removeItem('tg_pos_user'); sessionStorage.removeItem('tg_pos_user'); window.location.hash = ''; window.app.renderLogin();
     sessionStorage.removeItem('tg_popup_shown');
     // เครื่องหน้าร้านใช้ร่วมกันหลายคน — ตะกร้าและชื่อ/เบอร์พนักงานที่จำไว้ต้องไม่ติดไปถึงผู้ใช้คนถัดไป
     localStorage.removeItem('tg_cart');

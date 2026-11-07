@@ -417,6 +417,49 @@ t('bulk delete: Admin only, whitelisted tables, server-side id column, max 200, 
     ok(self, 'seeded admin present'); const r2 = unwrap(del('Members', [self])); eq(r2.deleted, 0); eq(r2.protectedIds, [self]);
   } finally { restore(); }
 });
+t('bulk status: Admin only, whitelisted tables, explicit เปิด/ปิด, only chosen rows change, unchanged/notFound reported, cache busted', () => {
+  const setSt = (table, ids, status, who) => api('BULK_SET_STATUS', { tableName: table, idValues: ids, status: status }, who || admin);
+  eq(setSt('Promotions', ['x'], 'ปิด', sales).status, 'error', 'Admin only');
+  ['Members', 'Branches', 'Orders', '__proto__', ''].forEach(tb => eq(setSt(tb, ['x'], 'ปิด').status, 'error', 'table ' + tb));
+  eq(setSt('Promotions', [], 'ปิด').status, 'error', 'empty'); eq(setSt('Promotions', ['x'], '').status, 'error', 'blank status'); eq(setSt('Promotions', ['x'], 'maybe').status, 'error', 'bad status');
+  eq(setSt('Promotions', Array.from({ length: 201 }, (_, i) => 'P' + i), 'ปิด').status, 'error', 'over max');
+  const sh = sheets.Promotions, h = sh.rows[0], idc = h.indexOf('Promo ID'), stc = h.indexOf('Status');
+  const snap = sh.rows.map(r => r.slice());
+  try {
+    const first = sh.rows[1][idc], second = sh.rows[2][idc], third = sh.rows[3] ? sh.rows[3][idc] : null;
+    const r1 = unwrap(setSt('Promotions', [first, second, 'NOPE'], 'ปิด'));
+    eq([r1.updated, r1.unchanged, r1.notFound, r1.newStatus], [2, 0, ['NOPE'], 'ปิด']);
+    eq([sh.rows[1][stc], sh.rows[2][stc]], ['ปิด', 'ปิด']);
+    if (third) eq(sh.rows[3][stc], snap[3][stc], 'unselected row untouched');
+    const r2 = unwrap(setSt('Promotions', [first], 'Inactive')); eq([r2.updated, r2.unchanged], [0, 1], 'legacy word accepted, already ปิด');
+    const r3 = unwrap(setSt('Promotions', [first, second], 'Active')); eq([r3.updated, r3.newStatus], [2, 'เปิด']);
+    ok(unwrap(api('GET_ALL_DATA', {}, admin)).promotions.filter(p => p['Promo ID'] === first)[0].Status === 'เปิด', 'cache busted');
+  } finally { sh.rows.length = 0; snap.forEach(r => sh.rows.push(r)); cache.remove('TABLE_Promotions'); }
+});
+t('emergency password reset: needs MPOS_RESET_ENABLE, validates input, hashes, clears rate-limit + its own properties, never leaks the password', () => {
+  const props = ctx.PropertiesService.getScriptProperties();
+  const run = () => ctx.resetMemberPasswordFromProperties();
+  let threw = false; try { run(); } catch (e) { threw = /MPOS_RESET_ENABLE/.test(String(e)); } ok(threw, 'refuses without the enable flag');
+  const mh = sheets.Members.rows[0], uc = mh.indexOf('Username'), pc = mh.indexOf('Password');
+  const row = () => sheets.Members.rows.find((r, i) => i > 0 && r[uc] === 'admin');
+  const before = row()[pc];
+  const attempt = (u, pw) => { props.setProperty('MPOS_RESET_ENABLE', 'true'); if (u !== null) props.setProperty('MPOS_RESET_USERNAME', u); if (pw !== null) props.setProperty('MPOS_RESET_PASSWORD', pw); try { return { ok: run() }; } catch (e) { return { err: String(e) }; } };
+  ok(attempt('admin', 'short').err, 'short password rejected'); eq(row()[pc], before, 'unchanged after reject');
+  ok(attempt('no.such.user', 'LongEnough#1').err, 'unknown user rejected');
+  ok(attempt(null, 'LongEnough#1').err, 'missing username rejected');
+  ['MPOS_RESET_ENABLE', 'MPOS_RESET_USERNAME', 'MPOS_RESET_PASSWORD'].forEach(k => eq(props.getProperty(k), null, k + ' cleared after a failed run'));
+  cache.put('LOGIN_FAIL_admin', '5');
+  const res = attempt('admin', 'Brand#New2026');
+  ok(res.ok && !/Brand#New2026/.test(res.ok), JSON.stringify(res));
+  ok(/^[a-f0-9]{64}$/.test(row()[pc]) && row()[pc] !== before, 'stored as salted hash');
+  eq(cache.get('LOGIN_FAIL_admin'), null, 'rate-limit lock cleared');
+  ['MPOS_RESET_ENABLE', 'MPOS_RESET_USERNAME', 'MPOS_RESET_PASSWORD'].forEach(k => eq(props.getProperty(k), null, k + ' cleared after success'));
+  const login = api('LOGIN', { username: 'admin', password: 'Brand#New2026' }); ok(login && (login.Token || (login.user && login.user.Token)), 'can log in with the new password');
+  eq(api('LOGIN', { username: 'admin', password: adminPw }).status, 'error', 'old password no longer works');
+  // restore the original password so later tests keep working
+  props.setProperty('MPOS_RESET_ENABLE', 'true'); props.setProperty('MPOS_RESET_USERNAME', 'admin'); props.setProperty('MPOS_RESET_PASSWORD', adminPw); run();
+  const again = api('LOGIN', { username: 'admin', password: adminPw }); ok(again && (again.Token || (again.user && again.user.Token)), 'original password restored');
+});
 t('import channels: blank ID auto-numbers after the highest CH-nn; explicit IDs kept; dup ID skipped; duplicate name warned', () => {
   const restore = importSnap(['Channels']); const ch = sheets.Channels.rows[0], before = sheets.Channels.rows.length;
   const ids = sheets.Channels.rows.slice(1).map(r => String(r[ch.indexOf('Channel ID')]));

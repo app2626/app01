@@ -1263,6 +1263,12 @@
           <button type="button" class="cms-btn cms-btn-red hidden" id="gridBulkDeleteBtn" onclick="window.app.grid.deleteSelected()">
             <i class="fas fa-trash"></i> <span id="gridBulkDeleteLabel">ลบรายการที่เลือก</span>
           </button>
+          <button type="button" class="cms-btn cms-btn-line hidden" id="gridBulkOnBtn" onclick="window.app.grid.setSelectedStatus('เปิด')">
+            <i class="fas fa-toggle-on"></i> เปิดที่เลือก
+          </button>
+          <button type="button" class="cms-btn cms-btn-line hidden" id="gridBulkOffBtn" onclick="window.app.grid.setSelectedStatus('ปิด')">
+            <i class="fas fa-toggle-off"></i> ปิดที่เลือก
+          </button>
           <button type="button" class="cms-btn cms-btn-line hidden" id="gridBulkQuickBtn" onclick="window.app.productGroup.openBulkQuickEdit()">
             <i class="fas fa-bolt"></i> แก้ไขราคา/สต๊อกด่วน
           </button>

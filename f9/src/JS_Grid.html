@@ -3,6 +3,8 @@
 window.app.grid = {
     TITLES: { Products: 'จัดการสินค้า', Branches: 'จัดการสาขา', Channels: 'จัดการช่องทางขาย', Members: 'จัดการสมาชิก', GiftMappings: 'จัดการชุดของแถม', AutoPromotions: 'จัดการโปรโมชั่นอัตโนมัติ', Promotions: 'จัดการส่วนลดและโปรโมชั่น', Interests: 'จัดการความสนใจ', Coupons: 'จัดการโค้ดส่วนลด', Orders: 'รายการจอง', InventoryLog: 'ประวัติสต๊อก', AuditLog: 'ประวัติการใช้งาน' },
     setPageSize: function(v) { const n = parseInt(v, 10); if (n > 0) { this.pageSize = n; this.renderPage(1); } },
+    STATUS_TABLES: ['Products', 'GiftMappings', 'AutoPromotions', 'Promotions'],
+    canBulkStatus: function() { return this.canBulk() && this.STATUS_TABLES.indexOf(this.tableName) > -1; },
     BULK_TABLES: ['Products', 'Branches', 'Channels', 'Members', 'GiftMappings', 'AutoPromotions', 'Promotions'],
     selected: {},
     canBulk: function() { return !this.isReadonly && this.BULK_TABLES.indexOf(this.tableName) > -1; },
@@ -19,6 +21,7 @@ window.app.grid = {
       const gc = document.getElementById('gridCrumb'); if (gc) gc.textContent = 'ข้อมูลระบบ > ' + ttl;
       const delBtn = document.getElementById('gridBulkDeleteBtn');
       if (delBtn) { const on = this.canBulk(); delBtn.classList.toggle('hidden', !on); }
+      ['gridBulkOnBtn', 'gridBulkOffBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.classList.toggle('hidden', !this.canBulkStatus()); });
       // ปุ่มเพิ่มข้อมูลของ Products เปิดฟอร์มเพิ่มสินค้าแบบหลาย SKU แทนฟอร์มแถวเดียวทั่วไป (ดู grid.handleAddClick)
       const addBtnIcon = document.getElementById('gridAddBtnIcon');
       const addBtnLabel = document.getElementById('gridAddBtnLabel');
@@ -251,6 +254,28 @@ window.app.grid = {
         all.checked = boxes.length > 0 && chk === boxes.length;
         all.indeterminate = chk > 0 && chk < boxes.length;
       }
+    },
+    // เปิด/ปิดหลายรายการที่เลือก (เฉพาะตารางใน STATUS_TABLES; server ตรวจสิทธิ์ Admin ซ้ำ)
+    setSelectedStatus: async function(status) {
+      const ids = Object.keys(this.selected);
+      if (!this.canBulkStatus()) return;
+      if (ids.length === 0) { Swal.fire({ icon: 'info', title: 'ยังไม่ได้เลือกรายการ', text: 'ติ๊กเลือกรายการที่ต้องการก่อน', confirmButtonText: 'ตกลง' }); return; }
+      const r = await Swal.fire({ title: status + ' ' + ids.length + ' รายการที่เลือก?', icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยัน' + status, cancelButtonText: 'ยกเลิก' });
+      if (!r.isConfirmed) return;
+      window.app.showLoading('กำลังเปลี่ยนสถานะ...');
+      try {
+        const res = await window.app.api('BULK_SET_STATUS', { tableName: this.tableName, idValues: ids, status: status });
+        window.app.hideLoading();
+        if (res && res.status === 'success') {
+          this.selected = {};
+          await window.app.refreshGlobalData();
+          let msg = 'เปลี่ยนเป็น ' + res.newStatus + ' แล้ว ' + res.updated + ' รายการ';
+          if (res.unchanged) msg += ' · เป็นสถานะนี้อยู่แล้ว ' + res.unchanged;
+          if (res.notFound && res.notFound.length) msg += ' · ไม่พบ ' + res.notFound.length;
+          Swal.fire({ icon: 'success', title: msg, showConfirmButton: false, timer: 1800 });
+          this.loadData();
+        } else Swal.fire('Error', res ? res.message : 'Error', 'error');
+      } catch (e) { window.app.hideLoading(); Swal.fire('Error', e.message || 'Error', 'error'); }
     },
     deleteSelected: async function() {
       const ids = Object.keys(this.selected);

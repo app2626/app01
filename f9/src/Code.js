@@ -533,6 +533,7 @@ function apiHandlerInner_(action, payload, userToken) {
       case 'GET_ALL_DATA': return getAllInitialData(ss, secureUser.Role === 'Admin');
       case 'SAVE_RECORD': return saveRecord(payload.tableName, payload.data, payload.idField, secureUser, ss);
       case 'DELETE_RECORDS': return deleteRecords(payload, secureUser, ss);
+      case 'BULK_SET_STATUS': return bulkSetStatus(payload, secureUser, ss);
       case 'DELETE_RECORD': return deleteRecord(payload.tableName, payload.idField, payload.idValue, secureUser, ss);
       case 'SAVE_PRODUCT_GROUP': return saveProductGroup(payload, secureUser, ss);
       case 'UPDATE_PRODUCT_GROUP': return updateProductGroup(payload, secureUser, ss);
@@ -2754,6 +2755,92 @@ function deleteRecords(payload, secureUser, ss) {
   } catch (e) {
     return { status: 'error', message: e.toString() };
   } finally {
+    lock.releaseLock();
+  }
+}
+
+// เปิด/ปิด หลายรายการพร้อมกัน (Admin) — เฉพาะตารางที่มีคอลัมน์ Status จริง; คอลัมน์ ID มาจากตารางฝั่งนี้ ไม่เชื่อ client
+var BULK_STATUS_TABLES_ = {
+  Products: { idField: 'SKU' }, GiftMappings: { idField: 'Mapping ID' }, AutoPromotions: { idField: 'Rule ID' }, Promotions: { idField: 'Promo ID' }
+};
+function bulkSetStatus(payload, secureUser, ss) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
+    const table = ((payload && payload.tableName) || '').toString();
+    const spec = Object.prototype.hasOwnProperty.call(BULK_STATUS_TABLES_, table) ? BULK_STATUS_TABLES_[table] : null;
+    if (!spec) return { status: 'error', message: 'ไม่รองรับการเปลี่ยนสถานะหลายรายการของตาราง: ' + table };
+    const target = (payload.status === undefined || payload.status === null || String(payload.status).trim() === '') ? null : statusFromInput_(payload.status);
+    if (target === null) return { status: 'error', message: "สถานะต้องเป็น 'เปิด' หรือ 'ปิด'" };
+    const raw = Array.isArray(payload.idValues) ? payload.idValues : [];
+    const ids = [], seen = {};
+    raw.forEach(v => { const t = (v === null || v === undefined ? '' : v).toString().trim(); if (t && !seen[t]) { seen[t] = true; ids.push(t); } });
+    if (ids.length === 0) return { status: 'error', message: 'ยังไม่ได้เลือกรายการ' };
+    if (ids.length > BULK_DELETE_MAX_) return { status: 'error', message: 'เปลี่ยนได้ครั้งละไม่เกิน ' + BULK_DELETE_MAX_ + ' รายการ (เลือกมา ' + ids.length + ')' };
+    const sheet = ss.getSheetByName(table);
+    if (!sheet) return { status: 'error', message: 'ไม่พบชีต ' + table };
+    const data = sheet.getDataRange().getDisplayValues();
+    const headers = data[0].map(h => h.toString().trim());
+    const idIdx = headers.indexOf(spec.idField), stIdx = headers.indexOf('Status');
+    if (idIdx === -1 || stIdx === -1) return { status: 'error', message: 'โครงสร้างชีต ' + table + ' ไม่ถูกต้อง (ไม่พบคอลัมน์ ' + spec.idField + ' หรือ Status)' };
+    const want = {};
+    ids.forEach(id => { want[id] = true; });
+    const found = {};
+    let updated = 0, unchanged = 0;
+    for (let i = 1; i < data.length; i++) {
+      const v = (data[i][idIdx] || '').toString().trim();
+      if (!want[v] || found[v]) continue;
+      found[v] = true;
+      const cur = (data[i][stIdx] || '').toString().trim();
+      if (cur === target) { unchanged++; continue; }
+      sheet.getRange(i + 1, stIdx + 1).setValue(target);
+      updated++;
+    }
+    const notFound = ids.filter(id => !found[id]);
+    if (updated > 0) {
+      CacheService.getScriptCache().remove("TABLE_" + table);
+      logAudit(secureUser.Username, "BULK_STATUS", "Set " + updated + " row(s) in " + table + " to " + target);
+    }
+    return { status: 'success', updated: updated, unchanged: unchanged, notFound: notFound, newStatus: target };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===== รีเซ็ตรหัสผ่านฉุกเฉิน (เจ้าของโปรเจกต์ Apps Script เท่านั้น) =====
+// ใช้เมื่อลืมรหัสผ่านและไม่มี Admin คนอื่น: ตั้ง Script Properties 3 ค่า (Project Settings → Script properties)
+//   MPOS_RESET_ENABLE = true, MPOS_RESET_USERNAME = <username>, MPOS_RESET_PASSWORD = <รหัสใหม่ อย่างน้อย 8 ตัว>
+// แล้วรันฟังก์ชันนี้จาก Apps Script editor (Run) — ฟังก์ชันล้างค่าทั้ง 3 ตัวทุกครั้งที่ทำงาน (สำเร็จหรือไม่ก็ตาม) ไม่ทิ้งรหัสผ่านไว้
+// ไม่มี property MPOS_RESET_ENABLE = true จะไม่ทำอะไรเลย (ฟังก์ชันนี้ถูกเรียกจากหน้าเว็บได้ในทางเทคนิค จึงต้องมีประตูนี้); ไม่คืนรหัสผ่านในผลลัพธ์
+function resetMemberPasswordFromProperties() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('MPOS_RESET_ENABLE') !== 'true') throw new Error('ไม่ได้เปิดใช้งาน: ตั้ง Script property MPOS_RESET_ENABLE = true ก่อน (ดูคอมเมนต์ของฟังก์ชัน)');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const username = (props.getProperty('MPOS_RESET_USERNAME') || '').toString().trim();
+    const password = (props.getProperty('MPOS_RESET_PASSWORD') || '').toString();
+    if (!username) throw new Error('ไม่ได้ตั้ง MPOS_RESET_USERNAME');
+    if (password.length < 8 || password.length > 100) throw new Error('MPOS_RESET_PASSWORD ต้องยาว 8-100 ตัวอักษร');
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Members');
+    if (!sheet || sheet.getLastRow() < 2) throw new Error('ไม่พบชีต Members หรือยังไม่มีสมาชิก');
+    const data = sheet.getDataRange().getDisplayValues();
+    const headers = data[0].map(h => h.toString().trim());
+    const uCol = headers.indexOf('Username'), pCol = headers.indexOf('Password');
+    if (uCol === -1 || pCol === -1) throw new Error('โครงสร้างชีต Members ไม่ถูกต้อง');
+    let row = -1;
+    for (let i = 1; i < data.length; i++) { if ((data[i][uCol] || '').toString().trim() === username) { row = i + 1; break; } }
+    if (row === -1) throw new Error("ไม่พบ Username '" + username + "' ในชีต Members (ตัวพิมพ์เล็ก/ใหญ่ต้องตรง)");
+    sheet.getRange(row, pCol + 1).setNumberFormat('@').setValue(hashPassword(password));
+    CacheService.getScriptCache().remove('LOGIN_FAIL_' + username); // ปลดล็อกการล็อกอินผิดเกินกำหนดของ user นี้
+    logAudit('SCRIPT_OWNER', 'RESET_PASSWORD', "Password reset for '" + username + "' via script properties");
+    return "รีเซ็ตรหัสผ่านของ '" + username + "' แล้ว — ล็อกอินด้วยรหัสใหม่ได้ทันที (แนะนำให้เปลี่ยนรหัสอีกครั้งหลังเข้าระบบ)";
+  } finally {
+    ['MPOS_RESET_ENABLE', 'MPOS_RESET_USERNAME', 'MPOS_RESET_PASSWORD'].forEach(function(k) { props.deleteProperty(k); });
     lock.releaseLock();
   }
 }
