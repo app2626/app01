@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ACT SAMSUNG System | ระบบบริหารจัดการ ACT</title>
-    <meta name="theme-color" content="#191B3A">
+    <meta name="theme-color" content="#1C1C36">
     <meta name="robots" content="noindex, nofollow">
     <script>
         (function() {
@@ -15,16 +15,17 @@
             } catch (e) {}
         })();
     </script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234B38B3'/%3E%3Cpath d='M16 6l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V9z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M12.5 16l2.5 2.5 4.5-5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.3/dist/sweetalert2.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
     <style>
         /* ===================== Design tokens ===================== */
@@ -32,17 +33,18 @@
         :root {
             --navy: #101B33;
             --navy-dark: #0A1226;
-            --trust: #4B38B3;
+            --trust: #4b38b3;
             --trust-dark: #3D2D96;
             --trust-soft: rgba(75,56,179,0.12);
             --trust-strong: rgba(75,56,179,0.38);
-            --success: #10B981;
-            --danger: #DC2626;
-            --warning: #F59E0B;
+            --success: #45CB85;
+            --danger: #f06548;
+            --warning: #ffbe0b;
+            --info: #299cdb;
 
             --radius-sm: 4px;
-            --radius-md: 5px;
-            --radius-lg: 10px;
+            --radius-md: 4px;
+            --radius-lg: 8px;
 
             /* โทนหลัก: ดีฟอลต์เป็นโหมดมืด (identity หลักของระบบ) */
             --bg-page: #0a0d13;
@@ -66,22 +68,22 @@
             --shadow-card: 0 1px 2px rgba(0,0,0,0.4), 0 6px 16px -8px rgba(0,0,0,0.5);
             --shadow-soft-hover: 0 10px 18px -8px rgba(0,0,0,0.5), 0 22px 40px -18px rgba(0,0,0,0.65);
             --shadow-trust-ring: 0 0 0 3px rgba(124,104,230,0.45);
-            --topbar-bg: #12142B;
+            --topbar-bg: #1C1C36;
             --sb-bg: #12161f; --sb-border: rgba(255,255,255,0.08); --sb-text: #9CA6BC; --sb-text-hover: #F5F7FB; --sb-hover-bg: rgba(255,255,255,0.06); --sb-active-bg: rgba(124,104,230,0.18); --sb-active-text: #B9ADFF; --sb-label: #67718C;
         }
 
         /* โหมดสว่าง: สลับเฉพาะค่าพื้นผิว/ตัวหนังสือ ส่วนสี brand (trust/navy) คงเดิม */
         [data-theme="light"] {
-            --bg-page: #F3F3F9;
+            --bg-page: #f2f2f7;
             --surface-1: #FFFFFF;
-            --surface-2: #F5F7FB;
-            --surface-3: #EEF1F7;
-            --surface-hover: #E9EDF5;
-            --border: #E3E8F0;
-            --border-strong: #D3DAE8;
-            --text-primary: #16213C;
-            --text-secondary: #5B6577;
-            --text-muted: #7C8598;
+            --surface-2: #f8f9fa;
+            --surface-3: #f3f6f9;
+            --surface-hover: #f3f3f9;
+            --border: #e9ebec;
+            --border-strong: #ced4da;
+            --text-primary: #212529;
+            --text-secondary: #6d7080;
+            --text-muted: #878a99;
 
             --glass-strong: rgba(255,255,255,0.98);
             --glass-soft: rgba(255,255,255,0.98);
@@ -89,20 +91,20 @@
             --glass-highlight: rgba(255,255,255,0.8);
             --glass-blur: 20px;
 
-            --shadow-card: 0 1px 2px rgba(56,65,74,0.15);
+            --shadow-card: 0 3px 3px 0 rgba(56,65,74,0.1);
             --shadow-soft-hover: 0 4px 10px rgba(15,27,51,0.08), 0 20px 34px -16px rgba(15,27,51,0.22);
             --shadow-trust-ring: 0 0 0 3px rgba(75,56,179,0.25);
-            --topbar-bg: #191B3A;
-            --sb-bg: #FFFFFF; --sb-border: #E9EBEC; --sb-text: #495057; --sb-text-hover: #4B38B3; --sb-hover-bg: #F3F3F9; --sb-active-bg: rgba(75,56,179,0.10); --sb-active-text: #4B38B3; --sb-label: #878A99;
+            --topbar-bg: #1C1C36;
+            --sb-bg: #FFFFFF; --sb-border: #e9ebec; --sb-text: #6d7080; --sb-text-hover: #4b38b3; --sb-hover-bg: #f3f3f9; --sb-active-bg: rgba(75,56,179,0.15); --sb-active-text: #4b38b3; --sb-label: #878a99;
         }
 
         /* บังคับขนาดตัวอักษร 12px ทั้งระบบ */
         body, table, .btn, .form-control, .form-select, .form-label, .small, .badge {
             font-size: 13px !important;
-            font-family: 'Inter', 'Kanit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Inter', 'Noto Sans Thai', 'Segoe UI', Tahoma, sans-serif;
         }
 
-        h1, h2, h3, h4, h5, h6 { font-family: 'Inter', 'Kanit', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Inter', 'Noto Sans Thai', 'Segoe UI', Tahoma, sans-serif; }
         h2, h3, h4 { font-size: 18px !important; }
         h5, h6 { font-size: 14px !important; }
         .kpi-container h1 { font-size: 28px !important; }
@@ -335,8 +337,8 @@
         .btn:focus-visible { box-shadow: var(--shadow-trust-ring) !important; outline: none; }
         .btn-primary { background-color: var(--trust) !important; border-color: var(--trust) !important; color: #fff !important; }
         .btn-primary:hover, .btn-primary:focus { background-color: var(--trust-dark) !important; border-color: var(--trust-dark) !important; color: #fff !important; }
-        .btn-success { background-color: #2EAD6D !important; border-color: #2EAD6D !important; color: #fff !important; }
-        .btn-success:hover, .btn-success:focus { background-color: #258F5A !important; border-color: #258F5A !important; color: #fff !important; }
+        .btn-success { background-color: var(--success) !important; border-color: var(--success) !important; color: #fff !important; }
+        .btn-success:hover, .btn-success:focus { background-color: #3bb875 !important; border-color: #3bb875 !important; color: #fff !important; }
         .btn-danger { background-color: var(--danger) !important; border-color: var(--danger) !important; }
         .btn-outline-danger { color: var(--danger) !important; border-color: var(--danger) !important; }
         .btn-outline-danger:hover { background-color: var(--danger) !important; color: #fff !important; }
@@ -445,13 +447,114 @@
         .login-box::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--trust); }
         .login-icon-badge { width: 68px; height: 68px; border-radius: 50%; background: var(--trust-soft); display: inline-flex; align-items: center; justify-content: center; margin: 0 auto 14px; box-shadow: inset 0 0 0 1px var(--trust-strong); }
         .login-icon-badge i { font-size: 30px !important; }
+
+        /* ===== รอบที่ 1: ความสม่ำเสมอ + สถานะโหลด/ว่าง/แจ้งเตือน ===== */
+        .app-spinner { width: 3rem; height: 3rem; }
+        /* เมนูข้าง: น้ำหนักตัวอักษรเดียวกัน เฉพาะรายการ active หนาขึ้น */
+        #myTab .nav-link { font-weight: 500; }
+        #myTab .nav-link.active { font-weight: 600; }
+        /* Skeleton loader */
+        @keyframes skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+        .skeleton, .skeleton-cell > span { display: inline-block; min-width: 40px; height: 1em; border-radius: var(--radius-sm); color: transparent !important; background: linear-gradient(90deg, var(--surface-3) 25%, var(--surface-hover) 50%, var(--surface-3) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s linear infinite; user-select: none; }
+        h1.skeleton { min-width: 90px; height: 1.1em; }
+        .skeleton-cell > span { width: 80%; }
+        .skeleton-cell:nth-child(3n) > span { width: 55%; }
+        .skeleton-cell:nth-child(4n) > span { width: 65%; }
+        @media (prefers-reduced-motion: reduce) { .skeleton, .skeleton-cell > span { animation: none; } }
+        /* Empty state */
+        .empty-state { padding: 36px 16px; text-align: center; color: var(--text-secondary); }
+        .empty-state i { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; margin-bottom: 12px; border-radius: 50%; background: var(--trust-soft); color: var(--trust); font-size: 22px; }
+        .empty-state .empty-title { display: block; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+        .empty-state .empty-sub { display: block; font-size: 12px; color: var(--text-muted); }
+        table.dataTable td.dataTables_empty { padding: 0 !important; }
+        /* Toast แจ้งผลสำเร็จ: ไม่บังหน้าจอ ไม่ต้องกดปิด */
+        body.swal2-toast-shown .swal2-container { background: transparent !important; backdrop-filter: none !important; }
+        .swal2-popup.swal2-toast { padding: 10px 14px !important; border-left: 4px solid var(--success) !important; background: var(--surface-1) !important; backdrop-filter: none !important; box-shadow: var(--shadow-soft-hover) !important; }
+        .swal2-popup.swal2-toast .swal2-title { font-size: 13px !important; font-weight: 600; margin: 0 0 0 8px; color: var(--text-primary); }
+        .swal2-popup.swal2-toast .swal2-html-container { font-size: 12px; margin: 0 0 0 8px !important; color: var(--text-secondary) !important; }
+        .swal2-popup.swal2-toast .swal2-timer-progress-bar { background: var(--success); }
+
+        /* ===== รอบที่ 2: badge สถานะแบบเดียวกันทั้งระบบ + รายละเอียดแบรนด์ ===== */
+        .badge { font-weight: 600; letter-spacing: .01em; padding: .4em .75em; }
+        .badge.bg-success, .badge.bg-danger, .badge.bg-warning, .badge.bg-info, .badge.bg-primary, .badge.bg-secondary { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; }
+        .badge.bg-success::before, .badge.bg-danger::before, .badge.bg-warning::before, .badge.bg-primary::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .badge.bg-success { background: rgba(16,185,129,.14) !important; color: color-mix(in srgb, var(--success) 72%, var(--text-primary)) !important; border-color: rgba(16,185,129,.3); }
+        .badge.bg-danger { background: rgba(220,38,38,.12) !important; color: color-mix(in srgb, var(--danger) 78%, var(--text-primary)) !important; border-color: rgba(220,38,38,.3); }
+        .badge.bg-warning { background: rgba(245,158,11,.16) !important; color: color-mix(in srgb, var(--warning) 60%, var(--text-primary)) !important; border-color: rgba(245,158,11,.35); }
+        .badge.bg-primary { background: var(--trust-soft) !important; color: color-mix(in srgb, var(--trust) 75%, var(--text-primary)) !important; border-color: var(--trust-strong); }
+        .badge.bg-secondary { background: var(--surface-3) !important; color: var(--text-secondary) !important; border-color: var(--border-strong); }
+        /* ตัวเลขทุกตาราง/KPI ชิดหลักเท่ากัน */
+        table.dataTable td, .kpi-container h1, .price-promo, .price-rrp { font-variant-numeric: tabular-nums lining-nums; }
+        .kpi-container h1 { letter-spacing: -.01em; line-height: 1.15; }
+        .kpi-container h6 { font-size: 12px !important; text-transform: none; }
+        /* KPI การ์ดยกตัวเล็กน้อยเมื่อ hover */
+        .kpi-container { transition: background-color .15s ease, transform .15s ease, border-color .15s ease; }
+        .kpi-container:hover { transform: translateY(-1px); }
+        /* ตารางข้อมูล: แถวเปลี่ยนสี hover นุ่มขึ้น */
+        table.dataTable tbody tr { transition: background-color .12s ease; }
+        .footer-meta { margin-top: 4px; font-size: 11px; opacity: .75; }
+        @media (prefers-reduced-motion: reduce) { .kpi-container:hover { transform: none; } }
+
+        /* ===== ธีมเดียวกับ TG CMS Super App (Velzon): การ์ดขาวไร้ขอบ เงาบาง หัวตารางโปร่ง เมนูข้างขาว ===== */
+        .card, .tab-content > .tab-pane { border: 0 !important; box-shadow: var(--shadow-card) !important; border-radius: var(--radius-md) !important; margin-bottom: 24px; }
+        .card:hover { border-color: transparent; }
+        #form-pane, #data-pane, #dash-pane, #deep-pane, #daily-dash-pane, #track-pane, #transfer-pane, #act-transfer-pane, #settings-pane { border-top: 0 !important; background-color: var(--surface-1); }
+        .card.bg-light { border: 0 !important; }
+        html body .table thead th, html body table.dataTable thead th, html body th { background: transparent !important; color: var(--text-muted) !important; font-weight: 600; font-size: 13px !important; border-bottom: 1px solid var(--border) !important; }
+        table.dataTable > tbody > tr > td, table.dataTable > thead > tr > th { padding: 12px 10px 12px 16px; }
+        table.dataTable td { border-bottom: 1px solid var(--border); }
+        table.dataTable.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: var(--surface-1); }
+        .table-hover > tbody > tr:hover > * { background-color: var(--surface-hover); }
+        .btn { font-weight: 400; box-shadow: var(--shadow-card); }
+        .btn-outline-primary, .btn-outline-info, .btn-outline-secondary, .btn-outline-danger, .btn-outline-success { box-shadow: none; }
+        .btn-primary, .btn-success, .btn-danger { color: #fff !important; }
+        .form-control, .form-select { border-color: #ced4da; }
+        .page-title-bar { background: var(--surface-1); border-bottom: 1px solid var(--border); box-shadow: 0 1px 2px rgba(56,65,74,.05); padding: 12px 24px; margin-bottom: 24px; }
+        .page-title-bar h4 { font-size: 15px !important; font-weight: 600; color: var(--text-secondary); }
+        .page-crumb b { color: var(--text-primary); }
+        .app-header-bar #currentUserDisplay { background-color: #2A2A50 !important; border-radius: 0 !important; }
+        .app-header-bar .app-header-badge { background-color: #2A2A50 !important; }
+        #myTab .nav-link { font-weight: 400; }
+        #myTab .nav-link.active { font-weight: 500; }
+        #myTab .sidebar-section { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; }
+        .app-footer { background: var(--surface-1); margin: 0; padding: 18px 8px; border-top: 1px solid var(--border); color: var(--text-muted); }
+        .badge { font-weight: 500; }
+
+        /* ===== รอบที่ 3: ออฟไลน์ / สรุปวันนี้ / คู่มือ / ช่องที่ยังไม่กรอก / เมนูล่างบนมือถือ ===== */
+        #offlineBar { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 10050; padding: 8px 14px; text-align: center; background: var(--danger); color: #fff; font-weight: 500; }
+        #offlineBar.show { display: block; }
+        .today-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 12px 16px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
+        .today-title { font-weight: 600; color: var(--text-primary); }
+        .today-title i { color: var(--trust); margin-right: 6px; }
+        .today-items { display: flex; flex-wrap: wrap; gap: 10px; margin-left: auto; }
+        .today-item { display: flex; align-items: baseline; gap: 8px; padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; transition: border-color .15s ease; }
+        .today-item:hover { border-color: var(--trust); }
+        .today-num { font-size: 18px; font-weight: 700; color: var(--trust); font-variant-numeric: tabular-nums; }
+        .today-warn .today-num { color: color-mix(in srgb, var(--warning) 70%, var(--text-primary)); }
+        .today-danger .today-num { color: var(--danger); }
+        .help-guide h6 { margin: 14px 0 2px; color: var(--text-primary); }
+        .help-guide h6 i { width: 18px; color: var(--trust); }
+        .help-guide p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+        .help-guide kbd { background: var(--surface-3); color: var(--text-primary); border: 1px solid var(--border-strong); }
+        .help-ver { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); text-align: center; }
+        .select-sku.is-invalid + .select2-container .select2-selection, .select-imei.is-invalid + .select2-container .select2-selection { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(240,101,72,.2); }
+        @media (max-width: 991.98px) {
+            body { padding-bottom: 68px; }
+            #myTab { position: fixed !important; left: 0; right: 0; bottom: 0; top: auto; z-index: 1030; margin: 0 !important; border-radius: 0 !important; border: 0 !important; border-top: 1px solid var(--border) !important; padding: 4px 6px !important; gap: 2px; box-shadow: 0 -2px 8px rgba(56,65,74,.08) !important; }
+            #myTab .nav-link { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 74px; padding: 6px 4px !important; font-size: 10px !important; line-height: 1.15; text-align: center; white-space: normal !important; border-radius: var(--radius-sm) !important; }
+            #myTab .nav-link i { font-size: 16px; }
+            .back-to-top { bottom: 80px; right: 14px; }
+            .today-items { margin-left: 0; width: 100%; }
+            .today-item { flex: 1 1 30%; justify-content: center; flex-direction: column; align-items: center; gap: 0; }
+        }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
+<div id="offlineBar" role="alert" aria-live="assertive"><i class="fas fa-wifi"></i> ขาดการเชื่อมต่ออินเทอร์เน็ต — ระบบจะทำงานต่อเมื่อเชื่อมต่อได้อีกครั้ง</div>
+
 <div id="overlay">
-    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+    <div class="spinner-border text-primary app-spinner" role="status"></div>
     <div class="mt-3 text-secondary fw-bold">กำลังเชื่อมต่อฐานข้อมูล...</div>
 </div>
 
@@ -496,6 +599,9 @@
             <h3 class="text-primary m-0 fw-bold"><i class="fas fa-shield-alt text-gold"></i> ACT SAMSUNG System<span class="brand-sub">ระบบบริหารจัดการและตรวจสอบรายการ ACT</span></h3>
             </div>
             <div class="d-flex align-items-center gap-2">
+                <button type="button" class="theme-toggle-btn" id="helpBtn" title="คู่มือการใช้งาน" aria-label="คู่มือการใช้งาน">
+                    <i class="fas fa-circle-question"></i>
+                </button>
                 <button type="button" class="theme-toggle-btn" id="themeToggleBtn" title="สลับโหมดมืด/สว่าง" aria-label="สลับโหมดมืด/สว่าง">
                     <i class="fas fa-moon"></i>
                 </button>
@@ -522,34 +628,34 @@
         <li class="sidebar-brand" role="presentation"><i class="fas fa-shield-alt"></i><span>ACT SAMSUNG<small>Management System</small></span></li>
         <li class="sidebar-section">ทั่วไป</li>
         <li class="nav-item">
-            <button class="nav-link tab-form active fw-bold shadow-sm" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-pane" type="button"><i class="fas fa-edit"></i> ฟอร์มบันทึกข้อมูลหน้าสาขา</button>
+            <button class="nav-link tab-form active" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-pane" type="button"><i class="fas fa-edit"></i> ฟอร์มบันทึกข้อมูลหน้าสาขา</button>
         </li>
-        <li class="nav-item ms-2">
-            <button class="nav-link tab-data fw-bold shadow-sm" id="data-tab" data-bs-toggle="tab" data-bs-target="#data-pane" type="button"><i class="fas fa-table"></i> ข้อมูลACTทั้งหมด</button>
+        <li class="nav-item">
+            <button class="nav-link tab-data" id="data-tab" data-bs-toggle="tab" data-bs-target="#data-pane" type="button"><i class="fas fa-table"></i> ข้อมูลACTทั้งหมด</button>
         </li>
         <li class="sidebar-section">รายงาน</li>
-        <li class="nav-item ms-2">
-            <button class="nav-link tab-dash fw-bold shadow-sm" id="dash-tab" data-bs-toggle="tab" data-bs-target="#dash-pane" type="button"><i class="fas fa-chart-pie"></i> แดชบอร์ดสรุปผู้บริหาร</button>
+        <li class="nav-item">
+            <button class="nav-link tab-dash" id="dash-tab" data-bs-toggle="tab" data-bs-target="#dash-pane" type="button"><i class="fas fa-chart-pie"></i> แดชบอร์ดสรุปผู้บริหาร</button>
         </li>
-        <li class="nav-item ms-2">
-            <button class="nav-link tab-deep fw-bold shadow-sm" id="deep-tab" data-bs-toggle="tab" data-bs-target="#deep-pane" type="button"><i class="fas fa-search-plus"></i> เจาะลึกสต๊อกรายรุ่น</button>
+        <li class="nav-item">
+            <button class="nav-link tab-deep" id="deep-tab" data-bs-toggle="tab" data-bs-target="#deep-pane" type="button"><i class="fas fa-search-plus"></i> เจาะลึกสต๊อกรายรุ่น</button>
         </li>
-        <li class="nav-item ms-2">
-            <button class="nav-link tab-daily fw-bold shadow-sm" id="daily-dash-tab" data-bs-toggle="tab" data-bs-target="#daily-dash-pane" type="button"><i class="fas fa-calendar-day"></i> แดชบอร์ดสรุปรายวัน</button>
+        <li class="nav-item">
+            <button class="nav-link tab-daily" id="daily-dash-tab" data-bs-toggle="tab" data-bs-target="#daily-dash-pane" type="button"><i class="fas fa-calendar-day"></i> แดชบอร์ดสรุปรายวัน</button>
         </li>
-        <li class="nav-item ms-2">
-            <button class="nav-link tab-track fw-bold shadow-sm" id="track-tab" data-bs-toggle="tab" data-bs-target="#track-pane" type="button"><i class="fas fa-map-marker-alt"></i> ติดตามขายสินค้า(แอเรีย)</button>
+        <li class="nav-item">
+            <button class="nav-link tab-track" id="track-tab" data-bs-toggle="tab" data-bs-target="#track-pane" type="button"><i class="fas fa-map-marker-alt"></i> ติดตามขายสินค้า(แอเรีย)</button>
         </li>
         <li class="sidebar-section">โอนย้าย</li>
-        <li class="nav-item ms-2">
-            <button class="nav-link tab-transfer fw-bold shadow-sm" id="transfer-tab" data-bs-toggle="tab" data-bs-target="#transfer-pane" type="button"><i class="fas fa-truck"></i> โอนย้ายสต๊อก</button>
+        <li class="nav-item">
+            <button class="nav-link tab-transfer" id="transfer-tab" data-bs-toggle="tab" data-bs-target="#transfer-pane" type="button"><i class="fas fa-truck"></i> โอนย้ายสต๊อก</button>
         </li>
-        <li class="nav-item ms-2">
-            <button class="nav-link tab-act-transfer fw-bold shadow-sm" id="act-transfer-tab" data-bs-toggle="tab" data-bs-target="#act-transfer-pane" type="button"><i class="fas fa-right-left"></i> โอนย้ายรายการ ACT</button>
+        <li class="nav-item">
+            <button class="nav-link tab-act-transfer" id="act-transfer-tab" data-bs-toggle="tab" data-bs-target="#act-transfer-pane" type="button"><i class="fas fa-right-left"></i> โอนย้ายรายการ ACT</button>
         </li>
-        <li class="nav-item ms-2" id="settingsTabLi" style="display:none;">
+        <li class="nav-item" id="settingsTabLi" style="display:none;">
             <div class="sidebar-section">ผู้ดูแลระบบ</div>
-            <button class="nav-link tab-settings fw-bold shadow-sm" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane" type="button"><i class="fas fa-gears"></i> ตั้งค่าระบบ</button>
+            <button class="nav-link tab-settings" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-pane" type="button"><i class="fas fa-gears"></i> ตั้งค่าระบบ</button>
         </li>
     </ul>
 
@@ -562,6 +668,14 @@
     <div class="tab-content border-0" id="myTabContent">
         
         <div class="tab-pane fade show active bg-white p-3 rounded shadow-sm" id="form-pane">
+            <div id="todaySummary" class="today-summary d-none" aria-live="polite">
+                <div class="today-title"><i class="fas fa-clipboard-list"></i> ภาพรวมวันนี้</div>
+                <div class="today-items">
+                    <button type="button" class="today-item" data-go="data"><span class="today-num" id="sumTotal">0</span><span class="today-lbl">รายการทั้งหมด</span></button>
+                    <button type="button" class="today-item today-warn" data-go="data"><span class="today-num" id="sumUnsold">0</span><span class="today-lbl">ยังไม่ขาย</span></button>
+                    <button type="button" class="today-item today-danger" data-go="data"><span class="today-num" id="sumOverdue">0</span><span class="today-lbl">ค้างเกิน 15 วัน</span></button>
+                </div>
+            </div>
             <div id="timeAlert" class="alert alert-danger d-none fw-bold shadow-sm">
                 <i class="fas fa-lock-open"></i> นอกเวลาทำการ ระบบจะไม่บันทึกข้อมูลหลัก แต่สามารถดูรายงานและเปลี่ยนสเตตัสได้
             </div>
@@ -1174,18 +1288,153 @@
     <footer class="app-footer">
         <div><i class="fas fa-shield-alt"></i> ACT SAMSUNG System &middot; ข้อมูลภายในองค์กร ใช้งานได้เฉพาะผู้ที่ได้รับอนุญาต</div>
         <div>การเข้าสู่ระบบและการเปลี่ยนสถานะรายการทุกครั้งถูกบันทึกเพื่อการตรวจสอบ</div>
+        <div class="footer-meta">ACT SAMSUNG Management System &middot; v1.1 &middot; &copy; <span id="footerYear"></span></div>
     </footer>
     </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.3/dist/sweetalert2.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+// ===== UI helpers: toast / error ที่เข้าใจง่าย / กันกดซ้ำ / ออฟไลน์ / session / คู่มือ / skeleton =====
+(function () {
+    var _fire = Swal.fire.bind(Swal);
+    var THAI = /[฀-๿]/;
+    function isTech(t) { return !!t && !THAI.test(t) && /[A-Za-z]/.test(t); }
+    function refCode() { return 'E-' + Date.now().toString(36).toUpperCase().slice(-6); }
+    // ข้อความ error เชิงเทคนิค (อังกฤษล้วน) -> ข้อความสุภาพ + รหัสอ้างอิง (รายละเอียดเต็มอยู่ใน console)
+    function friendly(text) {
+        if (typeof text !== 'string') return text;
+        if (!navigator.onLine) return 'ไม่มีการเชื่อมต่ออินเทอร์เน็ต กรุณาตรวจสอบสัญญาณแล้วลองใหม่อีกครั้ง';
+        var i = text.indexOf(': '), head = i > -1 ? text.slice(0, i) : '', tail = i > -1 ? text.slice(i + 2) : text;
+        if (isTech(tail) && !/^AUTH_REQUIRED$/.test(tail)) {
+            var ref = refCode();
+            try { console.error('[' + ref + ']', text); } catch (e) {}
+            return (THAI.test(head) ? head : 'ดำเนินการไม่สำเร็จ') + ' — ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง หากยังไม่สำเร็จให้แจ้งผู้ดูแลพร้อมรหัสอ้างอิง ' + ref;
+        }
+        return text;
+    }
+    function iconOf(args) { return args.length === 3 ? args[2] : (args[0] && typeof args[0] === 'object' ? args[0].icon : null); }
+
+    Swal.fire = function (a, b, c) {
+        var args = arguments, icon = iconOf(args);
+        if (icon === 'success' || icon === 'error' || icon === 'warning' || icon === 'info') UI.releaseSubmit();
+        // ผลสำเร็จ -> toast (ยกเว้นเรื่องรหัสผ่านที่ผู้ใช้ต้องอ่านให้ชัด)
+        if (args.length === 3 && c === 'success' && typeof a === 'string' && !/รหัสผ่าน/.test(String(b))) {
+            return _fire({ toast: true, position: 'top-end', icon: 'success', title: a, text: b ? String(b) : undefined,
+                showConfirmButton: false, timer: 3200, timerProgressBar: true, width: 'auto' });
+        }
+        if (args.length === 3 && c === 'error') return _fire(a, friendly(b), c);
+        if (args.length === 1 && a && typeof a === 'object' && a.icon === 'error' && typeof a.text === 'string') {
+            a = Object.assign({}, a, { text: friendly(a.text) });
+            return _fire(a);
+        }
+        return _fire.apply(Swal, args);
+    };
+
+    // ตารางว่าง (ใช้กับทุก DataTable) + ภาษาไทย
+    var emptyHtml = '<div class="empty-state"><i class="fas fa-inbox"></i><span class="empty-title">ไม่พบข้อมูล</span><span class="empty-sub">ลองปรับตัวกรอง หรือเพิ่มรายการใหม่</span></div>';
+    $.extend(true, $.fn.dataTable.defaults, { language: { emptyTable: emptyHtml, zeroRecords: emptyHtml, loadingRecords: 'กำลังโหลด...', processing: 'กำลังประมวลผล...', search: 'ค้นหา:', lengthMenu: 'แสดง _MENU_ รายการ', info: 'แสดง _START_ ถึง _END_ จาก _TOTAL_ รายการ', infoEmpty: 'ไม่มีรายการ', infoFiltered: '(กรองจาก _MAX_ รายการ)', paginate: { first: 'หน้าแรก', previous: 'ก่อนหน้า', next: 'ถัดไป', last: 'หน้าสุดท้าย' } } });
+
+    // กันกดบันทึกซ้ำ: ฟอร์มบันทึก/โอนย้ายล็อกปุ่มจนกว่าจะมีผลลัพธ์ (หรือครบ 30 วินาที)
+    var busyForm = null, busyTimer = null, busyHtml = '';
+    function releaseSubmit() {
+        if (!busyForm) return;
+        var btn = busyForm.querySelector('button[type=submit]');
+        if (btn) { btn.disabled = false; btn.innerHTML = busyHtml; }
+        busyForm = null; clearTimeout(busyTimer);
+    }
+    document.addEventListener('submit', function (e) {
+        var f = e.target;
+        if (!f || ['actForm', 'transferForm', 'actTransferForm'].indexOf(f.id) === -1) return;
+        if (busyForm) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+        var btn = f.querySelector('button[type=submit]');
+        busyForm = f;
+        if (btn) { busyHtml = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังบันทึก...'; }
+        busyTimer = setTimeout(releaseSubmit, 30000);
+    }, true);
+
+    // แถบเตือนเมื่อขาดอินเทอร์เน็ต
+    function syncOnline() { document.getElementById('offlineBar').classList.toggle('show', !navigator.onLine); }
+    window.addEventListener('online', syncOnline); window.addEventListener('offline', syncOnline); syncOnline();
+
+    // เตือนก่อน session หมดอายุ (เซิร์ฟเวอร์ตั้งไว้ 24 ชม.) เตือนเมื่อเหลือ ~15 นาที ครั้งเดียวต่อการล็อกอิน
+    var warnedAt = null;
+    setInterval(function () {
+        try {
+            var t = localStorage.getItem('actssToken'), at = parseInt(localStorage.getItem('actssLoginAt'), 10);
+            if (!t || !at || warnedAt === at) return;
+            if (Date.now() - at > (24 * 60 - 15) * 60000) {
+                warnedAt = at;
+                _fire({ toast: true, position: 'top-end', icon: 'warning', title: 'เซสชันใกล้หมดอายุ', text: 'กรุณาบันทึกงานที่ค้างไว้ แล้วเข้าสู่ระบบใหม่', showConfirmButton: false, timer: 12000, timerProgressBar: true, width: 'auto' });
+            }
+        } catch (e) {}
+    }, 60000);
+
+    // คู่มือการใช้งานย่อ
+    document.getElementById('helpBtn').addEventListener('click', function () {
+        _fire({
+            title: 'คู่มือการใช้งาน', width: 560, confirmButtonText: 'เข้าใจแล้ว',
+            html: '<div class="help-guide text-start">' +
+                '<h6><i class="fas fa-edit"></i> บันทึกรายการ ACT</h6><p>เลือก SKU และ IMEI ให้ครบทุกแถว ใส่ชื่อพนักงาน แล้วกด "บันทึก" ช่องที่ขาดจะขึ้นกรอบแดง</p>' +
+                '<h6><i class="fas fa-table"></i> ดู/กรองข้อมูล</h6><p>ใช้ตัวกรองด้านบนตาราง กด "ล้างตัวกรอง" เพื่อเริ่มใหม่ และดาวน์โหลดไฟล์ CSV ได้จากปุ่มส่งออก</p>' +
+                '<h6><i class="fas fa-truck"></i> โอนย้าย</h6><p>สร้างคำขอที่แท็บโอนย้าย ฝั่งปลายทางกดรับ/ปฏิเสธได้ในแท็บเดียวกัน</p>' +
+                '<h6><i class="fas fa-keyboard"></i> ปุ่มลัด</h6><p>กด <kbd>/</kbd> เพื่อค้นหารายการทันที</p>' +
+                '<h6><i class="fas fa-headset"></i> พบปัญหา</h6><p>แจ้งผู้ดูแลระบบพร้อม <b>รหัสอ้างอิง</b> (ถ้ามี) และเวลาที่เกิดเหตุ</p>' +
+                '<div class="help-ver">ACT SAMSUNG Management System · v1.2</div></div>'
+        });
+    });
+
+    // ปุ่มลัด "/" = ค้นหาด่วนในตารางข้อมูล
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+        var t = e.target, tag = t && t.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+        var ls = document.getElementById('loginScreen');
+        if (!ls || getComputedStyle(ls).display !== 'none') return;
+        e.preventDefault();
+        bootstrap.Tab.getOrCreateInstance(document.getElementById('data-tab')).show();
+        setTimeout(function () { var i = document.querySelector('#dataTable_filter input'); if (i) i.focus(); }, 250);
+    });
+
+    // aria-label ให้ปุ่มไอคอนล้วน (อ่านจาก title) — ทำซ้ำเมื่อ DOM เปลี่ยน
+    var ariaTimer = null;
+    function fixAria() {
+        document.querySelectorAll('button:not([aria-label]), a.btn:not([aria-label])').forEach(function (b) {
+            if (!b.textContent.trim() && b.title) b.setAttribute('aria-label', b.title);
+        });
+    }
+    new MutationObserver(function () { clearTimeout(ariaTimer); ariaTimer = setTimeout(fixAria, 400); }).observe(document.body, { childList: true, subtree: true });
+    fixAria();
+
+    document.getElementById('footerYear').textContent = new Date().getFullYear();
+    $(document).on('click', '.today-item[data-go]', function () {
+        bootstrap.Tab.getOrCreateInstance(document.getElementById($(this).data('go') + '-tab')).show();
+    });
+
+    window.UI = {
+        releaseSubmit: releaseSubmit,
+        friendly: friendly,
+        skeletonRows: function (tableSel, rows) {
+            var $t = $(tableSel); if (!$t.length) return;
+            var cols = $t.find('thead th').length || 1, h = '';
+            for (var r = 0; r < (rows || 6); r++) { h += '<tr>'; for (var c = 0; c < cols; c++) h += '<td class="skeleton-cell"><span>&nbsp;</span></td>'; h += '</tr>'; }
+            $t.find('tbody').html(h);
+        },
+        kpiLoading: function (on) { $('#kpi-total,#kpi-sold,#kpi-unsold').toggleClass('skeleton', !!on); },
+        setSummary: function (total, unsold, overdue) {
+            $('#sumTotal').text(total); $('#sumUnsold').text(unsold); $('#sumOverdue').text(overdue);
+            $('#todaySummary').removeClass('d-none');
+        }
+    };
+})();
+</script>
 
 <script>
     // 💡 ป้องกัน Error ด้วยการประกาศตัวแปรให้เป็น Global Scope 100%
@@ -1325,7 +1574,7 @@
 
     function handleAuthFailure(err) {
         Swal.close();
-        try { localStorage.removeItem('actssToken'); } catch(e) {}
+        try { localStorage.removeItem('actssToken'); localStorage.removeItem('actssLoginAt'); } catch(e) {}
         currentToken = null;
         currentLocCode = null;
         currentLocName = null;
@@ -1625,9 +1874,9 @@
         try {
             var rememberedLocCode = localStorage.getItem('actssRememberedLocCode');
             var rememberedPassword = localStorage.getItem('actssRememberedPassword');
-            if (rememberedLocCode && rememberedPassword) {
+            if (rememberedLocCode) {
                 $('#loginLocCode').val(rememberedLocCode);
-                $('#loginPassword').val(rememberedPassword);
+                if (rememberedPassword) $('#loginPassword').val(rememberedPassword);
                 $('#loginRememberMe').prop('checked', true);
             }
         } catch(e) {}
@@ -1653,7 +1902,7 @@
                     currentLocCode = res.locCode;
                     currentLocName = res.locName;
                     currentRole = res.role || 'ทั่วไป';
-                    try { localStorage.setItem('actssToken', res.token); } catch(e) {}
+                    try { localStorage.setItem('actssToken', res.token); localStorage.setItem('actssLoginAt', String(Date.now())); } catch(e) {}
 
                     try {
                         if ($('#loginRememberMe').is(':checked')) {
@@ -2379,6 +2628,8 @@
                 var desc = $(this).find('.input-desc').val();
                 var imei = $(this).find('.select-imei').val();
                 var status = $(this).find('.input-status').val();
+                $(this).find('.select-sku').toggleClass('is-invalid', !sku);
+                $(this).find('.select-imei').toggleClass('is-invalid', !imei);
                 if(!sku || !imei) validationError = true;
                 payload.items.push({ sku: sku, desc: desc, imei: imei, status: status });
             });
@@ -2540,9 +2791,11 @@
     }
 
     function loadDataTable() {
+        if (!dataTableInstance) { UI.skeletonRows('#dataTable', 8); UI.kpiLoading(true); }
         google.script.run
         .withFailureHandler(function(err) {
             console.error(err);
+            UI.kpiLoading(false);
             if (err && err.message === 'AUTH_REQUIRED') { handleAuthFailure(err); return; }
             Swal.fire('ข้อผิดพลาดเครือข่าย', 'ระบบล้มเหลวในการเชื่อมโยงตาราง: ' + err.message, 'error');
         })
@@ -2560,6 +2813,7 @@
         var unsoldPool = [];
         var productSet = new Set();
         var filterModelSet = new Set();
+        var sumTotal = records ? records.length : 0, sumUnsold = 0, sumOverdue = 0;
 
         if(records && records.length > 0) {
             records.forEach(function(r) {
@@ -2568,6 +2822,7 @@
                 var ageDays = computeAgingDays(displayActDate);
                 var ageBadgeColor = ageDays > 15 ? 'bg-danger' : (ageDays > 7 ? 'bg-warning text-dark' : 'bg-success');
                 var statusStyle = r.status === 'ขายแล้ว' ? 'bg-success' : 'bg-danger';
+                if (r.status !== 'ขายแล้ว') { sumUnsold++; if (ageDays > 15) sumOverdue++; }
 
                 var cleanSku = r.sku ? r.sku.toString().trim() : "";
                 var mappedModelName = (masterProductMap[cleanSku] && masterProductMap[cleanSku] !== "") ? masterProductMap[cleanSku] : r.desc;
@@ -2616,6 +2871,7 @@
         }
         // ตารางว่าง: ปล่อย tbody ว่างให้ DataTables แสดงข้อความ "ไม่พบข้อมูล" เอง (แถว colspan ที่สร้างเองทำให้ DataTables เด้ง alert ค้างหน้า)
         $('#dataTable tbody').html(tbody);
+        UI.setSummary(sumTotal, sumUnsold, sumOverdue);
         
         var existingProduct = $('#filterProduct').val();
         $('#filterProduct').empty().append('<option value="">-- ทุกสินค้า --</option>');
@@ -2633,8 +2889,7 @@
         if(existingFilterModel && existingFilterModel.length) $('#filterModel').val(existingFilterModel);
 
         dataTableInstance = $('#dataTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[15, "desc"]],
+                        "order": [[15, "desc"]],
             "columnDefs": [{ targets: 22, visible: false, searchable: true }],
             "responsive": {
                 details: {
@@ -2741,8 +2996,7 @@
         }
         $('#trackTable tbody').html(tbody);
         trackTableInstance = $('#trackTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[1, "desc"]], "pageLength": 25
+                        "order": [[1, "desc"]], "pageLength": 25
         });
     }
 
@@ -2811,6 +3065,7 @@
             }
         });
 
+        UI.kpiLoading(false);
         $('#kpi-total').text(totalAct);
         $('#kpi-sold').text(totalSold);
         $('#kpi-unsold').text(totalUnsold);
@@ -2820,8 +3075,7 @@
         for(var m in modelAggregator) { modelTbody += '<tr><td>' + escapeHtml(m) + '</td><td class="text-center fw-bold text-primary">' + modelAggregator[m] + '</td></tr>'; }
         $('#modelTable tbody').html(modelTbody);
         modelTableInstance = $('#modelTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[1, "desc"]], "pageLength": 20, "lengthChange": false, "info": false
+                        "order": [[1, "desc"]], "pageLength": 20, "lengthChange": false, "info": false
         });
 
 
@@ -2841,8 +3095,7 @@
         }
         $('#areaAgingTable tbody').html(areaAgingTbody);
         areaAgingTableInstance = $('#areaAgingTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[1, "desc"]], "pageLength": 20, "lengthChange": false, "info": false
+                        "order": [[1, "desc"]], "pageLength": 20, "lengthChange": false, "info": false
         });
 
         var existingModel = $('#deepFilterModel').val();
@@ -2916,8 +3169,7 @@
         });
         $('#dailyModelTable tbody').html(tbodyModel);
         dailyModelTableInstance = $('#dailyModelTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [], "pageLength": 20, "lengthChange": false
+                        "order": [], "pageLength": 20, "lengthChange": false
         });
 
         $('#dailyModelTable tbody').off('click', 'td.details-control').on('click', 'td.details-control', function () {
@@ -3005,7 +3257,7 @@
                 { data: 'model', className: 'align-middle fw-bold text-dark', render: function(data) { return escapeHtml(data); } },
                 { data: 'count', className: 'text-center align-middle fw-bold text-primary fs-6' }
             ],
-            order: [[2, 'desc']], language: { url: "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" }, responsive: false
+            order: [[2, 'desc']], responsive: false
         });
 
         $('#modelDetailTable tbody').off('click', 'td.model-details-control');
@@ -3208,8 +3460,7 @@
         });
         $('#incomingTransferTable tbody').html(tbody);
         incomingTransferTableInstance = $('#incomingTransferTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [], "paging": false, "searching": false, "info": false, "columnDefs": [{ "orderable": false, "targets": 0 }]
+                        "order": [], "paging": false, "searching": false, "info": false, "columnDefs": [{ "orderable": false, "targets": 0 }]
         });
         $('#selectAllTransfer').prop('checked', false);
         updateSelectedTransferCount();
@@ -3237,8 +3488,7 @@
         });
         $('#outgoingTransferTable tbody').html(tbody);
         outgoingTransferTableInstance = $('#outgoingTransferTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[1, "desc"]], "pageLength": 10, "columnDefs": [{ "orderable": false, "targets": 0 }]
+                        "order": [[1, "desc"]], "pageLength": 10, "columnDefs": [{ "orderable": false, "targets": 0 }]
         });
         $('#selectAllOutgoingTransfer').prop('checked', false);
         updateSelectedOutgoingTransferCount();
@@ -3291,8 +3541,7 @@
         });
         $('#incomingActTransferTable tbody').html(tbody);
         incomingActTransferTableInstance = $('#incomingActTransferTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [], "paging": false, "searching": false, "info": false, "columnDefs": [{ "orderable": false, "targets": 0 }]
+                        "order": [], "paging": false, "searching": false, "info": false, "columnDefs": [{ "orderable": false, "targets": 0 }]
         });
         $('#selectAllActTransfer').prop('checked', false);
         updateSelectedActTransferCount();
@@ -3320,8 +3569,7 @@
         });
         $('#outgoingActTransferTable tbody').html(tbody);
         outgoingActTransferTableInstance = $('#outgoingActTransferTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[1, "desc"]], "pageLength": 10, "columnDefs": [{ "orderable": false, "targets": 0 }]
+                        "order": [[1, "desc"]], "pageLength": 10, "columnDefs": [{ "orderable": false, "targets": 0 }]
         });
         $('#selectAllOutgoingActTransfer').prop('checked', false);
         updateSelectedOutgoingActTransferCount();
@@ -3360,8 +3608,7 @@
         });
         $('#settingsUsersTable tbody').html(tbody);
         settingsUsersTableInstance = $('#settingsUsersTable').DataTable({
-            "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/th.json" },
-            "order": [[0, "asc"]], "pageLength": 25
+                        "order": [[0, "asc"]], "pageLength": 25
         });
     }
 

@@ -236,9 +236,18 @@ function requireAdminSession_(token) {
   return session;
 }
 
+// ป้องกันฟังก์ชันตั้งค่า/กู้บัญชีถูกเรียกจากหน้าเว็บ: เว็บแอปนี้ "รันในนามเจ้าของ + เข้าถึงได้ทุกคน"
+// ฟังก์ชัน global ทุกตัวจึงถูกเรียกผ่าน google.script.run ได้ ต้องอนุญาตเฉพาะตอนเจ้าของรันเองจาก editor / clasp run
+function assertOwnerRun_() {
+  let active = "", effective = "";
+  try { active = Session.getActiveUser().getEmail(); effective = Session.getEffectiveUser().getEmail(); } catch (e) {}
+  if (!active || !effective || active !== effective) throw new Error("Forbidden");
+}
+
 // รันเองจาก Apps Script editor หรือ `clasp run adminBootstrapAccount --params '["username","password"]'` เท่านั้น
 // ใช้สร้าง/รีเซ็ตรหัสผ่านบัญชี Admin คนแรก (ไม่มีปุ่มเรียกจากหน้าเว็บ)
 function adminBootstrapAccount(username, password) {
+  assertOwnerRun_();
   username = (username || "").toString().trim();
   password = (password || "").toString();
   if (!username || password.length < 4) throw new Error("ต้องระบุ username และรหัสผ่านอย่างน้อย 4 ตัวอักษร");
@@ -265,7 +274,32 @@ function adminBootstrapAccount(username, password) {
 // LocCode สงวนไว้แทนบัญชี Admin ที่ login ผ่านหน้าแรกร่วมกับสาขา (ไม่ใช่ LocCode สาขาจริง)
 const ADMIN_SESSION_LOCCODE = "__ADMIN__";
 
+// ล็อกชั่วคราวเมื่อใส่รหัสผิดติดกัน (นับด้วย CacheService ไม่แตะโครงสร้างชีต)
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_SECONDS = 900; // 15 นาที
+const LOGIN_BAD_CRED_MSG_ = "รหัสสาขาหรือรหัสผ่านไม่ถูกต้อง";
+
 function login(locCode, password) {
+  const key = "loginfail_" + (locCode || "").toString().trim().slice(0, 40);
+  let cache = null, fails = 0;
+  try {
+    cache = CacheService.getScriptCache();
+    fails = parseInt(cache.get(key), 10) || 0;
+  } catch (e) { cache = null; }
+  if (cache && fails >= LOGIN_MAX_FAILS) {
+    return { success: false, message: "ใส่รหัสผิดหลายครั้ง บัญชีถูกล็อกชั่วคราว 15 นาที กรุณาลองใหม่ภายหลัง หรือติดต่อผู้ดูแลระบบ" };
+  }
+  const res = loginCore_(locCode, password);
+  if (cache) {
+    try {
+      if (res && res.success) cache.remove(key);
+      else if (res && res.message === LOGIN_BAD_CRED_MSG_) cache.put(key, String(fails + 1), LOGIN_LOCK_SECONDS);
+    } catch (e) {}
+  }
+  return res;
+}
+
+function loginCore_(locCode, password) {
   locCode = (locCode || "").toString().trim();
   password = (password || "").toString();
   if (!locCode || !password) return { success: false, message: "กรุณากรอกรหัสสาขาและรหัสผ่าน" };
@@ -671,6 +705,7 @@ function changeAdminPassword_(token, oldPassword, newPassword) {
 // รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — สร้างชีต Users/Sessions/AccountSetup
 // พร้อม header ให้ครบ ถ้าชีตมีอยู่แล้วจะข้ามไม่แตะของเดิม เรียกได้ซ้ำอย่างปลอดภัย
 function setupAuthSheets() {
+  assertOwnerRun_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   let usersSheet = getUsersSheet_(ss);
@@ -733,6 +768,7 @@ function setupAuthSheets() {
 // รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — สร้างชีต TransferRequests
 // สำหรับฟีเจอร์โอนย้ายสต๊อกข้ามสาขา เรียกได้ซ้ำอย่างปลอดภัย (ข้ามถ้ามีชีตอยู่แล้ว)
 function setupTransferSheet() {
+  assertOwnerRun_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!getTransferSheet_(ss)) {
     const sheet = ss.insertSheet("TransferRequests");
@@ -748,6 +784,7 @@ function setupTransferSheet() {
 // รันเองจาก Apps Script editor เท่านั้น (ไม่ผูกปุ่มใดๆ บนเว็บ) — สร้างชีต ActRecordTransfers
 // สำหรับฟีเจอร์โอนย้ายรายการ ACT ข้ามสาขา (คนละระบบ/คนละหน้ากับโอนย้ายสต๊อกด้านบน) เรียกได้ซ้ำอย่างปลอดภัย (ข้ามถ้ามีชีตอยู่แล้ว)
 function setupActTransferSheet() {
+  assertOwnerRun_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!getActTransferSheet_(ss)) {
     const sheet = ss.insertSheet("ActRecordTransfers");
@@ -763,6 +800,7 @@ function setupActTransferSheet() {
 // รันเองจาก Apps Script editor เท่านั้น ครั้งเดียว — ลบคอลัมน์ ApprovedAt/ApprovedBy ที่เหลือค้างจากตอนยังมีขั้นตอนอนุมัติ
 // (ตัดขั้นตอนอนุมัติออกจากระบบแล้ว) ออกจากชีต TransferRequests ที่สร้างไปแล้ว คอลัมน์ ReceivedAt/ReceivedBy จะเลื่อนมาแทนที่อัตโนมัติ
 function migrateTransferSheetRemoveApprovalColumns() {
+  assertOwnerRun_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getTransferSheet_(ss);
   if (!sheet) throw new Error("ไม่พบชีต TransferRequests");
@@ -777,6 +815,7 @@ function migrateTransferSheetRemoveApprovalColumns() {
 // อ่านชีต "AccountSetup" (A: LocCode, B: PlainPassword) แล้ว hash เขียนลงชีต "Users"
 // ทำเสร็จแล้วให้ลบคอลัมน์ B ในชีต AccountSetup ทิ้ง อย่าปล่อยรหัสผ่าน plaintext ค้างไว้
 function adminSetupUsers() {
+  assertOwnerRun_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const setupSheet = findSheet(ss, "accountsetup");
   const usersSheet = getUsersSheet_(ss);
