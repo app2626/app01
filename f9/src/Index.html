@@ -253,6 +253,10 @@
                   <li><i class="fas fa-gift"></i> รับของแถม</li>
                 </ul>
               </section>
+              <section class="pf-col" id="footerCatCol">
+                <h3 class="pf-h">หมวดสินค้า</h3>
+                <nav class="pf-links" aria-label="หมวดสินค้า" id="footerCatLinks"></nav>
+              </section>
               <section class="pf-col">
                 <h3 class="pf-h">บริการลูกค้า</h3>
                 <nav class="pf-links" aria-label="ลิงก์ด่วน" id="footerQuickLinks">
@@ -270,7 +274,7 @@
               <p class="pf-secure"><i class="fas fa-lock"></i> ข้อมูลเข้ารหัสและปลอดภัย <span class="pf-dot"></span> Online</p>
            </div>
         </footer>
-        <button type="button" id="backToTopBtn" aria-label="เลื่อนขึ้นด้านบน" title="กลับขึ้นด้านบน" onclick="window.scrollTo({top:0,behavior:'smooth'})" class="hidden fixed bottom-28 right-7 lg:bottom-32 lg:right-12 z-[39] w-11 h-11 rounded-full bg-[#141416] text-[#FF6B00] border border-[#FF6B00]/50 shadow-lg hover:scale-105 transition-all items-center justify-center"><i class="fas fa-arrow-up"></i></button>
+        <button type="button" id="backToTopBtn" aria-label="เลื่อนขึ้นด้านบน" title="กลับขึ้นด้านบน" onclick="window.scrollTo({top:0,behavior:'smooth'})" class="hidden fixed bottom-28 right-7 lg:bottom-32 lg:right-12 z-[39] w-11 h-11 rounded-full bg-white text-slate-700 border border-slate-200 shadow-lg hover:text-[#E05300] hover:border-[#FF6B00] hover:scale-105 transition-all items-center justify-center"><i class="fas fa-arrow-up"></i></button>
       </div>
 
       <div id="popupBannerModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true" aria-label="แบนเนอร์ประชาสัมพันธ์">
@@ -300,28 +304,13 @@
   <template id="tmpl-dashboard">
     <div class="space-y-6">
         
-        <div id="dashHeroWrap" class="w-full h-[30vh] md:h-[40vh] rounded-3xl overflow-hidden shadow-md relative group mb-6 hidden bg-slate-200">
-            <div id="sliderTrack" class="flex w-full h-full transition-transform duration-700 ease-in-out"></div>
-            <button onclick="window.app.dashboard.slider.prev()" aria-label="แบนเนอร์ก่อนหน้า" class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/30 hover:bg-white/90 backdrop-blur-md rounded-full text-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md focus:outline-none"><i class="fas fa-chevron-left"></i></button>
-            <button onclick="window.app.dashboard.slider.next()" aria-label="แบนเนอร์ถัดไป" class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/30 hover:bg-white/90 backdrop-blur-md rounded-full text-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md focus:outline-none"><i class="fas fa-chevron-right"></i></button>
-            <div id="sliderDots" class="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2"></div>
-        </div>
-
-        <div id="dashPromoGridWrap" class="hidden">
-            <div class="flex items-center mb-4 pl-1">
-                <i class="fas fa-bolt text-amber-500 mr-2 text-xl"></i>
-                <h2 class="font-black text-xl text-slate-800 tracking-tight">แคมเปญสุดพิเศษ</h2>
-            </div>
-            <div id="dashPromoGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
-        </div>
-
         <div class="bg-white border border-slate-200 shadow-sm rounded-2xl p-4">
           <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
             <div class="flex items-center gap-2 w-full md:w-auto">
               <i class="far fa-calendar-alt text-indigo-500"></i>
-              <input type="date" class="border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" id="dashStartDate" onchange="window.app.dashboard.applyFilters()">
+              <input type="date" class="flex-1 min-w-0 md:flex-none border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" id="dashStartDate" onchange="window.app.dashboard.applyFilters()">
               <span class="text-slate-400">-</span>
-              <input type="date" class="border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" id="dashEndDate" onchange="window.app.dashboard.applyFilters()">
+              <input type="date" class="flex-1 min-w-0 md:flex-none border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" id="dashEndDate" onchange="window.app.dashboard.applyFilters()">
             </div>
             
             <div class="flex flex-wrap md:flex-nowrap gap-4 items-center w-full md:w-auto">
@@ -348,7 +337,7 @@
         <!-- Empty/error state ของ Dashboard (5A.4) — เติมเนื้อหาด้วย window.app.emptyState -->
         <div id="dashEmptyState" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm"></div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 lg:gap-4">
+        <div class="dash-kpis grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3 lg:gap-4">
           <div class="kpi-gradient-total border border-slate-100 shadow-sm rounded-2xl p-5 text-center transform transition hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2"><i class="fas fa-coins text-indigo-500 mr-1.5 opacity-80"></i>ยอดขายรวม</p><h3 class="text-xl md:text-2xl font-black text-indigo-600 truncate" id="dashKpiTotal">฿0</h3></div>
           <div class="kpi-gradient-mob border border-slate-100 shadow-sm rounded-2xl p-5 text-center transform transition hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2"><i class="fas fa-mobile-alt text-emerald-600 mr-1.5 opacity-80"></i>ยอดจองโมบาย</p><h3 class="text-xl md:text-2xl font-black text-slate-800 truncate" id="dashKpiMobiles">0</h3></div>
           <div class="kpi-gradient-acc border border-slate-100 shadow-sm rounded-2xl p-5 text-center transform transition hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2"><i class="fas fa-headphones text-slate-600 mr-1.5 opacity-80"></i>ยอดจองอุปกรณ์เสริม</p><h3 class="text-xl md:text-2xl font-black text-slate-800 truncate" id="dashKpiAccessories">0</h3></div>
@@ -356,6 +345,22 @@
           <div class="kpi-gradient-resF border border-slate-100 shadow-sm rounded-2xl p-5 text-center transform transition hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2"><i class="fas fa-calendar-check text-blue-500 mr-1.5 opacity-80"></i>ยอดจอง F</p><h3 class="text-xl md:text-2xl font-black text-blue-600 truncate" id="dashKpiResF">0</h3></div>
           <div class="kpi-gradient-aov border border-slate-100 shadow-sm rounded-2xl p-5 text-center transform transition hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2"><i class="fas fa-receipt text-purple-500 mr-1.5 opacity-80"></i>เฉลี่ยต่อบิล</p><h3 class="text-xl md:text-2xl font-black text-slate-800 truncate" id="dashKpiAov">฿0</h3></div>
           <div class="kpi-gradient-conv border border-slate-100 shadow-sm rounded-2xl p-5 text-center transform transition hover:-translate-y-1 hover:shadow-md"><p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2"><i class="fas fa-percentage text-emerald-500 mr-1.5 opacity-80"></i>อัตราปิดการขาย</p><h3 class="text-xl md:text-2xl font-black text-emerald-600 truncate" id="dashKpiConv">0%</h3></div>
+        </div>
+
+        <!-- แบนเนอร์ประชาสัมพันธ์ (จัดการที่ ตั้งค่าระบบ → แบนเนอร์) — อยู่ใต้ตัวเลข KPI: หน้าแรกของระบบหลังร้านต้องเห็นยอดก่อน -->
+        <div id="dashHeroWrap" class="w-full h-[160px] md:h-[220px] rounded-2xl overflow-hidden shadow-md relative group mb-6 hidden bg-slate-200">
+            <div id="sliderTrack" class="flex w-full h-full transition-transform duration-700 ease-in-out"></div>
+            <button onclick="window.app.dashboard.slider.prev()" aria-label="แบนเนอร์ก่อนหน้า" class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/30 hover:bg-white/90 backdrop-blur-md rounded-full text-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md focus:outline-none"><i class="fas fa-chevron-left"></i></button>
+            <button onclick="window.app.dashboard.slider.next()" aria-label="แบนเนอร์ถัดไป" class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/30 hover:bg-white/90 backdrop-blur-md rounded-full text-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md focus:outline-none"><i class="fas fa-chevron-right"></i></button>
+            <div id="sliderDots" class="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2"></div>
+        </div>
+
+        <div id="dashPromoGridWrap" class="hidden">
+            <div class="flex items-center mb-4 pl-1">
+                <i class="fas fa-bullhorn text-[#FF6B00] mr-2"></i>
+                <h2 class="font-black text-base text-slate-800 tracking-tight">แคมเปญ / ประกาศ</h2>
+            </div>
+            <div id="dashPromoGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
         </div>
 
         <!-- Section 1: Sales Trends & Performance -->
@@ -505,25 +510,50 @@
       <!-- มือถือ: ห้ามล็อกการ์ดที่ความสูงคงที่ (เดิม 65vh) — ส่วนหัวบนจอแคบ (timer แนวตั้ง + select 2 ช่อง + ค้นหา + tiles + chips) กินพื้นที่เกือบหมด เหลือให้กริดสินค้า ~0px = หน้าดูว่างเปล่า (บั๊กที่เจอบน iPhone 2026-07-11); ให้การ์ดสูงตามเนื้อหาแล้วเลื่อนทั้งหน้าแทน ส่วน lg ขึ้นไปคง layout เดิม (การ์ดเต็มจอ + กริด scroll ข้างใน) -->
       <div class="pos-shell-card lg:flex-1 flex flex-col bg-white/95 backdrop-blur-xl border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-3xl transition-all duration-300 p-3.5 md:p-5 overflow-hidden relative min-h-[65vh] lg:h-full shrink-0 lg:shrink">
           
-          <!-- Storefront header: ค้นหา + ตะกร้า (แถวบน) และ ช่องทาง/สาขา เป็นชิปกะทัดรัด (แถวล่าง) — id เดิมทั้งหมดคงไว้ -->
+          <!-- แถบบริการบนสุดแบบเว็บร้านค้ามาตรฐาน (เดสก์ท็อป/แท็บเล็ต) — ลิงก์บริการลูกค้า + เบอร์ติดต่อจาก Settings -->
+          <div id="sfTopbar" class="sf-topbar shrink-0">
+            <span class="sf-topbar-msg"><i class="fas fa-certificate"></i> สินค้าของแท้ ประกันศูนย์ · ล็อกราคา Pre Booking ทันที · รับสิทธิ์ของแถม</span>
+            <nav class="sf-topbar-links" aria-label="บริการลูกค้า">
+              <button type="button" onclick="window.app.pos.openOrderTrackModal()"><i class="fas fa-qrcode"></i> เช็คสถานะใบจอง</button>
+              <button type="button" onclick="window.app.pos.openTradeInStandalone()"><i class="fas fa-retweet"></i> เก่าแลกใหม่</button>
+              <span id="sfTopbarPhone" class="hidden"></span>
+            </nav>
+          </div>
+
+          <!-- Storefront header: โลโก้ + ค้นหา + รายการโปรด + ตะกร้า + บัญชี (แถวบน) และ ช่องทาง/สาขา (แถวล่าง) — id เดิมทั้งหมดคงไว้ -->
           <div id="posStoreSentinel" aria-hidden="true" style="height:1px;margin-bottom:-1px;pointer-events:none"></div>
           <div id="posStoreHeader" class="pos-store-header shrink-0">
             <div class="pos-store-row">
+              <a href="#pos" class="sf-home" onclick="window.app.pos.goHome(event)" aria-label="หน้าแรกร้านค้า" title="หน้าแรกร้านค้า">
+                <span id="sfLogoBox" class="sf-logo"><i id="sfLogoIcon" class="fas fa-layer-group"></i></span>
+                <span class="sf-brand-name"><?= appName ?></span>
+              </a>
               <div class="pos-search-wrap">
                 <i class="fas fa-search pos-search-ico"></i>
                 <input type="text" class="pos-search" id="searchProduct" placeholder="ค้นหาสินค้า ชื่อรุ่น / SKU / หมวด..." oninput="window.app.pos.filterDebounced()" autocomplete="off" aria-label="ค้นหาสินค้า">
                 <button type="button" onclick="document.getElementById('searchProduct').value=''; window.app.pos.filter()" aria-label="ล้างคำค้นหา" class="pos-search-clear"><i class="fas fa-times-circle"></i></button>
               </div>
+              <button type="button" onclick="window.app.pos.openWishlistDrawer()" class="sf-icon-btn sf-wish-btn" title="รายการโปรด (Wishlist)" aria-label="รายการโปรด">
+                <i class="far fa-heart"></i>
+                <span class="sf-icon-lbl">รายการโปรด</span>
+                <span id="posWishlistCountBadge" class="sf-badge">0</span>
+              </button>
               <button type="button" onclick="window.app.pos.toggleCart()" class="pos-cart-btn" title="เปิดตะกร้าสั่งจอง">
                 <i class="fas fa-shopping-basket"></i>
                 <span class="pos-cart-lbl">ตะกร้า</span>
                 <span id="headerCartCount" class="pos-cart-count">0</span>
               </button>
-              <button type="button" id="posFullscreenBtn" onclick="window.app.toggleSidebar()" class="pos-fs-btn" aria-pressed="false" title="โหมดเต็มจอ (ซ่อนเมนูด้านข้าง)">
-                <i class="fas fa-expand"></i><span class="pos-fs-lbl">เต็มจอ</span>
-              </button>
+              <div class="sf-acct" id="sfAcctWrap">
+                <button type="button" id="sfAcctBtn" class="sf-icon-btn" onclick="window.app.toggleSfAccount(event)" aria-haspopup="menu" aria-expanded="false" aria-controls="sfAcctPop" title="บัญชีผู้ใช้ / ระบบหลังร้าน">
+                  <i class="far fa-circle-user"></i>
+                  <span class="sf-icon-lbl" id="sfAcctName">บัญชี</span>
+                  <i class="fas fa-chevron-down sf-caret"></i>
+                </button>
+                <div id="sfAcctPop" class="sf-acct-pop hidden" role="menu" aria-label="เมนูบัญชี"></div>
+              </div>
             </div>
             <div class="pos-where">
+              <nav id="sfCatNav" class="sf-catnav" aria-label="หมวดสินค้า"></nav>
               <label class="pos-where-chip"><i class="fas fa-satellite-dish"></i><span class="pos-sr">ช่องทางการขาย</span>
                 <select id="posChannelSelect" onchange="window.app.pos.onChannelChange()" aria-label="ช่องทางการขาย"><option value="">-- เลือกช่องทาง --</option></select></label>
               <label class="pos-where-chip"><i class="fas fa-store"></i><span class="pos-sr">สาขาที่ทำรายการ</span>
@@ -548,18 +578,6 @@
              <div class="flex items-center gap-1.5 md:gap-2 relative z-10 w-full sm:w-auto justify-between sm:justify-end border-t border-white/10 sm:border-none pt-2 sm:pt-0 flex-wrap">
                 <span class="text-[10px] font-extrabold text-[#FF6B00] mr-0.5 uppercase tracking-wider flex items-center gap-1" id="posTimerBadge">เหลือเวลาช้อป</span>
                 <div class="flex items-center gap-1.5" id="posTimerCountdownDisplay"></div>
-                <button type="button" onclick="window.app.pos.openTradeInStandalone()" class="px-2.5 py-1 rounded-lg bg-[#FF6B00]/15 hover:bg-[#FF6B00]/30 border border-[#FF6B00]/40 text-[10px] font-extrabold text-[#FF6B00] flex items-center gap-1 transition-colors shrink-0" title="คำนวณราคาเทรดอิน เก่าแลกใหม่">
-                   <i class="fas fa-retweet"></i> <span>เก่าแลกใหม่</span>
-                </button>
-                <button type="button" onclick="window.app.pos.openOrderTrackModal()" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-[10px] font-bold text-white flex items-center gap-1 transition-colors shrink-0" title="ค้นหาสถานะใบจอง / รับ QR รับเครื่อง">
-                   <i class="fas fa-qrcode text-[#FF6B00]"></i> <span>เช็คใบจอง</span>
-                </button>
-                <button type="button" onclick="window.app.pos.openWishlistDrawer()" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-400/40 text-[10px] font-extrabold text-rose-300 flex items-center gap-1.5 transition-colors shrink-0" title="รายการสินค้าที่สนใจ (Wishlist)">
-                   <i class="fas fa-heart text-rose-400"></i> <span>รายการโปรด</span> <span id="posWishlistCountBadge" class="px-1.5 py-0.2 bg-rose-600 text-white rounded-full text-[9px] font-black">0</span>
-                </button>
-                <button type="button" id="btnTogglePosPromo" onclick="window.app.pos.togglePromoZone()" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white flex items-center gap-1 transition-colors shrink-0" title="ซ่อน/แสดงแบนเนอร์และคูปอง">
-                   <i class="fas fa-ticket-alt text-[#FF6B00]"></i> <span id="lblTogglePosPromo" class="hidden md:inline">คูปอง & โปรฯ</span> <i id="icoTogglePosPromo" class="fas fa-chevron-up text-[8px]"></i>
-                </button>
              </div>
           </div>
 
@@ -641,7 +659,7 @@
 
       <!-- Off-canvas Wishlist Drawer -->
       <div id="wishlistDrawer" role="dialog" aria-modal="true" aria-label="รายการโปรด" class="fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[400px] lg:w-[440px] max-w-full h-[100dvh] flex flex-col bg-white shadow-2xl transform translate-x-full transition-transform duration-300">
-          <div class="bg-[#141416] text-white px-5 py-4 flex justify-between items-center relative overflow-hidden border-b-2 border-rose-500">
+          <div class="sf-dlg-head px-5 py-4 flex justify-between items-center relative overflow-hidden">
               <div class="flex items-center relative z-10">
                   <div class="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center mr-3 shadow-sm">
                     <i class="fas fa-heart text-sm animate-pulse"></i>
@@ -678,13 +696,13 @@
 
       <!-- Off-canvas Cart Drawer (BNN Dark + Yellow Header) -->
       <div id="cartDrawer" role="dialog" aria-modal="true" aria-label="ตะกร้าสินค้า" class="fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[400px] lg:w-[450px] max-w-full h-[100dvh] flex flex-col bg-white shadow-2xl transform translate-x-full transition-transform duration-300">
-          <div class="cart-drawer-header bg-[#141416] text-white px-5 flex justify-between items-center relative overflow-hidden border-b-2 border-[#FF6B00]">
+          <div class="cart-drawer-header sf-dlg-head px-5 flex justify-between items-center relative overflow-hidden">
               <div class="flex items-center relative z-10">
                   <div class="w-9 h-9 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center mr-3 shadow-sm">
                     <i class="fas fa-shopping-basket text-sm"></i>
                   </div>
                   <div>
-                    <h3 class="font-black text-base tracking-tight text-white flex items-center gap-1.5">ตะกร้าสั่งจอง <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#FF6B00] text-white font-black uppercase">FLASH</span></h3>
+                    <h3 class="font-black text-base tracking-tight text-white flex items-center gap-1.5">ตะกร้าสั่งจอง</h3>
                     <p class="text-[10px] text-slate-300 font-medium">รายการสินค้าที่เลือกไว้</p>
                   </div>
                   <span class="ml-3 bg-[#E11D48] text-white text-[11px] font-black px-2.5 py-0.5 rounded-full shadow-sm" id="cartCount">0</span>
@@ -732,38 +750,37 @@
           </div>
 
           <div class="cart-drawer-footer bg-white p-2 border-t border-slate-200 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.04)] flex gap-2">
-              <button type="button" class="px-3.5 h-full bg-slate-900 hover:bg-black text-[#FF6B00] text-xs font-extrabold rounded-xl shadow-sm transition-all flex items-center justify-center shrink-0" onclick="window.app.pos.openQuoteModal('cart')" title="ออกใบเสนอราคา / การ์ดสรุปโปรโมชัน">
+              <button type="button" class="sf-btn-2 px-3.5 h-full text-xs rounded-xl flex items-center justify-center shrink-0" onclick="window.app.pos.openQuoteModal('cart')" title="ออกใบเสนอราคา / การ์ดสรุปโปรโมชัน">
                   <i class="fas fa-file-invoice-dollar mr-1.5"></i> ใบเสนอราคา
               </button>
               <button class="flex-1 h-full bg-[#FF6B00] hover:bg-[#E05300] text-white text-sm font-black rounded-xl shadow-sm transition-all flex items-center justify-center group" onclick="window.app.pos.openCheckoutModal()">
-                  <i class="fas fa-bolt text-[#E11D48] mr-2"></i>
-                  ดำเนินการข้อมูลลูกค้า <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                  กรอกข้อมูลลูกค้า <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
               </button>
           </div>
       </div>
 
       <!-- Floating Product Compare Dock (แสดงเมื่อเลือกเทียบสินค้า 1-3 รุ่น) -->
-      <div id="posCompareBar" class="hidden fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[45] bg-[#141416] text-white border-2 border-[#FF6B00] rounded-2xl shadow-2xl px-3.5 py-2.5 flex items-center gap-2.5 max-w-[95vw]">
-         <div class="hidden sm:flex items-center gap-1.5 pr-2 border-r border-white/15 shrink-0">
-            <span class="w-7 h-7 rounded-lg bg-[#FF6B00] text-white flex items-center justify-center text-xs font-black"><i class="fas fa-scale-balanced text-[#E11D48]"></i></span>
+      <div id="posCompareBar" class="hidden fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[45] bg-white text-slate-800 border border-slate-200 rounded-2xl shadow-[0_18px_40px_-12px_rgba(15,23,42,0.35)] px-3.5 py-2.5 flex items-center gap-2.5 max-w-[95vw]">
+         <div class="hidden sm:flex items-center gap-1.5 pr-2 border-r border-slate-200 shrink-0">
+            <span class="w-7 h-7 rounded-lg bg-orange-50 text-[#FF6B00] flex items-center justify-center text-xs font-black"><i class="fas fa-scale-balanced"></i></span>
             <div>
-               <div class="text-[10px] font-black text-[#FF6B00] uppercase leading-none">เทียบสเปค</div>
-               <div id="posCompareCount" class="text-[10px] font-bold text-slate-300 leading-tight">(0/3)</div>
+               <div class="text-[11px] font-black text-slate-800 leading-none">เทียบสเปค</div>
+               <div id="posCompareCount" class="text-[10px] font-bold text-slate-500 leading-tight">(0/3)</div>
             </div>
          </div>
          <div id="posCompareSlots" class="flex items-center gap-2 overflow-x-auto custom-scrollbar py-0.5"></div>
          <div class="flex items-center gap-1.5 pl-1 shrink-0">
             <button type="button" onclick="window.app.pos.openCompareModal()" class="px-3.5 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E05300] text-white text-xs font-black flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap">
-               <i class="fas fa-table-columns text-[#E11D48]"></i> ดูตารางเทียบสเปค
+               <i class="fas fa-table-columns"></i> ดูตารางเทียบสเปค
             </button>
-            <button type="button" onclick="window.app.pos.clearCompare()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 flex items-center justify-center text-xs transition-colors" title="ล้างรายการเปรียบเทียบ" aria-label="ล้างรายการเปรียบเทียบ">
+            <button type="button" onclick="window.app.pos.clearCompare()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-500 flex items-center justify-center text-xs transition-colors" title="ล้างรายการเปรียบเทียบ" aria-label="ล้างรายการเปรียบเทียบ">
                <i class="fas fa-trash-alt"></i>
             </button>
          </div>
       </div>
 
       <!-- Sticky Bottom Cart Summary Bar สำหรับมือถือ/แท็บเล็ต -->
-      <div id="posMobileStickyCart" class="hidden lg:hidden fixed bottom-0 left-0 right-0 z-[42] bg-[#141416] text-white border-t-2 border-[#FF6B00] px-4 py-2.5 shadow-[0_-8px_25px_rgba(0,0,0,0.28)]" style="padding-bottom: calc(0.625rem + env(safe-area-inset-bottom));">
+      <div id="posMobileStickyCart" class="hidden lg:hidden fixed bottom-0 left-0 right-0 z-[42] bg-white text-slate-800 border-t border-slate-200 px-4 py-2.5 shadow-[0_-8px_25px_rgba(15,23,42,0.12)]" style="padding-bottom: calc(0.625rem + env(safe-area-inset-bottom));">
          <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2.5 min-w-0 cursor-pointer" onclick="window.app.pos.toggleCart()">
                <div class="w-10 h-10 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center relative shrink-0">
@@ -771,13 +788,13 @@
                   <span id="mobileStickyCount" class="absolute -top-1.5 -right-1.5 bg-[#E11D48] text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border border-white">0</span>
                </div>
                <div class="min-w-0">
-                  <div class="text-[10px] text-slate-300 font-bold uppercase tracking-wider">ยอดสุทธิในตะกร้า</div>
-                  <div id="mobileStickyTotal" class="text-base font-black text-[#FF6B00] leading-tight tabular-nums truncate">฿0</div>
+                  <div class="text-[10px] text-slate-500 font-bold">ยอดสุทธิในตะกร้า</div>
+                  <div id="mobileStickyTotal" class="text-base font-black text-slate-900 leading-tight tabular-nums truncate">฿0</div>
                </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-               <button type="button" onclick="window.app.pos.toggleCart()" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors">ดูตะกร้า</button>
-               <button type="button" onclick="window.app.pos.openCheckoutModal()" class="px-4 py-2 rounded-xl bg-[#FF6B00] text-white text-xs font-black flex items-center gap-1.5 shadow-sm"><i class="fas fa-bolt text-[#E11D48]"></i> สั่งจองเลย</button>
+               <button type="button" onclick="window.app.pos.toggleCart()" class="sf-btn-2 px-3 py-2 rounded-xl text-xs">ดูตะกร้า</button>
+               <button type="button" onclick="window.app.pos.openCheckoutModal()" class="px-4 py-2 rounded-xl bg-[#FF6B00] text-white text-xs font-black flex items-center gap-1.5 shadow-sm">สั่งจองเลย <i class="fas fa-arrow-right"></i></button>
             </div>
          </div>
       </div>
@@ -789,8 +806,8 @@
       <div class="fixed inset-0 z-10 overflow-y-auto p-4">
         <div class="flex min-h-full items-center justify-center text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-5xl border border-slate-200 flex flex-col max-h-[90vh]">
-            <div class="px-6 py-4 border-b-2 border-[#FF6B00] flex flex-wrap justify-between items-center gap-2 bg-[#141416] text-white">
-               <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-scale-balanced text-[#E11D48]"></i> COMPARE</span> เปรียบเทียบสเปค ราคา และของแถม</h3>
+            <div class="sf-dlg-head px-6 py-4 flex flex-wrap justify-between items-center gap-2">
+               <h3 class="text-base font-black text-white flex items-center gap-2"><i class="fas fa-scale-balanced sf-dlg-ico"></i> เปรียบเทียบสเปค ราคา และของแถม</h3>
                <div class="flex items-center gap-2">
                   <button type="button" onclick="window.app.pos.toggleCompareDiffOnly()" id="btnCompareDiffToggle" class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold text-[#FF6B00] border border-[#FF6B00]/40 flex items-center gap-1.5 transition-colors">
                      <i class="fas fa-highlighter"></i> <span id="lblCompareDiffToggle">ไฮไลต์เฉพาะจุดต่าง</span>
@@ -807,7 +824,7 @@
             <div id="compareModalBody" class="p-4 md:p-6 overflow-x-auto overflow-y-auto custom-scrollbar flex-1 bg-white"></div>
             <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
                <button type="button" class="text-xs font-bold text-rose-600 hover:underline" onclick="window.app.pos.clearCompare(); window.app.hideModal('compareModal')"><i class="fas fa-trash-alt mr-1"></i>ล้างรายการเปรียบเทียบทั้งหมด</button>
-               <button type="button" class="px-5 py-2 bg-[#141416] text-[#FF6B00] text-xs font-black rounded-xl" onclick="window.app.hideModal('compareModal')">ปิดหน้าต่าง</button>
+               <button type="button" class="sf-btn-2 px-5 py-2 text-xs rounded-xl" onclick="window.app.hideModal('compareModal')">ปิดหน้าต่าง</button>
             </div>
           </div>
         </div>
@@ -821,8 +838,8 @@
         <div class="flex min-h-full items-center justify-center p-4 text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-4xl border border-slate-200 flex flex-col max-h-[90vh]">
             
-            <div class="px-6 py-4 border-b-2 border-[#FF6B00] flex justify-between items-center bg-[#141416] text-white">
-               <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-bolt text-[#E11D48]"></i> FLASH</span> เลือกสเปคสินค้าและของแถม</h3>
+            <div class="sf-dlg-head px-6 py-4 flex justify-between items-center">
+               <h3 class="text-base font-black text-white flex items-center gap-2"><i class="fas fa-bolt sf-dlg-ico"></i> เลือกสเปคสินค้าและของแถม</h3>
                <div class="flex items-center gap-1">
                <button type="button" aria-label="คัดลอกลิงก์สินค้ารุ่นนี้" title="คัดลอกลิงก์สินค้ารุ่นนี้" id="shareProductBtn" class="text-slate-300 hover:text-[#FF6B00] focus:outline-none transition-colors h-9 px-2.5 flex items-center justify-center gap-1.5 rounded-lg hover:bg-white/10 text-xs font-bold" onclick="window.app.pos.copyProductLink()"><i class="fas fa-link"></i><span class="hidden sm:inline">คัดลอกลิงก์</span></button>
                <button type="button" aria-label="ปิดหน้าต่างเลือกสินค้า" class="text-slate-300 hover:text-[#FF6B00] focus:outline-none transition-colors w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 -mr-1" onclick="window.app.hideModal('addToCartModal')"><i class="fas fa-times text-lg"></i></button>
@@ -835,7 +852,7 @@
                   <!-- Left side: Image -->
                   <div class="w-full md:w-4/12 flex flex-col justify-start items-center shrink-0">
                      <div class="w-full max-w-[300px] aspect-square p-4 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center justify-center sticky top-0 hover:shadow-md transition-shadow relative group overflow-hidden cursor-zoom-in">
-                        <img id="modalProdImg" src="" class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-500 hover:scale-[1.5]">
+                        <img id="modalProdImg" src="" alt="" onerror="if(this.getAttribute('src')&&this.src!==window.app.NO_IMG)this.src=window.app.NO_IMG" class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-500 hover:scale-[1.5]">
                         <button id="btnPrevImg" onclick="window.app.pos.prevImage(event)" aria-label="รูปก่อนหน้า" class="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-left"></i></button>
                         <button id="btnNextImg" onclick="window.app.pos.nextImage(event)" aria-label="รูปถัดไป" class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-right"></i></button>
                      </div>
@@ -895,10 +912,10 @@
             </div>
             
             <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between items-center gap-3 rounded-b-3xl">
-               <button type="button" class="px-4 py-2.5 bg-slate-900 hover:bg-black text-[#FF6B00] text-xs md:text-sm font-extrabold rounded-xl transition-colors shadow-sm flex items-center gap-1.5" onclick="window.app.pos.openQuoteModal('product')"><i class="fas fa-file-invoice-dollar text-[#FF6B00]"></i> ออกใบเสนอราคา / ส่ง LINE</button>
+               <button type="button" class="sf-btn-2 px-4 py-2.5 text-xs md:text-sm rounded-xl flex items-center gap-1.5" onclick="window.app.pos.openQuoteModal('product')"><i class="fas fa-file-invoice-dollar"></i> ออกใบเสนอราคา / ส่ง LINE</button>
                <div class="flex items-center gap-2 ml-auto">
                   <button type="button" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm" onclick="window.app.hideModal('addToCartModal')">ยกเลิก</button>
-                  <button type="button" class="px-6 py-2.5 bg-[#FF6B00] hover:bg-[#E05300] text-white text-sm font-black rounded-xl shadow-md transition-all flex items-center gap-2" onclick="window.app.pos.confirmAddToCart()"><i class="fas fa-cart-plus text-[#E11D48]"></i> เพิ่มลงตะกร้า Pre Booking</button>
+                  <button type="button" class="px-6 py-2.5 bg-[#FF6B00] hover:bg-[#E05300] text-white text-sm font-black rounded-xl shadow-md transition-all flex items-center gap-2" onclick="window.app.pos.confirmAddToCart()"><i class="fas fa-cart-plus"></i> เพิ่มลงตะกร้า</button>
                </div>
             </div>
             
@@ -913,8 +930,8 @@
       <div class="fixed inset-0 z-10 overflow-y-auto p-4">
         <div class="flex min-h-full items-center justify-center text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border border-slate-200 flex flex-col max-h-[90vh]">
-            <div class="px-6 py-4 border-b-2 border-[#FF6B00] flex justify-between items-center bg-[#141416] text-white">
-               <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-retweet text-[#E11D48]"></i> TRADE-IN</span> โปรแกรมเก่าแลกใหม่ ประเมินราคาไว + โบนัสเพิ่มพิเศษ</h3>
+            <div class="sf-dlg-head px-6 py-4 flex justify-between items-center">
+               <h3 class="text-base font-black text-white flex items-center gap-2"><i class="fas fa-retweet sf-dlg-ico"></i> โปรแกรมเก่าแลกใหม่ ประเมินราคาไว + โบนัสเพิ่มพิเศษ</h3>
                <button type="button" class="text-slate-300 hover:text-[#FF6B00] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10" onclick="window.app.hideModal('tradeInModal')"><i class="fas fa-times text-lg"></i></button>
             </div>
             <div id="tradeInModalBody" class="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-white"></div>
@@ -929,15 +946,15 @@
       <div class="fixed inset-0 z-10 overflow-y-auto p-4">
         <div class="flex min-h-full items-center justify-center text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border border-slate-200 flex flex-col max-h-[92vh]">
-            <div class="px-6 py-4 border-b-2 border-[#FF6B00] flex justify-between items-center bg-[#141416] text-white">
-               <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-file-invoice-dollar text-[#E11D48]"></i> QUOTATION</span> ใบสรุปโปรโมชัน ของแถม และตารางผ่อน 0%</h3>
+            <div class="sf-dlg-head px-6 py-4 flex justify-between items-center">
+               <h3 class="text-base font-black text-white flex items-center gap-2"><i class="fas fa-file-invoice-dollar sf-dlg-ico"></i> ใบสรุปโปรโมชัน ของแถม และตารางผ่อน 0%</h3>
                <button type="button" class="text-slate-300 hover:text-[#FF6B00] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10" onclick="window.app.hideModal('quoteSummaryModal')"><i class="fas fa-times text-lg"></i></button>
             </div>
             <div id="quoteSummaryBody" class="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50"></div>
             <div class="px-6 py-3.5 bg-white border-t border-slate-200 flex flex-wrap justify-between items-center gap-2">
                <button type="button" onclick="window.app.pos.copyQuoteText()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-sm"><i class="fas fa-comment-dots"></i> คัดลอกข้อความส่ง LINE ให้ลูกค้า</button>
                <div class="flex items-center gap-2 ml-auto">
-                  <button type="button" onclick="window.app.pos.printQuoteCard()" class="px-4 py-2 bg-[#141416] hover:bg-black text-[#FF6B00] text-xs font-black rounded-xl flex items-center gap-1.5 shadow-sm"><i class="fas fa-print"></i> พิมพ์ / บันทึก PDF</button>
+                  <button type="button" onclick="window.app.pos.printQuoteCard()" class="sf-btn-2 px-4 py-2 text-xs rounded-xl flex items-center gap-1.5"><i class="fas fa-print"></i> พิมพ์ / บันทึก PDF</button>
                   <button type="button" onclick="window.app.hideModal('quoteSummaryModal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">ปิด</button>
                </div>
             </div>
@@ -952,8 +969,8 @@
       <div class="fixed inset-0 z-10 overflow-y-auto p-4">
         <div class="flex min-h-full items-center justify-center text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-3xl border border-slate-200 flex flex-col max-h-[90vh]">
-            <div class="px-6 py-4 border-b-2 border-[#FF6B00] flex justify-between items-center bg-[#141416] text-white">
-               <h3 class="text-base font-black text-white flex items-center gap-2"><span class="px-2 py-0.5 rounded bg-[#FF6B00] text-white text-xs font-black"><i class="fas fa-qrcode text-[#E11D48]"></i> TRACKING</span> ติดตามสถานะใบจอง & บัตรรับเครื่องดิจิทัล (QR Pass)</h3>
+            <div class="sf-dlg-head px-6 py-4 flex justify-between items-center">
+               <h3 class="text-base font-black text-white flex items-center gap-2"><i class="fas fa-qrcode sf-dlg-ico"></i> ติดตามสถานะใบจอง & บัตรรับเครื่องดิจิทัล (QR Pass)</h3>
                <button type="button" class="text-slate-300 hover:text-[#FF6B00] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10" onclick="window.app.hideModal('orderTrackModal')"><i class="fas fa-times text-lg"></i></button>
             </div>
             <div class="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-white space-y-4">
@@ -963,7 +980,7 @@
                      <input type="text" id="orderTrackQueryInput" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:bg-white focus:border-[#141416] focus:ring-2 focus:ring-amber-300 outline-none" placeholder="กรอกเลขที่ใบจอง (เช่น ORD-...) หรือเบอร์โทรศัพท์ / ชื่อลูกค้า..." onkeydown="if(event.key==='Enter') window.app.pos.searchTrackedOrder()">
                   </div>
                   <button type="button" onclick="window.app.pos.searchTrackedOrder()" class="px-5 py-2.5 bg-[#FF6B00] hover:bg-[#E05300] text-white text-xs md:text-sm font-black rounded-xl shadow-sm flex items-center justify-center gap-1.5 shrink-0">
-                     <i class="fas fa-search text-[#E11D48]"></i> ค้นหาใบจอง
+                     <i class="fas fa-search"></i> ค้นหาใบจอง
                   </button>
                </div>
                <div id="orderTrackResults" class="space-y-4">
@@ -983,8 +1000,7 @@
         <div class="flex min-h-full items-center justify-center px-4 text-center">
           <div class="relative transform overflow-hidden rounded-3xl bg-slate-50 text-left shadow-xl transition-all w-full max-w-5xl flex flex-col max-h-[90vh]">
             
-            <div class="px-8 py-5 flex justify-between items-center bg-slate-900 text-white relative overflow-hidden">
-               <div class="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImEiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCI+PHBhdGggZD0iTTAgMGg2MHY2MEgweiIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMzAiIHI9IjEuNSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA4KSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPjwvc3ZnPg==')]"></div>
+            <div class="sf-dlg-head px-6 md:px-8 py-4 flex justify-between items-center relative overflow-hidden">
                <h3 class="text-lg font-bold tracking-wide relative z-10 flex items-center gap-3">
                  <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                    <i class="fas fa-file-invoice text-sm"></i>
@@ -1060,7 +1076,7 @@
                <button type="button" class="px-5 py-3 text-slate-500 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors text-sm flex items-center gap-2" onclick="window.app.hideModal('checkoutModal')">
                   <i class="fas fa-arrow-left text-xs"></i> ย้อนกลับ
                </button>
-               <button type="button" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm transition-all flex items-center" onclick="window.app.pos.submitCheckout()">
+               <button type="button" class="px-8 py-3 bg-[#FF6B00] hover:bg-[#E05300] text-white font-black rounded-xl shadow-sm transition-all flex items-center" onclick="window.app.pos.submitCheckout()">
                   ยืนยันการสั่งจอง <i class="fas fa-check-circle ml-2"></i>
                </button>
             </div>
@@ -1113,7 +1129,7 @@
            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
               <div>
                  <h6 class="text-base font-black text-slate-800 mb-1"><i class="fas fa-chart-area text-indigo-500 mr-2"></i>Sales Forecasting (Actual vs Forecast)</h6>
-                 <p class="text-xs text-slate-500">กราฟแสดงยอดขายรายวันเปรียบเทียบกับยอดที่คาดการณ์ล่วงหน้า</p>
+                 <p id="anChartSub" class="text-xs text-slate-500">กราฟแสดงยอดขายรายวันเปรียบเทียบกับยอดที่คาดการณ์ล่วงหน้า</p>
               </div>
            </div>
            <div class="relative w-full h-[400px]">
@@ -1220,14 +1236,9 @@
            </div>
          </div>
          <div class="flex flex-wrap items-center gap-2">
-           <label for="bbCategoryFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">หมวดหมู่:</label>
-           <select id="bbCategoryFilter" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" onchange="window.app.branchBookingSummary.onCategoryChange()"></select>
-           <label for="bbAreaFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">แอเรีย:</label>
-           <input type="text" id="bbAreaFilter" list="bbAreaListOptions" placeholder="พิมพ์ค้นหา Area..." autocomplete="off" class="w-36 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()">
-           <datalist id="bbAreaListOptions"></datalist>
-           <label for="bbBranchFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">สาขา:</label>
-           <input type="text" id="bbBranchFilter" list="bbBranchListOptions" placeholder="พิมพ์ค้นหาชื่อ/รหัสสาขา..." autocomplete="off" class="w-52 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()">
-           <datalist id="bbBranchListOptions"></datalist>
+           <span class="inline-flex items-center gap-2"><label for="bbCategoryFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">หมวดหมู่:</label><select id="bbCategoryFilter" class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" onchange="window.app.branchBookingSummary.onCategoryChange()"></select></span>
+           <span class="inline-flex items-center gap-2"><label for="bbAreaFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">แอเรีย:</label><input type="text" id="bbAreaFilter" list="bbAreaListOptions" placeholder="พิมพ์ค้นหา Area..." autocomplete="off" class="w-36 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()"><datalist id="bbAreaListOptions"></datalist></span>
+           <span class="inline-flex items-center gap-2"><label for="bbBranchFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap">สาขา:</label><input type="text" id="bbBranchFilter" list="bbBranchListOptions" placeholder="พิมพ์ค้นหาชื่อ/รหัสสาขา..." autocomplete="off" class="w-52 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all" oninput="window.app.branchBookingSummary.onFilterChange()"><datalist id="bbBranchListOptions"></datalist></span>
          </div>
        </div>
 
@@ -1260,23 +1271,24 @@
           <button type="button" class="cms-btn cms-btn-green" id="gridAddBtn" onclick="window.app.grid.handleAddClick()">
             <i class="fas fa-plus" id="gridAddBtnIcon"></i> <span id="gridAddBtnLabel">เพิ่มข้อมูล</span>
           </button>
-          <button type="button" class="cms-btn cms-btn-red hidden" id="gridBulkDeleteBtn" onclick="window.app.grid.deleteSelected()">
+          <button type="button" class="cms-btn cms-btn-red hidden" disabled id="gridBulkDeleteBtn" onclick="window.app.grid.deleteSelected()">
             <i class="fas fa-trash"></i> <span id="gridBulkDeleteLabel">ลบรายการที่เลือก</span>
           </button>
-          <button type="button" class="cms-btn cms-btn-line hidden" id="gridBulkOnBtn" onclick="window.app.grid.setSelectedStatus('เปิด')">
+          <button type="button" class="cms-btn cms-btn-line hidden" disabled id="gridBulkOnBtn" onclick="window.app.grid.setSelectedStatus('เปิด')">
             <i class="fas fa-toggle-on"></i> เปิดที่เลือก
           </button>
-          <button type="button" class="cms-btn cms-btn-line hidden" id="gridBulkOffBtn" onclick="window.app.grid.setSelectedStatus('ปิด')">
+          <button type="button" class="cms-btn cms-btn-line hidden" disabled id="gridBulkOffBtn" onclick="window.app.grid.setSelectedStatus('ปิด')">
             <i class="fas fa-toggle-off"></i> ปิดที่เลือก
           </button>
-          <button type="button" class="cms-btn cms-btn-line hidden" id="gridBulkQuickBtn" onclick="window.app.productGroup.openBulkQuickEdit()">
-            <i class="fas fa-bolt"></i> แก้ไขราคา/สต๊อกด่วน
+          <span class="cms-grow" aria-hidden="true"></span>
+          <button type="button" class="cms-btn cms-btn-line hidden" title="แก้ไขราคา/สต๊อกหลายรายการพร้อมกัน" id="gridBulkQuickBtn" onclick="window.app.productGroup.openBulkQuickEdit()">
+            <i class="fas fa-bolt"></i> แก้ราคา/สต๊อก
           </button>
-          <button type="button" class="cms-btn cms-btn-line hidden" id="gridImportBtn" onclick="window.app.grid.handleImportClick()">
-            <i class="fas fa-file-import"></i> นำเข้า CSV
+          <button type="button" class="cms-btn cms-btn-line hidden" title="นำเข้าข้อมูลจากไฟล์ CSV (เพิ่มรายการใหม่เท่านั้น)" id="gridImportBtn" onclick="window.app.grid.handleImportClick()">
+            <i class="fas fa-file-import"></i> นำเข้า
           </button>
           <button type="button" class="cms-btn cms-btn-line hidden" id="gridExportBtn" onclick="window.app.grid.exportCSV()">
-            <i class="fas fa-file-csv"></i> Export CSV
+            <i class="fas fa-file-csv"></i> ส่งออก CSV
           </button>
         </div>
 
@@ -1474,20 +1486,15 @@
 
   <template id="tmpl-invoice">
     <div class="max-w-4xl mx-auto p-4 animate-fade-in-up">
-       <!-- Header -->
-       <div class="flex justify-between items-center mb-6 no-print flex-wrap gap-3">
-          <h2 class="text-2xl font-bold text-slate-800"><i class="fas fa-file-invoice text-indigo-500 mr-2"></i> ใบเสนอราคา / ใบแจ้งหนี้</h2>
-          <div class="flex gap-2 flex-wrap">
-             <button onclick="window.app.invoice.newDoc()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl font-bold shadow-sm transition-all" aria-label="สร้างเอกสารใหม่">
-                <i class="fas fa-plus mr-1"></i> สร้างใหม่
-             </button>
-             <button id="invSaveBtn" onclick="window.app.invoice.save()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold shadow-md transition-all" aria-label="บันทึกและส่งขออนุมัติ">
-                <i class="fas fa-save mr-1"></i> บันทึก/ส่งขออนุมัติ
-             </button>
-             <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold shadow-md transition-all">
-                <i class="fas fa-download mr-1"></i> ดาวน์โหลด PDF (Print)
-             </button>
-          </div>
+       <!-- Header (แบบเดียวกับหน้าตาราง: ชื่อหน้า + เส้นทาง, ปุ่มเป็น .cms-btn) -->
+       <div class="cms-head no-print"><h1><i class="fas fa-file-invoice text-indigo-500 mr-2"></i>ใบเสนอราคา / ใบแจ้งหนี้</h1><span class="cms-crumb">เอกสาร &gt; ใบเสนอราคา / ใบแจ้งหนี้</span></div>
+       <div class="cms-actions no-print">
+          <button type="button" onclick="window.app.invoice.newDoc()" class="cms-btn cms-btn-line" aria-label="สร้างเอกสารใหม่"><i class="fas fa-plus"></i> สร้างใหม่</button>
+          <button type="button" id="invSaveBtn" onclick="window.app.invoice.save()" class="cms-btn cms-btn-green" aria-label="บันทึกและส่งขออนุมัติ">
+             <i class="fas fa-save"></i> บันทึก/ส่งขออนุมัติ
+          </button>
+          <span class="cms-grow" aria-hidden="true"></span>
+          <button type="button" onclick="window.print()" class="cms-btn cms-btn-outline"><i class="fas fa-print"></i> พิมพ์ / บันทึก PDF</button>
        </div>
 
        <!-- รายการเอกสารที่บันทึกไว้ + ปุ่มอนุมัติ (Admin/Manager) -->

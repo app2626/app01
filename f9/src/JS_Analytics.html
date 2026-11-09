@@ -54,7 +54,7 @@ window.app.analytics = {
       const endDate = new Date(endStr);
       const now = new Date();
       
-      const formatTh = (d) => { const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return `${d.getDate()} ${m[d.getMonth()]} ${(d.getFullYear()+543).toString().substring(2)}`; };
+      const formatTh = (d) => { const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()+543}`; };
       const rangeEl = document.getElementById('analyticsDateRange');
       if (rangeEl) rangeEl.innerText = `(${formatTh(startDate)} - ${formatTh(endDate)})`;
 
@@ -179,6 +179,31 @@ window.app.analytics = {
           forecastAcc[lastActualIdx] = actualAcc[lastActualIdx];
       }
       
+      // ช่วงจองยาว (เช่นตั้งปิดรับจองไว้ไกลมาก) = จุดรายวันหลายหมื่นจุด กราฟอ่านไม่ออกและหน้าช้า
+      // > 120 วัน รวมเป็นรายสัปดาห์, > 2 ปี รายเดือน, > 10 ปี รายปี (ค่าสะสมใช้ค่าสุดท้ายของช่วง, ยอดของช่วงใช้ผลรวม) — KPI ด้านบนไม่เปลี่ยน
+      let period = 'รายวัน';
+      if (labels.length > 120) {
+        const yearly = labels.length > 3650, monthly = !yearly && labels.length > 730;
+        period = yearly ? 'รายปี' : monthly ? 'รายเดือน' : 'รายสัปดาห์';
+        const keyOf = (i) => yearly ? labels[i].slice(0, 4) : monthly ? labels[i].slice(0, 7) : labels[Math.floor(i / 7) * 7];
+        const nb = { labels: [], aM: [], fM: [], aA: [], fA: [], dM: [], dA: [] };
+        const lastNN = (arr, from, to) => { for (let k = to; k >= from; k--) if (arr[k] !== null && arr[k] !== undefined) return arr[k]; return null; };
+        let from = 0;
+        for (let i = 0; i < labels.length; i++) {
+          if (i === labels.length - 1 || keyOf(i + 1) !== keyOf(i)) {
+            nb.labels.push(keyOf(i));
+            nb.aM.push(lastNN(actualMobile, from, i)); nb.fM.push(lastNN(forecastMobile, from, i));
+            nb.aA.push(lastNN(actualAcc, from, i)); nb.fA.push(lastNN(forecastAcc, from, i));
+            let sM = 0, sA = 0; for (let k = from; k <= i; k++) { sM += dailyMobileArr[k] || 0; sA += dailyAccArr[k] || 0; }
+            nb.dM.push(sM); nb.dA.push(sA);
+            from = i + 1;
+          }
+        }
+        labels = nb.labels; actualMobile = nb.aM; forecastMobile = nb.fM; actualAcc = nb.aA; forecastAcc = nb.fA; dailyMobileArr = nb.dM; dailyAccArr = nb.dA;
+      }
+      this.chartPeriod = period; this.chartPoints = labels.length;
+      const subEl = document.getElementById('anChartSub'); if (subEl) subEl.textContent = 'กราฟแสดงยอดขายสะสม' + period + 'เปรียบเทียบกับยอดที่คาดการณ์ล่วงหน้า';
+
       const ctx = document.getElementById('chartAnalytics');
       if(!ctx) return;
       if(this.chart) this.chart.destroy();
@@ -218,7 +243,7 @@ window.app.analytics = {
                      label: function(ctx) {
                         let val = ctx.raw;
                         let daily = ctx.dataset.dailyData[ctx.dataIndex];
-                        return `${ctx.dataset.label}: ${val} (รายวัน: +${daily})`;
+                        return ctx.dataset.label + ': ' + val + ' (' + period + ': +' + daily + ')';
                      }
                   }
                }

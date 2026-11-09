@@ -1574,4 +1574,176 @@
   .popup-multi .popup-nav { display: flex; }
   .popup-multi .popup-dots { display: flex; }
   @media (prefers-reduced-motion: reduce) { .popup-track { transition: none; } }
+
+  /* ===== หน้าร้านแบบเว็บไซต์มาตรฐาน — html.sf-site (route() ใส่ให้เฉพาะ #pos) =====
+     ซ่อน sidebar/แถบบนของระบบหลังร้าน, เนื้อหาอยู่ในคอนเทนเนอร์กลางจอ (max 1320px),
+     แถบบริการ + header ร้านค้าพื้นหลังเต็มความกว้างจอ (box-shadow 100vmax + clip-path — ไม่ทำให้เกิด scroll แนวนอน) */
+  .sf-topbar, .sf-home { display: none; }
+  html.sf-site { --sf-hdr: #ffffff; --sf-line: #e2e8f0; --sf-top: #0f1b2d; }
+  html.sf-site.dark { --sf-hdr: #1e293b; --sf-line: #334155; --sf-top: #020617; }
+  html.sf-site #desktopSidebar, html.sf-site #desktopShowSidebarBtn, html.sf-site #mainContentWrapper > nav.glass-nav, html.sf-site .animate-blob { display: none !important; }
+  html.sf-site #mainContentWrapper { width: 100% !important; }
+  html.sf-site #page-content { max-width: 1320px; margin: 0 auto; padding: 0 16px 8px !important; }
+  @media (min-width: 768px) { html.sf-site #page-content { padding: 0 24px 8px !important; } }
+  html.sf-site #page-content .pos-shell-card { background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 0; overflow: visible; backdrop-filter: none; -webkit-backdrop-filter: none; min-height: 0; }
+
+  html.sf-site .sf-topbar { display: none; position: relative; isolation: isolate; align-items: center; justify-content: space-between; gap: 16px; height: 34px; font-size: 12px; font-weight: 600; color: #cbd5e1; }
+  html.sf-site .sf-topbar::before { content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: -100vmax; right: -100vmax; background: var(--sf-top); }
+  @media (min-width: 768px) { html.sf-site .sf-topbar { display: flex; } }
+  .sf-topbar-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .sf-topbar-msg i { color: #FF8A3D; margin-right: 4px; }
+  .sf-topbar-links { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
+  .sf-topbar-links button, .sf-topbar-links a { display: inline-flex; align-items: center; gap: 6px; color: #e2e8f0; font-weight: 700; text-decoration: none; transition: color .15s; }
+  .sf-topbar-links button:hover, .sf-topbar-links a:hover { color: #FF8A3D; }
+  .sf-topbar-links i { font-size: 11px; color: #94a3b8; }
+
+  html.sf-site .pos-store-header { top: 0; margin: 0 0 16px; padding: 12px 0 10px; border-radius: 0; border-bottom: 0; background: var(--sf-hdr); box-shadow: none; }
+  /* พื้นหลังเต็มจอด้วย ::before (ไม่ใช้ clip-path เพราะจะตัดเมนูบัญชีที่ห้อยลงมาใต้ header) */
+  html.sf-site .pos-store-header::before { content: ''; position: absolute; z-index: -1; top: 0; bottom: 0; left: -100vmax; right: -100vmax; background: var(--sf-hdr); transition: box-shadow .2s; }
+  html.sf-site .pos-store-header::after { content: ''; position: absolute; left: -100vmax; right: -100vmax; bottom: 0; height: 1px; background: var(--sf-line); }
+  html.sf-site .pos-store-header.is-stuck { box-shadow: none; }
+  html.sf-site .pos-store-header.is-stuck::before { box-shadow: 0 10px 24px -14px rgba(15,23,42,.35); }
+  @media (min-width: 768px) { html.sf-site .pos-store-header { padding: 14px 0 12px; } }
+  html.sf-site .pos-store-row { gap: 10px; }
+  html.sf-site .sf-home { display: flex; align-items: center; gap: 10px; flex-shrink: 0; text-decoration: none; margin-right: 6px; }
+  .sf-logo { width: 40px; height: 40px; border-radius: 12px; background: #8a6428; color: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 16px; flex-shrink: 0; }
+  .sf-brand-name { font-weight: 900; font-size: 18px; color: #141416; letter-spacing: -.01em; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 767px) { .sf-brand-name { display: none; } .sf-logo { width: 36px; height: 36px; border-radius: 10px; font-size: 14px; } html.sf-site .sf-home { margin-right: 0; } }
+  @media (min-width: 1024px) { html.sf-site .pos-search-wrap { max-width: 680px; margin: 0 auto; } }
+
+  .sf-icon-btn { position: relative; height: 46px; min-width: 46px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: #1e293b; font-size: 13px; font-weight: 800; flex-shrink: 0; transition: background .15s, color .15s; }
+  .sf-icon-btn > i:first-child { font-size: 19px; }
+  .sf-icon-btn:hover, .sf-icon-btn[aria-expanded="true"] { background: #f1f5f9; }
+  .sf-icon-lbl, .sf-caret { display: none; }
+  .sf-icon-lbl { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sf-caret { font-size: 10px; color: #94a3b8; }
+  @media (min-width: 1280px) { .sf-icon-lbl, .sf-caret { display: inline; } }
+  .sf-badge { position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #e11d48; color: #fff; font-size: 10px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--sf-hdr, #fff); }
+  @media (min-width: 1280px) { .sf-wish-btn .sf-badge { position: static; border: 0; } }
+  @media (max-width: 639px) { .sf-icon-btn { min-width: 40px; height: 42px; padding: 0 8px; } html.sf-site .pos-store-row { gap: 6px; } html.sf-site .pos-cart-btn { height: 42px; padding: 0 12px; } html.sf-site .pos-search { height: 42px; } }
+  @media (max-width: 479px) { .sf-wish-btn { display: none; } }
+
+  .sf-acct { position: relative; flex-shrink: 0; }
+  .sf-acct-pop { position: absolute; right: 0; top: calc(100% + 8px); width: min(290px, calc(100vw - 32px)); max-height: min(70vh, 560px); overflow-y: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 20px 40px -12px rgba(15,23,42,.3); padding: 6px; z-index: 70; text-align: left; }
+  .sf-acct-pop.hidden { display: none; }
+  .sf-acct-head { display: flex; align-items: center; gap: 10px; padding: 10px 10px 12px; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px; }
+  .sf-acct-head strong { display: block; font-size: 13px; color: #141416; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sf-acct-head small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #FF6B00; }
+  .sf-acct-av { width: 36px; height: 36px; border-radius: 50%; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sf-acct-sec { padding: 8px 10px 4px; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: #94a3b8; }
+  .sf-acct-pop a, .sf-acct-pop button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #334155; text-align: left; text-decoration: none; }
+  .sf-acct-pop a i, .sf-acct-pop button i { width: 16px; text-align: center; color: #94a3b8; font-size: 12px; }
+  .sf-acct-pop a:hover, .sf-acct-pop button:hover { background: #f8fafc; color: #141416; }
+  .sf-acct-div { height: 1px; background: #f1f5f9; margin: 4px 0; }
+  .sf-acct-pop .sf-acct-out, .sf-acct-pop .sf-acct-out i { color: #e11d48; }
+  .sf-acct-mob { display: none !important; }
+  @media (max-width: 479px) { .sf-acct-mob { display: flex !important; } }
+
+  html.sf-site #posTimerBanner { border-radius: 14px; }
+  html.sf-site .pf-grid, html.sf-site .pf-bottom { max-width: 1320px; margin-left: auto; margin-right: auto; }
+
+  html.dark .sf-brand-name { color: #f1f5f9; }
+  html.dark .sf-icon-btn { color: #e2e8f0; }
+  html.dark .sf-icon-btn:hover, html.dark .sf-icon-btn[aria-expanded="true"] { background: #334155; }
+  html.dark .sf-acct-pop { background: #1e293b; border-color: #334155; }
+  html.dark .sf-acct-head { border-color: #334155; }
+  html.dark .sf-acct-div { background: #334155; }
+  html.dark .sf-acct-head strong { color: #f1f5f9; }
+  html.dark .sf-acct-av { background: #0f172a; color: #94a3b8; }
+  html.dark .sf-acct-pop a, html.dark .sf-acct-pop button { color: #cbd5e1; }
+  html.dark .sf-acct-pop a:hover, html.dark .sf-acct-pop button:hover { background: #0f172a; color: #fff; }
+
+  /* ===== เว็บไซต์มาตรฐาน รอบ 2: เมนูหมวดใน header / footer 4 คอลัมน์ / การ์ดเรียบขึ้น ===== */
+  .sf-catnav { display: none; }
+  @media (min-width: 1024px) {
+    html.sf-site .sf-catnav { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+    html.sf-site .sf-catnav::-webkit-scrollbar { display: none; }
+    html.sf-site .pos-where { align-items: center; margin-top: 10px; }
+    html.sf-site .pos-where-chip { flex: 0 0 230px; }
+    /* เดสก์ท็อปมีเมนูหมวดใน header แล้ว — ไม่ต้องซ้ำด้วยไทล์ (มือถือยังใช้ไทล์) */
+    html.sf-site .sf-cattiles { display: none; }
+  }
+  .sf-nav-a { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; font-weight: 700; color: #1e293b; white-space: nowrap; transition: color .15s, background .15s; }
+  .sf-nav-a i { font-size: 12px; color: #64748b; }
+  .sf-nav-a:hover { background: #f1f5f9; color: #E05300; }
+  .sf-nav-a.on { color: #E05300; }
+  .sf-nav-a.on::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 2px; height: 2px; border-radius: 2px; background: #FF6B00; }
+  html.dark .sf-nav-a { color: #e2e8f0; }
+  html.dark .sf-nav-a:hover { background: #334155; color: #FF8A3D; }
+  html.dark .sf-nav-a.on { color: #FF8A3D; }
+
+  @media (min-width: 768px) { .pf-grid { grid-template-columns: 1.6fr 1fr 1fr 1.2fr; } }
+  html.sf-site .pos-footer { background: var(--sf-top); border-top: 0; margin-top: 40px; }
+  html.sf-site .pf-name, html.sf-site .pf-h { color: #fff; }
+  html.sf-site .pf-tagline, html.sf-site .pf-links button, html.sf-site .pf-contact { color: #cbd5e1; }
+  html.sf-site .pf-links button:hover, html.sf-site .pf-contact a:hover { color: #FF8A3D; }
+  html.sf-site .pf-links button i { color: #64748b; }
+  html.sf-site .pf-trust li { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); color: #e2e8f0; }
+  html.sf-site .pf-bottom { border-top-color: rgba(255,255,255,.1); color: #94a3b8; }
+
+  html.sf-site .pos-storefront .pos-card:hover { transform: translateY(-2px); border-color: #cbd5e1; box-shadow: 0 14px 28px -16px rgba(15, 42, 67, 0.3); }
+  html.sf-site .pos-storefront .pos-card .bnn-buy-btn:not(:disabled) { background: #FF6B00; border-color: #FF6B00; color: #fff; box-shadow: none; }
+  html.sf-site .pos-storefront .pos-card .bnn-buy-btn:not(:disabled):hover { background: #E05300; border-color: #E05300; color: #fff; transform: none; }
+
+  /* ===== เว็บไซต์มาตรฐาน รอบ 3: หัวหน้าต่าง (dialog) แบบร้านค้า — พื้นขาว ชื่อสีเข้ม ปุ่มปิดเทา; ปุ่มรอง .sf-btn-2 แบบเส้นขอบ =====
+     ใช้กับหน้าต่างของหน้าร้านทั้งหมด (เลือกสเปค, ตะกร้า, รายการโปรด, เทียบสเปค, เทรดอิน, ใบเสนอราคา, ติดตามใบจอง, ข้อมูลลูกค้า) */
+  .sf-dlg-head { background: #fff; color: #0f172a; border-bottom: 1px solid #e2e8f0; }
+  .sf-dlg-head h3, .sf-dlg-head h3.text-white { color: #0f172a !important; font-weight: 800; }
+  .sf-dlg-head p { color: #64748b !important; }
+  .sf-dlg-ico { color: #FF6B00; font-size: 15px; margin-right: 2px; }
+  .sf-dlg-head .text-slate-300 { color: #64748b !important; }
+  .sf-dlg-head .text-slate-300:hover { color: #0f172a !important; }
+  .sf-dlg-head [class*="bg-white/10"] { background: #f1f5f9 !important; color: #334155 !important; border-color: #e2e8f0 !important; }
+  .sf-dlg-head [class*="bg-white/10"]:hover { background: #e2e8f0 !important; }
+  .sf-dlg-head .text-white:not(h3):not([class*="bg-"]) { color: #334155 !important; }
+  .sf-btn-2 { background: #fff; color: #1e293b; border: 1px solid #cbd5e1; font-weight: 800; transition: background .15s, border-color .15s; }
+  .sf-btn-2:hover { background: #f8fafc; border-color: #94a3b8; }
+  html.dark .sf-dlg-head { background: #1e293b; color: #f1f5f9; border-bottom-color: #334155; }
+  html.dark .sf-dlg-head h3, html.dark .sf-dlg-head h3.text-white { color: #f1f5f9 !important; }
+  html.dark .sf-dlg-head p { color: #94a3b8 !important; }
+  html.dark .sf-dlg-head .text-slate-300 { color: #94a3b8 !important; }
+  html.dark .sf-dlg-head .text-slate-300:hover { color: #fff !important; }
+  html.dark .sf-dlg-head [class*="bg-white/10"] { background: #0f172a !important; color: #cbd5e1 !important; border-color: #334155 !important; }
+  html.dark .sf-dlg-head .text-white:not(h3):not([class*="bg-"]) { color: #cbd5e1 !important; }
+  html.dark .sf-btn-2 { background: #0f172a; color: #e2e8f0; border-color: #475569; }
+  html.dark .sf-btn-2:hover { background: #1e293b; }
+
+  /* ข้อความแนะนำจากกฎ AutoPromotions (Message Suggest อาจมี <b class=text-rose-...>) — โหมดมืดให้อ่านออก */
+  html.dark #cartAutoSuggest b, html.dark #cartAutoSuggest strong, html.dark #cartAutoSuggest [class*="text-rose"] { color: #fda4af !important; }
+
+  /* ===== ระบบหลังร้าน =====
+     เมนูด้านข้างเป็น flex คอลัมน์ที่เลื่อนได้ — หัวข้อหมวด (truncate = overflow:hidden) จะถูกบีบเหลือ 20px จนตัวหนังสือหาย ถ้ายอมให้ shrink */
+  #desktopMenu > *, #mobileMenu > * { flex-shrink: 0; }
+  /* footer เต็ม (หมวดสินค้า/บริการลูกค้า) เป็นของหน้าร้าน — หน้าหลังร้านเหลือแค่บรรทัดลิขสิทธิ์ */
+  html:not(.sf-site) .pos-footer .pf-grid { display: none; }
+  html:not(.sf-site) .pos-footer { margin-top: 8px; }
+
+  /* ===== ตารางข้อมูลหลังร้าน: แถบปุ่ม =====
+     ปุ่มหลัก (เพิ่ม) ซ้าย · ปุ่มทำกับรายการที่เลือก ถัดมา (กดได้เมื่อเลือกแล้ว) · เครื่องมือ (แก้ด่วน/นำเข้า/ส่งออก) ชิดขวา */
+  .cms-actions { align-items: center; }
+  .cms-actions .cms-grow { flex: 1 1 auto; }
+  .cms-btn { border-radius: 8px; font-weight: 600; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
+  .cms-btn-green { background: #16a34a; }
+  .cms-btn-green:hover { background: #15803d; filter: none; }
+  .cms-btn-red { background: #fff; color: #dc2626; border-color: #fecaca; }
+  .cms-btn-red:hover:not(:disabled) { background: #fef2f2; border-color: #f87171; filter: none; }
+  .cms-btn-line:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; filter: none; }
+  .cms-btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+  html.dark .cms-btn-red { background: transparent; color: #f87171; border-color: #7f1d1d; }
+  html.dark .cms-btn-red:hover:not(:disabled) { background: rgba(127,29,29,.25); }
+  html.dark .cms-btn-line:hover:not(:disabled) { background: #1e293b; }
+
+  /* แถวข้อความว่าง/ผิดพลาดในตารางกว้าง — ตรึงไว้ที่ส่วนที่มองเห็น (grid.stateRow) */
+  .cms-empty-cell { padding: 0 !important; }
+  .cms-empty-pin { position: sticky; left: 16px; white-space: normal; }
+
+  /* แถบปุ่มตารางบนมือถือ — ปุ่มเล็กลงให้รวมเหลือ 2-3 แถว ไม่ดันตารางลงไปครึ่งจอ */
+  @media (max-width: 639px) {
+    .cms-actions { gap: 6px; }
+    .cms-actions .cms-btn { padding: 6px 10px; font-size: 12px; gap: 5px; }
+    .cms-actions .cms-grow { display: none; }
+  }
+
+  /* KPI แดชบอร์ด 7 ช่องต่อแถว (xl) — ลด padding ข้างให้ตัวเลขมีที่มากขึ้น (ตัวเลขย่อฟอนต์เองผ่าน dashboard.fitKpis) */
+  @media (min-width: 1280px) { .dash-kpis > div { padding-left: 10px; padding-right: 10px; } }
 </style>

@@ -26,7 +26,7 @@ window.app.grid = {
       const addBtnIcon = document.getElementById('gridAddBtnIcon');
       const addBtnLabel = document.getElementById('gridAddBtnLabel');
       if (addBtnIcon && addBtnLabel) {
-        if (table === 'Products') { addBtnIcon.className = 'fas fa-layer-group'; addBtnLabel.textContent = 'เพิ่มสินค้าใหม่ (หลาย SKU)'; }
+        if (table === 'Products') { addBtnIcon.className = 'fas fa-layer-group'; addBtnLabel.textContent = 'เพิ่มสินค้า'; }
         else { addBtnIcon.className = 'fas fa-plus'; addBtnLabel.textContent = 'เพิ่มข้อมูล'; }
       }
       // ปุ่มแก้ไขราคา & สต๊อกด่วน (Bulk Quick Edit) เฉพาะหน้า Products
@@ -70,7 +70,7 @@ window.app.grid = {
       // ตัวเลือกต้องตรงกับค่าที่เก็บจริงในชีต (เหมือน options ของฟอร์มแก้ไข 'Reservation Status' ด้านบน)
       const resEl = document.getElementById('gridFilterResStatus');
       if (resEl) {
-        resEl.innerHTML = '<option value="">ประเภทการจอง: ทั้งหมด</option>'
+        resEl.innerHTML = '<option value="">ทั้งหมด</option>'
           + '<option value="จอง T (มีการจอง)">จอง T (มีการจอง)</option>'
           + '<option value="จอง F (สวมสิทธิ์การจอง)">จอง F (สวมสิทธิ์การจอง)</option>';
       }
@@ -78,7 +78,7 @@ window.app.grid = {
       const stEl = document.getElementById('gridFilterOrderStatus');
       if (stEl) {
         const options = window.app.getOrderStatusFlow().concat(['Cancelled']);
-        stEl.innerHTML = '<option value="">สถานะออเดอร์: ทั้งหมด</option>'
+        stEl.innerHTML = '<option value="">ทั้งหมด</option>'
           + options.map(o => '<option value="' + window.app.esc(o) + '">' + window.app.esc(o) + '</option>').join('');
       }
       // Category — จากชีต Products ผูกกับ SKU ของแต่ละแถว Order (แถว DISCOUNT ไม่มี SKU สินค้าจริง จึงไม่เข้าเงื่อนไขนี้)
@@ -92,7 +92,7 @@ window.app.grid = {
       });
       const catEl = document.getElementById('gridFilterCategory');
       if (catEl) {
-        catEl.innerHTML = '<option value="">Category: ทั้งหมด</option>'
+        catEl.innerHTML = '<option value="">ทั้งหมด</option>'
           + cats.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
       }
     },
@@ -110,17 +110,35 @@ window.app.grid = {
         else { this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลได้'); }
       } catch(e) { Swal.close(); this.renderLoadError(e.message); }
     },
+    // แถวข้อความว่าง/ผิดพลาดในตาราง — ตารางกว้างมาก (Orders ~2,700px) ข้อความจัดกลางเซลล์จะไปอยู่นอกจอทางขวา
+    // จึงตรึง (sticky) กล่องข้อความไว้ที่ส่วนที่มองเห็นของกรอบเลื่อน และกว้างเท่ากรอบนั้น
+    // วัดความกว้างหลังจัดหน้าเสร็จ (ตอน render หน้าอาจยังไม่ได้แสดงเมนูข้าง) และวัดใหม่เมื่อปรับขนาดหน้าต่าง
+    stateRow: function(inner) {
+      const self = this;
+      requestAnimationFrame(() => self.fitStateRow());
+      // เมนูข้างเลื่อนเข้ามาแบบมี transition — ResizeObserver จับทุกครั้งที่กรอบตารางเปลี่ยนขนาด (กรอบสร้างใหม่ทุกครั้งที่เปิดหน้า)
+      const wrap = document.querySelector('.cms-wrap');
+      if (wrap && !wrap._fitObs && window.ResizeObserver) { wrap._fitObs = new ResizeObserver(() => self.fitStateRow()); wrap._fitObs.observe(wrap); }
+      return '<tr><td colspan="' + this.visibleColCount() + '" class="cms-empty-cell"><div class="cms-empty-pin">' + inner + '</div></td></tr>';
+    },
+    fitStateRow: function() {
+      const wrap = document.querySelector('.cms-wrap');
+      const pins = document.querySelectorAll('#dataGridBody .cms-empty-pin');
+      if (!wrap || !pins.length) return;
+      const w = Math.max(240, wrap.clientWidth - 32) + 'px';
+      pins.forEach(p => { p.style.width = w; });
+    },
     // error state มาตรฐาน (5A.4) — แสดงในตารางพร้อมปุ่มลองใหม่ แทนการเด้ง Swal อย่างเดียว
     renderLoadError: function(msg) {
       const tbody = document.getElementById('dataGridBody');
       if (!tbody) { Swal.fire('Error', msg, 'error'); return; }
-      tbody.innerHTML = '<tr><td colspan="' + this.visibleColCount() + '">' + window.app.emptyState({
+      tbody.innerHTML = this.stateRow(window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',
         subtitle: msg,
         actionLabel: 'ลองใหม่',
         onclick: 'window.app.grid.loadData()'
-      }) + '</td></tr>';
+      }));
     },
     renderPage: function(page) {
       this.currentPage = page;
@@ -164,13 +182,13 @@ window.app.grid = {
             + "var c=document.getElementById('gridFilterCategory'); if(c) c.value='';"
             + "window.app.grid.filter()";
         }
-        tbody.innerHTML = '<tr><td colspan="' + this.visibleColCount() + '">' + window.app.emptyState({
+        tbody.innerHTML = this.stateRow(window.app.emptyState({
           icon: hasFilter ? 'fa-search' : 'fa-inbox',
           title: hasFilter ? 'ไม่พบข้อมูลที่ค้นหา' : 'ยังไม่มีข้อมูลในตารางนี้',
           subtitle: hasFilter ? 'ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองเพื่อแสดงข้อมูลทั้งหมด' : 'เมื่อมีการบันทึกข้อมูลใหม่ รายการจะแสดงที่นี่',
           actionLabel: hasFilter ? 'ล้างตัวกรอง' : '',
           onclick: hasFilter ? clearAction : ''
-        }) + '</td></tr>';
+        }));
         return;
       }
       let tbodyHtml = '';
@@ -246,6 +264,8 @@ window.app.grid = {
       const n = Object.keys(this.selected).length;
       const dl = document.getElementById('gridBulkDeleteLabel');
       if (dl) dl.textContent = 'ลบรายการที่เลือก' + (n ? ' (' + n + ')' : '');
+      // ปุ่มทำกับหลายรายการกดได้เมื่อเลือกแล้วเท่านั้น (ฟังก์ชันยังเช็ค ids.length === 0 ซ้ำ)
+      ['gridBulkDeleteBtn', 'gridBulkOnBtn', 'gridBulkOffBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = n === 0; });
       document.querySelectorAll('#dataGridBody .grid-sel').forEach(cb => { const tr = cb.closest('tr'); if (tr) tr.classList.toggle('cms-sel-row', cb.checked); });
       const all = document.getElementById('gridSelAll');
       if (all) {

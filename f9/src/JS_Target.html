@@ -54,7 +54,7 @@ window.app.target = {
       const endDate = new Date(endStr);
       const now = new Date();
       
-      const formatTh = (d) => { const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return `${d.getDate()} ${m[d.getMonth()]} ${(d.getFullYear()+543).toString().substring(2)}`; };
+      const formatTh = (d) => { const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()+543}`; };
       const rangeEl = document.getElementById('targetDateRange');
       if (rangeEl) rangeEl.innerText = `(${formatTh(startDate)} - ${formatTh(endDate)})`;
       

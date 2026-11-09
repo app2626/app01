@@ -63,7 +63,7 @@ window.app.dashboard = {
             let html = '';
             gridData.forEach((item, idx) => {
                 let formattedUrl = window.app.esc(window.app.formatImageUrl(item.url, 'w1000'));
-                let baseClass = "rounded-3xl overflow-hidden shadow-sm group relative bg-white border border-slate-100 h-[160px] md:h-[200px] skeleton";
+                let baseClass = "rounded-2xl overflow-hidden shadow-sm group relative bg-white border border-slate-100 h-[120px] md:h-[150px] skeleton";
                 if(idx === 0 && gridData.length >= 3) baseClass += " md:col-span-2 md:row-span-2 md:h-full";
 
                 let linkTag = item.link ? `<a href="${window.app.esc(item.link)}" target="_blank" class="block w-full h-full relative">` : `<div class="w-full h-full relative">`;
@@ -76,6 +76,19 @@ window.app.dashboard = {
         } else {
             if(gridWrap) gridWrap.classList.add('hidden');
         }
+    },
+
+    // ตัวเลข KPI 7 ช่องต่อแถวแคบ — ยอดหลักแสนขึ้นไปเคยโดนตัดเป็น "฿99,4…" (truncate) จึงย่อฟอนต์ลงทีละขั้นจนพอดีช่อง
+    // (ไม่ต่ำกว่า 13px) และใส่ title ให้เห็นตัวเลขเต็มเมื่อชี้ — เรียกซ้ำเมื่อเปลี่ยนขนาดหน้าต่าง
+    fitKpis: function() {
+      const self = this;
+      document.querySelectorAll('[id^="dashKpi"]').forEach(el => {
+        el.style.fontSize = '';
+        el.title = el.textContent;
+        let fs = parseFloat(getComputedStyle(el).fontSize) || 24;
+        while (el.scrollWidth > el.clientWidth + 1 && fs > 13) { fs -= 1; el.style.fontSize = fs + 'px'; }
+      });
+      if (!this._fitBound) { this._fitBound = true; window.addEventListener('resize', () => { clearTimeout(self._fitT); self._fitT = setTimeout(() => self.fitKpis(), 150); }); }
     },
 
     init: async function() {
@@ -257,13 +270,14 @@ window.app.dashboard = {
         }
       });
       
-      if(document.getElementById('dashKpiTotal')) document.getElementById('dashKpiTotal').innerText = '฿' + t.toLocaleString();
+      if(document.getElementById('dashKpiTotal')) document.getElementById('dashKpiTotal').innerText = '฿' + Math.round(t).toLocaleString();
       if(document.getElementById('dashKpiMobiles')) document.getElementById('dashKpiMobiles').innerText = totalMobiles; 
       if(document.getElementById('dashKpiAccessories')) document.getElementById('dashKpiAccessories').innerText = totalAccessories; 
       if(document.getElementById('dashKpiResT')) document.getElementById('dashKpiResT').innerText = resT;
       if(document.getElementById('dashKpiResF')) document.getElementById('dashKpiResF').innerText = resF;
       if(document.getElementById('dashKpiConv')) document.getElementById('dashKpiConv').innerText = (u.size>0 ? ((completedOrders.size/u.size)*100).toFixed(1) : 0) + '%';
-      if(document.getElementById('dashKpiAov')) document.getElementById('dashKpiAov').innerText = '฿' + (u.size>0 ? (t/u.size) : 0).toLocaleString();
+      if(document.getElementById('dashKpiAov')) document.getElementById('dashKpiAov').innerText = '฿' + Math.round(u.size>0 ? (t/u.size) : 0).toLocaleString();
+      this.fitKpis();
     },
     renderCharts: function() {
       if (typeof ChartDataLabels !== 'undefined') {

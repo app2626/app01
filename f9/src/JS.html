@@ -59,6 +59,13 @@ window.app = {
   },
 
   // สำหรับค่าที่ฝังเป็น string literal ใน onclick="fn('...')" — escape เป็น JS string ก่อน แล้วค่อย escape HTML
+  // ข้อความจากชีตที่อนุญาตให้จัดรูปแบบได้นิดหน่อย (เช่น Message Suggest/Apply ของ AutoPromotions — Admin/Manager แก้ได้):
+  // escape ทั้งหมดก่อน แล้วคืนเฉพาะแท็ก b/strong/em/i/u/br (class ได้แค่ตัวอักษรปลอดภัย) — ห้ามมี attribute อื่น/สคริปต์หลุดผ่าน
+  safeRichText: function(v) {
+    return window.app.esc(v).replace(/&lt;(\/?)(b|strong|em|i|u|br)(?:\s+class=(?:&quot;|&#39;)([A-Za-z0-9 _:\-]{0,80})(?:&quot;|&#39;))?\s*\/?&gt;/gi,
+      function(m, close, tag, cls) { tag = tag.toLowerCase(); return close ? '</' + tag + '>' : '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>'; });
+  },
+
   escAttrJs: function(v) {
     return window.app.esc(String(v === null || v === undefined ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
   },
@@ -701,6 +708,24 @@ window.app = {
   },
 
   // ข้อมูลติดต่อร้านใน footer (ตั้งค่าที่ ตั้งค่าระบบ › ข้อมูลติดต่อร้าน: ContactPhone / ContactLine / ContactHours)
+  // footer: ลิงก์หมวดสินค้า (เหมือนเมนูหมวดใน header) — กดจากหน้าไหนก็ได้ พาไปหน้าร้านพร้อมกรองหมวดนั้น
+  renderFooterCategories: function() {
+    const nav = document.getElementById('footerCatLinks'); if (!nav || !window.app.pos || !window.app.pos.storeCategories) return;
+    const cats = window.app.pos.storeCategories().filter(c => !c.includes('ของแถม')).slice(0, 8);
+    const esc = window.app.esc, escJs = window.app.escAttrJs;
+    nav.innerHTML = cats.map(c => '<button type="button" onclick="window.app.goCategory(\'' + escJs(c) + '\')"><i class="fas ' + window.app.pos.catIcon(c) + '"></i>' + esc(c) + '</button>').join('');
+    const col = document.getElementById('footerCatCol');
+    if (col) col.classList.toggle('hidden', cats.length === 0);
+  },
+  goCategory: function(cat) {
+    const pos = window.app.pos;
+    if (window.app.currentRoute === 'pos') { pos.setStoreCategory(cat); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    // ยังไม่อยู่หน้าร้าน: ตั้งตัวกรองในหน่วยความจำไว้ก่อน — pos.init วาดตาม storeFilters ปัจจุบัน
+    pos.storeFilters = pos.emptyStoreFilters();
+    pos.storeFilters.category = cat;
+    pos.storePage = 1;
+    window.location.hash = '#pos';
+  },
   renderFooterContact: function() {
     const box = document.getElementById('footerContact'); if (!box) return;
     const st = (window.app.globalData && window.app.globalData.settings) || {};
@@ -1098,6 +1123,58 @@ window.app = {
     if (btn) btn.setAttribute('aria-expanded', 'false');
   },
 
+  // ===== หน้าร้านแบบเว็บไซต์มาตรฐาน (html.sf-site เฉพาะ #pos) — header ร้าน: โลโก้ / เบอร์ติดต่อ / เมนูบัญชี =====
+  // เมนูบัญชีแทน sidebar แอดมินที่ถูกซ่อนบนหน้าร้าน: ลิงก์ไประบบหลังร้านตามสิทธิ์ (checkMenuAccess เดียวกับ sidebar) + ธีม/รหัสผ่าน/ออกจากระบบ
+  renderSiteHeader: function() {
+    const esc = window.app.esc;
+    window.app.applyLogo('sfLogoBox', 'sfLogoIcon', (window.app.globalData.settings || {}).LogoUrl);
+    const nm = document.getElementById('sfAcctName');
+    if (nm && window.app.user) nm.textContent = window.app.user.Name || 'บัญชี';
+    const ph = document.getElementById('sfTopbarPhone');
+    if (ph) {
+      const phone = String(((window.app.globalData.settings || {}).ContactPhone) || '').replace(/^'+/, '').trim();
+      ph.innerHTML = phone ? '<a href="tel:' + esc(phone.replace(/[^0-9+]/g, '')) + '"><i class="fas fa-phone"></i> ' + esc(phone) + '</a>' : '';
+      ph.classList.toggle('hidden', !phone);
+    }
+    const pop = document.getElementById('sfAcctPop');
+    if (!pop || !window.app.user) return;
+    const links = [];
+    this.menuConfig.forEach(m => {
+      if (m.isCategory || m.id === 'pos') return;
+      if (m.isParent) {
+        const first = (m.children || []).find(c => !c.isCategory && this.checkMenuAccess(c.id, c.roles));
+        if (first) links.push({ id: first.id, icon: m.icon, label: m.label });
+      } else if (this.checkMenuAccess(m.id, m.roles)) {
+        links.push({ id: m.id, icon: m.icon, label: m.label });
+      }
+    });
+    let h = '<div class="sf-acct-head"><span class="sf-acct-av"><i class="fas fa-user"></i></span><span class="min-w-0"><strong>' + esc(window.app.user.Name || '') + '</strong><small>' + esc(window.app.user.Role || '') + '</small></span></div>';
+    if (links.length) {
+      h += '<div class="sf-acct-sec">ระบบหลังร้าน</div>';
+      h += links.map(l => '<a role="menuitem" href="#' + esc(l.id) + '" onclick="window.app.closeSfAccount()"><i class="fas ' + esc(l.icon) + '"></i>' + esc(l.label) + '</a>').join('');
+    }
+    h += '<div class="sf-acct-div"></div>'
+      + '<button type="button" role="menuitem" class="sf-acct-mob" onclick="window.app.closeSfAccount(); window.app.pos.openWishlistDrawer()"><i class="fas fa-heart"></i>รายการโปรด</button>'
+      + '<button type="button" role="menuitem" class="sf-acct-mob" onclick="window.app.closeSfAccount(); window.app.pos.openOrderTrackModal()"><i class="fas fa-qrcode"></i>เช็คสถานะใบจอง</button>'
+      + '<button type="button" role="menuitem" onclick="window.app.toggleTheme()"><i class="fas fa-moon theme-toggle-icon"></i><span class="theme-toggle-label">โหมดมืด</span></button>'
+      + '<button type="button" role="menuitem" onclick="window.app.closeSfAccount(); window.app.openChangePassword()"><i class="fas fa-key"></i>เปลี่ยนรหัสผ่าน</button>'
+      + '<button type="button" role="menuitem" class="sf-acct-out" onclick="window.app.closeSfAccount(); window.app.logout()"><i class="fas fa-sign-out-alt"></i>ออกจากระบบ</button>';
+    pop.innerHTML = h;
+    window.app.updateThemeToggleUI();
+  },
+  toggleSfAccount: function(ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const pop = document.getElementById('sfAcctPop'), btn = document.getElementById('sfAcctBtn');
+    if (!pop) return;
+    const open = pop.classList.toggle('hidden') === false;
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+  closeSfAccount: function() {
+    const pop = document.getElementById('sfAcctPop'), btn = document.getElementById('sfAcctBtn');
+    if (pop) pop.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  },
+
   updateThemeToggleUI: function() {
     const isDark = document.documentElement.classList.contains('dark');
     document.querySelectorAll('.theme-toggle-icon').forEach(icon => {
@@ -1264,6 +1341,7 @@ window.app = {
   },
 
   renderLogin: function() {
+    document.documentElement.classList.remove('sf-site');
     const el = document.getElementById('app');
     const tmpl = document.getElementById('tmpl-login');
     if(el && tmpl) {
@@ -1305,8 +1383,10 @@ window.app = {
       document.addEventListener('click', function (e) {
         const wrap = document.getElementById('userMenuWrap');
         if (wrap && !wrap.contains(e.target)) window.app.closeUserMenu();
+        const sfw = document.getElementById('sfAcctWrap');
+        if (sfw && !sfw.contains(e.target)) window.app.closeSfAccount();
       });
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') window.app.closeUserMenu(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { window.app.closeUserMenu(); window.app.closeSfAccount(); } });
     }
     if (!window.__backToTopBound) {
       window.__backToTopBound = true;
@@ -1327,6 +1407,7 @@ window.app = {
       if(res && res.status === 'success') {
          window.app.globalData = res;
          window.app.preloadBanners();
+         window.app.renderFooterCategories();
          // ลิงก์สินค้าที่แชร์ (?p=) ไม่มี hash → พาไปหน้าสั่งจอง (pos) แทน dashboard
          // ปัดจอลงเพื่อรีเฟรช (มือถือ) = โหลด iframe ใหม่ hash หาย → กลับหน้าที่เปิดค้างไว้ (จำไว้ใน sessionStorage) แทนการเริ่มที่ dashboard
          // ลิงก์สินค้าที่แชร์ (?p=) ยังมาก่อนเสมอ
@@ -1485,6 +1566,8 @@ window.app = {
     }
     
     window.app.saveRoute_(hash); // ผ่านการเช็คสิทธิ์แล้วเท่านั้น — จำหน้าปัจจุบันไว้ใช้ตอนรีเฟรช
+    // หน้าร้าน (#pos) แสดงแบบเว็บไซต์มาตรฐาน: ซ่อน sidebar/แถบบนของระบบหลังร้าน ใช้ header ร้านค้าแทน (CSS html.sf-site)
+    document.documentElement.classList.toggle('sf-site', hash === 'pos');
     document.querySelectorAll('.nav-link').forEach(el => {
        el.classList.remove('bg-indigo-600', 'text-white', 'hover:bg-indigo-700', 'bg-indigo-50', 'text-indigo-600', 'active-link');
        if(el.id.startsWith('nav-desk-')) el.classList.add('text-slate-500', 'hover:bg-indigo-50', 'hover:text-indigo-600');
