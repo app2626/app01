@@ -833,6 +833,21 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("document.documentElement.classList.remove('dark');true");
     ok(bad.length === 0, bad.join(' | '));
   });
+  await T('forms: add forms open, fit the screen, close with the X button', async () => {
+    await ev("window.location.hash='#channels';true"); await sleep(1400);
+    await ev("window.app.grid.handleAddClick();true"); await sleep(600);
+    ok(await ev("!document.getElementById('formModal').classList.contains('hidden')"), 'generic form did not open');
+    eq(await ev("document.getElementById('formModalTitle').textContent"), 'เพิ่มช่องทางขาย', 'form title names the table');
+    ok(await ev("[...document.querySelectorAll('#dynamicForm label')].every(l=>/[ก-๙]/.test(l.textContent))"), 'all field labels are Thai');
+    await shot('form-generic');
+    await ev("document.querySelector('#formModal [aria-label=\"ปิดฟอร์ม\"]').click();true"); await sleep(300);
+    ok(await ev("document.getElementById('formModal').classList.contains('hidden')"), 'generic form did not close');
+    await ev("window.location.hash='#products';true"); await sleep(1500);
+    await ev("window.app.grid.handleAddClick();true"); await sleep(700);
+    await shot('form-product');
+    const w = JSON.parse(await ev("JSON.stringify([document.documentElement.scrollWidth, window.innerWidth])")); ok(w[0] <= w[1] + 1, 'page overflow with product form open ' + w);
+    await ev("window.Swal&&Swal.isVisible()&&Swal.close();document.querySelectorAll('[role=dialog]').forEach(d=>{if(!d.classList.contains('hidden')&&d.id)window.app.hideModal(d.id)});true"); await sleep(300);
+  });
   console.log('== SALES USER');
   curPhase = 'sales';
   await ev("window.app.logout ? window.app.logout() : (window.app.user=null,true)"); await sleep(600);
