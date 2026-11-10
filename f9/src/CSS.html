@@ -1576,15 +1576,16 @@
   @media (prefers-reduced-motion: reduce) { .popup-track { transition: none; } }
 
   /* ===== หน้าร้านแบบเว็บไซต์มาตรฐาน — html.sf-site (route() ใส่ให้เฉพาะ #pos) =====
-     ซ่อน sidebar/แถบบนของระบบหลังร้าน, เนื้อหาอยู่ในคอนเทนเนอร์กลางจอ (max 1320px),
+     ซ่อน sidebar/แถบบนของระบบหลังร้าน, เนื้อหาอยู่ในคอนเทนเนอร์กลางจอ (กว้างเกือบเต็มจอ: เว้นขอบรวม 4in, ไม่แคบกว่า 1320px),
      แถบบริการ + header ร้านค้าพื้นหลังเต็มความกว้างจอ (box-shadow 100vmax + clip-path — ไม่ทำให้เกิด scroll แนวนอน) */
   .sf-topbar, .sf-home { display: none; }
   html.sf-site { --sf-hdr: #ffffff; --sf-line: #e2e8f0; --sf-top: #0f1b2d; }
   html.sf-site.dark { --sf-hdr: #1e293b; --sf-line: #334155; --sf-top: #020617; }
   html.sf-site #desktopSidebar, html.sf-site #desktopShowSidebarBtn, html.sf-site #mainContentWrapper > nav.glass-nav, html.sf-site .animate-blob { display: none !important; }
   html.sf-site #mainContentWrapper { width: 100% !important; }
-  html.sf-site #page-content { max-width: 1320px; margin: 0 auto; padding: 0 16px 8px !important; }
+  html.sf-site #page-content { max-width: max(1320px, calc(100% - 4in)); margin: 0 auto; padding: 0 16px 8px !important; }
   @media (min-width: 768px) { html.sf-site #page-content { padding: 0 24px 8px !important; } }
+  @media (min-width: 1536px) { html.sf-site #page-content { padding: 0 40px 8px !important; } }
   html.sf-site #page-content .pos-shell-card { background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 0; overflow: visible; backdrop-filter: none; -webkit-backdrop-filter: none; min-height: 0; }
 
   html.sf-site .sf-topbar { display: none; position: relative; isolation: isolate; align-items: center; justify-content: space-between; gap: 16px; height: 34px; font-size: 12px; font-weight: 600; color: #cbd5e1; }
@@ -1640,7 +1641,7 @@
   @media (max-width: 479px) { .sf-acct-mob { display: flex !important; } }
 
   html.sf-site #posTimerBanner { border-radius: 14px; }
-  html.sf-site .pf-grid, html.sf-site .pf-bottom { max-width: 1320px; margin-left: auto; margin-right: auto; }
+  html.sf-site .pf-grid, html.sf-site .pf-bottom { max-width: max(1320px, calc(100% - 4in)); margin-left: auto; margin-right: auto; }
 
   html.dark .sf-brand-name { color: #f1f5f9; }
   html.dark .sf-icon-btn { color: #e2e8f0; }

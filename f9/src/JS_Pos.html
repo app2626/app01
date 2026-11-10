@@ -1742,7 +1742,7 @@ window.app.pos = {
         return;
       }
       if(products.length === 0 && searchEl && searchEl.value === '') {
-         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 pb-4">';
+         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 pb-4">';
          for(let k=0; k<10; k++) { skel += '<div class="bg-white border border-slate-200/80 p-3.5 rounded-2xl shadow-sm"><div class="skeleton mb-3" style="height:135px; width:100%;"></div><div class="skeleton mb-2" style="height:12px; width:85%;"></div><div class="skeleton mb-3" style="height:16px; width:45%;"></div><div class="skeleton" style="height:32px; width:100%; border-radius:0.75rem;"></div></div>'; }
          skel += '</div>'; row.innerHTML = skel; return;
       }
@@ -1797,7 +1797,7 @@ window.app.pos = {
         if (this.storePage > totalPages) this.storePage = totalPages;
         if (this.storePage < 1) this.storePage = 1;
         const pageItems = renderedList.slice((this.storePage - 1) * size, this.storePage * size);
-        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 pb-4">';
+        let html = '<div class="pos-storefront grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 pb-4">';
         pageItems.forEach(p => { html += this.cardHtml(p, searchTerm); });
         html += '</div>' + this.paginationHtml(totalPages);
         row.innerHTML = html;
