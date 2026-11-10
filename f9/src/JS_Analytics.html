@@ -96,10 +96,10 @@ window.app.analytics = {
           let d = toDateKey(tsObj);
           if (d < startKey || d > endKey) return; // นอกช่วงการจอง — ตัดออกทั้ง KPI และกราฟให้ตรงกัน
           
-          if (cat === 'โมบาย') {
+          if (window.app.isMobileCat(cat)) {
              totalMobile += qty;
              dailyMobile[d] = (dailyMobile[d] || 0) + qty;
-          } else if (['แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(cat)) {
+          } else if (['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(cat)) {
              totalAcc += qty;
              dailyAcc[d] = (dailyAcc[d] || 0) + qty;
           }

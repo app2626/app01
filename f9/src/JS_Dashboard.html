@@ -255,9 +255,9 @@ window.app.dashboard = {
             u.add(o.OrderID);
             if (o['Order Status'] === terminalStatus) completedOrders.add(o.OrderID);
             
-            let isMobile = o.Category === 'โมบาย';
+            let isMobile = window.app.isMobileCat(o.Category);
             // 6C.3 — "อุปกรณ์เสริม" แยกเป็น 3 หมวดย่อย (อุปกรณ์เสริม/สมาร์ทวอทช์/หูฟัง) แต่ KPI นี้ยังรวมเป็นยอดเดียว
-            let isAcc = ['แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category);
+            let isAcc = ['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category);
             if (isMobile || isAcc) {
                 let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
                 if(isMobile) totalMobiles += qty;
@@ -319,7 +319,7 @@ window.app.dashboard = {
       };
       const groupData = {};
       this.filteredOrders.forEach(o => {
-        if(window.app.isOrderCancelled(o) || (o.Category || '').toString().trim() !== 'โมบาย') return;
+        if(window.app.isOrderCancelled(o) || !window.app.isMobileCat(o.Category)) return;
         let mName = o.Model && o.Model !== '-' ? o.Model : o['Product Name'];
         const g = stripCapacityGroup(mName, o.Capacity);
         let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
@@ -355,7 +355,7 @@ window.app.dashboard = {
           window.app.chartExportButtons(canvasId);
         }
       };
-      buildModelAdvancedChart('chartModelAdvancedMobile', ['โมบาย']);
+      buildModelAdvancedChart('chartModelAdvancedMobile', ['โมบาย', 'แท็บเล็ต']);
       buildModelAdvancedChart('chartModelAdvancedWatchEarphone', ['สมาร์ทวอทช์', 'หูฟัง']);
 
       // Promotions summary is rendered as a table via renderPromotionsTable()
@@ -401,12 +401,12 @@ window.app.dashboard = {
         let ch = o.Channel || 'Unknown';
         let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
         
-        if (o.Category === 'โมบาย') {
+        if (window.app.isMobileCat(o.Category)) {
             allChannelsMobile.add(ch);
             if(!channelModelDataMobile[mName]) channelModelDataMobile[mName] = { total: 0, channels: {} };
             channelModelDataMobile[mName].total += qty;
             channelModelDataMobile[mName].channels[ch] = (channelModelDataMobile[mName].channels[ch] || 0) + qty;
-        } else if (['แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category)) {
+        } else if (['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category)) {
             allChannelsAcc.add(ch);
             if(!channelModelDataAcc[mName]) channelModelDataAcc[mName] = { total: 0, channels: {} };
             channelModelDataAcc[mName].total += qty;

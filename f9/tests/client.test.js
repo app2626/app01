@@ -882,10 +882,21 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const only = await total([{ Area: 'ALL BRANCHES', 'เป้า': 1000 }]);
     ok(/รวมทั้งหมด: 1,000 3 /.test(only), 'ALL only -> ' + only);
   });
-  await T('dashboard KPIs: tablet orders are counted (with the non-mobile devices), not dropped', async () => {
+  await T('dashboard KPIs: tablet orders are counted together with mobile, not dropped', async () => {
     await ev("window.location.hash='#dashboard';true"); await sleep(1500);
     const r = JSON.parse(await ev("(()=>{const d=window.app.dashboard;const keep=d.filteredOrders;d.filteredOrders=[{OrderID:'K1',Category:'โมบาย',Qty:1,'Row Total':100,'Reservation Status':'จอง T (มีการจอง)','Order Status':'Pending'},{OrderID:'K2',Category:'แท็บเล็ต',Qty:2,'Row Total':200,'Reservation Status':'จอง F (สวมสิทธิ์การจอง)','Order Status':'Pending'}];d.updateKPIs();const g=i=>document.getElementById(i).innerText;const out=[g('dashKpiMobiles'),g('dashKpiAccessories'),g('dashKpiResT'),g('dashKpiResF')];d.filteredOrders=keep;d.updateKPIs();return JSON.stringify(out)})()"));
-    eq(r, ['1', '2', '1', '2']);
+    eq(r, ['3', '0', '1', '2']);
+  });
+  await T('account menu on the storefront: back-office links change the page themselves (GAS iframe has base target=_top, native #links go nowhere)', async () => {
+    await ev("window.location.hash='#pos';true"); await sleep(1300);
+    await ev("document.getElementById('sfAcctBtn').click();true"); await sleep(200);
+    ok(await ev("!document.getElementById('sfAcctPop').classList.contains('hidden')"), 'menu did not open');
+    const r = JSON.parse(await ev("(()=>{const a=document.querySelector('#sfAcctPop a[href$=orders]');if(!a)return JSON.stringify({no:[...document.querySelectorAll('#sfAcctPop a')].map(x=>x.getAttribute('href'))});const e=new MouseEvent('click',{bubbles:true,cancelable:true});a.dispatchEvent(e);return JSON.stringify({prevented:e.defaultPrevented})})()"));
+    ok(r.prevented === true, 'click must be handled by the app, got ' + JSON.stringify(r));
+    await sleep(1300);
+    eq(await ev('location.hash'), '#orders');
+    ok(await ev("!!document.getElementById('dataGridBody') && !document.documentElement.classList.contains('sf-site')"), 'orders page not rendered');
+    ok(await ev("(()=>{const a=document.createElement('a');a.href='#';document.body.appendChild(a);const e=new MouseEvent('click',{bubbles:true,cancelable:true});a.dispatchEvent(e);a.remove();return e.defaultPrevented===false})()"), 'a bare # link must be left alone');
   });
   console.log('== SALES USER');
   curPhase = 'sales';

@@ -72,6 +72,9 @@ window.app = {
 
   // ทุกหน้าที่นับ/รวมยอดจองจาก Orders ต้องข้ามแถวที่ถูกยกเลิกด้วยฟังก์ชันนี้ — เดิมแต่ละหน้าเช็คเอง ('Cancelled' บ้าง, 'Cancelled'+'ยกเลิก' บ้าง)
   // ไม่สม่ำเสมอกัน ทำให้ถ้าแถวไหนถูกตั้ง Order Status เป็น 'ยกเลิก' (เช่น แก้ตรงชีตเอง) บางหน้าจะยังนับรวมอยู่ — รวมเป็นจุดเดียวกันแทน
+  // หมวดที่นับเป็น "โมบาย" ในแดชบอร์ด/วิเคราะห์ยอดขาย/เป้าหมาย — แท็บเล็ตนับรวมกับโมบาย (owner request 2026-11-10)
+  // ใช้เฉพาะการนับยอดในรายงาน ไม่เกี่ยวกับกฎจำกัดโมบาย 1 เครื่องต่อออเดอร์ (ยังใช้เฉพาะหมวด โมบาย)
+  isMobileCat: function(cat) { const c = (cat === undefined || cat === null ? '' : cat).toString().trim(); return c === 'โมบาย' || c === 'แท็บเล็ต'; },
   isOrderCancelled: function(o) {
     const s = (o && o['Order Status'] !== undefined && o['Order Status'] !== null ? o['Order Status'] : '').toString().trim();
     return s === 'Cancelled' || s === 'ยกเลิก';
@@ -1313,10 +1316,15 @@ window.app = {
 
     window.addEventListener('hashchange', () => window.app.route());
     document.addEventListener('click', (e) => {
-      const link = e.target.closest('a.nav-link[href^="#"]');
-      if (!link) return;
+      // ทุกลิงก์ #หน้า ในแอป (sidebar, เมนูบัญชีบนหน้าร้าน, ลิงก์แบนเนอร์ ฯลฯ) ต้องเปลี่ยน hash เอง:
+      // หน้าเว็บจริงอยู่ใน iframe ของ GAS ที่มี <base target="_top"> — ปล่อยให้เบราว์เซอร์จัดการ ลิงก์จะไปเปลี่ยนหน้าต่างนอกและไม่เกิดอะไรขึ้น
+      // (เดิมดักเฉพาะ a.nav-link ทำให้เมนู "บัญชีผู้ใช้ / ระบบหลังร้าน" กดแล้วไม่ไปไหนบนเว็บจริง)
+      const link = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+      if (!link || e.defaultPrevented) return;
+      const href = link.getAttribute('href') || '';
+      if (!/^#[A-Za-z0-9_-]+$/.test(href)) return;
       e.preventDefault();
-      window.location.hash = link.getAttribute('href');
+      if (window.location.hash === href) window.app.route(); else window.location.hash = href;
     });
   },
 
