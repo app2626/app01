@@ -141,6 +141,7 @@ window.app.target = {
           let totalActualSum = 0;
           let totalForecastSum = 0;
           
+          const hasAreaRows = targets.some(t => { const n = (t[nameKey] || '').toString().trim().toUpperCase(); return n && n !== 'ALL' && n !== 'ALL BRANCHES'; });
           targets.forEach(t => {
               let name = (t[nameKey] || '').toString().trim();
               if(!name) return;
@@ -169,9 +170,13 @@ window.app.target = {
               let forecastVal = Math.round(avgPerDay * totalDays);
               let diffVal = actualVal - targetVal;
               
-              totalTargetSum += targetVal;
-              totalActualSum += actualVal;
-              totalForecastSum += forecastVal;
+              // แถว ALL / ALL BRANCHES คือยอดรวมทุกสาขาอยู่แล้ว — ถ้าชีตมีแถวรายแอเรียด้วย ห้ามบวกซ้ำในบรรทัด "รวมทั้งหมด"
+              const isAllRow = (upperName === 'ALL' || upperName === 'ALL BRANCHES');
+              if (!(isAllRow && hasAreaRows)) {
+                totalTargetSum += targetVal;
+                totalActualSum += actualVal;
+                totalForecastSum += forecastVal;
+              }
               
               let diffClass = diffVal >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
               let diffIcon = diffVal >= 0 ? '<i class="fas fa-arrow-up mr-1"></i>' : '<i class="fas fa-arrow-down mr-1"></i>';

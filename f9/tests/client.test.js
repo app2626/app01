@@ -848,6 +848,45 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const w = JSON.parse(await ev("JSON.stringify([document.documentElement.scrollWidth, window.innerWidth])")); ok(w[0] <= w[1] + 1, 'page overflow with product form open ' + w);
     await ev("window.Swal&&Swal.isVisible()&&Swal.close();document.querySelectorAll('[role=dialog]').forEach(d=>{if(!d.classList.contains('hidden')&&d.id)window.app.hideModal(d.id)});true"); await sleep(300);
   });
+  console.log('== REGRESSIONS (category / target total / dashboard)');
+  curPhase = 'regress';
+  await T('product form: editing a tablet keeps its category (option exists, unknown categories are added, never blanked)', async () => {
+    const h = sheets.Products.rows[0], mi = h.indexOf('Model'), ci = h.indexOf('Category');
+    const catOf = m => sheets.Products.rows.filter(r => r[mi] === m).map(r => r[ci]);
+    await ev("window.location.hash='#products';true"); await sleep(1500);
+    eq([...new Set(catOf('Galaxy Test1'))], ['แท็บเล็ต'], 'seed');
+    await ev("window.app.grid.editForm(window.app.grid.dataList.findIndex(x=>x.Model==='Galaxy Test1'));true"); await sleep(800);
+    eq(await ev("document.getElementById('pgCategory').value"), 'แท็บเล็ต', 'select must show the stored category');
+    await ev("window.app.productGroup.save();true"); await sleep(1800);
+    eq([...new Set(catOf('Galaxy Test1'))], ['แท็บเล็ต'], 'category after save');
+    await ev("window.Swal&&Swal.isVisible()&&Swal.close();true"); await sleep(300);
+    await ev("window.app.productGroup.setCategory('หมวดพิเศษ');true");
+    eq(await ev("document.getElementById('pgCategory').value"), 'หมวดพิเศษ', 'unknown category kept as an extra option');
+    await ev("window.app.productGroup.setCategory('โมบาย');true");
+    eq(await ev("document.querySelectorAll('#pgCategory option[data-extra]').length"), 0, 'extra option removed again');
+  });
+  await T('product form: a single-colour product saves without deleting the untouched second row', async () => {
+    await ev("window.app.grid.handleAddClick();true"); await sleep(700);
+    await ev(`(()=>{const set=(id,v)=>{const e=document.getElementById(id);e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}))};set('pgModel','Reg One Colour');set('pgMarketingModel','Brand Reg One Colour');set('pgCapacity','128GB');set('pgPrice','9900');const r=document.querySelector('#pgVariantRows > div');r.querySelector('.pgSku').value='REG-ONE';r.querySelector('.pgColor').value='Black';r.querySelector('.pgStock').value='4';window.app.productGroup.save();return true})()`); await sleep(1800);
+    const h = sheets.Products.rows[0]; const rows = sheets.Products.rows.filter(r => r[h.indexOf('Model')] === 'Reg One Colour');
+    eq(rows.length, 1, 'rows saved (dialog: ' + (await ev("window.Swal&&Swal.isVisible()?Swal.getHtmlContainer().innerText:''")) + ')');
+    eq(rows[0][h.indexOf('SKU')], 'REG-ONE');
+    await ev("window.Swal&&Swal.isVisible()&&Swal.close();true");
+    ctx.apiHandler('DELETE_RECORD', { tableName: 'Products', idField: 'SKU', idValue: 'REG-ONE' }, AT);
+  });
+  await T('target page: the ALL BRANCHES row is not added again to the grand total when area rows exist', async () => {
+    await ev("window.location.hash='#target';true"); await sleep(1300);
+    const total = async (targets) => { await ev('window.app.target.render(' + JSON.stringify(targets) + ', ' + JSON.stringify([{ OrderID: 'X1', Timestamp: new Date().toISOString(), SKU: 'SKU-S24U', Qty: 2, 'Branch Code': 'B01', 'Order Status': 'Pending' }, { OrderID: 'X2', Timestamp: new Date().toISOString(), SKU: 'SKU-S24U', Qty: 1, 'Branch Code': 'O01', 'Order Status': 'Pending' }]) + ');true'); await sleep(200); return await ev("[...document.querySelectorAll('#page-content table tr')].pop().innerText.replace(/\\s+/g,' ').trim()"); };
+    const both = await total([{ Area: 'ALL BRANCHES', 'เป้า': 1000 }, { Area: 'สมชาย ใจดี', 'เป้า': 10 }, { Area: 'สมศรี ออนไลน์', 'เป้า': 5 }]);
+    ok(/รวมทั้งหมด: 15 3 /.test(both), 'with areas -> ' + both);
+    const only = await total([{ Area: 'ALL BRANCHES', 'เป้า': 1000 }]);
+    ok(/รวมทั้งหมด: 1,000 3 /.test(only), 'ALL only -> ' + only);
+  });
+  await T('dashboard KPIs: tablet orders are counted (with the non-mobile devices), not dropped', async () => {
+    await ev("window.location.hash='#dashboard';true"); await sleep(1500);
+    const r = JSON.parse(await ev("(()=>{const d=window.app.dashboard;const keep=d.filteredOrders;d.filteredOrders=[{OrderID:'K1',Category:'โมบาย',Qty:1,'Row Total':100,'Reservation Status':'จอง T (มีการจอง)','Order Status':'Pending'},{OrderID:'K2',Category:'แท็บเล็ต',Qty:2,'Row Total':200,'Reservation Status':'จอง F (สวมสิทธิ์การจอง)','Order Status':'Pending'}];d.updateKPIs();const g=i=>document.getElementById(i).innerText;const out=[g('dashKpiMobiles'),g('dashKpiAccessories'),g('dashKpiResT'),g('dashKpiResF')];d.filteredOrders=keep;d.updateKPIs();return JSON.stringify(out)})()"));
+    eq(r, ['1', '2', '1', '2']);
+  });
   console.log('== SALES USER');
   curPhase = 'sales';
   await ev("window.app.logout ? window.app.logout() : (window.app.user=null,true)"); await sleep(600);

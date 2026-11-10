@@ -2563,6 +2563,8 @@ function saveProductGroup(payload, secureUser, ss) {
     // Marketing Model และความจุเป็นฟิลด์บังคับเช่นเดียวกับ Model (owner request 2026-09-19)
     if (!sharedForRows['Marketing Model']) throw new Error("กรุณาระบุ Marketing Model");
     if (!sharedCapacity) throw new Error("กรุณาระบุความจุ");
+    // สินค้าใหม่ต้องมีหมวดหมู่เสมอ — หมวดว่างทำให้สินค้าหายจากหน้าร้าน/รายงานที่กรองตามหมวด (append ใช้ค่าจากแถวเดิม ไม่บังคับ)
+    if (!isAppend && !(sharedForRows['Category'] || '').toString().trim()) throw new Error("กรุณาเลือกหมวดหมู่สินค้า");
 
     // SKU เป็นรหัสหลักของทั้งชีต ต้องไม่ซ้ำทั้งกันเองในฟอร์มและกับ SKU ใดๆ ที่มีอยู่แล้วในระบบ (รวมถึง SKU เดิมของสินค้านี้เองตอน append)
     const existingSkus = {};
@@ -2645,6 +2647,8 @@ function updateProductGroup(payload, secureUser, ss) {
     // Marketing Model และความจุเป็นฟิลด์บังคับเช่นเดียวกับ Model (owner request 2026-09-19)
     if (!shared['Marketing Model']) throw new Error("กรุณาระบุ Marketing Model");
     if (!sharedCapacity) throw new Error("กรุณาระบุความจุ");
+    // ห้ามบันทึกหมวดหมู่ว่างทับของเดิม — เคยเกิดเมื่อฟอร์มไม่มีตัวเลือกของหมวดนั้น (เช่น แท็บเล็ต) แล้ว select ส่งค่าว่างมา
+    if (!(shared['Category'] || '').toString().trim()) throw new Error("กรุณาเลือกหมวดหมู่สินค้า");
 
     ensureProductSpecColumns_(ss);
     const sheet = ss.getSheetByName("Products");

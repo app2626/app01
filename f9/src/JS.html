@@ -1640,7 +1640,7 @@ window.app = {
             { key: 'Original Price', label: 'ราคาเดิม (เว้นว่างถ้าไม่ลดราคา)', type: 'number' },
             { key: 'Stock', label: 'Stock', type: 'number' },
             { key: 'Unit', label: 'Unit', type: 'text' },
-            { key: 'Category', label: 'Category', type: 'select', options: ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'] },
+            { key: 'Category', label: 'Category', type: 'select', options: ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'] },
             { key: 'Status', label: 'Status', type: 'select', options: ['เปิด', 'ปิด'] },
             { key: 'Channel', label: 'Channel Allowed', type: 'multi_select_channel' },
             { key: 'Display', label: 'หน้าจอ (Display)', type: 'text' },
@@ -1656,7 +1656,7 @@ window.app = {
         case 'autopromotions':
           // ดรอปดาวน์หมวดหมู่: รวมหมวดที่รู้จัก (ตรงกับ Category ของ Products) + หมวดเดิมที่เคยบันทึกไว้ในชีตนี้อยู่แล้ว (เผื่อพิมพ์ค่าอื่นไว้ก่อนหน้า)
           // กันปัญหา select เด้งไปเลือกตัวเลือกแรกเงียบๆ ตอนเปิดฟอร์มแก้ไขแถวที่มีค่าไม่ตรงกับลิสต์ที่รู้จัก
-          var apKnownCats = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'];
+          var apKnownCats = ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'];
           var apExisting = window.app.globalData.autoPromotions || [];
           var apCatOptions = Array.from(new Set([
             ...apKnownCats,

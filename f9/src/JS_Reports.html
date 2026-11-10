@@ -900,7 +900,7 @@ window.app.allBookingSummary = {
       });
       const sumCat = cat => Object.values(catData[cat]).reduce((s, c) => s + c.t + c.f, 0);
       // ลำดับหมวดตายตัวตามที่เจ้าของกำหนด (2026-07-11) — หมวดนอกลิสต์ต่อท้าย เรียงตามยอดจองรวมเหมือนเดิม
-      const catOrder = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'];
+      const catOrder = ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'];
       const catRank = cat => { const i = catOrder.indexOf(cat); return i === -1 ? catOrder.length : i; };
       const catNames = Object.keys(catData).sort((a, b) => (catRank(a) - catRank(b)) || (sumCat(b) - sumCat(a)));
       if (catNames.length === 0) { container.innerHTML = window.app.emptyState({ icon: 'fa-boxes-stacked', title: 'ไม่มีข้อมูลสินค้า', subtitle: '' }); return; }

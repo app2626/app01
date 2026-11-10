@@ -17,7 +17,7 @@ window.app.productGroup = {
       document.getElementById('pgCapacity').value = '';
       document.getElementById('pgProductGroup').value = '';
       document.getElementById('pgUnit').value = 'เครื่อง';
-      document.getElementById('pgCategory').value = 'โมบาย';
+      this.setCategory('โมบาย');
       document.getElementById('pgStatus').value = 'เปิด';
       document.getElementById('pgPrice').value = '';
       document.getElementById('pgOriginalPrice').value = '';
@@ -78,6 +78,21 @@ window.app.productGroup = {
     // แก้ไขสินค้าเดิมทั้งกลุ่ม (ทุก SKU ของ Model นี้) — เรียกจากปุ่ม "แก้ไข" บนแถว Products (ดู grid.editForm)
     // Model ถูกล็อกแก้ไม่ได้ในฟอร์มนี้เสมอ (กันแถวเดิมหลุดกลุ่ม/ชนกับ Model อื่นโดยไม่ตั้งใจ) — ฟิลด์ร่วมอื่นแก้ไขได้ตามปกติ
     // บันทึกแล้วจะลบ SKU เดิมทั้งหมดของ Model นี้แล้วเขียนชุดใหม่ทั้งหมดแทน (เพิ่ม/ลบ/แก้ SKU ได้อิสระในหน้าเดียว)
+    // ตั้งค่าหมวดหมู่ในฟอร์ม — ถ้าหมวดของสินค้าเดิมไม่อยู่ในตัวเลือก (เช่น นำเข้าจาก CSV หรือพิมพ์ในชีตเอง) ให้เพิ่มตัวเลือกนั้นชั่วคราว
+    // ไม่อย่างนั้น select จะกลายเป็นค่าว่างเงียบๆ แล้วการกดบันทึกจะลบหมวดหมู่ของสินค้าทิ้ง
+    setCategory: function(val) {
+      const sel = document.getElementById('pgCategory');
+      if (!sel) return;
+      Array.from(sel.querySelectorAll('option[data-extra]')).forEach(o => o.remove());
+      const v = (val || '').toString().trim() || 'โมบาย';
+      if (!Array.from(sel.options).some(o => o.value === v)) {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v; opt.setAttribute('data-extra', '1');
+        sel.appendChild(opt);
+      }
+      sel.value = v;
+    },
+
     openEdit: function(model) {
       model = (model || '').toString().trim();
       const rows = (window.app.grid.dataList || []).filter(r => (r['Model'] || '').toString().trim() === model);
@@ -94,7 +109,7 @@ window.app.productGroup = {
       document.getElementById('pgCapacity').value = first['Capacity'] || '';
       document.getElementById('pgProductGroup').value = first['Product Group'] || '';
       document.getElementById('pgUnit').value = first['Unit'] || '';
-      document.getElementById('pgCategory').value = first['Category'] || 'โมบาย';
+      this.setCategory(first['Category']);
       document.getElementById('pgStatus').value = first['Status'] || 'เปิด';
       document.getElementById('pgPrice').value = (first['Price'] || '').toString().replace(/,/g, '');
       document.getElementById('pgOriginalPrice').value = (first['Original Price'] || '').toString().replace(/,/g, '');
@@ -178,7 +193,7 @@ window.app.productGroup = {
           document.getElementById('pgMarketingModel').value = existingRow['Marketing Model'] || '';
           document.getElementById('pgCapacity').value = existingRow['Capacity'] || '';
           document.getElementById('pgProductGroup').value = existingRow['Product Group'] || '';
-          document.getElementById('pgCategory').value = existingRow['Category'] || 'โมบาย';
+          this.setCategory(existingRow['Category']);
           document.getElementById('pgUnit').value = existingRow['Unit'] || '';
           document.getElementById('pgStatus').value = existingRow['Status'] || 'เปิด';
           document.getElementById('pgPrice').value = (existingRow['Price'] || '').toString().replace(/,/g, '');
@@ -318,8 +333,11 @@ window.app.productGroup = {
           stock: row.querySelector('.pgStock').value,
           image: row.querySelector('.pgImage').value.trim()
         };
-      }).filter(Boolean);
+      }).filter(Boolean)
+        // แถวที่ไม่ได้กรอกอะไรเลย (ฟอร์มใหม่เปิดมา 2 แถวเสมอ) ไม่นับ — สินค้าสีเดียวไม่ต้องกดลบแถวว่างก่อน
+        .filter(v => v.sku || v.color || v.stock !== '' || v.image || window.app.pendingImageUploads['pgVariantImage_' + v._rowId]);
 
+      if (!shared['Category']) return Swal.fire('ผิดพลาด', 'กรุณาเลือกหมวดหมู่สินค้า', 'error');
       if (variants.length === 0) return Swal.fire('ผิดพลาด', 'กรุณาเพิ่มอย่างน้อย 1 SKU', 'error');
       for (const v of variants) {
         if (!v.sku) return Swal.fire('ผิดพลาด', 'กรุณาระบุ SKU ให้ครบทุกแถว', 'error');

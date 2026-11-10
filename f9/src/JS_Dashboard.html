@@ -257,7 +257,7 @@ window.app.dashboard = {
             
             let isMobile = o.Category === 'โมบาย';
             // 6C.3 — "อุปกรณ์เสริม" แยกเป็น 3 หมวดย่อย (อุปกรณ์เสริม/สมาร์ทวอทช์/หูฟัง) แต่ KPI นี้ยังรวมเป็นยอดเดียว
-            let isAcc = ['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category);
+            let isAcc = ['แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category);
             if (isMobile || isAcc) {
                 let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); if(isNaN(qty)) qty = 0;
                 if(isMobile) totalMobiles += qty;
@@ -291,7 +291,7 @@ window.app.dashboard = {
               formatter: function(value) { return value > 0 ? value.toLocaleString() : ''; }
           });
       }
-      const validCategories = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'];
+      const validCategories = ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'];
       const isDevice = (o) => o && o.Category && validCategories.includes(o.Category.toString().trim());
 
       // เก็บ key แยกจาก label ที่โชว์ — label เป็น th-TH locale string (D/M/YYYY ไม่เติม 0 นำหน้า) เรียงตามตัวอักษรตรงๆ ไม่ได้
@@ -406,7 +406,7 @@ window.app.dashboard = {
             if(!channelModelDataMobile[mName]) channelModelDataMobile[mName] = { total: 0, channels: {} };
             channelModelDataMobile[mName].total += qty;
             channelModelDataMobile[mName].channels[ch] = (channelModelDataMobile[mName].channels[ch] || 0) + qty;
-        } else if (['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category)) {
+        } else if (['แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category)) {
             allChannelsAcc.add(ch);
             if(!channelModelDataAcc[mName]) channelModelDataAcc[mName] = { total: 0, channels: {} };
             channelModelDataAcc[mName].total += qty;
@@ -468,7 +468,7 @@ window.app.dashboard = {
     renderPromotionsTable: function() {
       const tbody = document.getElementById('tablePromotionsBody'); if(!tbody) return;
       const promoData = {}; const promoProcessed = new Set(); let totalPromos = 0;
-      const isDevice = (o) => { const validCat = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง']; return o.Category && validCat.includes(o.Category.toString().trim()); };
+      const isDevice = (o) => { const validCat = ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง']; return o.Category && validCat.includes(o.Category.toString().trim()); };
       this.filteredOrders.forEach(o => {
         if(!window.app.isOrderCancelled(o) && !promoProcessed.has(o.OrderID)) {
            let orderItems = this.filteredOrders.filter(x => x.OrderID === o.OrderID);
@@ -520,7 +520,7 @@ window.app.dashboard = {
         }
       });
       
-      const validCat = ['โมบาย', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'];
+      const validCat = ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'];
       Object.values(ordersById).forEach(orderLines => {
          let hasDevice = orderLines.some(x => x.Category && validCat.includes(x.Category.toString().trim()));
          if(hasDevice) {
