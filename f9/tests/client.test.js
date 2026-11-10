@@ -874,6 +874,37 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.Swal&&Swal.isVisible()&&Swal.close();true");
     ctx.apiHandler('DELETE_RECORD', { tableName: 'Products', idField: 'SKU', idValue: 'REG-ONE' }, AT);
   });
+  await T('quick edit (แก้ราคา/สต๊อก): wide popup, stock is ADDED on top of the live stock (not overwritten), price-only edit keeps stock', async () => {
+    const h = sheets.Products.rows[0], si = h.indexOf('SKU'), sk = h.indexOf('Stock'), pr = h.indexOf('Price');
+    const row = sku => sheets.Products.rows.find(r => r[si] === sku);
+    await ev("window.location.hash='#products';true"); await sleep(1500);
+    ok(await ev("(()=>{const b=document.getElementById('gridBulkQuickBtn');return !!b&&!b.classList.contains('hidden')})()"), 'quick edit button hidden');
+    await ev("document.getElementById('gridBulkQuickBtn').click();true"); await sleep(600);
+    ok(await ev("!document.getElementById('bulkQuickEditModal').classList.contains('hidden')"), 'modal did not open');
+    const w = await ev("document.getElementById('bulkQuickEditBody').parentElement.getBoundingClientRect().width");
+    ok(w > 1100 && w <= 1217, 'popup width ' + w);
+    ok(await ev("document.querySelectorAll('#bulkQuickTableBody tr.bulk-quick-row').length") > 50, 'rows');
+    const stock0 = Number(row('T3-0')[sk]);
+    eq(await ev("document.querySelector('#bulkQuickTableBody tr[data-sku=\"T3-0\"] td:nth-child(6)').innerText.replace(/,/g,'')"), String(stock0), 'current stock column');
+    await ev("document.getElementById('bulkQuickSearchInput').value='T3-0';window.app.productGroup.filterBulkQuickRows();true");
+    eq(await ev("[...document.querySelectorAll('#bulkQuickTableBody tr.bulk-quick-row')].filter(r=>r.style.display!=='none').length"), 1, 'search filter');
+    await ev("window.app.productGroup.adjustVisibleBulkStock(10);window.app.productGroup.adjustVisibleBulkStock(50);true");
+    eq(await ev("document.querySelector('#bulkQuickTableBody tr[data-sku=\"T3-0\"] .bulk-inp-add').value"), '60', '+10 and +50 accumulate in the add box');
+    eq(await ev("document.querySelector('#bulkQuickTableBody tr[data-sku=\"T3-0\"] .bulk-new-total').innerText.replace(/,/g,'')"), String(stock0 + 60), 'preview of new total');
+    // someone books 1 unit while the popup is open -> the add must apply to the LIVE stock
+    row('T3-0')[sk] = stock0 - 1;
+    await ev("window.app.productGroup.saveBulkQuickEdit();true"); await sleep(1500);
+    eq(Number(row('T3-0')[sk]), stock0 - 1 + 60, 'stock must be live stock + added qty');
+    ok(await ev("document.getElementById('bulkQuickEditModal').classList.contains('hidden')"), 'modal should close after save');
+    // price-only edit must not touch stock
+    const stock1 = Number(row('T3-0')[sk]);
+    await ev("document.getElementById('gridBulkQuickBtn').click();true"); await sleep(600);
+    await ev("(()=>{const tr=document.querySelector('#bulkQuickTableBody tr[data-sku=\"T3-0\"]');tr.querySelector('.bulk-inp-price').value='7777';tr.querySelector('.bulk-inp-status').value='ปิด';window.app.productGroup.saveBulkQuickEdit();return true})()"); await sleep(1500);
+    eq([Number(row('T3-0')[pr]), Number(row('T3-0')[sk]), row('T3-0')[h.indexOf('Status')]], [7777, stock1, 'ปิด'], 'price/status edit keeps stock');
+    ctx.apiHandler('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: 'T3-0', Price: 9500, Status: 'เปิด', 'Stock Add': -(stock1 - stock0) }] }, AT);
+    eq(Number(row('T3-0')[sk]), stock0, 'restored');
+    await ev("window.Swal&&Swal.isVisible()&&Swal.close();true");
+  });
   await T('target page: the ALL BRANCHES row is not added again to the grand total when area rows exist', async () => {
     await ev("window.location.hash='#target';true"); await sleep(1300);
     const total = async (targets) => { await ev('window.app.target.render(' + JSON.stringify(targets) + ', ' + JSON.stringify([{ OrderID: 'X1', Timestamp: new Date().toISOString(), SKU: 'SKU-S24U', Qty: 2, 'Branch Code': 'B01', 'Order Status': 'Pending' }, { OrderID: 'X2', Timestamp: new Date().toISOString(), SKU: 'SKU-S24U', Qty: 1, 'Branch Code': 'O01', 'Order Status': 'Pending' }]) + ');true'); await sleep(200); return await ev("[...document.querySelectorAll('#page-content table tr')].pop().innerText.replace(/\\s+/g,' ').trim()"); };

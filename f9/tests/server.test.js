@@ -661,6 +661,16 @@ t('BULK_UPDATE_PRODUCTS applies the exact payload the quick-edit modal sends (SK
     eq(unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: 'NO-SUCH', Price: 1 }, null, 7] }, admin)).updatedCount, 0);
   } finally { row[si] = oldStock; row[pi] = oldPrice; cache.remove('TABLE_Products'); }
 });
+t('BULK_UPDATE_PRODUCTS "Stock Add" adds to the live stock, never below 0, ignores 0/garbage', () => {
+  const ph = sheets.Products.rows[0], row = sheets.Products.rows[1], sku = row[ph.indexOf('SKU')], si = ph.indexOf('Stock'), old = row[si];
+  try {
+    row[si] = 10;
+    unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: sku, 'Stock Add': 25 }] }, admin)); eq(row[si], 35, '+25');
+    unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: sku, 'Stock Add': '5' }] }, admin)); eq(row[si], 40, 'string number');
+    unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: sku, 'Stock Add': 0 }, { SKU: sku, 'Stock Add': 'abc' }] }, admin)); eq(row[si], 40, 'zero/garbage ignored');
+    unwrap(api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: sku, 'Stock Add': -100 }] }, admin)); eq(row[si], 0, 'floor at 0');
+  } finally { row[si] = old; cache.remove('TABLE_Products'); }
+});
 t('BULK_UPDATE_PRODUCTS admin', () => { const r = api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: 'SKU-S24U', Stock: 77 }], rows: [{ SKU: 'SKU-S24U', Stock: 77 }] }, admin); ok(r && typeof r === 'object', JSON.stringify(r).slice(0, 150)); });
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
 

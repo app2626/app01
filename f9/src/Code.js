@@ -2160,7 +2160,7 @@ function bulkUpdateProducts(payload, secureUser, ss) {
     updates.forEach(raw => {
       if (!raw || typeof raw !== 'object') return;
       const s = (pick(raw, ['sku', 'SKU']) || '').toString().trim();
-      if (s) updMap[s] = { sku: s, price: pick(raw, ['price', 'Price']), originalPrice: pick(raw, ['originalPrice', 'Original Price']), stock: pick(raw, ['stock', 'Stock', 'Stock Qty']), status: pick(raw, ['status', 'Status']) };
+      if (s) updMap[s] = { sku: s, price: pick(raw, ['price', 'Price']), originalPrice: pick(raw, ['originalPrice', 'Original Price']), stock: pick(raw, ['stock', 'Stock', 'Stock Qty']), stockAdd: pick(raw, ['stockAdd', 'Stock Add']), status: pick(raw, ['status', 'Status']) };
     });
 
     let updatedCount = 0;
@@ -2178,6 +2178,11 @@ function bulkUpdateProducts(payload, secureUser, ss) {
           const op = parseFloat(u.originalPrice);
           if (!isNaN(op) && op >= 0) data[i][origPriceIdx] = op;
         }
+      }
+      // เพิ่ม/ลดสต๊อกแบบบวกกับค่าจริงในชีตตอนบันทึก (อยู่ใต้ lock) — ไม่ทับด้วยตัวเลขที่ค้างบนหน้าจอ ผลลัพธ์ไม่ต่ำกว่า 0
+      if (stockIdx > -1 && u.stockAdd !== undefined && u.stockAdd !== '' && u.stockAdd !== null) {
+        const add = parseInt(u.stockAdd, 10);
+        if (Number.isInteger(add) && add !== 0) data[i][stockIdx] = Math.max(0, (parseInt(data[i][stockIdx], 10) || 0) + add);
       }
       if (stockIdx > -1 && u.stock !== undefined && u.stock !== '') {
         const st = parseInt(u.stock, 10);

@@ -383,7 +383,9 @@ window.app.productGroup = {
     // 6. BULK QUICK PRICE & STOCK EDITOR (แก้ไขราคา Flash Sale & สต๊อกแบบตารางด่วน)
     // ============================================================================
     openBulkQuickEdit: function() {
-      const products = (window.app.globalData && window.app.globalData.products) || [];
+      // หน้า Products (Admin) ใช้ข้อมูลสดที่ตารางโหลดไว้ — globalData.products อาจเป็นแคช/กรองตามช่องทาง
+      const gridRows = (window.app.grid && window.app.grid.tableName === 'Products') ? (window.app.grid.dataList || []) : [];
+      const products = gridRows.length ? gridRows : ((window.app.globalData && window.app.globalData.products) || []);
       const tbody = document.getElementById('bulkQuickTableBody');
       if (!tbody) return;
       const searchEl = document.getElementById('bulkQuickSearchInput');
@@ -392,13 +394,13 @@ window.app.productGroup = {
       products.forEach((p, idx) => {
         const sku = window.app.esc(p.SKU || '');
         const name = window.app.esc(p['Product Name'] || '');
-        const brand = window.app.esc(p.Brand || '-');
+        const brand = window.app.esc(p['Marketing Model'] || p.Model || '-');
         const cat = window.app.esc(p.Category || '-');
         const price = parseFloat(String(p.Price || 0).replace(/,/g, '')) || 0;
         const origPrice = parseFloat(String(p['Original Price'] || 0).replace(/,/g, '')) || '';
-        const stock = parseInt(String(p['Stock Qty'] || 0).replace(/,/g, ''), 10) || 0;
+        const stock = parseInt(String(p.Stock || 0).replace(/,/g, ''), 10) || 0;
         const status = (p.Status || 'เปิด') === 'ปิด' ? 'ปิด' : 'เปิด';
-        const searchBlob = window.app.esc((String(p.SKU || '') + ' ' + String(p['Product Name'] || '') + ' ' + String(p.Brand || '') + ' ' + String(p.Category || '')).toLowerCase());
+        const searchBlob = window.app.esc((String(p.SKU || '') + ' ' + String(p['Product Name'] || '') + ' ' + String(p.Model || '') + ' ' + String(p['Marketing Model'] || '') + ' ' + String(p.Category || '')).toLowerCase());
         html += `<tr class="bulk-quick-row hover:bg-amber-50/40 transition-colors" data-sku="${sku}" data-search="${searchBlob}" data-orig-price="${price}" data-orig-full="${origPrice}" data-orig-stock="${stock}" data-orig-status="${status}">
           <td class="px-3 py-2 font-mono text-[11px] font-bold text-slate-600 whitespace-nowrap">${sku}</td>
           <td class="px-3 py-2 font-bold text-slate-800 text-xs">${name}</td>
@@ -409,9 +411,11 @@ window.app.productGroup = {
           <td class="px-3 py-2 text-right">
             <input type="number" class="bulk-inp-orig w-28 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-right font-semibold text-slate-600 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400" value="${origPrice}" placeholder="-">
           </td>
+          <td class="px-3 py-2 text-right font-extrabold ${stock <= 3 ? 'text-rose-600' : 'text-slate-700'} text-xs">${stock.toLocaleString()}</td>
           <td class="px-3 py-2 text-right">
-            <input type="number" class="bulk-inp-stock w-20 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-right font-extrabold ${stock <= 3 ? 'text-rose-600 bg-rose-50/40 border-rose-200' : 'text-emerald-700'} text-xs focus:outline-none focus:ring-2 focus:ring-amber-400" value="${stock}">
+            <input type="number" step="1" class="bulk-inp-add w-24 px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-right font-extrabold text-emerald-700 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400" value="" placeholder="+ เพิ่ม" oninput="window.app.productGroup.updateBulkRowTotal(this.closest('tr'))">
           </td>
+          <td class="px-3 py-2 text-right font-extrabold text-slate-800 text-xs"><span class="bulk-new-total">${stock.toLocaleString()}</span></td>
           <td class="px-3 py-2 text-center">
             <select class="bulk-inp-status px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold ${status === 'เปิด' ? 'text-emerald-600' : 'text-slate-400'} focus:outline-none focus:ring-2 focus:ring-amber-400">
               <option value="เปิด" ${status === 'เปิด' ? 'selected' : ''}>เปิด</option>
@@ -432,15 +436,24 @@ window.app.productGroup = {
       });
     },
 
+    // "คงเหลือใหม่" = สต๊อกปัจจุบัน + จำนวนที่เพิ่ม (ไม่ต่ำกว่า 0) — แค่แสดงผล ตัวบวกจริงทำที่ server ตอนบันทึก
+    updateBulkRowTotal: function(tr) {
+      if (!tr) return;
+      const cur = parseInt(tr.getAttribute('data-orig-stock') || 0, 10) || 0;
+      const add = parseInt(tr.querySelector('.bulk-inp-add')?.value || 0, 10) || 0;
+      const el = tr.querySelector('.bulk-new-total');
+      if (el) { el.textContent = Math.max(0, cur + add).toLocaleString(); el.classList.toggle('text-emerald-600', add > 0); el.classList.toggle('text-rose-600', add < 0); }
+    },
+
     adjustVisibleBulkStock: function(delta) {
       document.querySelectorAll('#bulkQuickTableBody .bulk-quick-row').forEach(tr => {
         if (tr.style.display === 'none') return;
-        const inp = tr.querySelector('.bulk-inp-stock');
+        const inp = tr.querySelector('.bulk-inp-add');
         if (!inp) return;
-        const cur = parseInt(inp.value, 10) || 0;
-        inp.value = Math.max(0, cur + delta);
+        inp.value = (parseInt(inp.value, 10) || 0) + delta;
+        this.updateBulkRowTotal(tr);
       });
-      window.app.toast('ปรับสต๊อกรายการที่แสดงผล ' + (delta > 0 ? '+' + delta : delta) + ' ชิ้นแล้ว (กดบันทึกเพื่อยืนยัน)');
+      window.app.toast('เพิ่มสต๊อกรายการที่แสดงผล ' + (delta > 0 ? '+' + delta : delta) + ' ชิ้นแล้ว (กดบันทึกเพื่อยืนยัน)');
     },
 
     saveBulkQuickEdit: async function() {
@@ -450,21 +463,20 @@ window.app.productGroup = {
         const newPrice = parseFloat(tr.querySelector('.bulk-inp-price')?.value || 0) || 0;
         const rawOrig = (tr.querySelector('.bulk-inp-orig')?.value || '').trim();
         const newOrig = rawOrig === '' ? '' : (parseFloat(rawOrig) || 0);
-        const newStock = Math.max(0, parseInt(tr.querySelector('.bulk-inp-stock')?.value || 0, 10) || 0);
+        const stockAdd = parseInt(tr.querySelector('.bulk-inp-add')?.value || 0, 10) || 0;
         const newStatus = tr.querySelector('.bulk-inp-status')?.value || 'เปิด';
 
         const oldPrice = parseFloat(tr.getAttribute('data-orig-price') || 0) || 0;
         const oldOrigRaw = tr.getAttribute('data-orig-full') || '';
         const oldOrig = oldOrigRaw === '' ? '' : (parseFloat(oldOrigRaw) || 0);
-        const oldStock = parseInt(tr.getAttribute('data-orig-stock') || 0, 10) || 0;
         const oldStatus = tr.getAttribute('data-orig-status') || 'เปิด';
 
-        if (newPrice !== oldPrice || String(newOrig) !== String(oldOrig) || newStock !== oldStock || newStatus !== oldStatus) {
+        if (newPrice !== oldPrice || String(newOrig) !== String(oldOrig) || stockAdd !== 0 || newStatus !== oldStatus) {
           updates.push({
             SKU: sku,
             Price: newPrice,
             'Original Price': newOrig,
-            'Stock Qty': newStock,
+            'Stock Add': stockAdd, // จำนวนที่ "เพิ่ม" — server บวกกับสต๊อกจริงตอนบันทึก ไม่ทับด้วยตัวเลขเก่าบนหน้าจอ
             Status: newStatus
           });
         }
