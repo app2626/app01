@@ -11,7 +11,7 @@ window.app.pos = {
     // 6A — group object ล่าสุดของแต่ละ Model จาก renderProducts (ไว้ re-render การ์ดเดี่ยวตอนสลับ variant)
     cardGroups: {},
     // 6B — ตัวกรอง storefront (ทำงานร่วมกับช่องค้นหา + channel เดิมใน filter())
-    storeFilters: { category: '', groups: [], capacities: [], colors: [], priceRange: '', priceMin: '', priceMax: '', sort: '', inStock: false },
+    storeFilters: { category: '', brand: '', groups: [], capacities: [], colors: [], priceRange: '', priceMin: '', priceMax: '', sort: '', inStock: false },
     storePage: 1,
     storePageSize: 12,
     sidebarOpen: false,
@@ -428,16 +428,16 @@ window.app.pos = {
             slidesHtml += '<div class="w-full h-full shrink-0 relative cursor-pointer select-none" ' + clickAttr + '>'
               + '<img src="' + esc(img) + '" alt="' + esc(title || 'Pre Booking Banner') + '" class="w-full h-full object-cover">'
               + ((title || sub)
-                  ? '<div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 pt-6 flex items-end justify-between">'
+                  ? '<div class="pm-hero-cap">'
                     + '<div>'
-                    + (title ? '<div class="text-xs md:text-sm font-black text-[#FF6B00] leading-tight drop-shadow">' + esc(title) + '</div>' : '')
-                    + (sub ? '<div class="text-[10px] text-white/90 font-medium line-clamp-1">' + esc(sub) + '</div>' : '')
+                    + (title ? '<div class="pm-hero-title">' + esc(title) + '</div>' : '')
+                    + (sub ? '<div class="pm-hero-sub line-clamp-1">' + esc(sub) + '</div>' : '')
                     + '</div>'
-                    + '<span class="px-2 py-0.5 rounded-full bg-[#FF6B00] text-white text-[9px] font-black shrink-0">ช้อปเลย <i class="fas fa-arrow-right ml-0.5"></i></span>'
+                    + '<span class="pm-hero-cta">ดูสินค้า <i class="fas fa-arrow-right"></i></span>'
                     + '</div>'
                   : '')
               + '</div>';
-            dotsHtml += '<button type="button" onclick="window.app.pos.goToHero(' + idx + ')" class="h-1.5 rounded-full transition-all ' + (idx === 0 ? 'w-5 bg-[#FF6B00]' : 'w-1.5 bg-white/60 hover:bg-white') + '" aria-label="สไลด์ ' + (idx + 1) + '"></button>';
+            dotsHtml += '<button type="button" onclick="window.app.pos.goToHero(' + idx + ')" class="pm-hdot' + (idx === 0 ? ' on' : '') + '" aria-label="สไลด์ ' + (idx + 1) + '"></button>';
           });
           track.innerHTML = slidesHtml;
           track.style.transform = 'translateX(0%)';
@@ -477,7 +477,7 @@ window.app.pos = {
       track.style.transform = 'translateX(-' + (this.heroIndex * 100) + '%)';
       if (dots && dots.children.length === count) {
         Array.from(dots.children).forEach((d, i) => {
-          d.className = 'h-1.5 rounded-full transition-all ' + (i === this.heroIndex ? 'w-5 bg-[#FF6B00]' : 'w-1.5 bg-white/60 hover:bg-white');
+          d.className = 'pm-hdot' + (i === this.heroIndex ? ' on' : '');
         });
       }
     },
@@ -497,11 +497,8 @@ window.app.pos = {
         if (name) selectedNames.push(name);
       });
 
-      let html = '<div class="bg-white border border-slate-200/90 rounded-2xl p-2.5 md:p-3 shadow-sm h-full flex flex-col justify-center">';
-      html += '<div class="flex items-center justify-between mb-2">';
-      html += '  <div class="flex items-center gap-1.5 text-xs font-black text-slate-900"><span class="w-5 h-5 rounded-md bg-[#E11D48] text-white flex items-center justify-center text-[10px]"><i class="fas fa-ticket-alt"></i></span> คูปองส่วนลด & โปรโมชั่นพิเศษ</div>';
-      html += '  <span class="text-[10px] font-bold text-slate-400">คลิกเพื่อใช้กับตะกร้าทันที</span>';
-      html += '</div>';
+      let html = '<div class="pm-vouchers">';
+      html += '<div class="pm-sec-head"><h2 class="pm-sec-title">คูปองและโปรโมชั่น</h2><span class="pm-sec-sub">กดเพื่อใช้กับตะกร้าทันที</span><button type="button" class="pm-sec-more" onclick="window.app.pos.openPromoHub()">ดูทั้งหมด <i class="fas fa-chevron-right"></i></button></div>';
       html += '<div class="flex items-center gap-2.5 overflow-x-auto custom-scrollbar pb-1">';
 
       if (promos.length > 0) {
@@ -514,12 +511,11 @@ window.app.pos = {
 
           html += '<div class="bnn-voucher-card' + (isApplied ? ' applied' : '') + ' shrink-0 w-[210px] md:w-[225px] rounded-xl p-2.5 flex items-center justify-between gap-2 cursor-pointer select-none" onclick="window.app.pos.applyVoucher(\'' + escJs(name) + '\')">';
           html += '  <div class="min-w-0 pl-1">';
-          html += '    <div class="text-[11px] font-black text-[#E11D48] leading-tight truncate">' + esc(badgeVal) + '</div>';
-          html += '    <div class="text-[11px] font-extrabold text-slate-800 truncate mt-0.5" title="' + esc(name) + '">' + esc(name) + '</div>';
-          html += '    <div class="text-[9px] font-bold text-slate-400 mt-0.5">คูปองส่วนลดท้ายบิล</div>';
+          html += '    <div class="pm-v-val truncate">' + esc(badgeVal) + '</div>';
+          html += '    <div class="pm-v-name truncate" title="' + esc(name) + '">' + esc(name) + '</div>';
+          html += '    <div class="pm-v-note">คูปองส่วนลดท้ายบิล</div>';
           html += '  </div>';
-          html += '  <button type="button" class="shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-all '
-            + (isApplied ? 'bg-emerald-600 text-white shadow-sm' : 'bg-[#141416] text-[#FF6B00] hover:bg-slate-800') + '">'
+          html += '  <button type="button" class="pm-v-btn shrink-0' + (isApplied ? ' on' : '') + '">'
             + (isApplied ? '<i class="fas fa-check mr-0.5"></i>ใช้อยู่' : 'เก็บใช้')
             + '</button>';
           html += '</div>';
@@ -537,11 +533,11 @@ window.app.pos = {
         const pct = parseFloat(r['Discount Percent']) || 10;
         html += '<div class="bnn-voucher-card shrink-0 w-[215px] md:w-[235px] rounded-xl p-2.5 flex items-center justify-between gap-2 cursor-pointer select-none" onclick="window.app.pos.setStoreCategory(\'' + escJs(getCat) + '\')">';
         html += '  <div class="min-w-0 pl-1">';
-        html += '    <div class="text-[11px] font-black text-indigo-600 leading-tight truncate"><i class="fas fa-bolt text-amber-500 mr-1"></i>Bundle ลด ' + esc(pct) + '%</div>';
-        html += '    <div class="text-[10px] font-extrabold text-slate-800 truncate mt-0.5">ซื้อ ' + esc(buyCat) + ' คู่ ' + esc(getCat) + '</div>';
-        html += '    <div class="text-[9px] font-bold text-emerald-600 mt-0.5">ระบบคำนวณลดอัตโนมัติ</div>';
+        html += '    <div class="pm-v-val truncate">ซื้อคู่ ลด ' + esc(pct) + '%</div>';
+        html += '    <div class="pm-v-name truncate">ซื้อ ' + esc(buyCat) + ' คู่ ' + esc(getCat) + '</div>';
+        html += '    <div class="pm-v-note">ระบบคำนวณลดอัตโนมัติ</div>';
         html += '  </div>';
-        html += '  <span class="shrink-0 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[9px] font-black">ดูสินค้า</span>';
+        html += '  <span class="pm-v-btn shrink-0">ดูสินค้า</span>';
         html += '</div>';
       });
 
@@ -671,16 +667,16 @@ window.app.pos = {
       }
 
       el.classList.remove('hidden');
-      let html = '<div class="flex items-center gap-2 overflow-x-auto custom-scrollbar py-1.5 px-2.5 bg-slate-50/90 border border-slate-200/80 rounded-xl">';
-      html += '<span class="text-[10px] font-black text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1"><i class="fas fa-clock-rotate-left text-amber-500"></i> ดูล่าสุด:</span>';
+      let html = '<div class="pm-recent flex items-center gap-2 overflow-x-auto custom-scrollbar">';
+      html += '<span class="pm-recent-lb shrink-0">ดูล่าสุด</span>';
       items.forEach(p => {
         const img = window.app.formatImageUrl(p['Image URL']);
         const pr = (parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0).toLocaleString();
-        html += '<button type="button" onclick="window.app.pos.openAddToCartModal(\'' + escJs(p.SKU) + '\')" class="shrink-0 flex items-center gap-1.5 bg-white hover:bg-amber-50/60 border border-slate-200 hover:border-amber-400 rounded-lg px-2 py-1 transition-all text-left max-w-[195px] shadow-2xs">'
+        html += '<button type="button" onclick="window.app.pos.openAddToCartModal(\'' + escJs(p.SKU) + '\')" class="pm-recent-item shrink-0 flex items-center gap-2 text-left max-w-[210px]">'
           + '<img src="' + esc(img) + '" alt="" onerror="this.remove()" class="w-6 h-6 object-contain shrink-0">'
           + '<div class="min-w-0">'
           + '  <div class="text-[10px] font-extrabold text-slate-800 truncate">' + esc(p['Product Name']) + '</div>'
-          + '  <div class="text-[9px] font-black text-[#E11D48] leading-none">฿' + pr + '</div>'
+          + '  <div class="pm-recent-pr tabular-nums">฿' + pr + '</div>'
           + '</div>'
           + '</button>';
       });
@@ -1254,6 +1250,7 @@ window.app.pos = {
         // ตัวกรองหลายค่า: ค่าในกลุ่มเดียวกันเป็น OR, ต่างกลุ่มเป็น AND
         return matchType && matchSearch && matchChannel
           && (!f.category || (p.Category || '').trim() === f.category)
+          && (!f.brand || this.brandOf(p) === f.brand)
           && (!f.groups.length || f.groups.includes((p['Product Group'] || '').trim()))
           && (!f.capacities.length || f.capacities.includes((p.Capacity || '').trim()))
           && (!f.colors.length || f.colors.includes((p.Color || '').trim()))
@@ -1279,12 +1276,12 @@ window.app.pos = {
       this.renderProducts(list);
       this.syncUrl();
       this.renderPopularShelf();
-      this.renderNewsShelf();
+      this.renderBrandStrip(); this.renderNewShelf(); this.renderNewsShelf();
     },
     // 6B — มี filter storefront ตัวใดตัวหนึ่ง active อยู่ไหม (ใช้โชว์ปุ่มล้างตัวกรอง + เลือก empty state)
     storeFiltersActive: function() {
       const f = this.storeFilters;
-      return !!(f.category || f.groups.length || f.capacities.length || f.colors.length || f.priceRange || f.priceMin !== '' || f.priceMax !== '' || f.sort || f.inStock);
+      return !!(f.category || f.brand || f.groups.length || f.capacities.length || f.colors.length || f.priceRange || f.priceMin !== '' || f.priceMax !== '' || f.sort || f.inStock);
     },
     // 6B — header ของ storefront: แถว category tiles (BNN Flash Sale Pills) → แถว sub-chips รุ่น (Product Group) → แถว filter chips
     // re-render ทั้งแถบทุกครั้งที่ตัวกรองเปลี่ยน (popover ถูกสร้างใหม่ในสถานะปิดเสมอ)
@@ -1348,7 +1345,7 @@ window.app.pos = {
       if (el.dataset.sig === sig) return; // ไม่เปลี่ยน = ไม่วาดใหม่ (กันกะพริบตอนพิมพ์ค้น/สลับหน้า)
       el.dataset.sig = sig;
       if (!show) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-      let html = '<div class="flex items-center gap-2 mb-1.5 px-0.5"><span class="text-[12px] font-black text-slate-800 flex items-center gap-1.5"><i class="fas fa-fire text-[#FF6B00]"></i> ยอดนิยมตอนนี้</span><span class="text-[10px] font-bold text-slate-400">รุ่นที่ถูกจองมากสุด</span></div>';
+      let html = '<div class="pm-sec-head"><h2 class="pm-sec-title">ยอดนิยมตอนนี้</h2><span class="pm-sec-sub">รุ่นที่ถูกจองมากสุด</span></div>';
       html += '<div class="sf-pop-row custom-scrollbar">';
       items.forEach(it => {
         html += '<button type="button" class="sf-pop-card" onclick="window.app.pos.openAddToCartModal(\'' + escJs(it.sku) + '\')" aria-label="' + esc(it.name) + ' อันดับ ' + it.rank + '">'
@@ -1376,7 +1373,7 @@ window.app.pos = {
       if (el.dataset.sig === sig) return;
       el.dataset.sig = sig;
       if (!list.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-      let html = '<div class="flex items-center gap-2 mb-1.5 px-0.5"><span class="text-[12px] font-black text-slate-800 flex items-center gap-1.5"><i class="fas fa-newspaper text-[#FF6B00]"></i> ข่าวสาร</span></div>';
+      let html = '<div class="pm-sec-head"><h2 class="pm-sec-title">ข่าวสาร</h2><span class="pm-sec-sub">อัปเดตล่าสุดจากร้าน</span></div>';
       html += '<div class="sf-news-row custom-scrollbar">';
       list.forEach(n => {
         const img = n.imageUrl ? '<img src="' + esc(window.app.formatImageUrl(n.imageUrl)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.display=\'none\';">' : '<span class="sf-news-noimg"><i class="fas fa-newspaper"></i></span>';
@@ -1422,7 +1419,8 @@ window.app.pos = {
       if (!nav) return;
       const esc = window.app.esc, escJs = window.app.escAttrJs, cur = this.storeFilters.category;
       const item = (val, label, ico) => '<button type="button" class="sf-nav-a' + (cur === val ? ' on' : '') + '" aria-current="' + (cur === val ? 'page' : 'false') + '" onclick="window.app.pos.setStoreCategory(\'' + escJs(val) + '\')">' + (ico ? '<i class="fas ' + ico + '"></i>' : '') + esc(label) + '</button>';
-      nav.innerHTML = item('', 'สินค้าทั้งหมด', 'fa-bars') + cats.filter(c => !c.includes('ของแถม')).map(c => item(c, c, '')).join('');
+      nav.innerHTML = item('', 'สินค้าทั้งหมด', 'fa-bars') + cats.filter(c => !c.includes('ของแถม')).map(c => item(c, c, '')).join('')
+        + '<button type="button" class="sf-nav-a sf-nav-promo" onclick="window.app.pos.openPromoHub()"><i class="fas fa-fire"></i>โปรโมชั่น</button>';
     },
     renderStoreHeader: function() {
       const bar = document.getElementById('storeFilterBar');
@@ -1512,12 +1510,205 @@ window.app.pos = {
       this.renderProducts(this.lastList);
       this.syncUrl();
       this.renderPopularShelf();
-      this.renderNewsShelf();
+      this.renderBrandStrip(); this.renderNewShelf(); this.renderNewsShelf();
       const row = document.getElementById('productGrid');
       if (row) { row.scrollTop = 0; if (row.scrollIntoView && window.innerWidth < 1024) row.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
     },
+    // ===== แบรนด์ / สินค้าใหม่ / ขายดี (ไอเดียจาก jaymartstore.com) — ไม่ต้องมีคอลัมน์ Brand: ดึงแบรนด์จากคำแรกของ Marketing Model =====
+    NEW_DAYS_: 30,
+    BRAND_ALIAS_: { IPHONE: 'APPLE', IPAD: 'APPLE', AIRPODS: 'APPLE', MACBOOK: 'APPLE', IMAC: 'APPLE', GALAXY: 'SAMSUNG', REDMI: 'XIAOMI', POCO: 'XIAOMI', RENO: 'OPPO', PIXEL: 'GOOGLE' },
+    BRAND_LABEL_: { SAMSUNG: 'Samsung', APPLE: 'Apple', OPPO: 'OPPO', VIVO: 'vivo', HUAWEI: 'Huawei', XIAOMI: 'Xiaomi', REALME: 'realme', HONOR: 'HONOR', TECNO: 'TECNO', INFINIX: 'Infinix', NOKIA: 'Nokia', GOOGLE: 'Google', ONEPLUS: 'OnePlus', ASUS: 'ASUS', JBL: 'JBL', SONY: 'Sony', ANKER: 'Anker' },
+    // คำทั่วไปที่ขึ้นต้นชื่อสินค้า (ไม่ใช่ชื่อแบรนด์) — ไม่นับเป็นแบรนด์ เช่น "Case ..." "Cable ..."
+    BRAND_GENERIC_: ['CASE', 'ADAPTER', 'CABLE', 'CHARGER', 'POWER', 'POWERBANK', 'BANK', 'BAG', 'FILM', 'GLASS', 'SCREEN', 'STAND', 'HOLDER', 'EARBUDS', 'HEADPHONE', 'HEADSET', 'SPEAKER', 'WATCH', 'SMARTWATCH', 'TABLET', 'PHONE', 'MOBILE', 'KEYBOARD', 'MOUSE', 'MEMORY', 'CARD', 'USB', 'TYPE', 'WIRELESS', 'BLUETOOTH', 'NEW', 'THE', 'PB', 'TG', 'COVER', 'STRAP', 'BAND'],
+    // คีย์แบรนด์ (ตัวพิมพ์ใหญ่) ของสินค้า; ของแถม/ชื่อที่ไม่ขึ้นต้นด้วยตัวอักษรละติน = '' (ไม่นับเป็นแบรนด์)
+    brandOf: function(p) {
+      if (!p || (p.Category || '').toString().includes('ของแถม')) return '';
+      const src = String(p['Marketing Model'] || p['Product Name'] || p.Model || '').trim();
+      const w = (src.split(/\s+/)[0] || '').toUpperCase();
+      if (!/^[A-Z]{2,}$/.test(w) || this.BRAND_GENERIC_.indexOf(w) !== -1) return '';
+      return this.BRAND_ALIAS_[w] || w;
+    },
+    brandLabel_: function(k) { return this.BRAND_LABEL_[k] || (k.charAt(0) + k.slice(1).toLowerCase()); },
+    // สินค้าขายปกติที่เปิดอยู่และขายได้ในช่องทางที่เลือก (ไม่รวมของแถม)
+    sellable_: function() {
+      const ch = (document.getElementById('posChannelSelect') || {}).value || '';
+      return (window.app.globalData.products || []).filter(p => p.Status === 'เปิด' && !(p.Category || '').toString().includes('ของแถม') && window.app.channelOk(p.Channel, ch));
+    },
+    // อายุสินค้าเป็นวันนับจาก Launch Date (yyyy-MM-dd เวลาไทย); null = ไม่มีวันที่ — ค่าติดลบ = ยังไม่ถึงวันวางขาย (ถือเป็นของใหม่ เหมาะกับ Pre Booking)
+    launchAgeDays_: function(p) {
+      const s = String((p && p['Launch Date']) || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+      const t = Date.parse(s + 'T00:00:00+07:00');
+      return isNaN(t) ? null : (Date.now() - t) / 864e5;
+    },
+    isNew: function(p) { const a = this.launchAgeDays_(p); return a !== null && a <= this.NEW_DAYS_; },
+    // รุ่นขายดี = 4 อันดับแรกของ globalData.popularModels (server คำนวณจากยอดจอง)
+    isHot: function(p) {
+      const m = p && p.Model;
+      if (!m || m === '-') return false;
+      return ((window.app.globalData || {}).popularModels || []).slice(0, 4).indexOf(m) !== -1;
+    },
+    setBrand: function(k) {
+      const f = this.storeFilters;
+      f.brand = (f.brand === k) ? '' : (k || '');
+      this.renderStoreHeader();
+      this.filter();
+    },
+    // แถบแบรนด์ (เลื่อนแนวนอน): นับเป็นจำนวนรุ่น เฉพาะสินค้าในหมวดที่เลือกอยู่ + ช่องทางนี้; ต้องมี >= 2 แบรนด์ (หรือเลือกแบรนด์ค้างอยู่) ถึงแสดง
+    renderBrandStrip: function() {
+      const el = document.getElementById('posBrands');
+      if (!el) return;
+      const f = this.storeFilters;
+      const byBrand = {};
+      this.sellable_().forEach(p => {
+        if (f.category && (p.Category || '').trim() !== f.category) return;
+        const b = this.brandOf(p);
+        if (!b) return;
+        (byBrand[b] = byBrand[b] || {})[(p.Model && p.Model !== '-') ? 'M:' + p.Model : 'S:' + p.SKU] = 1;
+      });
+      const list = Object.keys(byBrand).map(b => ({ key: b, n: Object.keys(byBrand[b]).length })).sort((a, b) => (b.n - a.n) || a.key.localeCompare(b.key));
+      const show = list.length >= 2 || !!f.brand;
+      const sig = show ? JSON.stringify([list, f.brand]) : '';
+      if (el.dataset.sig === sig) return;
+      el.dataset.sig = sig;
+      if (!show) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      const hue = (k) => { let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) % 360; return h; };
+      let html = '<div class="pm-sec-head"><h2 class="pm-sec-title">แบรนด์ที่ขาย</h2><span class="pm-sec-sub">เลือกแบรนด์เพื่อดูเฉพาะรุ่นของแบรนด์นั้น</span></div>';
+      html += '<div class="sf-brand-row custom-scrollbar" role="group" aria-label="เลือกแบรนด์">';
+      html += '<button type="button" class="sf-brand-chip' + (f.brand ? '' : ' on') + '" aria-pressed="' + (f.brand ? 'false' : 'true') + '" onclick="window.app.pos.setBrand(\'\')"><span class="sf-brand-ic" style="--h:20"><i class="fas fa-border-all"></i></span><span class="sf-brand-nm">ทั้งหมด</span></button>';
+      list.forEach(it => {
+        const on = f.brand === it.key;
+        html += '<button type="button" class="sf-brand-chip' + (on ? ' on' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" onclick="window.app.pos.setBrand(\'' + escJs(it.key) + '\')">'
+          + '<span class="sf-brand-ic" style="--h:' + hue(it.key) + '">' + esc(it.key.charAt(0)) + '</span>'
+          + '<span class="sf-brand-nm">' + esc(this.brandLabel_(it.key)) + '</span><span class="sf-brand-n">' + it.n + '</span></button>';
+      });
+      html += '</div>';
+      el.classList.remove('hidden');
+      el.innerHTML = html;
+    },
+    // ชั้น "สินค้าใหม่": รุ่นที่ Launch Date อยู่ใน 30 วัน (หรือยังไม่ถึงวันวางขาย) เรียงใหม่สุดก่อน; หน้าแรกที่ไม่ค้น/ไม่กรองเท่านั้น; ต้องมี >= 2 รุ่นที่มีของ
+    renderNewShelf: function() {
+      const el = document.getElementById('posNewArrivals');
+      if (!el) return;
+      const searchEl = document.getElementById('searchProduct');
+      const idle = !(searchEl && searchEl.value.trim() !== '') && !this.storeFiltersActive() && (this.storePage || 1) === 1;
+      const priceOf = (p) => parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
+      const items = [];
+      if (idle) {
+        const byModel = {};
+        this.sellable_().forEach(p => {
+          if (!this.isNew(p) || this.stockOf(p) <= 0) return;
+          const k = (p.Model && p.Model !== '-') ? 'M:' + p.Model : 'S:' + p.SKU;
+          const cur = byModel[k];
+          if (!cur || priceOf(p) < priceOf(cur)) byModel[k] = p;
+        });
+        Object.keys(byModel).map(k => byModel[k])
+          .sort((a, b) => this.launchAgeDays_(a) - this.launchAgeDays_(b))
+          .slice(0, 8)
+          .forEach(rep => items.push({ sku: rep.SKU, name: String(rep['Product Name'] || rep['Marketing Model'] || rep.Model || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/^SAMSUNG\s+/i, ''), img: rep['Image URL'], price: priceOf(rep) }));
+      }
+      const show = items.length >= 2;
+      const sig = show ? JSON.stringify(items.map(i => [i.sku, i.price])) : '';
+      if (el.dataset.sig === sig) return;
+      el.dataset.sig = sig;
+      if (!show) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      let html = '<div class="pm-sec-head"><h2 class="pm-sec-title">สินค้าใหม่</h2><span class="pm-sec-sub">เปิดตัวล่าสุด จองได้เลย</span></div><div class="sf-pop-row custom-scrollbar">';
+      items.forEach(it => {
+        html += '<button type="button" class="sf-pop-card sf-new-card" onclick="window.app.pos.openAddToCartModal(\'' + escJs(it.sku) + '\')" aria-label="' + esc(it.name) + ' สินค้าใหม่">'
+          + '<span class="sf-new-tag">NEW</span>'
+          + '<img src="' + esc(window.app.formatImageUrl(it.img)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
+          + '<span class="sf-pop-name">' + esc(it.name) + '</span>'
+          + '<span class="sf-pop-price">฿' + it.price.toLocaleString() + '</span></button>';
+      });
+      html += '</div>';
+      el.classList.remove('hidden');
+      el.innerHTML = html;
+    },
+    // ===== หน้าโปรโมชั่นทั้งหมด (ไอเดียจากหน้า /promotions + /vouchers ของ jaymartstore.com): แคมเปญ(แบนเนอร์) + คูปอง + โปรซื้อคู่ ในหน้าต่างเดียว =====
+    // ข้อมูลทั้งหมดมาจากที่หน้าร้านโหลดอยู่แล้ว (แบนเนอร์ที่ server กรองเฉพาะช่วงวันที่แสดงอยู่ / Promotions / AutoPromotions) — ไม่มีการเรียก server เพิ่ม
+    promoCampaigns_: function() {
+      const g = window.app.globalData || {}, seen = {}, out = [];
+      [].concat(g.heroBanners || [], g.gridBanners || [], g.popupBanners || []).forEach(b => {
+        if (!b) return;
+        const o = (typeof b === 'string') ? { url: b } : b;
+        const url = String(o.url || o['Image URL'] || '').trim();
+        if (!url || seen[url]) return;
+        seen[url] = 1;
+        out.push({ url: url, title: String(o.title || '').trim(), sub: String(o.details || o.Details || '').trim(), link: String(o.link || o.targetLink || '').trim() });
+      });
+      return out;
+    },
+    openPromoHub: function() {
+      const body = document.getElementById('promoHubBody');
+      if (!body) return;
+      const esc = window.app.esc, escJs = window.app.escAttrJs, g = window.app.globalData || {};
+      this._promoCamps = this.promoCampaigns_();
+      let html = '';
+      // 1) แคมเปญ — กดแล้วทำเหมือนแบนเนอร์หลัก (ลิงก์ http = เปิดแท็บใหม่ ไม่งั้นค้นสินค้าด้วยลิงก์/ชื่อแคมเปญ)
+      if (this._promoCamps.length) {
+        html += '<section><div class="pm-sec-head"><h3 class="pm-sec-title">แคมเปญ</h3><span class="pm-sec-sub">' + this._promoCamps.length + ' รายการที่เปิดอยู่</span></div><div class="sf-promo-grid">';
+        this._promoCamps.forEach((c, i) => {
+          html += '<button type="button" class="sf-camp" onclick="window.app.pos.openPromoCampaign(' + i + ')" aria-label="' + esc(c.title || 'แคมเปญ ' + (i + 1)) + '">'
+            + '<img src="' + esc(window.app.formatImageUrl(c.url)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
+            + ((c.title || c.sub) ? '<span class="sf-camp-cap">' + (c.title ? '<b>' + esc(c.title) + '</b>' : '') + (c.sub ? '<span>' + esc(c.sub) + '</span>' : '') + '</span>' : '')
+            + '</button>';
+        });
+        html += '</div></section>';
+      }
+      // 2) คูปองส่วนลด — กด "เก็บใช้" = ใส่คูปองในตะกร้า (applyVoucher เดิม) แล้ววาดสถานะ "ใช้อยู่" ใหม่
+      const selectedNames = [];
+      document.querySelectorAll('.cart-promo-select').forEach(el => {
+        if (!el.value) return;
+        const opt = el.options[el.selectedIndex];
+        const name = opt ? (opt.getAttribute('data-name') || '') : '';
+        if (name) selectedNames.push(name);
+      });
+      const promos = (g.promotions || []).filter(p => ['เปิด', 'open', 'active', 'on', 'true'].includes((p.Status || '').toString().trim().toLowerCase()));
+      if (promos.length) {
+        html += '<section><div class="pm-sec-head"><h3 class="pm-sec-title">คูปองส่วนลด</h3><span class="pm-sec-sub">กดเพื่อใช้กับตะกร้า</span></div><div class="sf-promo-grid sf-promo-grid-sm">';
+        promos.forEach(p => {
+          const name = (p['Promo Name'] || '').toString().trim();
+          const isPct = /percent|%/i.test((p['Discount Type'] || '').toString());
+          const dVal = parseFloat((p.Value || 0).toString().replace(/[^\d.\-]/g, '')) || 0;
+          const on = selectedNames.includes(name);
+          html += '<div class="bnn-voucher-card sf-promo-coupon' + (on ? ' applied' : '') + '" onclick="window.app.pos.applyVoucher(\'' + escJs(name) + '\');window.app.pos.openPromoHub()">'
+            + '<div class="min-w-0"><div class="pm-v-val truncate">' + esc(isPct ? 'ลด ' + dVal + '%' : 'ลด ฿' + dVal.toLocaleString()) + '</div><div class="pm-v-name" title="' + esc(name) + '">' + esc(name) + '</div><div class="pm-v-note">คูปองส่วนลดท้ายบิล</div></div>'
+            + '<span class="pm-v-btn shrink-0' + (on ? ' on' : '') + '">' + (on ? '<i class="fas fa-check mr-0.5"></i>ใช้อยู่' : 'เก็บใช้') + '</span></div>';
+        });
+        html += '</div></section>';
+      }
+      // 3) ซื้อคู่ลดพิเศษ (AutoPromotions) — ไม่มีกติกาในชีต = ใช้ค่าเริ่มต้นเดียวกับแถบคูปอง
+      let rules = (g.autoPromotions || []).filter(r => window.app.statusOn(r.Status));
+      if (!rules.length) rules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10 }];
+      html += '<section><div class="pm-sec-head"><h3 class="pm-sec-title">ซื้อคู่ลดพิเศษ</h3><span class="pm-sec-sub">ระบบคำนวณส่วนลดให้อัตโนมัติในตะกร้า</span></div><div class="sf-promo-grid sf-promo-grid-sm">';
+      rules.forEach(r => {
+        const buyCat = (r['Buy Category'] || 'โมบาย').toString().trim();
+        const getCat = (r['Get Discount Category'] || 'อุปกรณ์เสริม').toString().trim();
+        const pct = parseFloat(r['Discount Percent']) || 10;
+        html += '<div class="bnn-voucher-card sf-promo-coupon" onclick="window.app.pos.promoHubCategory(\'' + escJs(getCat) + '\')">'
+          + '<div class="min-w-0"><div class="pm-v-val truncate">ซื้อคู่ ลด ' + esc(pct) + '%</div><div class="pm-v-name">ซื้อ ' + esc(buyCat) + ' คู่ ' + esc(getCat) + '</div><div class="pm-v-note">ระบบคำนวณลดอัตโนมัติ</div></div>'
+          + '<span class="pm-v-btn shrink-0">ดูสินค้า</span></div>';
+      });
+      html += '</div></section>';
+      body.innerHTML = html;
+      window.app.showModal('promoHubModal');
+    },
+    openPromoCampaign: function(i) {
+      const c = (this._promoCamps || [])[i];
+      if (!c) return;
+      window.app.hideModal('promoHubModal');
+      if (c.link && /^https?:/i.test(c.link)) { window.open(c.link, '_blank'); return; }
+      const kw = c.link || c.title;
+      if (kw) { this.clearStoreFilters(false); this.applyBannerSearch(kw); }
+    },
+    promoHubCategory: function(cat) {
+      window.app.hideModal('promoHubModal');
+      this.setStoreCategory(cat);
+    },
     emptyStoreFilters: function() {
-      return { category: '', groups: [], capacities: [], colors: [], priceRange: '', priceMin: '', priceMax: '', sort: '', inStock: false };
+      return { category: '', brand: '', groups: [], capacities: [], colors: [], priceRange: '', priceMin: '', priceMax: '', sort: '', inStock: false };
     },
     // สินค้าที่เปิดขายในขอบเขตหมวด + ซีรีส์ที่เลือก (ใช้ทำรายการตัวเลือกสี/ความจุ)
     optionScope_: function(prods) {
@@ -1592,6 +1783,7 @@ window.app.pos = {
     paramsFromState: function() {
       const f = this.storeFilters, p = {};
       if (f.category) p.cat = [f.category];
+      if (f.brand) p.brand = [f.brand];
       if (f.groups.length) p.grp = f.groups.slice();
       if (f.capacities.length) p.cap = f.capacities.slice();
       if (f.colors.length) p.col = f.colors.slice();
@@ -1617,10 +1809,11 @@ window.app.pos = {
     applyUrlParams: function(params, force) {
       params = params || {};
       const g = (k) => (Array.isArray(params[k]) ? params[k] : (params[k] !== undefined ? [String(params[k])] : [])).map(String);
-      const known = ['cat', 'grp', 'cap', 'col', 'pr', 'pmin', 'pmax', 'sort', 'stock', 'q', 'page', 'p'];
+      const known = ['cat', 'brand', 'grp', 'cap', 'col', 'pr', 'pmin', 'pmax', 'sort', 'stock', 'q', 'page', 'p'];
       if (!force && !known.some(k => g(k).length)) return; // ไม่มีพารามิเตอร์ของเรา = คงตัวกรองในหน่วยความจำไว้
       const f = this.emptyStoreFilters();
       f.category = g('cat')[0] || '';
+      f.brand = (g('brand')[0] || '').slice(0, 40).toUpperCase();
       f.groups = g('grp'); f.capacities = g('cap'); f.colors = g('col');
       const pr = g('pr')[0] || ''; f.priceRange = ['lt10', '10-30', '30-50', 'gt50'].includes(pr) ? pr : '';
       const mn = parseFloat(g('pmin')[0]), mx = parseFloat(g('pmax')[0]);
@@ -1743,7 +1936,7 @@ window.app.pos = {
       }
       if(products.length === 0 && searchEl && searchEl.value === '') {
          let skel = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 pb-4">';
-         for(let k=0; k<10; k++) { skel += '<div class="bg-white border border-slate-200/80 p-3.5 rounded-2xl shadow-sm"><div class="skeleton mb-3" style="height:135px; width:100%;"></div><div class="skeleton mb-2" style="height:12px; width:85%;"></div><div class="skeleton mb-3" style="height:16px; width:45%;"></div><div class="skeleton" style="height:32px; width:100%; border-radius:0.75rem;"></div></div>'; }
+         for(let k=0; k<10; k++) { skel += '<div class="pm-skel"><div class="skeleton mb-3" style="aspect-ratio:1/1; width:100%; border-radius:18px;"></div><div class="skeleton mb-2" style="height:12px; width:85%;"></div><div class="skeleton mb-3" style="height:16px; width:45%;"></div><div class="skeleton" style="height:32px; width:100%; border-radius:0.75rem;"></div></div>'; }
          skel += '</div>'; row.innerHTML = skel; return;
       }
 
@@ -1893,8 +2086,8 @@ window.app.pos = {
         caps.forEach(cap => {
           const existsInColor = vars.some(v => v.Color === st.color && v.Capacity === cap);
           const sel = cap === st.cap;
-          chipsHtml += '<button type="button" class="px-2 py-0.5 rounded-md border text-[10px] transition-all '
-            + (sel ? 'bg-white border-[#FF6B00] font-extrabold text-[#E05300] ring-1 ring-[#FF6B00]' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400 font-semibold')
+          chipsHtml += '<button type="button" class="pm-chip'
+            + (sel ? ' on' : '')
             + (existsInColor ? '' : ' opacity-40')
             + '" onclick="window.app.pos.selectCardVariant(\'' + escJs(p.Model) + '\',\'' + escJs(cap) + '\',\'\')">' + esc(cap) + '</button>';
         });
@@ -1906,7 +2099,8 @@ window.app.pos = {
       const catLabel = esc((variant.Category || 'สินค้า').toString().trim());
       // แบรนด์: คำแรกของชื่อรุ่นถ้าเป็นตัวอักษรละติน (เช่น Samsung) ไม่งั้นใช้หมวด
       const firstWord = String(dispName || '').trim().split(/\s+/)[0] || '';
-      const brandLabel = /^[A-Za-z]{2,}$/.test(firstWord) ? esc(firstWord.toUpperCase()) : catLabel.toUpperCase();
+      const brandKey = this.brandOf(variant);
+      const brandLabel = brandKey ? esc(this.brandLabel_(brandKey).toUpperCase()) : (/^[A-Za-z]{2,}$/.test(firstWord) ? esc(firstWord.toUpperCase()) : catLabel.toUpperCase());
       // parse ทนต่อเซลล์ format สกุลเงิน (เช่น "฿49,900.00") — เก็บเฉพาะตัวเลข/จุด/ลบ
       const priceNum = parseFloat(String(variant.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
       const price = priceNum.toLocaleString();
@@ -1924,16 +2118,23 @@ window.app.pos = {
       if (isGift) {
         topLeftBadge = '<div class="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 bg-slate-800 text-white text-[10px] font-bold rounded-md shadow-sm pointer-events-none"><i class="fas fa-gift text-amber-400 mr-1"></i>ของแถม</div>';
       } else if (hasSave && savePct > 0) {
-        topLeftBadge = '<div class="bnn-discount-badge absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 pointer-events-none"><i class="fas fa-bolt text-[#FF6B00]"></i> -' + savePct + '%</div>';
+        topLeftBadge = '<div class="bnn-discount-badge absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 pointer-events-none">-' + savePct + '%</div>';
       }
 
       // ป้ายหมวดหมู่มุมขวาบน
       const topRightBadge = '';
+      // ป้าย NEW (Launch Date <= 30 วัน) / ขายดี (4 อันดับแรกของยอดจอง) มุมซ้ายล่างของรูป — ไม่ติดบนของแถมและสินค้าหมด
+      let flagsHtml = '';
+      if (!isGift && !outOfStock) {
+        if (this.isNew(variant)) flagsHtml += '<span class="pm-flag pm-flag-new">NEW</span>';
+        if (this.isHot(variant)) flagsHtml += '<span class="pm-flag pm-flag-hot"><i class="fas fa-fire"></i>ขายดี</span>';
+      }
+      if (flagsHtml) flagsHtml = '<div class="pm-flags">' + flagsHtml + '</div>';
 
       // Watermark ทับกลางภาพเมื่อสินค้าหมด (BNN Sold Out Overlay)
       const soldOutOverlay = outOfStock
         ? '<div class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center pointer-events-none">'
-          + '<div class="px-3 py-1.5 rounded-full bg-slate-900/90 text-white text-[11px] font-black uppercase tracking-wider shadow-md border border-white/30">SOLD OUT • สินค้าหมด</div>'
+          + '<div class="pm-soldout">สินค้าหมด</div>'
           + '</div>'
         : '';
 
@@ -1954,19 +2155,19 @@ window.app.pos = {
           const pct = parseFloat(r['Discount Percent']) || 0;
           if (pct > 0 && (!best || pct > best.pct)) best = { pct: pct, buyCat: (r['Buy Category'] || '').toString().trim() };
         });
-        if (best) bundleBadge = '<span class="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-rose-50 text-[#E11D48] border border-rose-200/80 font-extrabold"><i class="fas fa-tags text-[8px]"></i> ลด ' + esc(best.pct) + '% เมื่อซื้อคู่ ' + esc(best.buyCat) + '</span>';
+        if (best) bundleBadge = '<span class="pm-tag pm-tag-deal"><i class="fas fa-tags"></i> ลด ' + esc(best.pct) + '% เมื่อซื้อคู่ ' + esc(best.buyCat) + '</span>';
       }
 
       // Phase 2 Smart E-Commerce Badges: ผ่อน 0% + แถมฟรี X รายการ + ปุ่มเทียบสเปค
       let installmentBadge = '';
       if (!isGift && priceNum >= 3000) {
-        installmentBadge = '<span class="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-extrabold"><i class="fas fa-credit-card text-[8px]"></i> ผ่อน 0% ฿' + Math.ceil(priceNum / 10).toLocaleString() + '/ด.</span>';
+        installmentBadge = '<span class="pm-tag"><i class="far fa-credit-card"></i> ผ่อน 0% ฿' + Math.ceil(priceNum / 10).toLocaleString() + '/ด.</span>';
       }
       let giftCountBadge = '';
       if (!isGift) {
         const giftInfo = this.countEligibleGifts(variant, currentChannelForBadge);
         if (giftInfo.total > 0) {
-          giftCountBadge = '<span class="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-extrabold"><i class="fas fa-gift text-[8px]"></i> แถมฟรี ' + giftInfo.total + ' รายการ</span>';
+          giftCountBadge = '<span class="pm-tag pm-tag-gift"><i class="fas fa-gift"></i> แถมฟรี ' + giftInfo.total + ' รายการ</span>';
         }
       }
       const isCompared = (this.compareList || []).includes(cardKey);
@@ -1976,7 +2177,7 @@ window.app.pos = {
       const isFavorited = (this.wishlist || []).includes(variant.SKU);
       const skuClean = (variant.SKU || '').replace(/[^a-zA-Z0-9_-]/g, '');
       const wishlistBtnHtml = !isGift
-        ? '<button type="button" class="btn-wishlist-' + skuClean + ' absolute bottom-2 left-2 z-20 w-7 h-7 rounded-lg bg-white/95 border border-slate-200 text-xs shadow-sm flex items-center justify-center transition-all hover:scale-110 ' + (isFavorited ? 'text-rose-500 border-rose-300 bg-rose-50/80' : 'text-slate-400 hover:text-rose-500') + '" onclick="window.app.pos.toggleWishlist(\'' + escJs(variant.SKU) + '\', event)" title="' + (isFavorited ? 'ลบออกจากรายการโปรด' : 'บันทึกเป็นรายการโปรด') + '"><i class="' + (isFavorited ? 'fas fa-heart text-rose-500 animate-pulse' : 'far fa-heart') + '"></i></button>'
+        ? '<button type="button" class="pm-wish btn-wishlist-' + skuClean + ' absolute bottom-2 left-2 z-20 w-7 h-7 rounded-lg bg-white/95 border border-slate-200 text-xs shadow-sm flex items-center justify-center transition-all hover:scale-110 ' + (isFavorited ? 'text-rose-500 border-rose-300 bg-rose-50/80' : 'text-slate-400 hover:text-rose-500') + '" onclick="window.app.pos.toggleWishlist(\'' + escJs(variant.SKU) + '\', event)" title="' + (isFavorited ? 'ลบออกจากรายการโปรด' : 'บันทึกเป็นรายการโปรด') + '"><i class="' + (isFavorited ? 'fas fa-heart text-rose-500 animate-pulse' : 'far fa-heart') + '"></i></button>'
         : '';
 
       // หลอดไฟแสดงสถานะสต๊อก (BNN Flash Sale Stock Progress Bar)
@@ -1989,8 +2190,8 @@ window.app.pos = {
           // หลอดสเกลความขาดแคลน: เต็มเมื่อเหลือ >= 30 ชิ้น (ชีตไม่มีสต๊อกเริ่มต้น จึงคิด % ที่ขายไปแล้วไม่ได้) ขั้นต่ำ 8% ให้เห็นหลอดเสมอ
           const stockPct = Math.max(8, Math.min(100, Math.round(stockNum / 30 * 100)));
           const stockMeter = '<span class="sf-stock-bar" aria-hidden="true"><span style="width:' + stockPct + '%"></span></span>';
-          if (stockNum <= 5) stockBarHtml = '<div class="sf-stock low"><i class="fas fa-fire"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น' + stockMeter + '</div>';
-          else stockBarHtml = '<div class="sf-stock ok"><i class="fas fa-check-circle"></i> ' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น' + stockMeter + '</div>';
+          if (stockNum <= 5) stockBarHtml = '<div class="sf-stock low"><i class="pm-dot"></i>' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น' + stockMeter + '</div>';
+          else stockBarHtml = '<div class="sf-stock ok"><i class="pm-dot"></i>' + esc(colorLbl) + 'เหลือ ' + stockNum + ' ชิ้น' + stockMeter + '</div>';
         }
       }
 
@@ -1998,34 +2199,35 @@ window.app.pos = {
       let bookBtn = '';
       if (!isGift) {
         if (outOfStock) {
-          bookBtn = '<button type="button" disabled class="w-full py-2 rounded-xl bg-slate-100 text-slate-400 text-xs font-bold cursor-not-allowed border border-slate-200">สินค้าหมด</button>';
+          bookBtn = '<button type="button" disabled class="pm-cta-off w-full">สินค้าหมด</button>';
         } else {
-          bookBtn = '<button type="button" class="bnn-buy-btn w-full py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5" onclick="window.app.pos.openAddToCartModal(\'' + escJs(variant.SKU) + '\')" aria-label="จอง ' + pName + '"><i class="fas fa-cart-plus"></i> จองเลย</button>';
+          bookBtn = '<button type="button" class="bnn-buy-btn w-full flex items-center justify-center gap-1.5" onclick="window.app.pos.openAddToCartModal(\'' + escJs(variant.SKU) + '\')" aria-label="จอง ' + pName + '">จองเลย <i class="fas fa-arrow-right"></i></button>';
         }
       }
 
-      let card = '<div class="pos-card group relative flex flex-col h-full bg-white rounded-2xl overflow-hidden' + (isGift ? ' opacity-80' : '') + '" data-card-key="' + esc(cardKey) + '">';
+      let card = '<div class="pos-card pm-card group relative flex flex-col h-full' + (isGift ? ' opacity-80' : '') + '" data-card-key="' + esc(cardKey) + '">';
       card +=      topLeftBadge;
       card +=      topRightBadge;
       const openable = !isGift && !outOfStock;
       const openAttr = openable ? ' onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')"' : '';
-      card += '    <div class="relative h-[150px] md:h-[180px] p-4 pt-8 flex items-center justify-center bg-white overflow-hidden' + (openable ? ' cursor-pointer' : '') + '"' + openAttr + '>';
+      card += '    <div class="pm-media relative flex items-center justify-center overflow-hidden' + (openable ? ' cursor-pointer' : '') + '"' + openAttr + '>';
       card +=        soldOutOverlay;
       card +=        compareBtnHtml;
       card +=        wishlistBtnHtml;
+      card +=        flagsHtml;
       card += '      <img src="' + esc(imgUrl) + '" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;" alt="' + esc(pName) + '" class="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105' + (outOfStock ? ' grayscale opacity-60' : '') + '">';
       card += '    </div>';
-      card += '    <div class="p-3 flex flex-col flex-1 gap-1.5">';
+      card += '    <div class="pm-body flex flex-col flex-1 gap-1.5">';
       card += '      <div class="sf-brand">' + brandLabel + '</div>';
       const nameOpenAttr = openable ? ' role="link" tabindex="0" onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')" onkeydown="if(event.key===\'Enter\'){window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')}"' : '';
-      card += '      <div class="font-bold text-slate-900 text-xs md:text-[14px] line-clamp-2 leading-snug min-h-[2.25rem]' + (openable ? ' cursor-pointer hover:text-[#FF6B00] transition-colors' : '') + '"' + nameOpenAttr + ' title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
+      card += '      <div class="pm-name line-clamp-2' + (openable ? ' cursor-pointer' : '') + '"' + nameOpenAttr + ' title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
       if (p.isGroup) card += '<div class="text-[10px] text-slate-500 font-medium line-clamp-1 -mt-0.5" title="' + esc(pName) + '">' + esc(pName) + '</div>';
       if (bundleBadge || installmentBadge || giftCountBadge) {
         card += '<div class="flex items-center gap-1 flex-wrap">' + bundleBadge + installmentBadge + giftCountBadge + '</div>';
       }
       if (dotsHtml) card += '<div class="flex items-center gap-1.5 flex-wrap pt-0.5">' + dotsHtml + '</div>';
       if (chipsHtml) card += '<div class="flex items-center gap-1 flex-wrap pt-0.5">' + chipsHtml + '</div>';
-      card += '      <div class="mt-auto pt-2 border-t border-slate-100/90">';
+      card += '      <div class="pm-foot mt-auto">';
       // ราคาช่วงสไตล์ BNN: รุ่นที่มีหลายราคา (ตามความจุ/สี) แสดง "฿ต่ำสุด - ฿สูงสุด" แล้วบอกราคาของรุ่นที่เลือกอยู่ไว้ใต้ราคา
       let rMin = priceNum, rMax = priceNum;
       if (p.isGroup) {
@@ -2038,15 +2240,15 @@ window.app.pos = {
       const hasRange = rMax > rMin;
       const strikeHtml = hasSave ? '<span class="text-[10px] text-slate-400 line-through font-semibold tabular-nums">฿' + origNum.toLocaleString() + '</span>' : '';
       if (hasRange) {
-        card += '        <div class="mb-0.5"><span class="sf-range text-slate-900 font-black text-base md:text-[17px] leading-none tabular-nums">฿' + rMin.toLocaleString() + ' - ฿' + rMax.toLocaleString() + '</span></div>';
+        card += '        <div class="mb-0.5"><span class="sf-range pm-price tabular-nums">฿' + rMin.toLocaleString() + ' - ฿' + rMax.toLocaleString() + '</span></div>';
         card += '        <div class="sf-selprice flex items-baseline gap-1.5 flex-wrap ' + (hasSave ? 'mb-0.5' : 'mb-2') + '">รุ่นที่เลือก <b class="tabular-nums">฿' + price + '</b>' + strikeHtml + '</div>';
       } else {
         card += '        <div class="flex items-baseline gap-1.5 flex-wrap ' + (hasSave ? 'mb-0.5' : 'mb-2') + '">';
-        card += '          <span class="text-slate-900 font-black text-base md:text-lg leading-none tabular-nums">฿' + price + '</span>' + strikeHtml;
+        card += '          <span class="pm-price tabular-nums">฿' + price + '</span>' + strikeHtml;
         card += '        </div>';
       }
       if (hasSave) {
-        card += '      <div class="sf-save mb-2"><i class="fas fa-ticket"></i> ประหยัดไป ฿' + (origNum - priceNum).toLocaleString() + '</div>';
+        card += '      <div class="sf-save mb-2">ประหยัด ฿' + (origNum - priceNum).toLocaleString() + '</div>';
       }
       card +=          stockBarHtml;
       card +=          bookBtn;
@@ -2716,7 +2918,7 @@ window.app.pos = {
       }); 
       cD.innerHTML=html; 
       if(cL) cL.innerText=c;
-      if(hdC) hdC.innerText=c;
+      if(hdC){ const prevC = hdC.innerText; hdC.innerText=c; if(String(prevC) !== String(c)){ hdC.classList.remove('pm-bump'); void hdC.offsetWidth; hdC.classList.add('pm-bump'); } }
       if(mobCnt) mobCnt.innerText=c;
       if(mobBar) mobBar.classList.remove('hidden');
     },

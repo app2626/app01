@@ -103,8 +103,13 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await ev("window.location.hash='#dashboard';true"); await sleep(1500); await snap('dashboard');
   await ev("window.location.hash='#pos';true"); await sleep(1500); await snap('pos-overlay');
   await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(1200);
+  // ตัวอย่างหน้าตาป้าย NEW/ขายดี + ชั้นสินค้าใหม่: ใส่ Launch Date ให้ 3 รุ่นแรกที่ขายได้ และตั้งรุ่นขายดี (เฉพาะภาพ ไม่แตะข้อมูลจริง)
+  await ev("(()=>{const a=window.app,g=a.globalData,pos=a.pos;const ms=[...new Set(g.products.filter(p=>p.Status==='เปิด'&&!(p.Category||'').includes('ของแถม')&&p.Model&&p.Model!=='-'&&pos.stockOf(p)>0).map(p=>p.Model))];const d=n=>new Date(Date.now()+7*3600e3-n*864e5).toISOString().slice(0,10);g.products.forEach(p=>{const i=ms.indexOf(p.Model);if(i>-1&&i<3)p['Launch Date']=d(i*4+1);});g.popularModels=ms.slice(1,5);pos.filter();return true})()"); await sleep(600);
   await snap('pos-desktop');
-  await ev("window.scrollTo(0,0);document.querySelector('#productGrid .pos-card').click();true"); await sleep(900); await snap('pos-modal'); await ev("window.Swal&&Swal.close();document.querySelectorAll('[id$=Modal]').forEach(m=>m.classList.add('hidden'));true");
+  await ev("window.scrollTo(0,document.getElementById('storeFilterBar').getBoundingClientRect().top+window.scrollY-130);true"); await sleep(700); await snap('pos-cards');
+  await ev("window.scrollTo(0,document.body.scrollHeight);true"); await sleep(700); await snap('pos-bottom');
+  await ev("window.scrollTo(0,0);window.app.pos.openPromoHub();true"); await sleep(900); await snap('pos-promos'); await ev("window.app.hideModal('promoHubModal');true"); await sleep(300);
+  await ev("window.scrollTo(0,0);document.querySelector('#productGrid .pos-card .bnn-buy-btn').click();true"); await sleep(900); await snap('pos-modal'); await ev("window.Swal&&Swal.close();document.querySelectorAll('[id$=Modal]').forEach(m=>m.classList.add('hidden'));true");
   await view(390, 800, true); await sleep(600); await snap('pos-mobile');
   await ev("window.app.pos.toggleCart&&window.app.pos.toggleCart();true"); await sleep(500); await snap('cart-mobile');
   await ev("window.app.pos.toggleCart&&window.app.pos.toggleCart();true");

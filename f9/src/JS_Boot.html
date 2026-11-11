@@ -7,7 +7,7 @@ document.addEventListener('keydown', function(e) {
   if (window.app.pos && window.app.pos.openPopover) { window.app.pos.closeFilterPopovers(); return; }
   const popup = document.getElementById('popupBannerModal');
   if (popup && !popup.classList.contains('hidden')) { window.app.closePopupBanner(); return; }
-  const modalOrder = ['formModal', 'checkoutModal', 'addToCartModal'];
+  const modalOrder = ['promoHubModal', 'formModal', 'checkoutModal', 'addToCartModal'];
   for (let i = 0; i < modalOrder.length; i++) {
     const el = document.getElementById(modalOrder[i]);
     if (el && !el.classList.contains('hidden')) { window.app.hideModal(modalOrder[i]); return; }
@@ -22,6 +22,33 @@ document.addEventListener('click', function(e) {
   if (e.target && e.target.closest && e.target.closest('.store-pop-wrap')) return;
   window.app.pos.closeFilterPopovers();
 });
+
+// เอฟเฟกต์ตามเมาส์ (หน้าร้าน): ตั้งตัวแปร CSS --mx/--my ให้แสงตามเมาส์ และ --rx/--ry ให้แท่นรูปเอียงเล็กน้อย
+// เฉพาะอุปกรณ์ที่มีเมาส์จริง; ผ่าน requestAnimationFrame เพื่อไม่ให้หน่วง; ไม่แตะ DOM อื่นนอกจาก style ของ element นั้น
+(function() {
+  if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  var last = null, raf = 0, ev = null;
+  function reset(el) { if (!el) return; el.style.removeProperty('--rx'); el.style.removeProperty('--ry'); }
+  function apply() {
+    raf = 0;
+    if (!ev || !ev.target || !ev.target.closest) return;
+    var el = ev.target.closest('.pos-storefront .pm-media, .bnn-voucher-card');
+    if (last && last !== el) reset(last);
+    last = el;
+    if (!el) return;
+    var r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    var x = ev.clientX - r.left, y = ev.clientY - r.top;
+    el.style.setProperty('--mx', x + 'px');
+    el.style.setProperty('--my', y + 'px');
+    if (el.classList.contains('pm-media')) {
+      el.style.setProperty('--ry', (((x / r.width) - 0.5) * 9).toFixed(2) + 'deg');
+      el.style.setProperty('--rx', ((0.5 - (y / r.height)) * 9).toFixed(2) + 'deg');
+    }
+  }
+  document.addEventListener('pointermove', function(e) { ev = e; if (!raf) raf = requestAnimationFrame(apply); }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', function() { reset(last); last = null; });
+})();
 
 document.addEventListener('DOMContentLoaded', () => { if (!window.app.initialized) { window.app.initialized = true; window.app.init(); } });
 window.onload = () => { if (!window.app.initialized) { window.app.initialized = true; window.app.init(); } };

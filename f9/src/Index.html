@@ -54,7 +54,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <?!= include('CSS'); ?>
   <?!= include('TailwindCSS'); ?>
@@ -514,6 +514,7 @@
           <div id="sfTopbar" class="sf-topbar shrink-0">
             <span class="sf-topbar-msg"><i class="fas fa-certificate"></i> สินค้าของแท้ ประกันศูนย์ · ล็อกราคา Pre Booking ทันที · รับสิทธิ์ของแถม</span>
             <nav class="sf-topbar-links" aria-label="บริการลูกค้า">
+              <button type="button" onclick="window.app.pos.openPromoHub()"><i class="fas fa-fire"></i> โปรโมชั่น</button>
               <button type="button" onclick="window.app.pos.openOrderTrackModal()"><i class="fas fa-qrcode"></i> เช็คสถานะใบจอง</button>
               <button type="button" onclick="window.app.pos.openTradeInStandalone()"><i class="fas fa-retweet"></i> เก่าแลกใหม่</button>
               <span id="sfTopbarPhone" class="hidden"></span>
@@ -596,11 +597,8 @@
               <!-- มือถือ overlay สูงตามเนื้อหา (ยาว) — ตรึงข้อความช่วงบนให้เห็นทันทีไม่ต้องเลื่อน; lg ค่อย center ตามเดิม -->
               <div id="criteriaOverlay" class="absolute inset-0 bg-white/95 backdrop-blur-sm flex items-start pt-20 lg:pt-0 lg:items-center justify-center z-20 rounded-2xl transition-opacity duration-300">
                   <div class="text-center px-6 py-8 max-w-md bg-white border border-slate-200 rounded-3xl shadow-lg">
-                      <div class="w-16 h-16 rounded-2xl bg-[#141416] text-[#FF6B00] flex items-center justify-center mx-auto mb-4 shadow-md border-2 border-[#FF6B00]">
-                          <i class="fas fa-bolt text-2xl"></i>
-                      </div>
-                      <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-wider mb-2">Pre Booking STOREFRONT</span>
-                      <h3 class="text-base md:text-lg font-black text-slate-800">กรุณาเลือกช่องทางและสาขาเพื่อเริ่มช้อปดีลพิเศษ</h3>
+                      <div class="pm-gate-ico"><i class="fas fa-store"></i></div>
+                      <h3 class="text-base md:text-lg font-black text-slate-800">เลือกช่องทางและสาขาเพื่อเริ่มจอง</h3>
                       <p class="text-xs text-slate-500 mt-1.5 font-medium">ระบบจะแสดงรายการสินค้า สต๊อกคงเหลือ และโปรโมชั่นของแถมตามสาขาที่เลือก</p>
                   </div>
               </div>
@@ -620,7 +618,10 @@
 
               <!-- ชั้น "ยอดนิยมตอนนี้" (รุ่นที่ถูกจองมากสุด — pos.renderPopularShelf; ซ่อนเมื่อมีคำค้น/ตัวกรอง/หน้า 2+) -->
               <!-- ข่าวสารร้าน (จากหน้าจัดการข่าวสาร — pos.renderNewsShelf; ซ่อนเมื่อไม่มีข่าว/กำลังค้นหา/กรอง) -->
+              <!-- แถบแบรนด์ (pos.renderBrandStrip — กดเลือกแบรนด์ = ตัวกรอง) และชั้น "สินค้าใหม่" (pos.renderNewShelf) -->
+              <div id="posBrands" class="hidden mb-3 shrink-0"></div>
               <div id="posNews" class="hidden mb-3 shrink-0"></div>
+              <div id="posNewArrivals" class="hidden mb-3 shrink-0"></div>
               <div id="posPopular" class="hidden mb-3 shrink-0"></div>
 
               <!-- 6B — category tiles + sub-chips รุ่น + filter chips (render โดย pos.renderStoreHeader) -->
@@ -633,24 +634,12 @@
               </div>
 
               <!-- BNN Trust & Guarantee Micro-Bar -->
-              <div class="mt-2 pt-2.5 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-600 font-bold shrink-0">
-                <div class="flex items-center gap-2 bg-slate-50/80 px-3 py-1.5 rounded-xl border border-slate-100">
-                  <i class="fas fa-shield-halved text-emerald-600 text-sm"></i>
-                  <span class="truncate">สินค้าของแท้ 100% ประกันศูนย์</span>
-                </div>
-                <div class="flex items-center gap-2 bg-slate-50/80 px-3 py-1.5 rounded-xl border border-slate-100">
-                  <i class="fas fa-bolt text-amber-500 text-sm"></i>
-                  <span class="truncate">ล็อกราคา Pre Booking ทันที</span>
-                </div>
-                <div class="flex items-center gap-2 bg-slate-50/80 px-3 py-1.5 rounded-xl border border-slate-100">
-                  <i class="fas fa-gifts text-[#E11D48] text-sm"></i>
-                  <span class="truncate">รับสิทธิ์ของแถมแบรนด์ & ช่องทาง</span>
-                </div>
-                <div class="flex items-center gap-2 bg-slate-50/80 px-3 py-1.5 rounded-xl border border-slate-100">
-                  <i class="fas fa-file-invoice text-indigo-600 text-sm"></i>
-                  <span class="truncate">ออกใบจอง/ใบเสร็จ PDF อัตโนมัติ</span>
-                </div>
-              </div>
+              <ul class="pm-trust shrink-0" aria-label="บริการของร้าน">
+                <li><i class="fas fa-shield-halved" aria-hidden="true"></i><div><strong>ของแท้ ประกันศูนย์</strong><span>สินค้าใหม่ รับประกันจากผู้ผลิตโดยตรง</span></div></li>
+                <li><i class="fas fa-lock" aria-hidden="true"></i><div><strong>ล็อกราคาทันที</strong><span>จองวันนี้ ได้ราคา Pre Booking แน่นอน</span></div></li>
+                <li><i class="fas fa-gift" aria-hidden="true"></i><div><strong>สิทธิ์ของแถม</strong><span>ของแถมจากแบรนด์และช่องทางที่จอง</span></div></li>
+                <li><i class="fas fa-file-lines" aria-hidden="true"></i><div><strong>ใบจองอัตโนมัติ</strong><span>รับใบจองและใบเสร็จ PDF หลังยืนยัน</span></div></li>
+              </ul>
           </div>
       </div>
 
@@ -862,7 +851,7 @@
                   <!-- Right side: Details & Variants -->
                   <div class="w-full md:w-8/12 flex flex-col">
                      <div class="mb-4 pb-3 border-b border-slate-100">
-                        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 text-[#E11D48] text-[10px] font-black mb-1.5 border border-rose-100"><i class="fas fa-bolt"></i> ราคาพิเศษ Pre Booking</div>
+                        <div class="pm-eyebrow">ราคาพิเศษ Pre Booking</div>
                         <h4 id="modalProdName" class="font-black text-slate-900 mb-1.5 leading-snug text-base md:text-lg"></h4>
                         <div class="text-xl md:text-2xl font-black text-[#E11D48] tabular-nums" id="modalProdPrice"></div>
                         <input type="hidden" id="modalProdSKU">
@@ -935,6 +924,22 @@
                <button type="button" class="text-slate-300 hover:text-[#FF6B00] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10" onclick="window.app.hideModal('tradeInModal')"><i class="fas fa-times text-lg"></i></button>
             </div>
             <div id="tradeInModalBody" class="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-white"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- หน้าโปรโมชั่นทั้งหมด (pos.openPromoHub): แคมเปญ + คูปอง + โปรซื้อคู่ -->
+    <div id="promoHubModal" class="fixed inset-0 z-[70] hidden" role="dialog" aria-modal="true" aria-label="โปรโมชั่นทั้งหมด">
+      <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('promoHubModal')"></div>
+      <div class="fixed inset-0 z-10 overflow-y-auto p-4">
+        <div class="flex min-h-full items-center justify-center text-center">
+          <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-5xl border border-slate-200 flex flex-col max-h-[92vh]">
+            <div class="sf-dlg-head px-6 py-4 flex justify-between items-center">
+               <h3 class="text-base font-black text-white flex items-center gap-2"><i class="fas fa-fire sf-dlg-ico"></i> โปรโมชั่นทั้งหมด</h3>
+               <button type="button" aria-label="ปิด" class="text-slate-300 hover:text-[#FF6B00] w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10" onclick="window.app.hideModal('promoHubModal')"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div id="promoHubBody" class="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 bg-white space-y-6"></div>
           </div>
         </div>
       </div>
@@ -1390,6 +1395,7 @@
                   </div>
                   <div><label class="block text-xs font-bold text-slate-500 mb-1">ราคา *</label><input type="number" id="pgPrice" class="pg-input pgSharedField"></div>
                   <div><label class="block text-xs font-bold text-slate-500 mb-1">ราคาเดิม (เว้นว่างถ้าไม่ลดราคา)</label><input type="number" id="pgOriginalPrice" class="pg-input pgSharedField"></div>
+                  <div><label class="block text-xs font-bold text-slate-500 mb-1">วันเปิดตัว (ติดป้าย NEW 30 วัน · ล้างค่า = ไม่ติดป้าย)</label><input type="date" id="pgLaunchDate" class="pg-input pgSharedField"></div>
                 </div>
               </div>
 

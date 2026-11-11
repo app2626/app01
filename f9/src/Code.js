@@ -1,5 +1,8 @@
 // คอลัมน์สเปคสินค้าในชีต Products (9 คอลัมน์มาตรฐานสำหรับตารางเปรียบเทียบสเปคและหน้ารายละเอียดสินค้า)
 var PRODUCT_SPEC_COLS_ = ["Display", "Processor", "RAM", "Rear Camera", "Front Camera", "Battery", "OS", "Connectivity", "Warranty"];
+// วันเปิดตัว/วางขาย (ข้อความ yyyy-MM-dd เวลาไทย) — หน้าร้านใช้ติดป้าย NEW 30 วัน + ชั้น "สินค้าใหม่"; ว่าง = ไม่ใช่สินค้าใหม่
+// สินค้าที่สร้างผ่านฟอร์มเพิ่มสินค้าและไม่กรอกวันที่ จะถูกตั้งเป็นวันนี้อัตโนมัติ; สินค้าเดิมในชีตคงว่างจนกว่าแอดมินจะกรอก
+var PRODUCT_LAUNCH_COL_ = "Launch Date";
 
 function doGet(e) {
   // ชื่อเว็บแอปตั้งค่าได้จากเมนู "ตั้งค่าระบบ" (Settings sheet, key SystemName) — เพื่อให้สำเนาโปรเจกต์ไปใช้ที่อื่น
@@ -47,7 +50,7 @@ function setupDatabase(userToken) {
   const tables = {
     // 6C.1 — Original Price ต่อท้ายเสมอ (display-only: ป้าย "ประหยัด/เดิม" บนการ์ด POS — ราคาคิดเงินจริงคือ Price)
     // เพิ่มคอลัมน์สเปคสินค้า 9 คอลัมน์ต่อท้ายชีต Products สำหรับตารางเปรียบเทียบสเปคและหน้ารายละเอียดสินค้า
-    "Products": ["SKU", "Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Stock", "Unit", "Category", "Status", "Channel", "Original Price"].concat(PRODUCT_SPEC_COLS_),
+    "Products": ["SKU", "Product Name", "Model", "Marketing Model", "Product Group", "Capacity", "Color", "Image URL", "Price", "Stock", "Unit", "Category", "Status", "Channel", "Original Price"].concat(PRODUCT_SPEC_COLS_).concat([PRODUCT_LAUNCH_COL_]),
     "Members": ["Username", "Password", "Role", "Name", "Branch Code", "Accessible Menus"],
     "Branches": ["Channel", "Branch Code", "Branch Name", "Area", "Mall", "Region", "Province", "Type Name"],
     "Channels": ["Channel ID", "Channel Name", "Description"],
@@ -799,6 +802,36 @@ function bannerDateStr_(v) {
   const s = v.toString().trim();
   return BANNER_DATE_RE_.test(s) ? s : '';
 }
+// วันเปิดตัวสินค้า: คืน yyyy-MM-dd หรือ '' (ว่าง); ค่าที่ไม่ใช่วันที่จริงให้ error (ฟอร์มส่งมาจาก input type=date เสมอ)
+function launchDateClean_(v) {
+  const raw = (v === null || v === undefined) ? '' : v;
+  const s = bannerDateStr_(raw);
+  if (!s) {
+    if (Object.prototype.toString.call(raw) !== '[object Date]' && raw.toString().trim() !== '') throw new Error("วันที่เปิดตัวไม่ถูกต้อง (ต้องเป็น ปี-เดือน-วัน เช่น 2026-11-01)");
+    return '';
+  }
+  if (!bannerDateValid_(s)) throw new Error("วันที่เปิดตัวไม่ถูกต้อง: " + s);
+  return s;
+}
+// นำเข้า CSV: แปลงวันเปิดตัวจากไฟล์ — '' = ไม่ระบุ; รับ ปี-เดือน-วัน / ปี/เดือน/วัน (ปี พ.ศ. >= 2400 แปลงเป็น ค.ศ. ให้); รูปแบบอื่น (เช่น 1/11/2026 ที่ Excel แปลงเอง) = null เพราะวัน/เดือนกำกวม
+function importLaunchDate_(raw) {
+  const t = (raw === null || raw === undefined ? '' : raw).toString().trim();
+  if (!t) return '';
+  const m = /^([0-9]{4})[-/]([0-9]{1,2})[-/]([0-9]{1,2})$/.exec(t);
+  if (!m) return null;
+  let y = Number(m[1]);
+  if (y >= 2400) y -= 543;
+  const s = String(y) + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+  return bannerDateValid_(s) ? s : null;
+}
+function todayThai_() { return Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd"); }
+// เขียนแถวสินค้าใหม่ต่อท้ายชีต Products — บังคับคอลัมน์ Launch Date เป็นข้อความก่อน (กัน Sheets แปลงเป็น Date)
+function writeProductRows_(sheet, headers, newRows) {
+  const startRow = sheet.getLastRow() + 1;
+  const ldIdx = headers.indexOf(PRODUCT_LAUNCH_COL_);
+  if (ldIdx !== -1) sheet.getRange(startRow, ldIdx + 1, newRows.length, 1).setNumberFormat('@');
+  sheet.getRange(startRow, 1, newRows.length, headers.length).setValues(newRows);
+}
 function bannerDateValid_(s) {
   if (!BANNER_DATE_RE_.test(s)) return false;
   const p = s.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
@@ -964,7 +997,7 @@ function ensureProductSpecColumns_(ss) {
     let lastCol = sheet.getLastColumn();
     if (lastCol < 1) return;
     let headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
-    const missingCols = PRODUCT_SPEC_COLS_.filter(col => headers.indexOf(col) === -1);
+    const missingCols = PRODUCT_SPEC_COLS_.concat([PRODUCT_LAUNCH_COL_]).filter(col => headers.indexOf(col) === -1);
     let schemaChanged = false;
 
     if (missingCols.length > 0) {
@@ -977,6 +1010,10 @@ function ensureProductSpecColumns_(ss) {
       headers = headers.concat(missingCols);
       lastCol = headers.length;
       schemaChanged = true;
+      // คอลัมน์ Launch Date เป็นข้อความ yyyy-MM-dd: ตั้ง format @ ทั้งคอลัมน์ กัน Sheets แปลงเป็น Date เอง
+      if (missingCols.indexOf(PRODUCT_LAUNCH_COL_) !== -1 && sheet.getMaxRows() >= 2) {
+        sheet.getRange(2, headers.indexOf(PRODUCT_LAUNCH_COL_) + 1, sheet.getMaxRows() - 1, 1).setNumberFormat('@');
+      }
     }
 
     // ตรวจสอบแถวสินค้าที่มีอยู่ ถ้าคอลัมน์สเปคทั้ง 9 ช่องยังว่างเปล่าทั้งหมด (และไม่ใช่ของแถม) ให้เติมสเปคเริ่มต้นลงชีตทันที
@@ -1922,11 +1959,14 @@ function importProducts(payload, secureUser, ss) {
       if (!/^\d{1,9}$/.test(stockStr)) return fail('สต๊อกต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป');
       const status = get('Status') || 'เปิด';
       if (status !== 'เปิด' && status !== 'ปิด') return fail("สถานะต้องเป็น 'เปิด' หรือ 'ปิด'");
+      const launch = importLaunchDate_(get('Launch Date'));
+      if (launch === null) return fail('วันเปิดตัว (Launch Date) ไม่ถูกต้อง — ใช้รูปแบบ ปี-เดือน-วัน เช่น 2026-11-01 (ถ้าใช้ Excel ให้ตั้งคอลัมน์เป็นข้อความก่อนพิมพ์)');
 
       let shared = sharedByModel[model];
       if (shared) {
         const filePrice = num(get('Price'));
         if (get('Price') !== '' && !isNaN(filePrice) && filePrice !== Number(shared['Price'])) { warningCount = note(warnings, warningCount, { line: line, sku: sku, reason: 'ราคาในไฟล์ต่างจากรุ่น ' + model + ' ที่มีอยู่ — ใช้ราคาของรุ่นเดิม' }); }
+        if (launch !== '' && launch !== bannerDateStr_(shared['Launch Date'])) { warningCount = note(warnings, warningCount, { line: line, sku: sku, reason: 'วันเปิดตัวในไฟล์ต่างจากรุ่นเดิม — ใช้ค่าของรุ่นเดิม (' + (bannerDateStr_(shared['Launch Date']) || 'ไม่ระบุ') + ')' }); }
         const fileCap = get('Capacity');
         if (fileCap !== '' && fileCap !== (shared['Capacity'] || '').toString().trim()) { warningCount = note(warnings, warningCount, { line: line, sku: sku, reason: 'ความจุในไฟล์ต่างจากรุ่น ' + model + ' ที่มีอยู่ — ใช้ความจุของรุ่นเดิม' }); }
       } else {
@@ -1937,7 +1977,7 @@ function importProducts(payload, secureUser, ss) {
         if (!get('Category')) return fail('รุ่นใหม่ต้องระบุหมวด (Category)');
         let origPrice = '';
         if (get('Original Price') !== '') { origPrice = num(get('Original Price')); if (isNaN(origPrice) || origPrice < 0) return fail('ราคาก่อนลด (Original Price) ไม่ถูกต้อง'); }
-        shared = { 'Model': model, 'Price': price, 'Original Price': origPrice };
+        shared = { 'Model': model, 'Price': price, 'Original Price': origPrice, 'Launch Date': launch };
         PRODUCT_IMPORT_SHARED_FIELDS_.forEach(f => { if (f !== 'Price' && f !== 'Original Price') shared[f] = sanitizeSheetText_(get(f)); });
         if (!shared['Channel']) shared['Channel'] = 'ALL';
         if (!PRODUCT_SPEC_COLS_.some(c => (shared[c] || '').toString().trim() !== '')) {
@@ -1958,7 +1998,7 @@ function importProducts(payload, secureUser, ss) {
     if (!dryRun && outRows.length > 0) {
       const startRow = sheet.getLastRow() + 1;
       // SKU/Model เป็นข้อความเสมอ — ไม่ให้ Sheets ตีความรหัสตัวเลขยาวเป็นตัวเลข (ปัดเป็น 8.65E+13 / เสียความแม่นยำเกิน 15 หลัก)
-      [skuIdx, modelIdx].forEach(ci => sheet.getRange(startRow, ci + 1, outRows.length, 1).setNumberFormat('@'));
+      [skuIdx, modelIdx, headers.indexOf(PRODUCT_LAUNCH_COL_)].forEach(ci => { if (ci !== -1) sheet.getRange(startRow, ci + 1, outRows.length, 1).setNumberFormat('@'); });
       sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
       CacheService.getScriptCache().remove("TABLE_Products");
       logAudit(secureUser.Username, "IMPORT_PRODUCTS", "Imported " + outRows.length + " SKU(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
@@ -2558,6 +2598,10 @@ function saveProductGroup(payload, secureUser, ss) {
       PRODUCT_GROUP_FREE_TEXT_FIELDS_.forEach(f => { sharedForRows[f] = sanitizeSheetText_((sharedForRows[f] || '').toString().trim()); });
     }
 
+    // วันเปิดตัว: append เข้า Model เดิมคงค่าของแถวเดิม; สินค้าใหม่ใช้ค่าจากฟอร์ม ว่างให้ = วันนี้ (ขึ้นป้าย NEW อัตโนมัติ)
+    if (isAppend) sharedForRows[PRODUCT_LAUNCH_COL_] = bannerDateStr_(sharedForRows[PRODUCT_LAUNCH_COL_]);
+    else sharedForRows[PRODUCT_LAUNCH_COL_] = launchDateClean_(sharedForRows[PRODUCT_LAUNCH_COL_]) || todayThai_();
+
     // ราคาเป็นฟิลด์ร่วมของสินค้า (ทุก SKU ของสินค้าเดียวกันใช้ราคาเดียวกัน) — ตรวจครั้งเดียวจากค่าที่จะใช้จริง
     const sharedPrice = parseFloat(sharedForRows['Price']);
     if (isNaN(sharedPrice) || sharedPrice < 0) throw new Error("กรุณาระบุราคาให้ถูกต้อง");
@@ -2602,7 +2646,7 @@ function saveProductGroup(payload, secureUser, ss) {
       return headers.map(h => rowObj[h] !== undefined ? rowObj[h] : '');
     });
 
-    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, headers.length).setValues(newRows);
+    writeProductRows_(sheet, headers, newRows);
     CacheService.getScriptCache().remove("TABLE_Products");
     logAudit(secureUser.Username, isAppend ? "INSERT_PRODUCT_SKUS" : "INSERT_PRODUCT_GROUP",
       (isAppend ? "Added " + newRows.length + " SKU(s) to existing product: " : "Created product: ") + model + " (" + newRows.length + " SKUs)");
@@ -2667,6 +2711,15 @@ function updateProductGroup(payload, secureUser, ss) {
     const hasExisting = data.some((row, i) => i > 0 && (row[modelIdx] || '').toString().trim() === originalModel);
     if (!hasExisting) throw new Error("ไม่พบสินค้า Model \"" + originalModel + "\" ในระบบ (อาจถูกลบไปแล้ว กรุณารีเฟรชหน้า)");
 
+    // วันเปิดตัว: ฟอร์มส่งมา = ใช้ค่านั้น (ว่างได้ = ไม่ใช่สินค้าใหม่); ไม่ได้ส่งคีย์นี้มา (client เก่า) = คงค่าเดิมของสินค้า ไม่ให้ถูกล้าง
+    if (Object.prototype.hasOwnProperty.call(shared, PRODUCT_LAUNCH_COL_)) {
+      shared[PRODUCT_LAUNCH_COL_] = launchDateClean_(shared[PRODUCT_LAUNCH_COL_]);
+    } else {
+      const ldIdx0 = headers.indexOf(PRODUCT_LAUNCH_COL_);
+      const firstRow0 = data.find((row, i) => i > 0 && (row[modelIdx] || '').toString().trim() === originalModel);
+      shared[PRODUCT_LAUNCH_COL_] = (ldIdx0 !== -1 && firstRow0) ? bannerDateStr_(firstRow0[ldIdx0]) : '';
+    }
+
     // SKU ต้องไม่ซ้ำกับสินค้า "อื่น" ที่ไม่ใช่กลุ่มที่กำลังแก้ไข — แถวเดิมของกลุ่มนี้กำลังจะถูกลบแล้วเขียนใหม่อยู่แล้ว จึงชนกันเองไม่ได้ (อนุญาตให้คง SKU เดิมไว้ได้ตามปกติ)
     const otherSkus = {};
     for (let i = 1; i < data.length; i++) {
@@ -2703,7 +2756,7 @@ function updateProductGroup(payload, secureUser, ss) {
     for (let i = data.length - 1; i >= 1; i--) {
       if ((data[i][modelIdx] || '').toString().trim() === originalModel) sheet.deleteRow(i + 1);
     }
-    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, headers.length).setValues(newRows);
+    writeProductRows_(sheet, headers, newRows);
     CacheService.getScriptCache().remove("TABLE_Products");
     logAudit(secureUser.Username, "UPDATE_PRODUCT_GROUP", "Updated product: " + originalModel + " (" + newRows.length + " SKUs)");
 

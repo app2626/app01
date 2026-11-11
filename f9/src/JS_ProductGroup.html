@@ -21,6 +21,8 @@ window.app.productGroup = {
       document.getElementById('pgStatus').value = 'เปิด';
       document.getElementById('pgPrice').value = '';
       document.getElementById('pgOriginalPrice').value = '';
+      // สินค้าใหม่: วันเปิดตัวเริ่มต้น = วันนี้ (เวลาไทย) → ขึ้นป้าย NEW 30 วันบนหน้าร้าน; ล้างวันที่ได้ถ้าไม่ต้องการป้าย
+      { const ldEl = document.getElementById('pgLaunchDate'); if (ldEl) ldEl.value = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); }
       document.getElementById('pgImageUrl').value = '';
       ['pgDisplay', 'pgProcessor', 'pgRam', 'pgRearCamera', 'pgFrontCamera', 'pgBattery', 'pgOs', 'pgConnectivity', 'pgWarranty'].forEach(id => {
         const el = document.getElementById(id);
@@ -113,6 +115,7 @@ window.app.productGroup = {
       document.getElementById('pgStatus').value = first['Status'] || 'เปิด';
       document.getElementById('pgPrice').value = (first['Price'] || '').toString().replace(/,/g, '');
       document.getElementById('pgOriginalPrice').value = (first['Original Price'] || '').toString().replace(/,/g, '');
+      { const ldEl = document.getElementById('pgLaunchDate'); if (ldEl) ldEl.value = /^\d{4}-\d{2}-\d{2}$/.test(String(first['Launch Date'] || '').trim()) ? String(first['Launch Date']).trim() : ''; }
       const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
       setVal('pgDisplay', first['Display']);
       setVal('pgProcessor', first['Processor']);
@@ -198,6 +201,7 @@ window.app.productGroup = {
           document.getElementById('pgStatus').value = existingRow['Status'] || 'เปิด';
           document.getElementById('pgPrice').value = (existingRow['Price'] || '').toString().replace(/,/g, '');
           document.getElementById('pgOriginalPrice').value = (existingRow['Original Price'] || '').toString().replace(/,/g, '');
+          { const ldEl = document.getElementById('pgLaunchDate'); if (ldEl) ldEl.value = /^\d{4}-\d{2}-\d{2}$/.test(String(existingRow['Launch Date'] || '').trim()) ? String(existingRow['Launch Date']).trim() : ''; }
           document.getElementById('pgImageUrl').value = existingRow['Image URL'] || '';
           const setValAp = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
           setValAp('pgDisplay', existingRow['Display']);
@@ -315,6 +319,8 @@ window.app.productGroup = {
 
       const origPriceRaw = document.getElementById('pgOriginalPrice').value.trim();
       shared['Original Price'] = origPriceRaw === '' ? '' : Number(origPriceRaw);
+      const ldSend = document.getElementById('pgLaunchDate');
+      shared['Launch Date'] = ldSend ? String(ldSend.value || '').trim() : '';
 
       const checkedChannels = Array.from(document.querySelectorAll('.pgChannelChk:checked')).map(c => c.value);
       shared['Channel'] = checkedChannels.length ? checkedChannels.join(',') : 'ALL';
@@ -508,7 +514,7 @@ window.app.productGroup = {
     },
     // ===== นำเข้าสินค้าจากไฟล์ CSV (Admin) — เพิ่ม SKU ใหม่เท่านั้น ข้าม SKU ที่มีอยู่แล้ว =====
     // client แค่แปลงไฟล์เป็นแถว + แสดงตัวอย่าง (dryRun); ตัวตรวจจริงและการเขียนอยู่ที่ server (importProducts) เสมอ
-    IMPORT_HEADERS: ['SKU', 'Model', 'Marketing Model', 'Product Group', 'Capacity', 'Color', 'Image URL', 'Price', 'Original Price', 'Stock', 'Unit', 'Category', 'Status', 'Channel', 'Display', 'Processor', 'RAM', 'Rear Camera', 'Front Camera', 'Battery', 'OS', 'Connectivity', 'Warranty'],
+    IMPORT_HEADERS: ['SKU', 'Model', 'Marketing Model', 'Product Group', 'Capacity', 'Color', 'Image URL', 'Price', 'Original Price', 'Stock', 'Unit', 'Category', 'Status', 'Channel', 'Display', 'Processor', 'RAM', 'Rear Camera', 'Front Camera', 'Battery', 'OS', 'Connectivity', 'Warranty', 'Launch Date'],
     IMPORT_MAX_ROWS: 1000,
     IMPORT_MAX_BYTES: 2 * 1024 * 1024,
 
@@ -536,6 +542,7 @@ window.app.productGroup = {
       const escCell = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
       const example = ['SKU-EXAMPLE-BLK', 'Galaxy Example', 'Galaxy Example 5G', 'Galaxy', '256GB', 'Black', '', '29900', '32900', '10', 'เครื่อง', 'โมบาย', 'เปิด', 'ALL'];
       while (example.length < this.IMPORT_HEADERS.length) example.push('');
+      example[this.IMPORT_HEADERS.indexOf('Launch Date')] = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
       const csv = '﻿' + this.IMPORT_HEADERS.map(escCell).join(',') + '\r\n' + example.map(escCell).join(',') + '\r\n';
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
@@ -550,6 +557,7 @@ window.app.productGroup = {
       const esc = window.app.esc;
       const example = ['8650000000001', 'Galaxy Example', 'Galaxy Example 5G', 'Galaxy', '256GB', 'Black', '', '29900', '32900', '10', 'เครื่อง', 'โมบาย', 'เปิด', 'ALL'];
       while (example.length < this.IMPORT_HEADERS.length) example.push('');
+      example[this.IMPORT_HEADERS.indexOf('Launch Date')] = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
       const cell = (v) => '<td style="mso-number-format:\'\\@\'">' + esc(v) + '</td>';
       const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">'
         + '<style>td,col{mso-number-format:"\\@"}</style></head><body><table>'
@@ -571,6 +579,7 @@ window.app.productGroup = {
           + '<ul class="list-disc pl-5">'
           + '<li>เพิ่มเฉพาะ <b>SKU ใหม่</b> — SKU ที่มีอยู่แล้วจะถูกข้ามและรายงาน ไม่เขียนทับข้อมูลเดิม</li>'
           + '<li>รุ่นใหม่ต้องมี Model, Marketing Model, ความจุ, ราคา, หมวด (Category) และสต๊อก</li>'
+          + '<li><b>Launch Date</b> (วันเปิดตัว) ไม่บังคับ — รูปแบบ <b>ปี-เดือน-วัน</b> เช่น 2026-11-01 ใช้ติดป้าย NEW 30 วัน เว้นว่าง = ไม่ติดป้าย (ปี พ.ศ. ระบบแปลงให้)</li>'
           + '<li>ไม่ต้องกรอก Product Name — ระบบสร้างจาก Model + Color ให้</li>'
           + '<li>รหัสตัวเลขยาว (SKU/บาร์โค้ด) ต้องตั้งคอลัมน์เป็น <b>ข้อความ (Text)</b> ก่อนวาง ไม่เช่นนั้น Excel จะแปลงเป็น 8.65E+13 และข้อมูลเสียถาวร — Excel: เลือกคอลัมน์ → Ctrl+1 → Text · Google Sheets: Format → Number → Plain text · หรือ <a href="#" class="underline font-bold text-indigo-600" onclick="window.app.productGroup.downloadImportTemplateXls();return false;">ดาวน์โหลดไฟล์ Excel ที่ตั้งเป็นข้อความไว้แล้ว</a></li>'
           + '<li>ครั้งละไม่เกิน ' + this.IMPORT_MAX_ROWS + ' แถว และจะแสดงตัวอย่างผลให้ตรวจก่อนบันทึกจริง</li>'

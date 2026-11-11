@@ -99,6 +99,19 @@ t('UPDATE_PRODUCT_GROUP edits price, keeps model', () => { const r = api('UPDATE
 t('UPDATE_PRODUCT_GROUP rename Model rejected', () => eq(api('UPDATE_PRODUCT_GROUP', { originalModel: 'Galaxy Z Flip8', shared: Object.assign({}, flipShared, { Model: 'Renamed' }), variants: [{ sku: 'ZF8-BLK', color: 'Black', stock: 8 }] }, admin).status, 'error'));
 t('UPDATE_PRODUCT_GROUP with a blank Category is rejected and the stored category is kept', () => { const r = api('UPDATE_PRODUCT_GROUP', { originalModel: 'Galaxy Z Flip8', shared: Object.assign({}, flipShared, { Price: 34900, Category: '' }), variants: [{ sku: 'ZF8-BLK', color: 'Black', stock: 8 }, { sku: 'ZF8-BLU', color: 'Blue', stock: 2 }] }, admin); eq(r.status, 'error', JSON.stringify(r)); ok(tbl('Products').filter(x => x.Model === 'Galaxy Z Flip8').every(x => x.Category === 'โมบาย')); });
 t('SAVE_PRODUCT_GROUP new model needs a Category; a tablet category is stored as-is', () => { const base = { Model: 'Tab Reg1', 'Marketing Model': 'Brand Tab Reg1', 'Product Group': 'Tab', Capacity: '128GB', Price: 9900, Status: 'เปิด', Channel: 'ALL', Unit: 'เครื่อง', 'Image URL': '' }; eq(api('SAVE_PRODUCT_GROUP', { shared: Object.assign({}, base, { Category: '' }), variants: [{ sku: 'TABR-1', color: 'Gray', stock: 3 }] }, admin).status, 'error'); eq(api('SAVE_PRODUCT_GROUP', { shared: Object.assign({}, base, { Category: 'แท็บเล็ต' }), variants: [{ sku: 'TABR-1', color: 'Gray', stock: 3 }] }, admin).status, 'success'); eq(tbl('Products').find(x => x.SKU === 'TABR-1').Category, 'แท็บเล็ต'); eq(api('DELETE_RECORD', { tableName: 'Products', idField: 'SKU', idValue: 'TABR-1' }, admin).status, 'success'); });
+// ---- Launch Date (ป้าย NEW / ชั้นสินค้าใหม่)
+t('Products header has Launch Date column', () => ok(sheets.Products.rows[0].includes('Launch Date')));
+t('SAVE_PRODUCT_GROUP new model without Launch Date is stamped today (Thai time)', () => { const r = api('SAVE_PRODUCT_GROUP', { shared: Object.assign({}, flipShared, { Model: 'LD-Auto', 'Marketing Model': 'Brand LD-Auto' }), variants: [{ sku: 'LD-A1', color: 'Black', stock: 5 }] }, admin); eq(r.status, 'success', JSON.stringify(r)); const p = tbl('Products').find(x => x.SKU === 'LD-A1'); eq(p['Launch Date'], ctx.todayThai_()); ok(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(p["Launch Date"])); });
+t('SAVE_PRODUCT_GROUP keeps an explicit Launch Date', () => { api('SAVE_PRODUCT_GROUP', { shared: Object.assign({}, flipShared, { Model: 'LD-Set', 'Marketing Model': 'Brand LD-Set', 'Launch Date': '2026-01-15' }), variants: [{ sku: 'LD-S1', color: 'Black', stock: 5 }] }, admin); eq(tbl('Products').find(x => x.SKU === 'LD-S1')['Launch Date'], '2026-01-15'); });
+t('SAVE_PRODUCT_GROUP rejects a malformed / impossible Launch Date', () => { ['15/01/2026', 'yesterday', '2026-02-30'].forEach((d, i) => eq(api('SAVE_PRODUCT_GROUP', { shared: Object.assign({}, flipShared, { Model: 'LD-Bad' + i, 'Marketing Model': 'Brand LD-Bad' + i, 'Launch Date': d }), variants: [{ sku: 'LD-B' + i, color: 'c', stock: 1 }] }, admin).status, 'error', d)); });
+t('UPDATE_PRODUCT_GROUP changes Launch Date; a blank value clears it; an omitted key keeps it', () => {
+  const up = (sh) => api('UPDATE_PRODUCT_GROUP', { originalModel: 'LD-Set', shared: Object.assign({}, flipShared, { Model: 'LD-Set', 'Marketing Model': 'Brand LD-Set' }, sh), variants: [{ sku: 'LD-S1', color: 'Black', stock: 5 }] }, admin);
+  const ld = () => tbl('Products').find(x => x.SKU === 'LD-S1')['Launch Date'];
+  eq(up({ 'Launch Date': '2026-03-01' }).status, 'success'); eq(ld(), '2026-03-01');
+  eq(up({}).status, 'success'); eq(ld(), '2026-03-01', 'omitted key must keep the stored date');
+  eq(up({ 'Launch Date': '' }).status, 'success'); eq(ld(), '');
+});
+t('GET_ALL_DATA exposes Launch Date to the storefront', () => { const g = unwrap(api('GET_ALL_DATA', {}, sales)); ok(g.products.some(p => p.SKU === 'LD-A1' && p['Launch Date'] === ctx.todayThai_())); });
 console.log('== CHECKOUT');
 const FSTAT = 'จอง F (สวมสิทธิ์การจอง)', TSTAT = 'จอง T (มีการจอง)';
 const cartFor = (qty, sku) => [{ SKU: sku || 'SKU-S24U', 'Product Name': 'Samsung Galaxy S24 Ultra', qty, Price: 46900, brandGifts: [], channelGifts: [] }];
@@ -261,6 +274,31 @@ t('popular: ranks models by booked qty, windows widen 7→30d, ignores cancelled
   } finally {
     sheets.Products.rows.length = pRows; sheets.Orders.rows.length = 1; sheets.Orders.rows.push(...savedOrders); clear();
   }
+});
+// ----- IMPORT_PRODUCTS: คอลัมน์ Launch Date -----
+t('import: Launch Date column - kept as yyyy-MM-dd text, Buddhist-year/slash forms normalised, ambiguous or impossible dates reject only that row, blank allowed, existing model keeps its date with a warning', () => {
+  const base = { Model: 'IMP-LD', 'Marketing Model': 'Import LD', Capacity: '128GB', Price: '9,900', Category: 'โมบาย', Stock: '2' };
+  const mk = (sku, model, ld) => { const o = { SKU: sku, Model: model, 'Marketing Model': 'Import ' + model, Capacity: '128GB', Price: '1', Category: 'โมบาย', Stock: '1' }; if (ld !== undefined) o['Launch Date'] = ld; return o; };
+  const rows = [
+    Object.assign({}, base, { SKU: 'LD-I1', Color: 'Black', 'Launch Date': '2026-11-01' }),
+    Object.assign({}, base, { SKU: 'LD-I2', Color: 'White', 'Launch Date': '2026-12-25' }),
+    mk('LD-I3', 'IMP-LD2', '2569/3/5'),
+    mk('LD-I4', 'IMP-LD3'),
+    mk('LD-I5', 'IMP-LD4', '1/11/2026'),
+    mk('LD-I6', 'IMP-LD5', '2026-02-30'),
+    mk('LD-I7', 'IMP-LD6', 'พรุ่งนี้')
+  ];
+  const before = sheets.Products.rows.length;
+  const dry = unwrap(api('IMPORT_PRODUCTS', { rows: rows, dryRun: true }, admin));
+  eq(dry.created, 4, JSON.stringify(dry)); eq(dry.errorCount, 3, JSON.stringify(dry.errors));
+  ok(dry.warnings.some(w => w.sku === 'LD-I2' && /2026-11-01/.test(w.reason)), JSON.stringify(dry.warnings));
+  eq(sheets.Products.rows.length, before, 'dryRun must not write');
+  const real = unwrap(api('IMPORT_PRODUCTS', { rows: rows, dryRun: false }, admin));
+  eq(real.created, 4);
+  const ld = sku => tbl('Products').find(x => x.SKU === sku);
+  eq(ld('LD-I1')['Launch Date'], '2026-11-01'); eq(ld('LD-I2')['Launch Date'], '2026-11-01', 'same model keeps the first date');
+  eq(ld('LD-I3')['Launch Date'], '2026-03-05', 'Buddhist year converted'); eq(ld('LD-I4')['Launch Date'], '');
+  ok(!ld('LD-I5') && !ld('LD-I6') && !ld('LD-I7'), 'rows with a bad date must not be imported');
 });
 // ----- IMPORT_PRODUCTS (นำเข้า CSV) -----
 t('import: Admin only; dryRun never writes; real run adds only new valid SKUs; reports skipped/rejected', () => {

@@ -1486,23 +1486,8 @@
   #desktopSidebar { box-shadow: 1px 0 0 rgba(15, 42, 67, 0.04), 12px 0 32px -24px rgba(15, 42, 67, 0.25); }
 
   /* ---------- การ์ดสินค้าหน้าร้าน ---------- */
-  .pos-storefront .pos-card {
-    border-radius: 18px;
-    border: 1px solid #e8edf3;
-    box-shadow: 0 1px 2px rgba(15, 42, 67, 0.04), 0 8px 20px -14px rgba(15, 42, 67, 0.18);
-    animation: sfCardIn 0.45s var(--ease-out) both;
-  }
-  .pos-storefront .pos-card:hover {
-    transform: translateY(-5px);
-    border-color: rgba(255, 107, 0, 0.55);
-    box-shadow: 0 22px 36px -16px rgba(15, 42, 67, 0.28), 0 0 0 1px rgba(255, 107, 0, 0.35);
-  }
-  .pos-storefront .pos-card > div:first-of-type + div,
-  .pos-storefront .pos-card .relative.flex.items-center.justify-center {
-    background: radial-gradient(120% 90% at 50% 0%, #ffffff 0%, #f3f6fa 100%);
-  }
-  .pos-storefront .pos-card:hover img { transform: scale(1.05); }
-  .pos-storefront .pos-card img { transition: transform 0.45s var(--ease-out); }
+  /* รูปแบบการ์ด (พื้น/ขอบ/hover/ปุ่มจอง) ย้ายไปอยู่ที่บล็อก "PREMIUM STOREFRONT" ท้ายไฟล์ — ตรงนี้เหลือเฉพาะจังหวะเข้าแบบไล่ลำดับ */
+  .pos-storefront .pos-card { animation: sfCardIn 0.45s var(--ease-out) both; }
   .pos-storefront .pos-card:nth-child(2) { animation-delay: 40ms; }
   .pos-storefront .pos-card:nth-child(3) { animation-delay: 80ms; }
   .pos-storefront .pos-card:nth-child(4) { animation-delay: 120ms; }
@@ -1510,12 +1495,6 @@
   .pos-storefront .pos-card:nth-child(6) { animation-delay: 200ms; }
   .pos-storefront .pos-card:nth-child(n+7) { animation-delay: 240ms; }
   @keyframes sfCardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-
-  /* ปุ่มหลักในการ์ด (จองด่วน): ส้มไล่เฉด มีมิติ */
-  .pos-storefront .pos-card .bnn-buy-btn:not(:disabled) {
-    background: linear-gradient(180deg, #ff8333 0%, #ff6b00 100%);
-    box-shadow: 0 10px 18px -10px rgba(255, 107, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  }
 
   @media (prefers-reduced-motion: reduce) {
     .pos-storefront .pos-card { animation: none; }
@@ -1525,8 +1504,6 @@
 
   /* ---------- โหมดมืด: คู่กับกฎด้านบน ---------- */
   html.dark .login-chips span { background: #1e293b; border-color: #334155; color: #cbd5e1; }
-  html.dark .pos-storefront .pos-card { border-color: #2b3a4f; box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 24px -14px rgba(0,0,0,0.6); }
-  html.dark .pos-storefront .pos-card .relative.flex.items-center.justify-center { background: radial-gradient(120% 90% at 50% 0%, #243449 0%, #182436 100%); }
   /* โลโก้เริ่มต้นทุกตำแหน่งใช้โทนเดียวกัน */
   #mobileLogoBox:not(:has(.app-logo-img)), #footerLogoBox:not(:has(.app-logo-img)) {
     background: linear-gradient(145deg, #1f4466 0%, #0f2a43 100%) !important;
@@ -1682,9 +1659,6 @@
   html.sf-site .pf-trust li { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); color: #e2e8f0; }
   html.sf-site .pf-bottom { border-top-color: rgba(255,255,255,.1); color: #94a3b8; }
 
-  html.sf-site .pos-storefront .pos-card:hover { transform: translateY(-2px); border-color: #cbd5e1; box-shadow: 0 14px 28px -16px rgba(15, 42, 67, 0.3); }
-  html.sf-site .pos-storefront .pos-card .bnn-buy-btn:not(:disabled) { background: #FF6B00; border-color: #FF6B00; color: #fff; box-shadow: none; }
-  html.sf-site .pos-storefront .pos-card .bnn-buy-btn:not(:disabled):hover { background: #E05300; border-color: #E05300; color: #fff; transform: none; }
 
   /* ===== เว็บไซต์มาตรฐาน รอบ 3: หัวหน้าต่าง (dialog) แบบร้านค้า — พื้นขาว ชื่อสีเข้ม ปุ่มปิดเทา; ปุ่มรอง .sf-btn-2 แบบเส้นขอบ =====
      ใช้กับหน้าต่างของหน้าร้านทั้งหมด (เลือกสเปค, ตะกร้า, รายการโปรด, เทียบสเปค, เทรดอิน, ใบเสนอราคา, ติดตามใบจอง, ข้อมูลลูกค้า) */
@@ -1747,4 +1721,602 @@
 
   /* KPI แดชบอร์ด 7 ช่องต่อแถว (xl) — ลด padding ข้างให้ตัวเลขมีที่มากขึ้น (ตัวเลขย่อฟอนต์เองผ่าน dashboard.fitKpis) */
   @media (min-width: 1280px) { .dash-kpis > div { padding-left: 10px; padding-right: 10px; } }
+
+  /* ===================================================
+     PREMIUM STOREFRONT — หน้าร้าน (#pos, html.sf-site) โทนเรียบหรู
+     หลักการ: พื้นขาว + ตัวหนังสือสีหมึก, สีส้มใช้เฉพาะจุดที่ต้องการให้กด (ปุ่มหลักในหน้าต่าง/ตัวนับ/เส้นใต้เมนู),
+     การ์ดสินค้าไม่มีกรอบ — ใช้ "แท่นรูป" สีเทาอ่อนแทน, เว้นระยะมากขึ้น, ป้ายต่างๆ เป็นสีกลาง
+     สีทั้งหมดอ้างตัวแปร --pm-* (มีค่าคู่สำหรับโหมดมืดด้านล่าง) — เพิ่มของใหม่ให้ใช้ตัวแปร ไม่ใส่ hex ตรงๆ
+     =================================================== */
+  html.sf-site {
+    --pm-bg: #ffffff; --pm-well: #f5f5f7; --pm-well-2: #ededf0;
+    --pm-ink: #111318; --pm-ink-2: #454b57; --pm-mute: #868c98; --pm-line: #e8e9ed;
+    --pm-accent: #FF6B00; --pm-accent-ink: #c2410c;
+    --pm-btn: #111318; --pm-btn-fg: #ffffff;
+    --pm-ok: #15803d; --pm-low: #c2410c;
+    --sf-line: var(--pm-line);
+  }
+  html.sf-site.dark {
+    --pm-bg: #1e293b; --pm-well: #273549; --pm-well-2: #31425a;
+    --pm-ink: #f1f5f9; --pm-ink-2: #cbd5e1; --pm-mute: #94a3b8; --pm-line: #3a4a61;
+    --pm-accent-ink: #ff9a52;
+    --pm-btn: #f1f5f9; --pm-btn-fg: #0f172a;
+    --pm-ok: #4ade80; --pm-low: #fb923c;
+  }
+  html.sf-site:not(.dark) body { background: var(--pm-bg); }
+
+  /* ฟอนต์หน้าร้าน: IBM Plex Sans Thai (มีทั้งไทยและละติน หัวตัวอักษรไทยชัด อ่านง่ายกว่า fallback ของ Roboto) — เฉพาะ html.sf-site
+     ระวัง: ถ้าโหลดฟอนต์ไม่ได้ จะตกไป Roboto/Tahoma ตามลำดับเดิม; น้ำหนัก 800/900 ของ Tailwind (font-black/extrabold) ไม่มีในฟอนต์นี้ เบราว์เซอร์จะใช้ 700 */
+  html.sf-site body, html.sf-site .swal2-popup, html.sf-site .swal2-popup * {
+    font-family: 'IBM Plex Sans Thai', Roboto, 'Helvetica Neue', Helvetica, Tahoma, Arial, sans-serif !important;
+  }
+  html.sf-site .fas, html.sf-site .far, html.sf-site .fa-solid, html.sf-site .fa-regular { font-family: 'Font Awesome 6 Free' !important; }
+  html.sf-site .fab, html.sf-site .fa-brands { font-family: 'Font Awesome 6 Brands' !important; }
+  /* ภาษาไทยมีวรรณยุกต์/สระบน-ล่าง ต้องการระยะบรรทัดมากกว่าละติน และไม่ควรบีบตัวอักษร */
+  html.sf-site body { line-height: 1.6; }
+  html.sf-site .pm-sec-title, html.sf-site .pos-storefront .sf-h1, html.sf-site #addToCartModal #modalProdName,
+  html.sf-site #addToCartModal #modalProdPrice, html.sf-site .sf-brand-name, html.sf-site .pm-price { letter-spacing: 0; }
+  html.sf-site .pos-storefront .pm-name { line-height: 1.5; letter-spacing: 0; }
+  html.sf-site .pos-storefront .sf-h1 { line-height: 1.3; font-weight: 700; }
+  html.sf-site .pm-sec-title { line-height: 1.35; font-weight: 600; }
+  html.sf-site .pm-hero-title { line-height: 1.35; letter-spacing: 0; }
+  html.sf-site .tabular-nums, html.sf-site .pm-price { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Header ---------- */
+  html.sf-site .sf-topbar { height: 36px; font-weight: 500; letter-spacing: .01em; }
+  html.sf-site .pos-store-header { padding-top: 16px; }
+  html.sf-site .pos-store-row { gap: 12px; }
+  html.sf-site .sf-logo { background: var(--pm-btn); color: var(--pm-btn-fg); border-radius: 12px; }
+  html.sf-site .sf-brand-name { font-weight: 800; font-size: 19px; letter-spacing: -.02em; color: var(--pm-ink); }
+  html.sf-site .pos-search { height: 44px; border: 1px solid transparent; background: var(--pm-well); font-weight: 500; color: var(--pm-ink); }
+  html.sf-site .pos-search::placeholder { color: var(--pm-mute); font-weight: 400; }
+  html.sf-site .pos-search:hover { background: var(--pm-well-2); }
+  html.sf-site .pos-search:focus { background: var(--pm-bg); border-color: var(--pm-ink); box-shadow: 0 0 0 4px rgba(17, 19, 24, .06); }
+  html.sf-site .pos-search-ico { color: var(--pm-mute); }
+  html.sf-site .sf-icon-btn { color: var(--pm-ink); font-weight: 600; height: 44px; }
+  html.sf-site .sf-icon-btn:hover, html.sf-site .sf-icon-btn[aria-expanded="true"] { background: var(--pm-well); }
+  html.sf-site .sf-badge { background: var(--pm-ink); color: var(--pm-bg); font-weight: 700; }
+  html.sf-site .pos-cart-btn { height: 44px; padding: 0 18px; background: var(--pm-btn); color: var(--pm-btn-fg); border: 0; font-weight: 600; }
+  html.sf-site .pos-cart-btn:hover { background: var(--pm-accent); color: #fff; }
+  html.sf-site .pos-cart-lbl { color: inherit; }
+  html.sf-site .pos-cart-count { background: var(--pm-accent); color: #fff; font-weight: 700; min-width: 20px; height: 20px; }
+  html.sf-site .pos-cart-btn:hover .pos-cart-count { background: #fff; color: var(--pm-accent-ink); }
+  html.sf-site .sf-nav-a { font-weight: 500; font-size: 14px; color: var(--pm-ink-2); border-radius: 8px; }
+  html.sf-site .sf-nav-a i { color: var(--pm-mute); }
+  html.sf-site .sf-nav-a:hover { background: transparent; color: var(--pm-ink); }
+  html.sf-site .sf-nav-a.on { color: var(--pm-ink); font-weight: 700; }
+  html.sf-site .sf-nav-a.on::after { background: var(--pm-accent); bottom: 0; }
+  html.sf-site .pos-where-chip { background: transparent; border-color: var(--pm-line); color: var(--pm-mute); height: 38px; }
+  html.sf-site .pos-where-chip select { font-weight: 600; color: var(--pm-ink); }
+  html.sf-site .pos-where-chip:hover { border-color: var(--pm-mute); }
+  html.sf-site .pos-where-chip:focus-within { border-color: var(--pm-ink); box-shadow: 0 0 0 4px rgba(17, 19, 24, .06); }
+  html.sf-site .sf-acct-pop { border-color: var(--pm-line); border-radius: 18px; box-shadow: 0 24px 48px -16px rgba(15, 23, 42, .28); }
+  html.sf-site .sf-acct-head small { color: var(--pm-mute); }
+
+  /* ---------- แถบแคมเปญ Pre Booking: กรมท่าเรียบ ไม่มีลายเฉียง/ป้ายเอียง ---------- */
+  html.sf-site #posTimerBanner { background: radial-gradient(520px 160px at 12% 0%, rgba(255, 107, 0, .16), transparent 70%), var(--sf-top); border: 0; border-radius: 18px; box-shadow: none; padding: 14px 20px; margin-bottom: 16px; }
+  html.sf-site #posTimerBanner::before, html.sf-site #posTimerBanner::after { display: none; }
+  html.sf-site .bnn-flash-emblem { transform: none; background: transparent; box-shadow: none; border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; padding: 6px 14px; }
+  html.sf-site .bnn-flash-emblem > * { transform: none; }
+  html.sf-site .bnn-flash-emblem i { color: var(--pm-accent) !important; animation: none; }
+  html.sf-site .bnn-flash-emblem span { font-weight: 700; letter-spacing: .12em; font-size: 11px; }
+  html.sf-site #posCampaignTitleText { color: #ffb37a; font-weight: 600; letter-spacing: .08em; }
+  html.sf-site #posTimerPeriodText { font-weight: 500; color: #cbd5e1; }
+  html.sf-site #posTimerBadge { color: #94a3b8 !important; font-weight: 600; letter-spacing: .1em; }
+  html.sf-site .bnn-timer-box { background: rgba(255, 255, 255, .08); color: #fff; border-bottom: 0; box-shadow: none; min-width: 40px; padding: 4px 8px; border-radius: 10px; }
+  html.sf-site .bnn-timer-box span:first-child { font-size: 15px; font-weight: 700; }
+  html.sf-site .bnn-timer-box span + span { color: #94a3b8 !important; font-weight: 500; font-size: 9px; margin-top: 0; }
+  html.sf-site .bnn-timer-box.bnn-timer-sec { background: rgba(255, 107, 0, .9); }
+  html.sf-site .bnn-timer-box.bnn-timer-sec span + span { color: #ffe3cf !important; }
+
+  /* ---------- แบนเนอร์หลัก ---------- */
+  html.sf-site #posEcomHeroZone { margin-bottom: 28px; }
+  html.sf-site #posEcomHeroZone > * + * { margin-top: 28px; }
+  html.sf-site #posHeroBannerWrap { border: 0; border-radius: 22px; box-shadow: none; background: var(--pm-well); }
+  @media (min-width: 768px) { html.sf-site #posHeroBannerWrap { height: 220px; } }
+  @media (min-width: 1280px) { html.sf-site #posHeroBannerWrap { height: 280px; } }
+  @media (min-width: 1536px) { html.sf-site #posHeroBannerWrap { height: 320px; } }
+  .pm-hero-cap { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 48px 20px 30px; background: linear-gradient(to top, rgba(8, 12, 20, .72), rgba(8, 12, 20, .28) 55%, transparent); }
+  .pm-hero-title { color: #fff; font-weight: 700; font-size: 16px; line-height: 1.25; letter-spacing: -.01em; text-wrap: balance; }
+  .pm-hero-sub { color: rgba(255, 255, 255, .82); font-size: 12px; margin-top: 3px; }
+  .pm-hero-cta { flex-shrink: 0; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: #fff; color: #111318; font-size: 12px; font-weight: 600; }
+  .pm-hero-cta i { font-size: 10px; }
+  .pm-hdot { width: 6px; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .55); transition: width .3s var(--ease-out), background .2s; }
+  .pm-hdot:hover { background: #fff; }
+  .pm-hdot.on { width: 22px; background: #fff; }
+  html.sf-site #posHeroDots { bottom: 14px; gap: 6px; }
+  @media (min-width: 768px) { .pm-hero-cap { padding: 64px 32px 36px; } .pm-hero-title { font-size: 24px; } .pm-hero-sub { font-size: 14px; } .pm-hero-cta { padding: 10px 20px; font-size: 13px; } }
+
+  /* ---------- หัวข้อแต่ละชั้น (คูปอง / ข่าวสาร / ยอดนิยม) ---------- */
+  .pm-sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .pm-sec-title { font-size: 18px; font-weight: 700; letter-spacing: -.02em; color: var(--pm-ink, #111318); line-height: 1.2; }
+  .pm-sec-sub { font-size: 12.5px; color: var(--pm-mute, #868c98); }
+  @media (min-width: 768px) { .pm-sec-title { font-size: 22px; } }
+  html.sf-site #posNews, html.sf-site #posPopular { margin-bottom: 32px; }
+
+  /* คูปอง */
+  .pm-vouchers > .flex { gap: 12px; padding-bottom: 4px; }
+  html.sf-site .bnn-voucher-card { background: var(--pm-bg); border: 1px solid var(--pm-line); border-left-width: 1px; border-radius: 16px; padding: 14px 14px 14px 16px; width: 250px; }
+  html.sf-site .bnn-voucher-card:hover { border-color: var(--pm-ink); transform: none; box-shadow: none; }
+  html.sf-site .bnn-voucher-card.applied { background: var(--pm-well); border-color: var(--pm-ink); }
+  .pm-v-val { font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--pm-ink); line-height: 1.2; }
+  .pm-v-name { font-size: 12px; font-weight: 500; color: var(--pm-ink-2); margin-top: 3px; }
+  .pm-v-note { font-size: 11px; color: var(--pm-mute); margin-top: 2px; }
+  .pm-v-btn { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--pm-line); background: transparent; color: var(--pm-ink); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .bnn-voucher-card:hover .pm-v-btn { border-color: var(--pm-ink); }
+  .pm-v-btn.on { background: var(--pm-btn); border-color: var(--pm-btn); color: var(--pm-btn-fg); }
+
+  /* ดูล่าสุด */
+  html.sf-site #posRecentlyViewed { margin-bottom: 24px; }
+  .pm-recent { padding: 2px 0 6px; gap: 10px; }
+  .pm-recent-lb { font-size: 12px; font-weight: 600; color: var(--pm-mute); margin-right: 4px; }
+  .pm-recent-item { padding: 6px 12px 6px 6px; border-radius: 12px; background: var(--pm-well); transition: background .18s; }
+  .pm-recent-item:hover { background: var(--pm-well-2); }
+  .pm-recent-item img { width: 32px; height: 32px; border-radius: 8px; }
+  .pm-recent-item .text-slate-800 { font-size: 11.5px; font-weight: 600; }
+  .pm-recent-pr { font-size: 11px; font-weight: 500; color: var(--pm-mute); line-height: 1.3; }
+
+  /* ข่าวสาร / ยอดนิยม */
+  html.sf-site .sf-news-row, html.sf-site .sf-pop-row { gap: 16px; padding: 2px 0 10px; }
+  html.sf-site .sf-news-card { flex-basis: 260px; border: 0; border-radius: 0; background: transparent; gap: 6px; padding: 0; overflow: visible; }
+  html.sf-site .sf-news-card:hover { box-shadow: none; transform: none; }
+  html.sf-site .sf-news-img { border-radius: 16px; background: var(--pm-well); margin-bottom: 6px; }
+  html.sf-site .sf-news-img img { transition: transform .5s var(--ease-out); }
+  html.sf-site .sf-news-card:hover .sf-news-img img { transform: scale(1.04); }
+  html.sf-site .sf-news-cat { margin: 0; font-size: 11px; font-weight: 600; color: var(--pm-mute); letter-spacing: .04em; }
+  html.sf-site .sf-news-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--pm-ink); line-height: 1.4; }
+  html.sf-site .sf-news-card:hover .sf-news-title { text-decoration: underline; text-underline-offset: 3px; }
+  html.sf-site .sf-pop-card { flex-basis: 168px; border: 0; background: var(--pm-well); border-radius: 18px; padding: 18px 12px 14px; gap: 6px; }
+  html.sf-site .sf-pop-card:hover { background: var(--pm-well-2); box-shadow: none; transform: none; }
+  html.sf-site .sf-pop-card img { width: 96px; height: 96px; transition: transform .45s var(--ease-out); }
+  html.sf-site .sf-pop-card:hover img { transform: scale(1.05); }
+  html.sf-site .sf-pop-rank { top: 10px; left: 10px; background: transparent; color: var(--pm-mute); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  html.sf-site .sf-pop-rank.top { background: transparent; color: var(--pm-accent-ink); }
+  html.sf-site .sf-pop-name { font-size: 12.5px; font-weight: 600; color: var(--pm-ink); }
+  html.sf-site .sf-pop-price { font-size: 12.5px; font-weight: 500; color: var(--pm-ink-2); }
+
+  /* ---------- ตัวกรองด้านซ้าย ---------- */
+  html.sf-site .pos-storefront .sf-panel { border: 0; background: transparent; padding: 0 4px 0 0; border-radius: 0; }
+  html.sf-site .pos-storefront .sf-title { font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--pm-ink); margin-bottom: 6px; }
+  html.sf-site .pos-storefront .sf-title i { color: var(--pm-mute); }
+  html.sf-site .pos-storefront .sf-switch { font-size: 13px; font-weight: 500; color: var(--pm-ink-2); padding: 10px 0 14px; border-color: var(--pm-line); }
+  html.sf-site .pos-storefront .sf-switch.on .sf-knob { background: var(--pm-btn); }
+  html.sf-site .pos-storefront .sf-switch.on .sf-knob::after { background: var(--pm-btn-fg); }
+  html.sf-site .pos-storefront .sf-group { border-color: var(--pm-line); padding: 6px 0; }
+  html.sf-site .pos-storefront .sf-group summary { font-size: 13.5px; font-weight: 600; color: var(--pm-ink); padding: 10px 0; }
+  html.sf-site .pos-storefront .sf-opt { font-size: 13px; padding: 6px 0; font-weight: 400; color: var(--pm-ink-2); }
+  html.sf-site .pos-storefront .sf-opt:hover { color: var(--pm-ink); }
+  html.sf-site .pos-storefront .sf-opt.on { color: var(--pm-ink); font-weight: 600; }
+  html.sf-site .pos-storefront .sf-box { border-radius: 5px; border-color: #c4c8d0; background: transparent; color: var(--pm-btn-fg); }
+  html.sf-site .pos-storefront .sf-opt:hover .sf-box { border-color: var(--pm-ink); }
+  html.sf-site .pos-storefront .sf-opt.on .sf-box { background: var(--pm-btn); border-color: var(--pm-btn); }
+  html.sf-site .pos-storefront .sf-price input { border-color: var(--pm-line); border-radius: 10px; padding: 8px 10px; background: var(--pm-bg); color: var(--pm-ink); }
+  html.sf-site .pos-storefront .sf-price input:focus { border-color: var(--pm-ink); box-shadow: 0 0 0 3px rgba(17, 19, 24, .06); }
+  html.sf-site .pos-storefront .sf-price-go { background: var(--pm-btn); color: var(--pm-btn-fg); border-radius: 10px; padding: 8px 12px; font-weight: 600; }
+  html.sf-site .pos-storefront .sf-clear { border: 0; background: transparent; color: var(--pm-ink-2); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-align: left; padding: 10px 0; }
+  html.sf-site .pos-storefront .sf-clear:disabled { text-decoration: none; color: var(--pm-mute); }
+  html.sf-site .pos-storefront .sf-clear:not(:disabled):hover { background: transparent; color: var(--pm-ink); }
+  @media (max-width: 1023px) { html.sf-site .pos-storefront .sf-panel { padding: 16px; border: 1px solid var(--pm-line); border-radius: 18px; } }
+
+  /* ---------- หัวรายการสินค้า ---------- */
+  html.sf-site .pos-storefront .sf-crumb { font-size: 12px; color: var(--pm-mute); margin-bottom: 10px; }
+  html.sf-site .pos-storefront .sf-crumb .cur { color: var(--pm-ink-2); font-weight: 500; }
+  html.sf-site .pos-storefront .sf-head { gap: 12px; margin-bottom: 4px; }
+  html.sf-site .pos-storefront .sf-h1 { font-size: 26px; font-weight: 800; letter-spacing: -.025em; color: var(--pm-ink); }
+  @media (min-width: 1024px) { html.sf-site .pos-storefront .sf-h1 { font-size: 32px; } }
+  html.sf-site .pos-storefront .sf-count { font-size: 13px; font-weight: 400; color: var(--pm-mute); }
+  html.sf-site .pos-storefront .sf-sortbar { border-color: var(--pm-line); padding: 6px 0 14px; margin-bottom: 24px; }
+  html.sf-site .pos-storefront .sf-sort { font-weight: 400; color: var(--pm-mute); font-size: 13px; }
+  html.sf-site .pos-storefront .sf-sort select, html.sf-site .pos-storefront .sf-filter-btn { border-color: var(--pm-line); border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: 13px; color: var(--pm-ink); background-color: var(--pm-bg); }
+  html.sf-site .pos-storefront .sf-dot { background: var(--pm-accent); }
+  html.sf-site .sf-chip { border-color: var(--pm-line); color: var(--pm-ink-2); font-weight: 600; }
+  html.sf-site .sf-chip:hover { border-color: var(--pm-ink); color: var(--pm-ink); }
+  html.sf-site .sf-chip.on { background: var(--pm-btn); border-color: var(--pm-btn); color: var(--pm-btn-fg); }
+  html.sf-site .sf-cattiles .sf-tile { border: 0; background: var(--pm-well); border-radius: 18px; min-width: 84px; padding: 14px 12px 12px; }
+  html.sf-site .sf-cattiles .sf-tile.on { background: var(--pm-btn); }
+  html.sf-site .sf-cattiles .sf-tile-ic { background: transparent; color: var(--pm-ink); width: 28px; height: 28px; font-size: 20px; }
+  html.sf-site .sf-cattiles .sf-tile.on .sf-tile-ic { background: transparent; color: var(--pm-btn-fg); }
+  html.sf-site .sf-cattiles .sf-tile-lb { font-weight: 600; }
+
+  /* ---------- การ์ดสินค้า ---------- */
+  html.sf-site #productGrid .pos-storefront.grid { column-gap: 16px; row-gap: 36px; padding-bottom: 24px; }
+  @media (min-width: 768px) { html.sf-site #productGrid .pos-storefront.grid { column-gap: 24px; row-gap: 48px; } }
+  .pos-storefront .pm-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+  .pos-storefront .pm-card:hover { transform: none; border: 0; box-shadow: none; }
+  .pos-storefront .pm-media { aspect-ratio: 1 / 1; background: var(--pm-well, #f5f5f7); border-radius: 20px; transition: background .25s; }
+  .pos-storefront .pm-card:hover .pm-media { background: var(--pm-well-2, #ededf0); }
+  .pos-storefront .pm-media > img { position: absolute; top: 12%; left: 12%; width: 76%; height: 76%; max-width: none; max-height: none; object-fit: contain; transition: transform .5s var(--ease-out); }
+  .pos-storefront .pm-card:hover .pm-media > img { transform: scale(1.045); }
+  .pos-storefront .pm-body { padding: 14px 2px 0; gap: 6px; }
+  .pos-storefront .sf-brand { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--pm-mute, #868c98); }
+  .pos-storefront .pm-name { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -.005em; color: var(--pm-ink, #111318); }
+  @media (min-width: 768px) { .pos-storefront .pm-name { font-size: 15.5px; } }
+  .pos-storefront .pm-name[role="link"]:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .pos-storefront .pm-name mark { background: rgba(255, 107, 0, .18); color: inherit; border-radius: 3px; }
+  .pos-storefront .pm-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; background: var(--pm-well, #f5f5f7); color: var(--pm-ink-2, #454b57); font-size: 10.5px; font-weight: 500; line-height: 1.4; white-space: nowrap; }
+  .pos-storefront .pm-tag i { font-size: 9px; color: var(--pm-mute, #868c98); }
+  .pos-storefront .pm-tag-deal { color: var(--pm-accent-ink, #c2410c); background: rgba(255, 107, 0, .09); }
+  .pos-storefront .pm-tag-deal i { color: inherit; }
+  .pos-storefront .color-dot { width: 16px; height: 16px; border-color: rgba(17, 19, 24, .18); }
+  .pos-storefront .pm-chip { padding: 3px 9px; border-radius: 999px; border: 1px solid var(--pm-line, #e8e9ed); background: transparent; color: var(--pm-ink-2, #454b57); font-size: 11px; font-weight: 500; line-height: 1.4; }
+  .pos-storefront .pm-chip:hover { border-color: var(--pm-mute, #868c98); }
+  .pos-storefront .pm-chip.on { border-color: var(--pm-ink, #111318); color: var(--pm-ink, #111318); font-weight: 600; }
+  .pos-storefront .pm-foot { padding-top: 8px; }
+  .pos-storefront .pm-price { font-size: 17px; font-weight: 700; letter-spacing: -.015em; line-height: 1.1; color: var(--pm-ink, #111318); }
+  @media (min-width: 768px) { .pos-storefront .pm-price { font-size: 19px; } }
+  .pos-storefront .sf-selprice { color: var(--pm-mute, #868c98); font-weight: 400; }
+  .pos-storefront .sf-selprice b { color: var(--pm-ink, #111318); font-weight: 600; }
+  .pos-storefront .sf-save { font-size: 11.5px; font-weight: 600; color: var(--pm-accent-ink, #c2410c); }
+  .pos-storefront .sf-stock { font-size: 11.5px; font-weight: 400; color: var(--pm-mute, #868c98); margin-bottom: 12px; }
+  .pos-storefront .sf-stock.ok, .pos-storefront .sf-stock.out { color: var(--pm-mute, #868c98); }
+  .pos-storefront .sf-stock.low { color: var(--pm-low, #c2410c); font-weight: 600; }
+  .pos-storefront .pm-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: var(--pm-ok, #15803d); }
+  .pos-storefront .sf-stock.low .pm-dot { background: var(--pm-low, #c2410c); }
+  .pos-storefront .sf-stock-bar { height: 2px; margin-top: 7px; background: var(--pm-line, #e8e9ed); }
+  .pos-storefront .sf-stock-bar > span { background: var(--pm-ink-2, #454b57); }
+  .pos-storefront .sf-stock.ok .sf-stock-bar { display: none; }
+  .pos-storefront .sf-stock.low .sf-stock-bar > span { background: var(--pm-low, #c2410c); }
+  .pos-storefront .pm-card .bnn-buy-btn, .pos-storefront .pm-cta-off { height: 40px; border-radius: 999px; font-size: 13px; font-weight: 600; letter-spacing: .01em; border: 1px solid transparent; }
+  .pos-storefront .pm-card .bnn-buy-btn { background: var(--pm-btn, #111318); color: var(--pm-btn-fg, #fff); box-shadow: none; }
+  .pos-storefront .pm-card .bnn-buy-btn i { font-size: 10px; transition: transform .25s var(--ease-out); }
+  .pos-storefront .pm-card .bnn-buy-btn:hover { background: var(--pm-accent, #FF6B00); color: #fff; border-color: transparent; box-shadow: none; transform: none; }
+  .pos-storefront .pm-card .bnn-buy-btn:hover i { transform: translateX(3px); }
+  .pos-storefront .pm-cta-off { background: transparent; border-color: var(--pm-line, #e8e9ed); color: var(--pm-mute, #868c98); cursor: not-allowed; }
+  .pos-storefront .bnn-discount-badge { top: 12px; left: 12px; background: var(--pm-btn, #111318); color: var(--pm-btn-fg, #fff); box-shadow: none; border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .pos-storefront .pm-soldout { padding: 7px 16px; border-radius: 999px; background: var(--pm-bg, #fff); color: var(--pm-ink, #111318); font-size: 12px; font-weight: 600; box-shadow: 0 6px 18px -8px rgba(15, 23, 42, .35); }
+  .pos-storefront .pm-media > .absolute.inset-0 { background: rgba(245, 245, 247, .55); border-radius: inherit; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  html.dark .pos-storefront .pm-media > .absolute.inset-0 { background: rgba(15, 23, 42, .55) !important; }
+  /* ปุ่มบนรูป: หัวใจมุมขวาบน, เทียบสเปคมุมขวาล่าง — เดสก์ท็อปโผล่เมื่อชี้การ์ด (ที่เลือกไว้แล้วแสดงตลอด), จอสัมผัสแสดงตลอด */
+  .pos-storefront .pm-wish { top: 10px; right: 10px; bottom: auto; left: auto; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--pm-bg, #fff); color: var(--pm-ink-2, #454b57); font-size: 13px; box-shadow: 0 4px 12px -6px rgba(15, 23, 42, .35); }
+  .pos-storefront .pm-wish:hover { transform: scale(1.08); }
+  .pos-storefront .pm-wish.text-rose-500 { background: var(--pm-bg, #fff); }
+  .pos-storefront .pm-wish .animate-pulse { animation: none; }
+  .pos-storefront .pm-card .bnn-compare-btn { right: 10px; bottom: 10px; padding: 6px 11px; border-radius: 999px; border: 0; background: var(--pm-bg, #fff); color: var(--pm-ink-2, #454b57); font-size: 10.5px; font-weight: 600; box-shadow: 0 4px 12px -6px rgba(15, 23, 42, .35); }
+  .pos-storefront .pm-card .bnn-compare-btn.active { background: var(--pm-btn, #111318) !important; color: var(--pm-btn-fg, #fff) !important; }
+  .pos-storefront .pm-card .bnn-compare-btn.active i { color: inherit; }
+  /* แสดงปุ่มหัวใจ/เทียบสเปคตลอดทุกอุปกรณ์ (เดิมซ่อนจนกว่าจะชี้การ์ด ทำให้ผู้ใช้มองไม่เห็น) และอยู่เหนือแสงตามเมาส์ */
+  .pos-storefront .pm-wish, .pos-storefront .pm-card .bnn-compare-btn { z-index: 5; transition: transform .2s, background .2s, color .2s; }
+  .pos-storefront .pm-card .bnn-compare-btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--pm-line, #e8e9ed); }
+  .pos-storefront .pm-card .bnn-compare-btn:hover { color: #E85F00; border-color: #FF6B00; }
+  .pm-skel { padding: 0; }
+  html.dark .pos-storefront .color-dot { border-color: rgba(255, 255, 255, .28); }
+
+  /* เลขหน้า */
+  html.sf-site .sf-pager { gap: 4px; padding: 16px 0 40px; }
+  html.sf-site .sf-pager .sf-pg { min-width: 40px; height: 40px; border-radius: 50%; border-color: transparent; background: transparent; font-weight: 500; color: var(--pm-ink-2); }
+  html.sf-site .sf-pager .sf-pg:hover:not(:disabled):not(.on) { background: var(--pm-well); border-color: transparent; color: var(--pm-ink); }
+  html.sf-site .sf-pager .sf-pg.on { background: var(--pm-btn); border-color: var(--pm-btn); color: var(--pm-btn-fg); font-weight: 600; }
+
+  /* ---------- แถบบริการของร้าน ---------- */
+  .pm-trust { list-style: none; margin: 16px 0 0; padding: 28px 0 8px; border-top: 1px solid var(--pm-line, #e8e9ed); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 20px; }
+  @media (min-width: 1024px) { .pm-trust { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px; padding-top: 36px; } }
+  .pm-trust li { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+  .pm-trust i { font-size: 18px; color: var(--pm-ink, #111318); margin-top: 2px; width: 22px; text-align: center; flex-shrink: 0; }
+  .pm-trust strong { display: block; font-size: 13.5px; font-weight: 600; color: var(--pm-ink, #111318); }
+  .pm-trust span { display: block; font-size: 12px; line-height: 1.5; color: var(--pm-mute, #868c98); margin-top: 2px; }
+
+  /* ---------- หน้าต่างเลือกช่องทาง/สาขา ---------- */
+  .pm-gate-ico { width: 56px; height: 56px; border-radius: 18px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: var(--pm-well, #f5f5f7); color: var(--pm-ink, #111318); }
+  html.sf-site #criteriaOverlay, html.sf-site #bookingBlockOverlay { background: color-mix(in srgb, var(--pm-bg) 92%, transparent); }
+  html.sf-site #criteriaOverlay > div, html.sf-site #bookingBlockOverlay > div { border-color: var(--pm-line); box-shadow: 0 30px 60px -30px rgba(15, 23, 42, .3); border-radius: 24px; padding: 36px 32px; }
+
+  /* ---------- หน้าต่างรายละเอียดสินค้า: ลดสี เหลือสีหมึก + ปุ่มหลักส้มปุ่มเดียว ---------- */
+  html.sf-site #addToCartModal .sf-dlg-ico { display: none; }
+  .pm-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--pm-accent-ink, #c2410c); margin-bottom: 8px; }
+  html.sf-site #addToCartModal #modalProdName { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
+  html.sf-site #addToCartModal #modalProdPrice { color: var(--pm-ink) !important; font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+  html.sf-site:not(.dark) #addToCartModal #modalInstallmentBox { background: var(--pm-well); border-color: transparent; }
+  html.sf-site:not(.dark) #addToCartModal #modalVariantSelection { background: transparent; border-color: var(--pm-line); }
+  html.sf-site #addToCartModal .aspect-square { background: var(--pm-well); border: 0; box-shadow: none; }
+
+  /* ---------- Footer ---------- */
+  html.sf-site .pos-footer { margin-top: 56px; }
+  html.sf-site .pf-grid { padding-top: 48px; padding-bottom: 32px; }
+  html.sf-site .pf-logo { background: rgba(255, 255, 255, .1); }
+  html.sf-site .pf-h { font-weight: 600; letter-spacing: .1em; font-size: 11px; color: #94a3b8; }
+  html.sf-site .pf-links button, html.sf-site .pf-contact { font-weight: 400; }
+  html.sf-site .pf-links button:hover, html.sf-site .pf-contact a:hover { color: #fff; }
+  html.sf-site .pf-trust li { font-weight: 500; }
+
+  /* แถบลอย (เทียบสเปค / ตะกร้ามือถือ) */
+  html.sf-site #posCompareBar { border-color: var(--pm-line); border-radius: 20px; }
+
+  /* ===================================================
+     VIVID LAYER — เติมสีสัน + ลูกเล่น ทับบล็อก PREMIUM (ต้องอยู่ท้ายสุด; ใช้เฉพาะ html.sf-site = หน้าร้าน)
+     สีหลักไล่เฉดส้ม→ชมพูแดง (--pm-grad) · เฉดรองฟ้า/เขียว/ม่วง ใช้กับป้ายและไอคอนหมวดให้แยกกันออก
+     แอนิเมชันทั้งหมดใช้ transform/opacity/background-position เท่านั้น และปิดทั้งหมดเมื่อผู้ใช้ตั้ง prefers-reduced-motion
+     =================================================== */
+  html.sf-site {
+    --pm-grad: linear-gradient(135deg, #FF6B00 0%, #FF3D6E 100%);
+    --pm-grad-hover: linear-gradient(135deg, #E85F00 0%, #E8305F 100%);
+    --pm-glow: 0 12px 26px -10px rgba(255, 90, 40, .65);
+  }
+  @keyframes pmFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+  @keyframes pmSlide { from { background-position: 0 0; } to { background-position: 200% 0; } }
+  @keyframes pmShine { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+  @keyframes pmRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @keyframes pmPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: .65; } }
+  @keyframes pmPop { 0% { transform: scale(.4); } 55% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  @keyframes pmBadge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+  @keyframes pmKen { from { transform: scale(1); } to { transform: scale(1.08); } }
+  @keyframes pmBump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+  /* พื้นหลัง: แสงสีจางๆ มุมจอ แทนพื้นขาวล้วน */
+  html.sf-site:not(.dark) body {
+    background:
+      radial-gradient(900px 480px at 100% -4%, rgba(255, 107, 0, .11), transparent 60%),
+      radial-gradient(820px 520px at -6% 10%, rgba(54, 104, 145, .11), transparent 58%),
+      radial-gradient(760px 520px at 55% 112%, rgba(244, 63, 94, .07), transparent 60%),
+      #fffdfb;
+    background-attachment: fixed;
+  }
+  html.sf-site.dark body {
+    background:
+      radial-gradient(900px 480px at 100% -4%, rgba(255, 107, 0, .10), transparent 60%),
+      radial-gradient(820px 520px at -6% 10%, rgba(54, 104, 145, .16), transparent 58%),
+      #0f172a;
+    background-attachment: fixed;
+  }
+
+  /* แถบบนสุด: กรมท่าไล่เฉด + เส้นสีวิ่งใต้แถบ */
+  html.sf-site .sf-topbar::before { background: linear-gradient(90deg, #0b1626, #1b3a59 50%, #0b1626); }
+  html.sf-site .sf-topbar::after { content: ''; position: absolute; z-index: -1; left: -100vmax; right: -100vmax; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, #FF6B00, #FF3D6E, #FF6B00, transparent); background-size: 200% 100%; animation: pmSlide 4s linear infinite; }
+  html.sf-site .sf-topbar-msg i { color: #FF9A3D; }
+
+  /* Header: โปร่งแสง + เบลอพื้นหลังเมื่อเลื่อนผ่านใต้ */
+  html.sf-site .pos-store-header::before { background: color-mix(in srgb, var(--sf-hdr) 84%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5); }
+  html.sf-site .pos-search:focus { background: var(--pm-bg); border-color: #FF6B00; box-shadow: 0 0 0 4px rgba(255, 107, 0, .16); }
+  html.sf-site .pos-search-wrap:focus-within .pos-search-ico { color: #FF6B00; }
+  html.sf-site .pos-cart-btn { background: var(--pm-grad); color: #fff; box-shadow: var(--pm-glow); transition: transform .2s var(--ease-out), box-shadow .2s, filter .2s; }
+  html.sf-site .pos-cart-btn:hover { background: var(--pm-grad-hover); color: #fff; transform: translateY(-2px); box-shadow: 0 16px 30px -10px rgba(255, 90, 40, .75); }
+  html.sf-site .pos-cart-count { background: #fff; color: #E8305F; min-width: 22px; height: 22px; }
+  html.sf-site .pos-cart-btn:hover .pos-cart-count { background: #fff; color: #E8305F; }
+  html.sf-site .pos-cart-btn:hover .fa-shopping-basket { animation: pmBump .5s var(--ease-out); }
+  html.sf-site .sf-badge { background: var(--pm-grad); color: #fff; }
+  html.sf-site .sf-nav-a:hover { color: #E85F00; }
+  html.sf-site .sf-nav-a.on { color: #E85F00; }
+  html.sf-site .sf-nav-a.on::after { height: 3px; border-radius: 3px; background: var(--pm-grad); }
+  html.sf-site .sf-logo { background: var(--pm-grad); color: #fff; box-shadow: 0 8px 18px -8px rgba(255, 90, 40, .7); }
+
+  /* แถบแคมเปญ Pre Booking: กรมท่า→ม่วงเข้ม→แดงเข้ม เคลื่อนไหวช้าๆ + แสงวาบผ่าน */
+  html.sf-site #posTimerBanner { background: linear-gradient(120deg, #0f2a43, #1b3a59 40%, #3b1d45 70%, #5c1d33); background-size: 220% 220%; animation: pmFlow 16s ease infinite; border: 0; box-shadow: 0 18px 36px -22px rgba(92, 29, 51, .8); }
+  html.sf-site #posTimerBanner::after { display: block; content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, .09) 50%, transparent 62%); background-size: 250% 100%; animation: pmShine 6s linear infinite; pointer-events: none; }
+  html.sf-site .bnn-flash-emblem { background: var(--pm-grad); border: 0; color: #fff; border-radius: 999px; box-shadow: 0 8px 18px -8px rgba(255, 90, 40, .8); }
+  html.sf-site .bnn-flash-emblem i { color: #fff !important; animation: pmPulse 1.6s ease-in-out infinite; }
+  html.sf-site #posCampaignTitleText { color: #FFB37A; }
+  html.sf-site .bnn-timer-box { background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .2); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  html.sf-site .bnn-timer-box.bnn-timer-sec { background: var(--pm-grad); border-color: transparent; animation: pmBadge 1s ease-in-out infinite; }
+  html.sf-site .bnn-timer-box.bnn-timer-sec span + span { color: #ffe9dd !important; }
+
+  /* แบนเนอร์หลัก: ซูมช้าๆ + ฟิล์มสีกรมท่า + ปุ่มไล่เฉด */
+  html.sf-site #posHeroBannerWrap { box-shadow: 0 28px 50px -28px rgba(15, 42, 67, .55); animation: pmRise .6s var(--ease-out) both; }
+  html.sf-site #posHeroTrack > div { overflow: hidden; }
+  html.sf-site #posHeroTrack img { animation: pmKen 14s ease-in-out infinite alternate; }
+  .pm-hero-cap { background: linear-gradient(to top, rgba(15, 42, 67, .88), rgba(15, 42, 67, .3) 60%, transparent); }
+  .pm-hero-cta { background: var(--pm-grad); color: #fff; box-shadow: var(--pm-glow); transition: transform .2s var(--ease-out); }
+  #posHeroTrack > div:hover .pm-hero-cta { transform: translateX(4px) scale(1.04); }
+  .pm-hdot.on { background: #FF6B00; width: 26px; }
+  html.sf-site #posHeroBannerWrap button[aria-label^="แบนเนอร์"] { background: rgba(255, 255, 255, .9); color: #0f2a43; }
+  html.sf-site #posHeroBannerWrap button[aria-label^="แบนเนอร์"]:hover { background: #fff; transform: translateY(-50%) scale(1.1); }
+
+  /* หัวข้อ: แท่งสีไล่เฉดหน้าชื่อ */
+  .pm-sec-title::before { content: ''; display: inline-block; width: 5px; height: .95em; margin-right: 10px; border-radius: 3px; vertical-align: -.1em; background: var(--pm-grad); }
+
+  /* คูปอง: ใบตั๋วสีอ่อน + แถบสีด้านซ้าย */
+  html.sf-site .bnn-voucher-card { position: relative; overflow: hidden; border: 1px solid #ffd9bf; background: linear-gradient(135deg, #fff8f1, #fff0f4); padding-left: 20px; transition: transform .25s var(--ease-out), box-shadow .25s, border-color .25s; animation: pmRise .5s var(--ease-out) both; }
+  html.sf-site .bnn-voucher-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--pm-grad); }
+  html.sf-site .bnn-voucher-card:nth-child(2) { animation-delay: 70ms; } html.sf-site .bnn-voucher-card:nth-child(3) { animation-delay: 140ms; } html.sf-site .bnn-voucher-card:nth-child(4) { animation-delay: 210ms; }
+  html.sf-site .bnn-voucher-card:hover { transform: translateY(-4px); border-color: #FF8A3D; box-shadow: 0 18px 30px -18px rgba(255, 90, 40, .55); }
+  html.sf-site .bnn-voucher-card.applied { background: linear-gradient(135deg, #ecfdf5, #e0f7ef); border-color: #34d399; }
+  html.sf-site .bnn-voucher-card.applied::before { background: linear-gradient(180deg, #10b981, #059669); }
+  html.sf-site .pm-v-val { background: var(--pm-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
+  html.sf-site .pm-v-btn { background: var(--pm-grad); border: 0; color: #fff; box-shadow: var(--pm-glow); }
+  html.sf-site .bnn-voucher-card:hover .pm-v-btn { border: 0; transform: scale(1.05); }
+  html.sf-site .pm-v-btn.on { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 10px 20px -10px rgba(5, 150, 105, .7); }
+  html.dark.sf-site .bnn-voucher-card, html.sf-site.dark .bnn-voucher-card { background: linear-gradient(135deg, rgba(255, 107, 0, .14), rgba(244, 63, 94, .10)); border-color: rgba(255, 138, 61, .35); }
+
+  /* ดูล่าสุด / ข่าว / ยอดนิยม */
+  html.sf-site .pm-recent-item { background: linear-gradient(135deg, #fff3e8, #eef3fb); transition: transform .2s var(--ease-out), box-shadow .2s; }
+  html.sf-site .pm-recent-item:hover { transform: translateY(-2px); box-shadow: 0 10px 18px -12px rgba(15, 42, 67, .5); }
+  html.sf-site .sf-news-card { animation: pmRise .5s var(--ease-out) both; }
+  html.sf-site .sf-news-card:nth-child(2) { animation-delay: 60ms; } html.sf-site .sf-news-card:nth-child(3) { animation-delay: 120ms; } html.sf-site .sf-news-card:nth-child(4) { animation-delay: 180ms; }
+  html.sf-site .sf-news-img { box-shadow: 0 16px 26px -18px rgba(15, 42, 67, .6); transition: transform .3s var(--ease-out); }
+  html.sf-site .sf-news-card:hover .sf-news-img { transform: translateY(-4px); }
+  html.sf-site .sf-news-cat { display: inline-block; align-self: flex-start; padding: 2px 10px; border-radius: 999px; background: rgba(255, 107, 0, .12); color: #C2410C; font-weight: 700; }
+  html.sf-site .sf-news-card:hover .sf-news-title { color: #E85F00; }
+  html.sf-site .sf-pop-card { background: linear-gradient(160deg, #fff7ef, #eef3ff); animation: pmRise .5s var(--ease-out) both; transition: transform .25s var(--ease-out), box-shadow .25s; }
+  html.sf-site .sf-pop-card:nth-child(2) { animation-delay: 50ms; } html.sf-site .sf-pop-card:nth-child(3) { animation-delay: 100ms; } html.sf-site .sf-pop-card:nth-child(4) { animation-delay: 150ms; } html.sf-site .sf-pop-card:nth-child(n+5) { animation-delay: 200ms; }
+  html.sf-site .sf-pop-card:hover { transform: translateY(-5px); box-shadow: 0 20px 32px -20px rgba(15, 42, 67, .55); }
+  html.sf-site .sf-pop-rank { top: 8px; left: 8px; width: 24px; height: 24px; min-width: 24px; padding: 0; border-radius: 50%; background: #cbd5e1; color: #fff; font-size: 11px; }
+  html.sf-site .sf-pop-card:nth-child(1) .sf-pop-rank { background: linear-gradient(135deg, #f59e0b, #fbbf24); box-shadow: 0 6px 12px -4px rgba(245, 158, 11, .8); }
+  html.sf-site .sf-pop-card:nth-child(2) .sf-pop-rank { background: linear-gradient(135deg, #94a3b8, #cbd5e1); }
+  html.sf-site .sf-pop-card:nth-child(3) .sf-pop-rank { background: linear-gradient(135deg, #c2410c, #fb923c); }
+  html.sf-site .sf-pop-price { color: #E8305F; font-weight: 700; }
+
+  /* ไทล์หมวด (มือถือ): ไอคอนวงกลมไล่เฉด หมวดละสี */
+  html.sf-site .sf-cattiles .sf-tile { background: linear-gradient(160deg, #ffffff, #fff4ea); border: 1px solid #ffe3cc; transition: transform .2s var(--ease-out), box-shadow .2s; }
+  html.sf-site .sf-cattiles .sf-tile:hover { transform: translateY(-3px); box-shadow: 0 14px 22px -14px rgba(255, 90, 40, .6); }
+  html.sf-site .sf-cattiles .sf-tile-ic { width: 38px; height: 38px; font-size: 16px; color: #fff; background: var(--pm-grad); box-shadow: 0 8px 14px -8px rgba(255, 90, 40, .8); }
+  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+2) .sf-tile-ic { background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 8px 14px -8px rgba(79, 70, 229, .8); }
+  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+3) .sf-tile-ic { background: linear-gradient(135deg, #10b981, #14b8a6); box-shadow: 0 8px 14px -8px rgba(5, 150, 105, .8); }
+  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+4) .sf-tile-ic { background: linear-gradient(135deg, #f43f5e, #fb7185); box-shadow: 0 8px 14px -8px rgba(225, 29, 72, .8); }
+  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+5) .sf-tile-ic { background: linear-gradient(135deg, #8b5cf6, #a78bfa); box-shadow: 0 8px 14px -8px rgba(124, 58, 237, .8); }
+  html.sf-site .sf-cattiles .sf-tile.on { background: linear-gradient(135deg, #0f2a43, #1b3a59); border-color: transparent; }
+  html.sf-site .sf-cattiles .sf-tile.on .sf-tile-ic { color: #fff; background: var(--pm-grad); box-shadow: 0 8px 16px -8px rgba(255, 90, 40, .9); }
+
+  /* ตัวกรองด้านซ้าย */
+  html.sf-site .pos-storefront .sf-opt.on .sf-box { background: var(--pm-grad); border-color: transparent; }
+  html.sf-site .pos-storefront .sf-opt:hover .sf-box { border-color: #FF6B00; }
+  html.sf-site .pos-storefront .sf-switch.on .sf-knob { background: var(--pm-grad); }
+  html.sf-site .pos-storefront .sf-switch.on .sf-knob::after { background: #fff; }
+  html.sf-site .pos-storefront .sf-price-go { background: var(--pm-grad); color: #fff; }
+  html.sf-site .pos-storefront .sf-group summary:hover { color: #E85F00; }
+  html.sf-site .pos-storefront .sf-title i { color: #FF6B00; }
+  html.sf-site .pos-storefront .sf-sort select:focus, html.sf-site .pos-storefront .sf-price input:focus { border-color: #FF6B00; box-shadow: 0 0 0 3px rgba(255, 107, 0, .16); }
+  html.sf-site .sf-pager .sf-pg.on { background: var(--pm-grad); border-color: transparent; color: #fff; box-shadow: var(--pm-glow); }
+  html.sf-site .sf-pager .sf-pg:hover:not(:disabled):not(.on) { background: #fff3e8; color: #E85F00; }
+
+  /* การ์ดสินค้า: แท่นรูปไล่เฉดพีช→ฟ้า, ยกตัว + เรืองแสงส้มเมื่อชี้ */
+  html.sf-site .pos-storefront .pm-media { background: linear-gradient(145deg, #fff3e8 0%, #f4f1fb 55%, #eaf2fb 100%); transition: transform .35s var(--ease-out), box-shadow .35s; }
+  html.sf-site .pos-storefront .pm-card:hover .pm-media { background: linear-gradient(145deg, #ffe9d6 0%, #efeafb 55%, #e1edfb 100%); transform: translateY(-6px); box-shadow: 0 26px 40px -22px rgba(255, 90, 40, .55); }
+  html.sf-site .pos-storefront .pm-media > img { filter: drop-shadow(0 14px 16px rgba(15, 42, 67, .22)); }
+  html.sf-site .pos-storefront .pm-card:hover .pm-media > img { transform: scale(1.07) rotate(-1.5deg); }
+  html.sf-site .pos-storefront .pm-name[role="link"]:hover { color: #E85F00; }
+  html.sf-site .pos-storefront .sf-brand { color: #E85F00; font-weight: 700; }
+  html.sf-site .pos-storefront .sf-save { color: #E8305F; }
+  html.sf-site .pos-storefront .bnn-discount-badge { background: linear-gradient(135deg, #FF3D6E, #FF6B00); color: #fff; box-shadow: 0 8px 16px -8px rgba(255, 61, 110, .9); animation: pmBadge 2.4s ease-in-out infinite; }
+  html.sf-site .pos-storefront .pm-tag { background: rgba(54, 104, 145, .10); color: #1f4a6e; }
+  html.sf-site .pos-storefront .pm-tag i { color: inherit; opacity: .8; }
+  html.sf-site .pos-storefront .pm-tag-gift { background: rgba(16, 185, 129, .13); color: #047857; }
+  html.sf-site .pos-storefront .pm-tag-deal { background: rgba(244, 63, 94, .11); color: #BE123C; }
+  html.sf-site .pos-storefront .pm-chip.on { border-color: #FF6B00; color: #C2410C; background: rgba(255, 107, 0, .08); }
+  html.sf-site .pos-storefront .color-dot { transition: transform .15s var(--ease-out), box-shadow .15s; }
+  html.sf-site .pos-storefront .color-dot:hover { transform: scale(1.25); box-shadow: 0 4px 10px -3px rgba(15, 42, 67, .5); }
+  html.sf-site .pos-storefront .sf-stock.low .pm-dot { animation: pmPulse 1.4s ease-in-out infinite; }
+  html.sf-site .pos-storefront .sf-stock.ok .sf-stock-bar > span, html.sf-site .pos-storefront .sf-stock-bar > span { background: linear-gradient(90deg, #10b981, #34d399); }
+  html.sf-site .pos-storefront .sf-stock.low .sf-stock-bar > span { background: linear-gradient(90deg, #FF6B00, #FF3D6E); }
+  html.sf-site .pos-storefront .pm-card .bnn-buy-btn { position: relative; overflow: hidden; background: var(--pm-grad); box-shadow: var(--pm-glow); transition: transform .2s var(--ease-out), box-shadow .2s; }
+  html.sf-site .pos-storefront .pm-card .bnn-buy-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .5) 50%, transparent 70%); transform: translateX(-120%); transition: transform .7s var(--ease-out); pointer-events: none; }
+  html.sf-site .pos-storefront .pm-card .bnn-buy-btn:hover { background: var(--pm-grad-hover); transform: translateY(-2px); box-shadow: 0 16px 28px -10px rgba(255, 90, 40, .75); }
+  html.sf-site .pos-storefront .pm-card .bnn-buy-btn:hover::after { transform: translateX(120%); }
+  html.sf-site .pos-storefront .pm-card .bnn-buy-btn:active { transform: translateY(0) scale(.98); }
+  html.sf-site .pos-storefront .pm-wish.text-rose-500 { background: #fff1f4; color: #E11D48; }
+  html.sf-site .pos-storefront .pm-wish.text-rose-500 i { animation: pmPop .45s var(--ease-out); }
+  html.sf-site .pos-storefront .pm-wish:hover { color: #E11D48; }
+
+  /* แถบบริการท้ายหน้า: ไอคอนวงกลมสีต่างกัน */
+  .pm-trust li { transition: transform .25s var(--ease-out); animation: pmRise .55s var(--ease-out) both; }
+  .pm-trust li:nth-child(2) { animation-delay: 80ms; } .pm-trust li:nth-child(3) { animation-delay: 160ms; } .pm-trust li:nth-child(4) { animation-delay: 240ms; }
+  .pm-trust li:hover { transform: translateY(-4px); }
+  .pm-trust i { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; margin-top: 0; background: var(--pm-grad); box-shadow: 0 10px 18px -10px rgba(255, 90, 40, .9); }
+  .pm-trust li:nth-child(2) i { background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 10px 18px -10px rgba(79, 70, 229, .9); }
+  .pm-trust li:nth-child(3) i { background: linear-gradient(135deg, #f43f5e, #fb7185); box-shadow: 0 10px 18px -10px rgba(225, 29, 72, .9); }
+  .pm-trust li:nth-child(4) i { background: linear-gradient(135deg, #10b981, #14b8a6); box-shadow: 0 10px 18px -10px rgba(5, 150, 105, .9); }
+  .pm-gate-ico { background: var(--pm-grad); color: #fff; box-shadow: 0 14px 24px -12px rgba(255, 90, 40, .9); animation: pmBadge 2.4s ease-in-out infinite; }
+  .pm-eyebrow { background: var(--pm-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
+
+  /* Footer: กรมท่าเข้ม + แถบสีไล่เฉดด้านบน */
+  html.sf-site .pos-footer { background: linear-gradient(180deg, #0f1b2d, #0a1220); border-top: 4px solid transparent; border-image: linear-gradient(90deg, #FF6B00, #FF3D6E, #6366f1, #10b981) 1; }
+  html.sf-site .pf-links button:hover { transform: translateX(4px); }
+  html.sf-site .pf-links button { transition: color .15s, transform .2s var(--ease-out); }
+  html.sf-site .pf-trust i { color: #FF9A3D; }
+
+  /* โหมดมืด: แท่น/ป้าย/การ์ดสีอ่อนเปลี่ยนเป็นโทนเข้ม */
+  html.sf-site.dark .pos-storefront .pm-media, html.sf-site.dark .pos-storefront .pm-card:hover .pm-media { background: linear-gradient(145deg, #3a2a22 0%, #2b2a3d 55%, #223048 100%); }
+  html.sf-site.dark .sf-pop-card, html.sf-site.dark .pm-recent-item { background: linear-gradient(160deg, rgba(255, 107, 0, .14), rgba(99, 102, 241, .12)); }
+  html.sf-site.dark .sf-cattiles .sf-tile { background: linear-gradient(160deg, #1b2536, #2a2330); border-color: rgba(255, 138, 61, .25); }
+  html.sf-site.dark .pos-storefront .pm-tag { background: rgba(96, 165, 250, .16); color: #93c5fd; }
+  html.sf-site.dark .pos-storefront .pm-tag-gift { background: rgba(52, 211, 153, .16); color: #6ee7b7; }
+  html.sf-site.dark .pos-storefront .pm-tag-deal { background: rgba(251, 113, 133, .16); color: #fda4af; }
+  html.sf-site.dark .pos-storefront .pm-chip.on { color: #FFB37A; background: rgba(255, 107, 0, .14); }
+  html.sf-site.dark .sf-news-cat { background: rgba(255, 138, 61, .18); color: #FFB37A; }
+  html.sf-site.dark .sf-pop-price, html.sf-site.dark .pos-storefront .sf-save { color: #fda4af; }
+  html.sf-site.dark .pos-storefront .sf-brand { color: #FFA566; }
+  html.sf-site.dark .pos-storefront .pm-wish.text-rose-500 { background: rgba(251, 113, 133, .18); color: #fda4af; }
+
+  /* ===================================================
+     MOTION LAYER 2 — เอฟเฟกต์ที่ตอบสนองต่อเมาส์/การเลื่อนหน้า (JS ใน JS_Boot.html ตั้งตัวแปร --mx --my --rx --ry เฉพาะจอที่มีเมาส์)
+     =================================================== */
+  @keyframes pmAurora { from { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); } to { transform: translate3d(-3%, 3%, 0) rotate(7deg) scale(1.08); } }
+  @keyframes pmBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes pmSheen { from { transform: translateX(-130%) skewX(-20deg); } to { transform: translateX(260%) skewX(-20deg); } }
+  @keyframes pmFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+  /* แสงสีลอยช้าๆ ด้านหลังเนื้อหา (ทำให้พื้นหลังไม่นิ่ง) */
+  html.sf-site body::before { content: ''; position: fixed; inset: -12%; z-index: -1; pointer-events: none; will-change: transform;
+    background:
+      radial-gradient(38% 34% at 84% 14%, rgba(255, 107, 0, .13), transparent 70%),
+      radial-gradient(36% 38% at 8% 34%, rgba(54, 104, 145, .13), transparent 70%),
+      radial-gradient(44% 38% at 62% 96%, rgba(244, 63, 94, .09), transparent 70%);
+    animation: pmAurora 24s ease-in-out infinite alternate; }
+  html.sf-site.dark body::before { opacity: .8; }
+
+  /* แถบความคืบหน้าการเลื่อนหน้า (ใช้ scroll-driven animation; เบราว์เซอร์ที่ไม่รองรับจะไม่แสดง) */
+  @supports (animation-timeline: scroll()) {
+    html.sf-site::before { content: ''; position: fixed; z-index: 120; top: 0; left: 0; right: 0; height: 3px; pointer-events: none; transform-origin: 0 50%; background: var(--pm-grad); box-shadow: 0 0 10px rgba(255, 90, 40, .6); transform: scaleX(0); animation: pmBar linear both; animation-timeline: scroll(root block); }
+  }
+
+  /* การ์ดสินค้า: เข้าฉากทีละใบ (ใช้ backwards เพื่อไม่ล็อก transform หลังจบ) */
+  html.sf-site .pos-storefront .pm-card { animation: pmRise .5s var(--ease-out) backwards; }
+  html.sf-site .pos-storefront .pm-card:nth-child(2) { animation-delay: 50ms; } html.sf-site .pos-storefront .pm-card:nth-child(3) { animation-delay: 100ms; }
+  html.sf-site .pos-storefront .pm-card:nth-child(4) { animation-delay: 150ms; } html.sf-site .pos-storefront .pm-card:nth-child(5) { animation-delay: 200ms; }
+  html.sf-site .pos-storefront .pm-card:nth-child(n+6) { animation-delay: 250ms; }
+
+  /* แสงตามเมาส์บนแท่นรูปสินค้า + เอียง 3 มิติเล็กน้อย */
+  html.sf-site .pos-storefront .pm-media::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .3s;
+    background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .55), transparent 65%); }
+  html.sf-site .pos-storefront .pm-card:hover .pm-media::after { opacity: 1; }
+  html.sf-site.dark .pos-storefront .pm-media::after { background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 160, 90, .22), transparent 65%); }
+  @media (hover: hover) and (pointer: fine) {
+    html.sf-site .pos-storefront .pm-media { transform-style: preserve-3d; will-change: transform; }
+    html.sf-site .pos-storefront .pm-card:hover .pm-media { transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px); transition: transform .12s linear, box-shadow .35s, background .35s; }
+  }
+  html.sf-site .pos-storefront .pm-card:active .pm-media { transform: translateY(-2px) scale(.985); }
+
+  /* คูปอง: แสงตามเมาส์ */
+  html.sf-site .bnn-voucher-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 138, 61, .20), transparent 65%); }
+  html.sf-site .bnn-voucher-card:hover::after { opacity: 1; }
+
+  /* ตะกร้าเด้งเมื่อจำนวนเปลี่ยน */
+  html.sf-site .pos-cart-count.pm-bump { animation: pmPop .5s var(--ease-out); }
+
+  /* ป้าย PRE BOOKING: แสงวาบกวาดผ่านเป็นระยะ + ฟ้าผ่าเต้น */
+  html.sf-site .bnn-flash-emblem { position: relative; overflow: hidden; }
+  html.sf-site .bnn-flash-emblem::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent); animation: pmSheen 3.2s ease-in-out infinite; pointer-events: none; }
+
+  /* ไอคอนในแถบบริการลอยเบาๆ สลับจังหวะ */
+  .pm-trust i { animation: pmFloat 4s ease-in-out infinite; }
+  .pm-trust li:nth-child(2) i { animation-delay: .5s; } .pm-trust li:nth-child(3) i { animation-delay: 1s; } .pm-trust li:nth-child(4) i { animation-delay: 1.5s; }
+
+  /* แถบแบรนด์ (pos.renderBrandStrip): ชิปกลมเลื่อนแนวนอน, ไอคอนตัวอักษรแรกไล่สีตามชื่อแบรนด์ (--h = เฉดสี) */
+  .sf-brand-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; scroll-snap-type: x proximity; }
+  .sf-brand-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 9px; padding: 7px 12px 7px 8px; border-radius: 999px; border: 1px solid var(--pm-line); background: var(--pm-bg); color: var(--pm-ink); font-size: 13px; font-weight: 600; cursor: pointer; scroll-snap-align: start; transition: transform .2s var(--ease-out), box-shadow .2s, border-color .2s, background .2s, color .2s; }
+  .sf-brand-chip:hover { transform: translateY(-2px); border-color: #FF6B00; box-shadow: 0 10px 20px -12px rgba(255, 90, 40, .55); }
+  .sf-brand-chip:active { transform: scale(.97); }
+  .sf-brand-chip.on { background: var(--pm-grad); color: #fff; border-color: transparent; box-shadow: var(--pm-glow); }
+  .sf-brand-ic { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; background: linear-gradient(135deg, hsl(var(--h) 80% 55%), hsl(calc(var(--h) + 40) 85% 48%)); }
+  .sf-brand-chip.on .sf-brand-ic { background: rgba(255, 255, 255, .28); }
+  .sf-brand-n { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--pm-well); color: var(--pm-mute); font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+  .sf-brand-chip.on .sf-brand-n { background: rgba(255, 255, 255, .25); color: #fff; }
+
+  /* ป้าย NEW / ขายดี บนรูปสินค้า (มุมซ้ายล่าง) + ป้าย NEW บนการ์ดชั้น "สินค้าใหม่" */
+  .pm-flags { position: absolute; left: 10px; bottom: 10px; z-index: 4; display: flex; gap: 5px; pointer-events: none; }
+  .pm-flag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: #fff; line-height: 1.4; }
+  .pm-flag-new { background: linear-gradient(135deg, #10b981, #14b8a6); box-shadow: 0 6px 12px -6px rgba(5, 150, 105, .8); }
+  .pm-flag-hot { background: linear-gradient(135deg, #f59e0b, #ef4444); box-shadow: 0 6px 12px -6px rgba(239, 68, 68, .8); }
+  .pm-flag-hot i { font-size: 10px; animation: pmPulse 1.4s ease-in-out infinite; }
+  .sf-new-card { position: relative; }
+  .sf-new-tag { position: absolute; top: 8px; left: 8px; z-index: 2; padding: 2px 9px; border-radius: 999px; background: linear-gradient(135deg, #10b981, #14b8a6); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; box-shadow: 0 6px 12px -6px rgba(5, 150, 105, .8); }
+
+  /* หน้าโปรโมชั่นทั้งหมด (promoHubModal): กริดแบนเนอร์แคมเปญ + การ์ดคูปอง/ซื้อคู่ */
+  .pm-sec-more { margin-left: auto; align-self: center; border: 0; background: none; color: #E85F00; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; padding: 4px 2px; }
+  .pm-sec-more i { font-size: 10px; transition: transform .2s var(--ease-out); }
+  .pm-sec-more:hover i { transform: translateX(3px); }
+  .sf-nav-promo { color: #E8305F; }
+  .sf-nav-promo i { margin-right: 6px; color: #FF6B00; }
+  .sf-promo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .sf-promo-grid-sm { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .sf-camp { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; padding: 0; border-radius: 18px; overflow: hidden; cursor: pointer; background: var(--pm-well); text-align: left; box-shadow: 0 14px 28px -20px rgba(15, 42, 67, .7); transition: transform .25s var(--ease-out), box-shadow .25s; animation: pmRise .45s var(--ease-out) backwards; }
+  .sf-camp:nth-child(2) { animation-delay: 50ms; } .sf-camp:nth-child(3) { animation-delay: 100ms; } .sf-camp:nth-child(n+4) { animation-delay: 150ms; }
+  .sf-camp img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s var(--ease-out); }
+  .sf-camp:hover { transform: translateY(-4px); box-shadow: 0 22px 34px -20px rgba(255, 90, 40, .6); }
+  .sf-camp:hover img { transform: scale(1.06); }
+  .sf-camp-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 14px 12px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(to top, rgba(15, 42, 67, .88), transparent); color: #fff; }
+  .sf-camp-cap b { font-size: 14px; font-weight: 700; }
+  .sf-camp-cap span { font-size: 12px; opacity: .85; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .sf-promo-coupon { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 12px 20px; border-radius: 14px; cursor: pointer; }
+  .sf-promo-coupon .pm-v-name { white-space: normal; }
+
+  .sf-brand-row { scrollbar-width: none; } .sf-brand-row::-webkit-scrollbar { display: none; }
+
+  /* ปุ่มกลับขึ้นบน + หัวใจรายการโปรด: เด้งตอบสนอง */
+  html.sf-site #backToTopBtn { transition: transform .2s var(--ease-out), box-shadow .2s; }
+  html.sf-site #backToTopBtn:hover { transform: translateY(-4px); box-shadow: 0 14px 24px -10px rgba(255, 90, 40, .6); }
+  html.sf-site .pos-storefront .pm-wish:active { transform: scale(.85); }
+
+  @media (prefers-reduced-motion: reduce) {
+    html.sf-site *, html.sf-site *::before, html.sf-site *::after { animation: none !important; }
+    html.sf-site .pos-storefront .pm-card:hover .pm-media { transform: translateY(-6px) !important; }
+  }
 </style>
