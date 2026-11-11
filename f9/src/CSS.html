@@ -2310,6 +2310,31 @@
 
   .sf-brand-row { scrollbar-width: none; } .sf-brand-row::-webkit-scrollbar { display: none; }
 
+  /* MOTION LAYER 3 — ลากเมาส์ผ่านสินค้า: การ์ดข้างเคียงหรี่ลง, ชื่อ/ราคา/รูป/ปุ่มตอบสนอง */
+  @keyframes pmBob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+  @keyframes pmPop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+  .pos-storefront .pm-card { transition: opacity .3s ease, filter .3s ease; }
+  .pos-storefront .pm-name { transition: color .2s ease; }
+  .pos-storefront .pm-price { display: inline-block; transform-origin: left center; transition: transform .25s var(--ease-out); }
+  .pos-storefront .pm-card .sf-swatch { transition: transform .2s var(--ease-out), box-shadow .2s; }
+  .pos-storefront .pm-card .sf-swatch:hover { transform: scale(1.35); box-shadow: 0 0 0 2px rgba(255, 107, 0, .45); }
+  .pos-storefront .pm-wish, .pos-storefront .pm-card .bnn-compare-btn { opacity: .92; }
+  .pos-storefront .sf-pop-card, .pos-storefront .sf-news-card { transition: transform .25s var(--ease-out), box-shadow .25s, border-color .25s; }
+  .pos-storefront .sf-pop-card:hover, .pos-storefront .sf-news-card:hover { transform: translateY(-4px); box-shadow: 0 16px 28px -14px rgba(15, 23, 42, .35); }
+  .pos-storefront .sf-pop-card:active, .pos-storefront .sf-news-card:active { transform: translateY(-1px) scale(.985); }
+  @media (hover: hover) and (pointer: fine) {
+    .pos-storefront :has(> .pm-card:hover) > .pm-card:not(:hover) { opacity: .62; filter: saturate(.8); }
+    .pos-storefront .pm-card:hover .pm-name { color: var(--pm-accent, #FF6B00); }
+    .pos-storefront .pm-card:hover .pm-price { transform: scale(1.06); }
+    .pos-storefront .pm-card:hover .pm-media > img { animation: pmBob 2.6s ease-in-out .35s infinite; }
+    .pos-storefront .pm-card:hover .pm-wish, .pos-storefront .pm-card:hover .bnn-compare-btn { opacity: 1; transform: translateY(-2px); }
+    .pos-storefront .pm-card:hover .bnn-discount-badge, .pos-storefront .pm-card:hover .bnn-deal-badge { animation: pmPop .4s var(--ease-out) both; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pos-storefront .pm-card:hover .pm-media > img, .pos-storefront .pm-card:hover .bnn-discount-badge, .pos-storefront .pm-card:hover .bnn-deal-badge { animation: none; }
+    .pos-storefront :has(> .pm-card:hover) > .pm-card:not(:hover) { opacity: 1; filter: none; }
+  }
+
   /* ปุ่มกลับขึ้นบน + หัวใจรายการโปรด: เด้งตอบสนอง */
   html.sf-site #backToTopBtn { transition: transform .2s var(--ease-out), box-shadow .2s; }
   html.sf-site #backToTopBtn:hover { transform: translateY(-4px); box-shadow: 0 14px 24px -10px rgba(255, 90, 40, .6); }
