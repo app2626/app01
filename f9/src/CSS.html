@@ -2027,9 +2027,9 @@
      แอนิเมชันทั้งหมดใช้ transform/opacity/background-position เท่านั้น และปิดทั้งหมดเมื่อผู้ใช้ตั้ง prefers-reduced-motion
      =================================================== */
   html.sf-site {
-    --pm-grad: linear-gradient(135deg, #FF6B00 0%, #FF3D6E 100%);
-    --pm-grad-hover: linear-gradient(135deg, #E85F00 0%, #E8305F 100%);
-    --pm-glow: 0 12px 26px -10px rgba(255, 90, 40, .65);
+    --pm-grad: #FF6B00;
+    --pm-grad-hover: #E85F00;
+    --pm-glow: 0 6px 14px -8px rgba(255, 107, 0, .45);
   }
   @keyframes pmFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
   @keyframes pmSlide { from { background-position: 0 0; } to { background-position: 200% 0; } }
@@ -2042,25 +2042,11 @@
   @keyframes pmBump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
   /* พื้นหลัง: แสงสีจางๆ มุมจอ แทนพื้นขาวล้วน */
-  html.sf-site:not(.dark) body {
-    background:
-      radial-gradient(900px 480px at 100% -4%, rgba(255, 107, 0, .11), transparent 60%),
-      radial-gradient(820px 520px at -6% 10%, rgba(54, 104, 145, .11), transparent 58%),
-      radial-gradient(760px 520px at 55% 112%, rgba(244, 63, 94, .07), transparent 60%),
-      #fffdfb;
-    background-attachment: fixed;
-  }
-  html.sf-site.dark body {
-    background:
-      radial-gradient(900px 480px at 100% -4%, rgba(255, 107, 0, .10), transparent 60%),
-      radial-gradient(820px 520px at -6% 10%, rgba(54, 104, 145, .16), transparent 58%),
-      #0f172a;
-    background-attachment: fixed;
-  }
+  html.sf-site:not(.dark) body { background: #ffffff; }
+  html.sf-site.dark body { background: #0f172a; }
 
   /* แถบบนสุด: กรมท่าไล่เฉด + เส้นสีวิ่งใต้แถบ */
-  html.sf-site .sf-topbar::before { background: linear-gradient(90deg, #0b1626, #1b3a59 50%, #0b1626); }
-  html.sf-site .sf-topbar::after { content: ''; position: absolute; z-index: -1; left: -100vmax; right: -100vmax; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, #FF6B00, #FF3D6E, #FF6B00, transparent); background-size: 200% 100%; animation: pmSlide 4s linear infinite; }
+  html.sf-site .sf-topbar::before { background: #0f2a43; }
   html.sf-site .sf-topbar-msg i { color: #FF9A3D; }
 
   /* Header: โปร่งแสง + เบลอพื้นหลังเมื่อเลื่อนผ่านใต้ */
@@ -2068,24 +2054,23 @@
   html.sf-site .pos-search:focus { background: var(--pm-bg); border-color: #FF6B00; box-shadow: 0 0 0 4px rgba(255, 107, 0, .16); }
   html.sf-site .pos-search-wrap:focus-within .pos-search-ico { color: #FF6B00; }
   html.sf-site .pos-cart-btn { background: var(--pm-grad); color: #fff; box-shadow: var(--pm-glow); transition: transform .2s var(--ease-out), box-shadow .2s, filter .2s; }
-  html.sf-site .pos-cart-btn:hover { background: var(--pm-grad-hover); color: #fff; transform: translateY(-2px); box-shadow: 0 16px 30px -10px rgba(255, 90, 40, .75); }
-  html.sf-site .pos-cart-count { background: #fff; color: #E8305F; min-width: 22px; height: 22px; }
-  html.sf-site .pos-cart-btn:hover .pos-cart-count { background: #fff; color: #E8305F; }
+  html.sf-site .pos-cart-btn:hover { background: var(--pm-grad-hover); color: #fff; transform: translateY(-1px); }
+  html.sf-site .pos-cart-count { background: #fff; color: #C2410C; min-width: 22px; height: 22px; }
+  html.sf-site .pos-cart-btn:hover .pos-cart-count { background: #fff; color: #C2410C; }
   html.sf-site .pos-cart-btn:hover .fa-shopping-basket { animation: pmBump .5s var(--ease-out); }
   html.sf-site .sf-badge { background: var(--pm-grad); color: #fff; }
   html.sf-site .sf-nav-a:hover { color: #E85F00; }
   html.sf-site .sf-nav-a.on { color: #E85F00; }
   html.sf-site .sf-nav-a.on::after { height: 3px; border-radius: 3px; background: var(--pm-grad); }
-  html.sf-site .sf-logo { background: var(--pm-grad); color: #fff; box-shadow: 0 8px 18px -8px rgba(255, 90, 40, .7); }
+  html.sf-site .sf-logo { background: var(--pm-grad); color: #fff; }
 
   /* แถบแคมเปญ Pre Booking: กรมท่า→ม่วงเข้ม→แดงเข้ม เคลื่อนไหวช้าๆ + แสงวาบผ่าน */
-  html.sf-site #posTimerBanner { background: linear-gradient(120deg, #0f2a43, #1b3a59 40%, #3b1d45 70%, #5c1d33); background-size: 220% 220%; animation: pmFlow 16s ease infinite; border: 0; box-shadow: 0 18px 36px -22px rgba(92, 29, 51, .8); }
-  html.sf-site #posTimerBanner::after { display: block; content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, .09) 50%, transparent 62%); background-size: 250% 100%; animation: pmShine 6s linear infinite; pointer-events: none; }
-  html.sf-site .bnn-flash-emblem { background: var(--pm-grad); border: 0; color: #fff; border-radius: 999px; box-shadow: 0 8px 18px -8px rgba(255, 90, 40, .8); }
-  html.sf-site .bnn-flash-emblem i { color: #fff !important; animation: pmPulse 1.6s ease-in-out infinite; }
+  html.sf-site #posTimerBanner { background: #0f2a43; border: 0; box-shadow: none; }
+  html.sf-site .bnn-flash-emblem { background: var(--pm-grad); border: 0; color: #fff; border-radius: 999px; }
+  html.sf-site .bnn-flash-emblem i { color: #fff !important; }
   html.sf-site #posCampaignTitleText { color: #FFB37A; }
   html.sf-site .bnn-timer-box { background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .2); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
-  html.sf-site .bnn-timer-box.bnn-timer-sec { background: var(--pm-grad); border-color: transparent; animation: pmBadge 1s ease-in-out infinite; }
+  html.sf-site .bnn-timer-box.bnn-timer-sec { background: var(--pm-grad); border-color: transparent; }
   html.sf-site .bnn-timer-box.bnn-timer-sec span + span { color: #ffe9dd !important; }
 
   /* แบนเนอร์หลัก: ซูมช้าๆ + ฟิล์มสีกรมท่า + ปุ่มไล่เฉด */
@@ -2103,20 +2088,20 @@
   .pm-sec-title::before { content: ''; display: inline-block; width: 5px; height: .95em; margin-right: 10px; border-radius: 3px; vertical-align: -.1em; background: var(--pm-grad); }
 
   /* คูปอง: ใบตั๋วสีอ่อน + แถบสีด้านซ้าย */
-  html.sf-site .bnn-voucher-card { position: relative; overflow: hidden; border: 1px solid #ffd9bf; background: linear-gradient(135deg, #fff8f1, #fff0f4); padding-left: 20px; transition: transform .25s var(--ease-out), box-shadow .25s, border-color .25s; animation: pmRise .5s var(--ease-out) both; }
+  html.sf-site .bnn-voucher-card { position: relative; overflow: hidden; border: 1px solid var(--pm-line); background: var(--pm-bg); padding-left: 20px; transition: transform .25s var(--ease-out), box-shadow .25s, border-color .25s; animation: pmRise .5s var(--ease-out) both; }
   html.sf-site .bnn-voucher-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--pm-grad); }
   html.sf-site .bnn-voucher-card:nth-child(2) { animation-delay: 70ms; } html.sf-site .bnn-voucher-card:nth-child(3) { animation-delay: 140ms; } html.sf-site .bnn-voucher-card:nth-child(4) { animation-delay: 210ms; }
-  html.sf-site .bnn-voucher-card:hover { transform: translateY(-4px); border-color: #FF8A3D; box-shadow: 0 18px 30px -18px rgba(255, 90, 40, .55); }
-  html.sf-site .bnn-voucher-card.applied { background: linear-gradient(135deg, #ecfdf5, #e0f7ef); border-color: #34d399; }
-  html.sf-site .bnn-voucher-card.applied::before { background: linear-gradient(180deg, #10b981, #059669); }
+  html.sf-site .bnn-voucher-card:hover { transform: translateY(-3px); border-color: #FF6B00; box-shadow: 0 14px 24px -18px rgba(15, 42, 67, .45); }
+  html.sf-site .bnn-voucher-card.applied { background: #f0fdf7; border-color: #34d399; }
+  html.sf-site .bnn-voucher-card.applied::before { background: #059669; }
   html.sf-site .pm-v-val { background: var(--pm-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
   html.sf-site .pm-v-btn { background: var(--pm-grad); border: 0; color: #fff; box-shadow: var(--pm-glow); }
   html.sf-site .bnn-voucher-card:hover .pm-v-btn { border: 0; transform: scale(1.05); }
-  html.sf-site .pm-v-btn.on { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 10px 20px -10px rgba(5, 150, 105, .7); }
-  html.dark.sf-site .bnn-voucher-card, html.sf-site.dark .bnn-voucher-card { background: linear-gradient(135deg, rgba(255, 107, 0, .14), rgba(244, 63, 94, .10)); border-color: rgba(255, 138, 61, .35); }
+  html.sf-site .pm-v-btn.on { background: #059669; box-shadow: none; }
+  html.dark.sf-site .bnn-voucher-card, html.sf-site.dark .bnn-voucher-card { background: #1e293b; border-color: #334155; }
 
   /* ดูล่าสุด / ข่าว / ยอดนิยม */
-  html.sf-site .pm-recent-item { background: linear-gradient(135deg, #fff3e8, #eef3fb); transition: transform .2s var(--ease-out), box-shadow .2s; }
+  html.sf-site .pm-recent-item { background: var(--pm-well); transition: transform .2s var(--ease-out), box-shadow .2s; }
   html.sf-site .pm-recent-item:hover { transform: translateY(-2px); box-shadow: 0 10px 18px -12px rgba(15, 42, 67, .5); }
   html.sf-site .sf-news-card { animation: pmRise .5s var(--ease-out) both; }
   html.sf-site .sf-news-card:nth-child(2) { animation-delay: 60ms; } html.sf-site .sf-news-card:nth-child(3) { animation-delay: 120ms; } html.sf-site .sf-news-card:nth-child(4) { animation-delay: 180ms; }
@@ -2124,25 +2109,18 @@
   html.sf-site .sf-news-card:hover .sf-news-img { transform: translateY(-4px); }
   html.sf-site .sf-news-cat { display: inline-block; align-self: flex-start; padding: 2px 10px; border-radius: 999px; background: rgba(255, 107, 0, .12); color: #C2410C; font-weight: 700; }
   html.sf-site .sf-news-card:hover .sf-news-title { color: #E85F00; }
-  html.sf-site .sf-pop-card { background: linear-gradient(160deg, #fff7ef, #eef3ff); animation: pmRise .5s var(--ease-out) both; transition: transform .25s var(--ease-out), box-shadow .25s; }
+  html.sf-site .sf-pop-card { background: var(--pm-well); animation: pmRise .5s var(--ease-out) both; transition: transform .25s var(--ease-out), box-shadow .25s; }
   html.sf-site .sf-pop-card:nth-child(2) { animation-delay: 50ms; } html.sf-site .sf-pop-card:nth-child(3) { animation-delay: 100ms; } html.sf-site .sf-pop-card:nth-child(4) { animation-delay: 150ms; } html.sf-site .sf-pop-card:nth-child(n+5) { animation-delay: 200ms; }
   html.sf-site .sf-pop-card:hover { transform: translateY(-5px); box-shadow: 0 20px 32px -20px rgba(15, 42, 67, .55); }
-  html.sf-site .sf-pop-rank { top: 8px; left: 8px; width: 24px; height: 24px; min-width: 24px; padding: 0; border-radius: 50%; background: #cbd5e1; color: #fff; font-size: 11px; }
-  html.sf-site .sf-pop-card:nth-child(1) .sf-pop-rank { background: linear-gradient(135deg, #f59e0b, #fbbf24); box-shadow: 0 6px 12px -4px rgba(245, 158, 11, .8); }
-  html.sf-site .sf-pop-card:nth-child(2) .sf-pop-rank { background: linear-gradient(135deg, #94a3b8, #cbd5e1); }
-  html.sf-site .sf-pop-card:nth-child(3) .sf-pop-rank { background: linear-gradient(135deg, #c2410c, #fb923c); }
-  html.sf-site .sf-pop-price { color: #E8305F; font-weight: 700; }
+  html.sf-site .sf-pop-rank { top: 8px; left: 8px; width: 24px; height: 24px; min-width: 24px; padding: 0; border-radius: 50%; background: #0f2a43; color: #fff; font-size: 11px; }
+  html.sf-site .sf-pop-price { color: var(--pm-ink); font-weight: 700; }
 
   /* ไทล์หมวด (มือถือ): ไอคอนวงกลมไล่เฉด หมวดละสี */
-  html.sf-site .sf-cattiles .sf-tile { background: linear-gradient(160deg, #ffffff, #fff4ea); border: 1px solid #ffe3cc; transition: transform .2s var(--ease-out), box-shadow .2s; }
-  html.sf-site .sf-cattiles .sf-tile:hover { transform: translateY(-3px); box-shadow: 0 14px 22px -14px rgba(255, 90, 40, .6); }
-  html.sf-site .sf-cattiles .sf-tile-ic { width: 38px; height: 38px; font-size: 16px; color: #fff; background: var(--pm-grad); box-shadow: 0 8px 14px -8px rgba(255, 90, 40, .8); }
-  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+2) .sf-tile-ic { background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 8px 14px -8px rgba(79, 70, 229, .8); }
-  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+3) .sf-tile-ic { background: linear-gradient(135deg, #10b981, #14b8a6); box-shadow: 0 8px 14px -8px rgba(5, 150, 105, .8); }
-  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+4) .sf-tile-ic { background: linear-gradient(135deg, #f43f5e, #fb7185); box-shadow: 0 8px 14px -8px rgba(225, 29, 72, .8); }
-  html.sf-site .sf-cattiles .sf-tile:nth-child(5n+5) .sf-tile-ic { background: linear-gradient(135deg, #8b5cf6, #a78bfa); box-shadow: 0 8px 14px -8px rgba(124, 58, 237, .8); }
-  html.sf-site .sf-cattiles .sf-tile.on { background: linear-gradient(135deg, #0f2a43, #1b3a59); border-color: transparent; }
-  html.sf-site .sf-cattiles .sf-tile.on .sf-tile-ic { color: #fff; background: var(--pm-grad); box-shadow: 0 8px 16px -8px rgba(255, 90, 40, .9); }
+  html.sf-site .sf-cattiles .sf-tile { background: var(--pm-bg); border: 1px solid var(--pm-line); transition: transform .2s var(--ease-out), box-shadow .2s; }
+  html.sf-site .sf-cattiles .sf-tile:hover { transform: translateY(-2px); box-shadow: 0 12px 20px -16px rgba(15, 42, 67, .5); }
+  html.sf-site .sf-cattiles .sf-tile-ic { width: 38px; height: 38px; font-size: 16px; color: #0f2a43; background: var(--pm-well); }
+  html.sf-site .sf-cattiles .sf-tile.on { background: #0f2a43; border-color: transparent; }
+  html.sf-site .sf-cattiles .sf-tile.on .sf-tile-ic { color: #fff; background: var(--pm-grad); }
 
   /* ตัวกรองด้านซ้าย */
   html.sf-site .pos-storefront .sf-opt.on .sf-box { background: var(--pm-grad); border-color: transparent; }
@@ -2153,31 +2131,26 @@
   html.sf-site .pos-storefront .sf-group summary:hover { color: #E85F00; }
   html.sf-site .pos-storefront .sf-title i { color: #FF6B00; }
   html.sf-site .pos-storefront .sf-sort select:focus, html.sf-site .pos-storefront .sf-price input:focus { border-color: #FF6B00; box-shadow: 0 0 0 3px rgba(255, 107, 0, .16); }
-  html.sf-site .sf-pager .sf-pg.on { background: var(--pm-grad); border-color: transparent; color: #fff; box-shadow: var(--pm-glow); }
+  html.sf-site .sf-pager .sf-pg.on { background: #0f2a43; border-color: transparent; color: #fff; }
   html.sf-site .sf-pager .sf-pg:hover:not(:disabled):not(.on) { background: #fff3e8; color: #E85F00; }
 
   /* การ์ดสินค้า: แท่นรูปไล่เฉดพีช→ฟ้า, ยกตัว + เรืองแสงส้มเมื่อชี้ */
-  html.sf-site .pos-storefront .pm-media { background: linear-gradient(145deg, #fff3e8 0%, #f4f1fb 55%, #eaf2fb 100%); transition: transform .35s var(--ease-out), box-shadow .35s; }
-  html.sf-site .pos-storefront .pm-card:hover .pm-media { background: linear-gradient(145deg, #ffe9d6 0%, #efeafb 55%, #e1edfb 100%); transform: translateY(-6px); box-shadow: 0 26px 40px -22px rgba(255, 90, 40, .55); }
-  html.sf-site .pos-storefront .pm-media > img { filter: drop-shadow(0 14px 16px rgba(15, 42, 67, .22)); }
+  html.sf-site .pos-storefront .pm-media { background: #f5f6f8; transition: transform .35s var(--ease-out), box-shadow .35s; }
+  html.sf-site .pos-storefront .pm-card:hover .pm-media { background: #eff1f4; transform: translateY(-6px); box-shadow: 0 22px 34px -24px rgba(15, 42, 67, .45); }
+  html.sf-site .pos-storefront .pm-media > img { filter: drop-shadow(0 10px 12px rgba(15, 42, 67, .14)); }
   html.sf-site .pos-storefront .pm-card:hover .pm-media > img { transform: scale(1.07) rotate(-1.5deg); }
   html.sf-site .pos-storefront .pm-name[role="link"]:hover { color: #E85F00; }
-  html.sf-site .pos-storefront .sf-brand { color: #E85F00; font-weight: 700; }
-  html.sf-site .pos-storefront .sf-save { color: #E8305F; }
-  html.sf-site .pos-storefront .bnn-discount-badge { background: linear-gradient(135deg, #FF3D6E, #FF6B00); color: #fff; box-shadow: 0 8px 16px -8px rgba(255, 61, 110, .9); animation: pmBadge 2.4s ease-in-out infinite; }
-  html.sf-site .pos-storefront .pm-tag { background: rgba(54, 104, 145, .10); color: #1f4a6e; }
-  html.sf-site .pos-storefront .pm-tag i { color: inherit; opacity: .8; }
-  html.sf-site .pos-storefront .pm-tag-gift { background: rgba(16, 185, 129, .13); color: #047857; }
-  html.sf-site .pos-storefront .pm-tag-deal { background: rgba(244, 63, 94, .11); color: #BE123C; }
-  html.sf-site .pos-storefront .pm-chip.on { border-color: #FF6B00; color: #C2410C; background: rgba(255, 107, 0, .08); }
+  html.sf-site .pos-storefront .sf-save { color: #BE123C; }
+  html.sf-site .pos-storefront .bnn-discount-badge { background: #E11D48; color: #fff; }
+  html.sf-site .pos-storefront .pm-chip.on { border-color: var(--pm-ink); color: var(--pm-ink); background: transparent; }
   html.sf-site .pos-storefront .color-dot { transition: transform .15s var(--ease-out), box-shadow .15s; }
   html.sf-site .pos-storefront .color-dot:hover { transform: scale(1.25); box-shadow: 0 4px 10px -3px rgba(15, 42, 67, .5); }
   html.sf-site .pos-storefront .sf-stock.low .pm-dot { animation: pmPulse 1.4s ease-in-out infinite; }
-  html.sf-site .pos-storefront .sf-stock.ok .sf-stock-bar > span, html.sf-site .pos-storefront .sf-stock-bar > span { background: linear-gradient(90deg, #10b981, #34d399); }
-  html.sf-site .pos-storefront .sf-stock.low .sf-stock-bar > span { background: linear-gradient(90deg, #FF6B00, #FF3D6E); }
+  html.sf-site .pos-storefront .sf-stock-bar > span { background: #94a3b8; }
+  html.sf-site .pos-storefront .sf-stock.low .sf-stock-bar > span { background: #E11D48; }
   html.sf-site .pos-storefront .pm-card .bnn-buy-btn { position: relative; overflow: hidden; background: var(--pm-grad); box-shadow: var(--pm-glow); transition: transform .2s var(--ease-out), box-shadow .2s; }
   html.sf-site .pos-storefront .pm-card .bnn-buy-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .5) 50%, transparent 70%); transform: translateX(-120%); transition: transform .7s var(--ease-out); pointer-events: none; }
-  html.sf-site .pos-storefront .pm-card .bnn-buy-btn:hover { background: var(--pm-grad-hover); transform: translateY(-2px); box-shadow: 0 16px 28px -10px rgba(255, 90, 40, .75); }
+  html.sf-site .pos-storefront .pm-card .bnn-buy-btn:hover { background: var(--pm-grad-hover); transform: translateY(-2px); box-shadow: 0 10px 18px -10px rgba(255, 107, 0, .6); }
   html.sf-site .pos-storefront .pm-card .bnn-buy-btn:hover::after { transform: translateX(120%); }
   html.sf-site .pos-storefront .pm-card .bnn-buy-btn:active { transform: translateY(0) scale(.98); }
   html.sf-site .pos-storefront .pm-wish.text-rose-500 { background: #fff1f4; color: #E11D48; }
@@ -2188,30 +2161,23 @@
   .pm-trust li { transition: transform .25s var(--ease-out); animation: pmRise .55s var(--ease-out) both; }
   .pm-trust li:nth-child(2) { animation-delay: 80ms; } .pm-trust li:nth-child(3) { animation-delay: 160ms; } .pm-trust li:nth-child(4) { animation-delay: 240ms; }
   .pm-trust li:hover { transform: translateY(-4px); }
-  .pm-trust i { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff; margin-top: 0; background: var(--pm-grad); box-shadow: 0 10px 18px -10px rgba(255, 90, 40, .9); }
-  .pm-trust li:nth-child(2) i { background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 10px 18px -10px rgba(79, 70, 229, .9); }
-  .pm-trust li:nth-child(3) i { background: linear-gradient(135deg, #f43f5e, #fb7185); box-shadow: 0 10px 18px -10px rgba(225, 29, 72, .9); }
-  .pm-trust li:nth-child(4) i { background: linear-gradient(135deg, #10b981, #14b8a6); box-shadow: 0 10px 18px -10px rgba(5, 150, 105, .9); }
-  .pm-gate-ico { background: var(--pm-grad); color: #fff; box-shadow: 0 14px 24px -12px rgba(255, 90, 40, .9); animation: pmBadge 2.4s ease-in-out infinite; }
+  .pm-trust i { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #0f2a43; margin-top: 0; background: var(--pm-well, #f5f5f7); }
+  .pm-gate-ico { background: var(--pm-grad); color: #fff; }
   .pm-eyebrow { background: var(--pm-grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
 
   /* Footer: กรมท่าเข้ม + แถบสีไล่เฉดด้านบน */
-  html.sf-site .pos-footer { background: linear-gradient(180deg, #0f1b2d, #0a1220); border-top: 4px solid transparent; border-image: linear-gradient(90deg, #FF6B00, #FF3D6E, #6366f1, #10b981) 1; }
+  html.sf-site .pos-footer { background: #0c1626; border-top: 1px solid rgba(255, 255, 255, .08); }
   html.sf-site .pf-links button:hover { transform: translateX(4px); }
   html.sf-site .pf-links button { transition: color .15s, transform .2s var(--ease-out); }
   html.sf-site .pf-trust i { color: #FF9A3D; }
 
   /* โหมดมืด: แท่น/ป้าย/การ์ดสีอ่อนเปลี่ยนเป็นโทนเข้ม */
-  html.sf-site.dark .pos-storefront .pm-media, html.sf-site.dark .pos-storefront .pm-card:hover .pm-media { background: linear-gradient(145deg, #3a2a22 0%, #2b2a3d 55%, #223048 100%); }
-  html.sf-site.dark .sf-pop-card, html.sf-site.dark .pm-recent-item { background: linear-gradient(160deg, rgba(255, 107, 0, .14), rgba(99, 102, 241, .12)); }
-  html.sf-site.dark .sf-cattiles .sf-tile { background: linear-gradient(160deg, #1b2536, #2a2330); border-color: rgba(255, 138, 61, .25); }
-  html.sf-site.dark .pos-storefront .pm-tag { background: rgba(96, 165, 250, .16); color: #93c5fd; }
-  html.sf-site.dark .pos-storefront .pm-tag-gift { background: rgba(52, 211, 153, .16); color: #6ee7b7; }
-  html.sf-site.dark .pos-storefront .pm-tag-deal { background: rgba(251, 113, 133, .16); color: #fda4af; }
-  html.sf-site.dark .pos-storefront .pm-chip.on { color: #FFB37A; background: rgba(255, 107, 0, .14); }
+  html.sf-site.dark .pos-storefront .pm-media, html.sf-site.dark .pos-storefront .pm-card:hover .pm-media { background: #1e293b; }
+  html.sf-site.dark .sf-pop-card, html.sf-site.dark .pm-recent-item { background: #1e293b; }
+  html.sf-site.dark .sf-cattiles .sf-tile { background: #1b2536; border-color: #334155; }
+  html.sf-site.dark .pos-storefront .pm-chip.on { border-color: #f1f5f9; color: #f1f5f9; background: transparent; }
   html.sf-site.dark .sf-news-cat { background: rgba(255, 138, 61, .18); color: #FFB37A; }
   html.sf-site.dark .sf-pop-price, html.sf-site.dark .pos-storefront .sf-save { color: #fda4af; }
-  html.sf-site.dark .pos-storefront .sf-brand { color: #FFA566; }
   html.sf-site.dark .pos-storefront .pm-wish.text-rose-500 { background: rgba(251, 113, 133, .18); color: #fda4af; }
 
   /* ===================================================
@@ -2223,13 +2189,6 @@
   @keyframes pmFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
   /* แสงสีลอยช้าๆ ด้านหลังเนื้อหา (ทำให้พื้นหลังไม่นิ่ง) */
-  html.sf-site body::before { content: ''; position: fixed; inset: -12%; z-index: -1; pointer-events: none; will-change: transform;
-    background:
-      radial-gradient(38% 34% at 84% 14%, rgba(255, 107, 0, .13), transparent 70%),
-      radial-gradient(36% 38% at 8% 34%, rgba(54, 104, 145, .13), transparent 70%),
-      radial-gradient(44% 38% at 62% 96%, rgba(244, 63, 94, .09), transparent 70%);
-    animation: pmAurora 24s ease-in-out infinite alternate; }
-  html.sf-site.dark body::before { opacity: .8; }
 
   /* แถบความคืบหน้าการเลื่อนหน้า (ใช้ scroll-driven animation; เบราว์เซอร์ที่ไม่รองรับจะไม่แสดง) */
   @supports (animation-timeline: scroll()) {
@@ -2254,16 +2213,12 @@
   html.sf-site .pos-storefront .pm-card:active .pm-media { transform: translateY(-2px) scale(.985); }
 
   /* คูปอง: แสงตามเมาส์ */
-  html.sf-site .bnn-voucher-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
-    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 138, 61, .20), transparent 65%); }
-  html.sf-site .bnn-voucher-card:hover::after { opacity: 1; }
 
   /* ตะกร้าเด้งเมื่อจำนวนเปลี่ยน */
   html.sf-site .pos-cart-count.pm-bump { animation: pmPop .5s var(--ease-out); }
 
   /* ป้าย PRE BOOKING: แสงวาบกวาดผ่านเป็นระยะ + ฟ้าผ่าเต้น */
   html.sf-site .bnn-flash-emblem { position: relative; overflow: hidden; }
-  html.sf-site .bnn-flash-emblem::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent); animation: pmSheen 3.2s ease-in-out infinite; pointer-events: none; }
 
   /* ไอคอนในแถบบริการลอยเบาๆ สลับจังหวะ */
   .pm-trust i { animation: pmFloat 4s ease-in-out infinite; }
@@ -2272,10 +2227,10 @@
   /* แถบแบรนด์ (pos.renderBrandStrip): ชิปกลมเลื่อนแนวนอน, ไอคอนตัวอักษรแรกไล่สีตามชื่อแบรนด์ (--h = เฉดสี) */
   .sf-brand-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; scroll-snap-type: x proximity; }
   .sf-brand-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 9px; padding: 7px 12px 7px 8px; border-radius: 999px; border: 1px solid var(--pm-line); background: var(--pm-bg); color: var(--pm-ink); font-size: 13px; font-weight: 600; cursor: pointer; scroll-snap-align: start; transition: transform .2s var(--ease-out), box-shadow .2s, border-color .2s, background .2s, color .2s; }
-  .sf-brand-chip:hover { transform: translateY(-2px); border-color: #FF6B00; box-shadow: 0 10px 20px -12px rgba(255, 90, 40, .55); }
+  .sf-brand-chip:hover { transform: translateY(-2px); border-color: #0f2a43; }
   .sf-brand-chip:active { transform: scale(.97); }
-  .sf-brand-chip.on { background: var(--pm-grad); color: #fff; border-color: transparent; box-shadow: var(--pm-glow); }
-  .sf-brand-ic { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; background: linear-gradient(135deg, hsl(var(--h) 80% 55%), hsl(calc(var(--h) + 40) 85% 48%)); }
+  .sf-brand-chip.on { background: #0f2a43; color: #fff; border-color: transparent; }
+  .sf-brand-ic { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #0f2a43; background: var(--pm-well, #f5f5f7); }
   .sf-brand-chip.on .sf-brand-ic { background: rgba(255, 255, 255, .28); }
   .sf-brand-n { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--pm-well); color: var(--pm-mute); font-size: 11px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
   .sf-brand-chip.on .sf-brand-n { background: rgba(255, 255, 255, .25); color: #fff; }
@@ -2283,24 +2238,24 @@
   /* ป้าย NEW / ขายดี บนรูปสินค้า (มุมซ้ายล่าง) + ป้าย NEW บนการ์ดชั้น "สินค้าใหม่" */
   .pm-flags { position: absolute; left: 10px; bottom: 10px; z-index: 4; display: flex; gap: 5px; pointer-events: none; }
   .pm-flag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: #fff; line-height: 1.4; }
-  .pm-flag-new { background: linear-gradient(135deg, #10b981, #14b8a6); box-shadow: 0 6px 12px -6px rgba(5, 150, 105, .8); }
-  .pm-flag-hot { background: linear-gradient(135deg, #f59e0b, #ef4444); box-shadow: 0 6px 12px -6px rgba(239, 68, 68, .8); }
-  .pm-flag-hot i { font-size: 10px; animation: pmPulse 1.4s ease-in-out infinite; }
+  .pm-flag-new { background: #0f2a43; }
+  .pm-flag-hot { background: #0f2a43; }
+  .pm-flag-hot i { font-size: 10px; color: #FF9A3D; }
   .sf-new-card { position: relative; }
-  .sf-new-tag { position: absolute; top: 8px; left: 8px; z-index: 2; padding: 2px 9px; border-radius: 999px; background: linear-gradient(135deg, #10b981, #14b8a6); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; box-shadow: 0 6px 12px -6px rgba(5, 150, 105, .8); }
+  .sf-new-tag { position: absolute; top: 8px; left: 8px; z-index: 2; padding: 2px 9px; border-radius: 999px; background: #0f2a43; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .06em; }
 
   /* หน้าโปรโมชั่นทั้งหมด (promoHubModal): กริดแบนเนอร์แคมเปญ + การ์ดคูปอง/ซื้อคู่ */
   .pm-sec-more { margin-left: auto; align-self: center; border: 0; background: none; color: #E85F00; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; padding: 4px 2px; }
   .pm-sec-more i { font-size: 10px; transition: transform .2s var(--ease-out); }
   .pm-sec-more:hover i { transform: translateX(3px); }
-  .sf-nav-promo { color: #E8305F; }
+  .sf-nav-promo { color: #E85F00; }
   .sf-nav-promo i { margin-right: 6px; color: #FF6B00; }
   .sf-promo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
   .sf-promo-grid-sm { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
   .sf-camp { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; padding: 0; border-radius: 18px; overflow: hidden; cursor: pointer; background: var(--pm-well); text-align: left; box-shadow: 0 14px 28px -20px rgba(15, 42, 67, .7); transition: transform .25s var(--ease-out), box-shadow .25s; animation: pmRise .45s var(--ease-out) backwards; }
   .sf-camp:nth-child(2) { animation-delay: 50ms; } .sf-camp:nth-child(3) { animation-delay: 100ms; } .sf-camp:nth-child(n+4) { animation-delay: 150ms; }
   .sf-camp img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s var(--ease-out); }
-  .sf-camp:hover { transform: translateY(-4px); box-shadow: 0 22px 34px -20px rgba(255, 90, 40, .6); }
+  .sf-camp:hover { transform: translateY(-4px); box-shadow: 0 22px 34px -22px rgba(15, 42, 67, .7); }
   .sf-camp:hover img { transform: scale(1.06); }
   .sf-camp-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 14px 12px; display: flex; flex-direction: column; gap: 2px; background: linear-gradient(to top, rgba(15, 42, 67, .88), transparent); color: #fff; }
   .sf-camp-cap b { font-size: 14px; font-weight: 700; }
@@ -2337,11 +2292,26 @@
 
   /* ปุ่มกลับขึ้นบน + หัวใจรายการโปรด: เด้งตอบสนอง */
   html.sf-site #backToTopBtn { transition: transform .2s var(--ease-out), box-shadow .2s; }
-  html.sf-site #backToTopBtn:hover { transform: translateY(-4px); box-shadow: 0 14px 24px -10px rgba(255, 90, 40, .6); }
+  html.sf-site #backToTopBtn:hover { transform: translateY(-4px); box-shadow: 0 14px 24px -12px rgba(15, 42, 67, .5); }
   html.sf-site .pos-storefront .pm-wish:active { transform: scale(.85); }
 
   @media (prefers-reduced-motion: reduce) {
     html.sf-site *, html.sf-site *::before, html.sf-site *::after { animation: none !important; }
     html.sf-site .pos-storefront .pm-card:hover .pm-media { transform: translateY(-6px) !important; }
+  }
+
+  /* CLEAN CARD — การ์ดสินค้าแบบเรียบ: ตัวเลือกสี+ความจุแถวเดียว, ราคา+ราคาเดิม+ประหยัดแถวเดียว, โปรโมชั่นเป็นข้อความบรรทัดเดียว (ไม่มีป้ายหลายสี)
+     สีที่ใช้บนหน้าร้าน: ส้ม #FF6B00 = ปุ่มหลัก/ลิงก์, กรมท่า #0f2a43 = ป้ายสถานะ, แดง #E11D48 = ส่วนลดเท่านั้น */
+  .pos-storefront .pm-vars { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
+  .pos-storefront .pm-pricerow { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; margin-bottom: 6px; }
+  .pos-storefront .pm-strike { font-size: 11.5px; color: var(--pm-mute, #868c98); text-decoration: line-through; }
+  .pos-storefront .pm-promo { margin-bottom: 6px; font-size: 11.5px; font-weight: 500; line-height: 1.5; color: var(--pm-ink-2, #454b57); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pos-storefront .pm-promo i { margin-right: 6px; font-size: 10px; color: #FF6B00; }
+  html.dark .pos-storefront .pm-promo { color: #cbd5e1; }
+  html.dark .pos-storefront .pm-strike { color: #94a3b8; }
+  /* ปุ่มเทียบสเปคบนรูป: จอที่มีเมาส์แสดงเมื่อชี้การ์ด (หรือกำลังเทียบอยู่/โฟกัสด้วยคีย์บอร์ด) — จอสัมผัสแสดงตลอด */
+  @media (hover: hover) and (pointer: fine) {
+    .pos-storefront .pm-card .bnn-compare-btn:not(.active) { opacity: 0; }
+    .pos-storefront .pm-card:hover .bnn-compare-btn, .pos-storefront .pm-card .bnn-compare-btn:focus-visible { opacity: 1; }
   }
 </style>

@@ -1459,7 +1459,7 @@ window.app.pos = {
       sh += '<div class="sf-title"><i class="fas fa-sliders"></i> กรองข้อมูลสินค้า</div>';
       sh += '<button type="button" class="sf-switch' + (f.inStock ? ' on' : '') + '" onclick="window.app.pos.setStoreFilter(\'inStock\', ' + (f.inStock ? 'false' : 'true') + ')" role="switch" aria-checked="' + (f.inStock ? 'true' : 'false') + '"><span>แสดงสินค้าพร้อมขาย</span><span class="sf-knob"></span></button>';
       sh += grp('หมวดสินค้า', opt(f.category === '', 'สินค้าทั้งหมด', "window.app.pos.setStoreCategory('')")
-        + cats.map(c => opt(f.category === c, c, "window.app.pos.setStoreCategory('" + escJs(c) + "')")).join(''));
+        + cats.filter(c => !c.includes('ของแถม') || f.category === c).map(c => opt(f.category === c, c, "window.app.pos.setStoreCategory('" + escJs(c) + "')")).join(''));
       if (groups.length > 0) {
         sh += grp('ซีรีส์ / รุ่น', groups.map(g => opt(f.groups.includes(g), g, "window.app.pos.setStoreGroup('" + escJs(g) + "')")).join(''));
       }
@@ -2155,19 +2155,19 @@ window.app.pos = {
           const pct = parseFloat(r['Discount Percent']) || 0;
           if (pct > 0 && (!best || pct > best.pct)) best = { pct: pct, buyCat: (r['Buy Category'] || '').toString().trim() };
         });
-        if (best) bundleBadge = '<span class="pm-tag pm-tag-deal"><i class="fas fa-tags"></i> ลด ' + esc(best.pct) + '% เมื่อซื้อคู่ ' + esc(best.buyCat) + '</span>';
+        if (best) bundleBadge = 'ลด ' + esc(best.pct) + '% เมื่อซื้อคู่ ' + esc(best.buyCat);
       }
 
       // Phase 2 Smart E-Commerce Badges: ผ่อน 0% + แถมฟรี X รายการ + ปุ่มเทียบสเปค
       let installmentBadge = '';
       if (!isGift && priceNum >= 3000) {
-        installmentBadge = '<span class="pm-tag"><i class="far fa-credit-card"></i> ผ่อน 0% ฿' + Math.ceil(priceNum / 10).toLocaleString() + '/ด.</span>';
+        installmentBadge = 'ผ่อน 0% ฿' + Math.ceil(priceNum / 10).toLocaleString() + '/ด.';
       }
       let giftCountBadge = '';
       if (!isGift) {
         const giftInfo = this.countEligibleGifts(variant, currentChannelForBadge);
         if (giftInfo.total > 0) {
-          giftCountBadge = '<span class="pm-tag pm-tag-gift"><i class="fas fa-gift"></i> แถมฟรี ' + giftInfo.total + ' รายการ</span>';
+          giftCountBadge = 'แถมฟรี ' + giftInfo.total + ' รายการ';
         }
       }
       const isCompared = (this.compareList || []).includes(cardKey);
@@ -2221,35 +2221,22 @@ window.app.pos = {
       card += '      <div class="sf-brand">' + brandLabel + '</div>';
       const nameOpenAttr = openable ? ' role="link" tabindex="0" onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')" onkeydown="if(event.key===\'Enter\'){window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')}"' : '';
       card += '      <div class="pm-name line-clamp-2' + (openable ? ' cursor-pointer' : '') + '"' + nameOpenAttr + ' title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
-      if (p.isGroup) card += '<div class="text-[10px] text-slate-500 font-medium line-clamp-1 -mt-0.5" title="' + esc(pName) + '">' + esc(pName) + '</div>';
-      if (bundleBadge || installmentBadge || giftCountBadge) {
-        card += '<div class="flex items-center gap-1 flex-wrap">' + bundleBadge + installmentBadge + giftCountBadge + '</div>';
-      }
-      if (dotsHtml) card += '<div class="flex items-center gap-1.5 flex-wrap pt-0.5">' + dotsHtml + '</div>';
-      if (chipsHtml) card += '<div class="flex items-center gap-1 flex-wrap pt-0.5">' + chipsHtml + '</div>';
+      // การ์ดแบบเรียบ: ชื่อ → ตัวเลือก (สี+ความจุ แถวเดียว) → ราคา → โปร 1 บรรทัด → สต๊อก → ปุ่ม (ชื่อเต็ม/ป้ายย่อยอยู่ในหน้ารายละเอียด)
+      if (dotsHtml || chipsHtml) card += '<div class="pm-vars">' + dotsHtml + chipsHtml + '</div>';
       card += '      <div class="pm-foot mt-auto">';
-      // ราคาช่วงสไตล์ BNN: รุ่นที่มีหลายราคา (ตามความจุ/สี) แสดง "฿ต่ำสุด - ฿สูงสุด" แล้วบอกราคาของรุ่นที่เลือกอยู่ไว้ใต้ราคา
+      // ราคาของตัวเลือกที่เลือกอยู่ (กดความจุ/สีแล้วราคาเปลี่ยนตาม) + ราคาเดิมขีดฆ่า + ประหยัด ในแถวเดียว
+      // รุ่นที่ราคาต่างกันตามความจุ/สี: ราคาหลัก = ช่วง "฿ต่ำสุด - ฿สูงสุด" แล้วบอกราคาของตัวที่เลือกในแถวถัดไป
       let rMin = priceNum, rMax = priceNum;
-      if (p.isGroup) {
-        p.products.forEach(v => {
-          const n = parseFloat(String(v.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
-          if (n < rMin) rMin = n;
-          if (n > rMax) rMax = n;
-        });
-      }
+      if (p.isGroup) p.products.forEach(v => { const n = parseFloat(String(v.Price || '0').replace(/[^\d.\-]/g, '')) || 0; if (n < rMin) rMin = n; if (n > rMax) rMax = n; });
       const hasRange = rMax > rMin;
-      const strikeHtml = hasSave ? '<span class="text-[10px] text-slate-400 line-through font-semibold tabular-nums">฿' + origNum.toLocaleString() + '</span>' : '';
-      if (hasRange) {
-        card += '        <div class="mb-0.5"><span class="sf-range pm-price tabular-nums">฿' + rMin.toLocaleString() + ' - ฿' + rMax.toLocaleString() + '</span></div>';
-        card += '        <div class="sf-selprice flex items-baseline gap-1.5 flex-wrap ' + (hasSave ? 'mb-0.5' : 'mb-2') + '">รุ่นที่เลือก <b class="tabular-nums">฿' + price + '</b>' + strikeHtml + '</div>';
-      } else {
-        card += '        <div class="flex items-baseline gap-1.5 flex-wrap ' + (hasSave ? 'mb-0.5' : 'mb-2') + '">';
-        card += '          <span class="pm-price tabular-nums">฿' + price + '</span>' + strikeHtml;
-        card += '        </div>';
-      }
-      if (hasSave) {
-        card += '      <div class="sf-save mb-2">ประหยัด ฿' + (origNum - priceNum).toLocaleString() + '</div>';
-      }
+      if (hasRange) card += '        <div class="mb-0.5"><span class="sf-range pm-price tabular-nums">฿' + rMin.toLocaleString() + ' - ฿' + rMax.toLocaleString() + '</span></div>';
+      card += '        <div class="pm-pricerow' + (hasRange ? ' sf-selprice' : '') + '">';
+      card += hasRange ? '          รุ่นที่เลือก <b class="tabular-nums">฿' + price + '</b>' : '          <span class="pm-price tabular-nums">฿' + price + '</span>';
+      if (hasSave) card += '<span class="pm-strike tabular-nums">฿' + origNum.toLocaleString() + '</span><span class="sf-save">ประหยัด ฿' + (origNum - priceNum).toLocaleString() + '</span>';
+      card += '        </div>';
+      // โปรโมชั่นรวมเป็นข้อความบรรทัดเดียว (ตัดด้วย … เมื่อยาวเกิน; ข้อความเต็มอยู่ใน title)
+      const promoBits = [bundleBadge, giftCountBadge, installmentBadge].filter(Boolean);
+      if (promoBits.length) card += '        <div class="pm-promo" title="' + promoBits.join(' · ') + '"><i class="fas fa-tag"></i>' + promoBits.join(' · ') + '</div>';
       card +=          stockBarHtml;
       card +=          bookBtn;
       card += '      </div>';
