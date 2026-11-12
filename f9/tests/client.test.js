@@ -270,6 +270,33 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await T('compare toggle adds to compare bar', async () => { await ev("document.querySelector('#productGrid .bnn-compare-btn').click();true"); await sleep(300); ok(await ev("window.app.pos.compareList.length>=1")); });
   await T('add-to-cart modal opens for a SKU', async () => { await ev("window.app.pos.openAddToCartModal('T1-0');true"); await sleep(500); ok(await ev("(()=>{const m=document.getElementById('addToCartModal')||document.querySelector('[id*=\"ddToCart\"]');return !!m && !m.classList.contains('hidden')})()") || true); });
   await shot('pos-modal');
+  await T('product detail page: full screen, breadcrumb, tabs (gifts first), sticky add-to-cart bar, no horizontal overflow', async () => {
+    await ev("window.app.hideModal('compareModal');window.app.pos.openAddToCartModal('MODEL:Galaxy Test1');true"); await sleep(400); await shot('pos-detail-page');
+    const r = JSON.parse(await ev(`(()=>{const m=document.getElementById('addToCartModal'),b=m.getBoundingClientRect(),bar=m.querySelector('.pd-bar').getBoundingClientRect(),sc=document.getElementById('pdScroll');
+      const vis=id=>!document.getElementById(id).classList.contains('hidden');
+      return JSON.stringify({w:b.width,h:b.height,iw:innerWidth,ih:innerHeight,barBottom:bar.bottom,crumb:document.getElementById('pdCrumb').textContent,name:document.getElementById('modalProdName').textContent,
+        barName:document.getElementById('pdBarName').textContent,barPrice:document.getElementById('pdBarPrice').textContent,price:document.getElementById('modalProdPrice').textContent,
+        tabs:[...m.querySelectorAll('.pd-tab')].map(t=>t.textContent.trim()),on:m.querySelector('.pd-tab.on').dataset.tab,gifts:vis('pdPanel-gifts'),specs:vis('pdPanel-specs'),
+        vars:vis('modalVariantSelection'),opts:m.querySelectorAll('#modalColorOptions button').length,over:sc.scrollWidth>sc.clientWidth+1,terms:document.getElementById('pdTerms').textContent.length})})()`));
+    ok(r.w === r.iw && r.h === r.ih, 'not full screen: ' + JSON.stringify(r));
+    ok(Math.abs(r.barBottom - r.ih) <= 1, 'bar must sit on the bottom edge: ' + r.barBottom + '/' + r.ih);
+    ok(r.crumb.includes('หน้าร้าน') && r.crumb.includes('Galaxy Test1'), r.crumb);
+    ok(r.name && r.barName === r.name && r.barPrice === r.price && /^฿/.test(r.price), JSON.stringify(r));
+    eq(r.tabs.join('|'), 'ของแถม|สเปคสินค้า|ผ่อนชำระ|เงื่อนไขการจอง'); eq(r.on, 'gifts'); ok(r.gifts && !r.specs && r.vars && r.opts >= 2 && !r.over && r.terms > 20, JSON.stringify(r));
+    await ev("document.querySelector('#addToCartModal .pd-tab[data-tab=specs]').click();true"); await sleep(150);
+    const t = JSON.parse(await ev("JSON.stringify({specs:!document.getElementById('pdPanel-specs').classList.contains('hidden'),gifts:!document.getElementById('pdPanel-gifts').classList.contains('hidden'),rows:document.querySelectorAll('#pdSpecs .pd-spec > div').length,sel:document.querySelector('#addToCartModal .pd-tab[data-tab=specs]').getAttribute('aria-selected')})"));
+    ok(t.specs && !t.gifts && t.rows >= 3 && t.sel === 'true', JSON.stringify(t));
+    await shot('pos-detail-specs');
+    // เปลี่ยนสี = ชื่อ/แถบล่างเปลี่ยนตาม และแท็บที่เปิดอยู่ไม่เด้งกลับ
+    await ev("document.querySelectorAll('#modalColorOptions button')[1].click();true"); await sleep(200);
+    const v = JSON.parse(await ev("JSON.stringify({name:document.getElementById('modalProdName').textContent,bar:document.getElementById('pdBarName').textContent,on:document.querySelector('#addToCartModal .pd-tab.on').dataset.tab})"));
+    ok(v.name !== r.name && v.bar === v.name && v.on === 'specs', JSON.stringify(v));
+    // ปิดด้วยปุ่มกลับ แล้วเปิดใหม่ต้องเริ่มที่แท็บของแถม
+    await ev("document.querySelector('#addToCartModal .pd-back').click();true"); await sleep(200);
+    ok(await ev("document.getElementById('addToCartModal').classList.contains('hidden') && document.body.style.overflow===''"), 'back button must close the page');
+    await ev("window.app.pos.openAddToCartModal('T1-0');true"); await sleep(300);
+    eq(await ev("document.querySelector('#addToCartModal .pd-tab.on').dataset.tab"), 'gifts');
+  });
 
   console.log('== COMPANION (ซื้อคู่) RECOMMENDATIONS');
   const swalOpen = () => P("!!(window.Swal && Swal.isVisible())");
@@ -627,6 +654,15 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await T('mobile: filter button opens sidebar', async () => { await ev("document.querySelector('.sf-filter-btn').click();true"); await sleep(300); ok(await ev("getComputedStyle(document.getElementById('storeSidebar')).display!=='none'")); await ev("document.querySelector('.sf-filter-btn').click();true"); });
   await T('mobile: 2-column card grid', async () => { const cols = await ev("getComputedStyle(document.querySelector('#productGrid .pos-storefront.grid')).gridTemplateColumns.split(' ').length"); ok(cols === 2, 'cols=' + cols); });
   await shot('pos-mobile'); await ev("document.getElementById('posStoreHeader').scrollIntoView({block:'start',behavior:'instant'});window.scrollTo({top:0,behavior:'instant'});true"); await sleep(250); await shot('pos-top-mobile'); await ev("window.scrollTo({top:1200,behavior:'instant'});true"); await sleep(450); { const m = JSON.parse(await ev("JSON.stringify({top:document.getElementById('posStoreHeader').getBoundingClientRect().top,stuck:document.getElementById('posStoreHeader').classList.contains('is-stuck'),where:getComputedStyle(document.querySelector('.pos-where')).display})")); await T('sticky header (mobile): pinned at the top edge (website mode, no app topbar), channel/branch row hidden while stuck', async () => { ok(Math.abs(m.top) <= 2, JSON.stringify(m)); ok(m.stuck && m.where === 'none', JSON.stringify(m)); }); await shot('pos-sticky-mobile'); await ev("(()=>{const g=window.app.globalData;g.__bakS1=g.settings;g.settings=Object.assign({},g.settings,{ContactPhone:'02-123-4567',ContactLine:'@teststore',ContactHours:'10:00-20:00'});window.app.renderFooterContact();document.querySelector('footer').scrollIntoView({block:'end',behavior:'instant'});return true})()"); await sleep(300); await shot('footer-mobile'); await ev("(()=>{const g=window.app.globalData;g.settings=g.__bakS1;window.app.renderFooterContact();return true})()"); await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(250); }
+  await T('mobile: product detail page fits the screen, add-to-cart button fully visible', async () => {
+    await ev("window.app.pos.openAddToCartModal('MODEL:Galaxy Test1');true"); await sleep(500);
+    const r = JSON.parse(await ev(`(()=>{const m=document.getElementById('addToCartModal'),sc=document.getElementById('pdScroll'),c=m.querySelector('.pd-bar-cta').getBoundingClientRect(),h=m.querySelector('.pd-head');
+      return JSON.stringify({iw:innerWidth,ih:innerHeight,over:sc.scrollWidth>sc.clientWidth+1,headOver:h.scrollWidth>h.clientWidth+1,l:c.left,r:c.right,b:c.bottom,tabsW:m.querySelector('.pd-tabs').getBoundingClientRect().width})})()`));
+    await shot('pos-detail-mobile');
+    ok(!r.over && !r.headOver && r.l >= 0 && r.r <= r.iw + 1 && r.b <= r.ih + 1 && r.tabsW <= r.iw, JSON.stringify(r));
+    await ev("document.documentElement.classList.add('dark');true"); await sleep(250); await shot('pos-detail-mobile-dark');
+    await ev("document.documentElement.classList.remove('dark');window.app.hideModal('addToCartModal');true"); await sleep(250);
+  });
   await T('mobile: cart drawer companions fit the screen (no horizontal overflow)', async () => {
     await P("window.app.pos.cartData=[{...window.app.globalData.products.find(p=>p.SKU==='T3-0'),qty:1,brandGifts:[],channelGifts:[]}];window.app.pos.saveAndRender();window.app.pos.toggleCart();true"); await sleep(700);
     const m = JSON.parse(await P("JSON.stringify((()=>{const d=document.getElementById('cartDrawer'),c=document.getElementById('cartCompanions');return {dw:d.scrollWidth,dc:d.clientWidth,rows:c.querySelectorAll('.sf-comp').length,over:[...c.querySelectorAll('.sf-comp')].some(r=>r.scrollWidth>r.clientWidth+1),vis:!c.classList.contains('hidden')}})())"));

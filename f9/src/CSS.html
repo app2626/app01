@@ -2003,11 +2003,6 @@
   /* ---------- หน้าต่างรายละเอียดสินค้า: ลดสี เหลือสีหมึก + ปุ่มหลักส้มปุ่มเดียว ---------- */
   html.sf-site #addToCartModal .sf-dlg-ico { display: none; }
   .pm-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--pm-accent-ink, #c2410c); margin-bottom: 8px; }
-  html.sf-site #addToCartModal #modalProdName { font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
-  html.sf-site #addToCartModal #modalProdPrice { color: var(--pm-ink) !important; font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
-  html.sf-site:not(.dark) #addToCartModal #modalInstallmentBox { background: var(--pm-well); border-color: transparent; }
-  html.sf-site:not(.dark) #addToCartModal #modalVariantSelection { background: transparent; border-color: var(--pm-line); }
-  html.sf-site #addToCartModal .aspect-square { background: var(--pm-well); border: 0; box-shadow: none; }
 
   /* ---------- Footer ---------- */
   html.sf-site .pos-footer { margin-top: 56px; }
@@ -2384,4 +2379,144 @@
   html.dark #desktopSidebar #userMenuBtn:hover { background: #1e293b; }
   html.dark #desktopSidebar #userMenuBtn > div:first-child { background: #1e293b; }
   html.dark #desktopSidebar #userMenuBtn > div:first-child i { color: #cbd5e1; }
+
+  /* ===================================================
+     PRODUCT DETAIL PAGE — หน้ารายละเอียดสินค้าเต็มจอ (#addToCartModal.pd-page; เปิด/ปิดด้วย showModal/hideModal เหมือน popup เดิม)
+     โครง: .pd-head (กลับ + เส้นทาง) / .pd-scroll (รูป + ข้อมูล + แท็บ) / .pd-bar (ราคา + เพิ่มลงตะกร้า ติดขอบล่าง)
+     ห้ามตั้ง display ให้ .pd-page หรือองค์ประกอบที่สลับด้วย .hidden โดยตรง — ใช้ :not(.hidden) เพื่อไม่ทับ .hidden ของ Tailwind
+     =================================================== */
+  .pd-page { background: #ffffff; }
+  .pd-shell { height: 100%; display: flex; flex-direction: column; background: #ffffff; text-align: left; color: #0f172a; }
+  .pd-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 10px 16px; }
+  .pd-back, .pd-head-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; font-weight: 600; color: #0f172a; transition: background-color .15s, border-color .15s; }
+  .pd-back { border: 1px solid #e2e8f0; background: #ffffff; }
+  .pd-back:hover, .pd-head-btn:hover { background: #f4f6f9; }
+  .pd-head-btn { color: #334155; }
+  .pd-head-btn.pd-x { width: 38px; padding: 0; justify-content: center; font-size: 16px; }
+  .pd-crumb { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; font-size: 13px; color: #64748b; }
+  .pd-crumb button { flex: 0 0 auto; font-weight: 500; color: #64748b; }
+  .pd-crumb button:hover { color: #0f172a; text-decoration: underline; text-underline-offset: 3px; }
+  .pd-crumb i { flex: 0 0 auto; font-size: 9px; color: #cbd5e1; }
+  .pd-crumb span { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: #0f172a; }
+  .pd-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .pd-wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+  .pd-top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  @media (min-width: 900px) {
+    .pd-wrap { padding: 32px 24px 64px; }
+    .pd-top { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: start; }
+    .pd-gallery { position: sticky; top: 0; }
+    /* จอเตี้ย: ย่อรูปลงเพื่อให้เห็นแถบแท็บ (ของแถมที่ต้องเลือก) โดยไม่ต้องเลื่อน */
+    .pd-gallery .pd-stage { max-height: min(560px, max(280px, calc(100vh - 330px))); padding: 5%; }
+  }
+  /* รูปสินค้า */
+  .pd-stage { position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 560px; display: flex; align-items: center; justify-content: center; padding: 8%; background: #f5f6f8; border-radius: 20px; overflow: hidden; }
+  .pd-stage > img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .pd-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 50%; background: #ffffff; color: #0f172a; box-shadow: 0 4px 14px -6px rgba(15, 23, 42, .35); }
+  .pd-nav:not(.hidden) { display: flex; }
+  .pd-nav:hover { background: #f4f6f9; }
+  .pd-prev { left: 12px; } .pd-next { right: 12px; }
+  .pd-thumbs { gap: 10px; margin-top: 12px; padding: 2px; overflow-x: auto; scrollbar-width: none; }
+  .pd-thumbs:not(.hidden) { display: flex; }
+  .pd-thumbs::-webkit-scrollbar { display: none; }
+  .pd-thumbs img { flex: 0 0 auto; width: 68px; height: 68px; padding: 5px; object-fit: contain; background: #f5f6f8; border: 2px solid transparent; border-radius: 12px; cursor: pointer; transition: border-color .15s; }
+  .pd-thumbs img:hover { border-color: #cbd5e1; }
+  .pd-thumbs img.border-indigo-500 { border-color: #0f2a43 !important; transform: none; }
+  /* ข้อมูลสินค้า */
+  .pd-brand { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #868c98; }
+  #addToCartModal #modalProdName { margin: 6px 0 16px; font-size: 24px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; color: #0f172a; }
+  @media (min-width: 900px) { #addToCartModal #modalProdName { font-size: 30px; } }
+  .pd-pricebox { padding: 16px 0; border-top: 1px solid #eef1f5; border-bottom: 1px solid #eef1f5; }
+  .pd-pricerow { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-top: 4px; }
+  #addToCartModal #modalProdPrice { font-size: 32px; font-weight: 700; line-height: 1.15; letter-spacing: -.02em; color: #0f172a; }
+  .pd-pricemeta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .pd-strike { font-size: 15px; color: #868c98; text-decoration: line-through; }
+  .pd-save { padding: 2px 8px; border-radius: 6px; background: #E11D48; color: #ffffff; font-size: 12.5px; font-weight: 700; }
+  .pd-instline { margin-top: 8px; font-size: 13.5px; color: #454b57; }
+  .pd-instline:empty { display: none; }
+  .pd-instline i { margin-right: 6px; color: #868c98; }
+  .pd-instline button { margin-left: 8px; font-weight: 600; color: #C2410C; text-decoration: underline; text-underline-offset: 3px; }
+  .pd-vars { margin-top: 20px; gap: 16px; }
+  .pd-vars:not(.hidden) { display: grid; }
+  .pd-var-lb { margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #0f172a; }
+  .pd-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pd-opts button { padding: 9px 16px !important; border-radius: 10px !important; font-size: 13.5px !important; font-weight: 600 !important; line-height: 1.3; }
+  .pd-opts > span { font-size: 13px !important; }
+  .pd-qty { margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #e8ecf1; border-radius: 12px; }
+  .pd-qty label { font-size: 13.5px; font-weight: 600; color: #0f172a; }
+  .pd-qty #modalProdStock { margin-left: 6px; font-weight: 500; color: #059669; }
+  .pd-qty-in { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; }
+  .pd-qty-in input { width: 64px; padding: 7px 6px; text-align: center; font-size: 15px; font-weight: 700; color: #0f172a; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; }
+  .pd-actions { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pd-actions:empty { display: none; }
+  .pd-actions button { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff; font-size: 13px; font-weight: 600; color: #0f172a; transition: background-color .15s, border-color .15s; }
+  .pd-actions button:hover { background: #f4f6f9; border-color: #cbd5e1; }
+  .pd-actions button i { color: #868c98; }
+  /* แท็บ */
+  .pd-tabs { margin-top: 40px; display: flex; gap: 4px; border-bottom: 1px solid #e8ecf1; overflow-x: auto; scrollbar-width: none; scroll-margin-top: 8px; }
+  .pd-tabs::-webkit-scrollbar { display: none; }
+  .pd-tab { flex: 0 0 auto; margin-bottom: -1px; padding: 12px 16px; border-bottom: 2px solid transparent; font-size: 14px; font-weight: 600; color: #64748b; white-space: nowrap; transition: color .15s, border-color .15s; }
+  .pd-tab:hover { color: #0f172a; }
+  .pd-tab.on { color: #0f172a; border-bottom-color: #FF6B00; }
+  .pd-panel { padding-top: 24px; }
+  .pd-hint { margin: 0 0 14px; font-size: 13px; line-height: 1.6; color: #64748b; }
+  .pd-inst + .pd-hint { margin: 14px 0 0; }
+  .pd-empty { padding: 24px; text-align: center; font-size: 14px; color: #868c98; background: #f8fafc; border-radius: 12px; }
+  .pd-gifts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  @media (min-width: 768px) { .pd-gifts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .pd-giftbox { padding: 16px; border: 1px solid #e8ecf1; border-radius: 14px; }
+  .pd-giftbox h3 { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #0f172a; }
+  .pd-giftbox h3 i { margin-right: 6px; color: #868c98; }
+  #addToCartModal .pd-giftbox label { font-size: 13px !important; font-weight: 500 !important; }
+  #addToCartModal .pd-giftbox label span { font-size: 11px !important; }
+  #addToCartModal .pd-giftbox input[type="number"] { width: 60px; font-size: 13px !important; }
+  #addToCartModal .pd-giftbox > div > div { box-shadow: none; }
+  .pd-spec { margin: 0; }
+  .pd-spec > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 12px 0; border-bottom: 1px solid #eef1f5; font-size: 14px; line-height: 1.6; }
+  @media (min-width: 640px) { .pd-spec > div { grid-template-columns: 180px minmax(0, 1fr); gap: 16px; } }
+  .pd-spec dt { font-weight: 500; color: #64748b; }
+  .pd-spec dd { margin: 0; color: #0f172a; overflow-wrap: anywhere; }
+  .pd-inst { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .pd-inst-opt { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; text-align: center; border: 1px solid #e8ecf1; border-radius: 12px; }
+  .pd-inst-opt.hot { border-color: #0f2a43; box-shadow: inset 0 0 0 1px #0f2a43; }
+  .pd-inst-opt span { font-size: 12.5px; color: #64748b; }
+  .pd-inst-opt b { font-size: 18px; font-weight: 700; color: #0f172a; }
+  .pd-inst-opt small { margin-left: 2px; font-size: 11px; font-weight: 500; color: #868c98; }
+  .pd-terms { max-width: 760px; font-size: 14px; line-height: 1.75; color: #334155; overflow-wrap: anywhere; }
+  .pd-terms b, .pd-terms strong { color: #0f172a; }
+  /* แถบล่างติดขอบจอ */
+  .pd-bar { flex: 0 0 auto; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: #ffffff; border-top: 1px solid #e8ecf1; }
+  .pd-bar-in { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  #pdBarImg { flex: 0 0 auto; width: 46px; height: 46px; padding: 3px; object-fit: contain; background: #f5f6f8; border-radius: 10px; }
+  .pd-bar-txt { flex: 1 1 auto; min-width: 0; }
+  #pdBarName { font-size: 13px; color: #454b57; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #pdBarPrice { font-size: 18px; font-weight: 700; line-height: 1.3; color: #0f172a; }
+  .pd-bar-quote { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px; border-radius: 12px; font-size: 13.5px; }
+  .pd-bar-cta { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 24px; border-radius: 12px; background: #FF6B00; color: #ffffff; font-size: 15px; font-weight: 700; transition: background-color .15s; }
+  .pd-bar-cta:hover { background: #E85F00; }
+  @media (max-width: 640px) {
+    .pd-back span, #shareProductBtn span, .pd-bar-quote span, #pdBarImg { display: none; }
+    .pd-back { width: 38px; padding: 0; justify-content: center; }
+    .pd-crumb > *:not(:last-child) { display: none; }
+    .pd-bar-quote { width: 46px; padding: 0; justify-content: center; }
+    .pd-bar-cta { padding: 0 18px; }
+    .pd-inst-opt b { font-size: 15px; }
+  }
+  /* โหมดมืด */
+  html.dark .pd-page, html.dark .pd-shell, html.dark .pd-bar { background: #0f172a; color: #f1f5f9; }
+  html.dark .pd-bar, html.dark .pd-tabs, html.dark .pd-pricebox, html.dark .pd-spec > div { border-color: #1e293b; }
+  html.dark .pd-back { background: #0f172a; border-color: #334155; }
+  html.dark .pd-back, html.dark .pd-head-btn, html.dark .pd-crumb span, html.dark #addToCartModal #modalProdName, html.dark #addToCartModal #modalProdPrice,
+  html.dark .pd-var-lb, html.dark .pd-qty label, html.dark .pd-tab.on, html.dark .pd-tab:hover, html.dark .pd-giftbox h3, html.dark .pd-spec dd, html.dark .pd-inst-opt b,
+  html.dark #pdBarPrice, html.dark .pd-terms b, html.dark .pd-terms strong { color: #f1f5f9; }
+  html.dark .pd-back:hover, html.dark .pd-head-btn:hover { background: #1e293b; }
+  html.dark .pd-stage, html.dark .pd-thumbs img, html.dark #pdBarImg, html.dark .pd-empty { background: #1e293b; }
+  html.dark .pd-thumbs img.border-indigo-500 { border-color: #f1f5f9 !important; }
+  html.dark .pd-nav { background: #334155; color: #f1f5f9; }
+  html.dark .pd-instline, html.dark #pdBarName, html.dark .pd-terms, html.dark .pd-hint { color: #cbd5e1; }
+  html.dark .pd-instline button { color: #FFB37A; }
+  html.dark .pd-qty, html.dark .pd-giftbox, html.dark .pd-inst-opt { border-color: #334155; }
+  html.dark .pd-inst-opt.hot { border-color: #f1f5f9; box-shadow: inset 0 0 0 1px #f1f5f9; }
+  html.dark .pd-qty-in input { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+  html.dark .pd-actions button { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+  html.dark .pd-actions button:hover { background: #1e293b; }
 </style>

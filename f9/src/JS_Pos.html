@@ -2319,8 +2319,22 @@ window.app.pos = {
          }
       }
 
+      // เปิดหน้ารายละเอียด: เริ่มที่แท็บของแถมเสมอ (ต้องเลือกก่อนเพิ่มลงตะกร้า) + เลื่อนกลับบนสุด + เติมเงื่อนไขการจองฉบับปัจจุบัน
+      this.setDetailTab('gifts');
+      const termsEl = document.getElementById('pdTerms');
+      if (termsEl) termsEl.innerHTML = window.app.safeRichText(window.app.policyText('booking')).replace(/\r?\n/g, '<br>');
       window.app.showModal('addToCartModal');
+      const sc = document.getElementById('pdScroll'); if (sc) sc.scrollTop = 0;
       this.setSharedModel(prod && prod.Model ? prod.Model : '');
+    },
+    // แท็บในหน้ารายละเอียดสินค้า (gifts / specs / install / terms) — scroll = เลื่อนลงมาที่แท็บด้วย (ใช้จากลิงก์ "ดูตารางผ่อน")
+    setDetailTab: function(tab, scroll) {
+      const tabs = document.querySelectorAll('#addToCartModal .pd-tab');
+      if (!tabs.length) return;
+      if (![...tabs].some(b => b.dataset.tab === tab)) tab = 'gifts';
+      tabs.forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      ['gifts', 'specs', 'install', 'terms'].forEach(t => { const p = document.getElementById('pdPanel-' + t); if (p) p.classList.toggle('hidden', t !== tab); });
+      if (scroll) { const bar = document.querySelector('#addToCartModal .pd-tabs'); if (bar && bar.scrollIntoView) bar.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
     },
     renderVariantOptions: function(selectedCapacity, selectedColor) {
         const groupProducts = this.currentGroupProducts;
@@ -2401,58 +2415,46 @@ window.app.pos = {
       document.getElementById('modalProdQty').value = 1; 
       document.getElementById('modalProdQty').max = (prod.Category === 'โมบาย') ? 1 : this.stockOf(prod);
 
-      // Phase 2: ตารางจำลองการผ่อนชำระ 0% + สเปคเด่นของเครื่อง + ปุ่มเทียบสเปคกับรุ่นอื่น
-      const instBox = document.getElementById('modalInstallmentBox');
-      if (instBox) {
-        if (!(prod.Category || '').includes('ของแถม')) {
-          const sp = this.getDeviceSpecs({ variant: prod, variants: [prod] });
-          const cKey = (prod.Model && prod.Model !== '-') ? prod.Model : ('SKU:' + prod.SKU);
-          const esc = window.app.esc, escJs = window.app.escAttrJs;
-          instBox.classList.remove('hidden');
-          instBox.innerHTML = `
-            <div class="space-y-2.5">
-              ${priceNum >= 3000 ? `
-              <div class="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-2.5 md:p-3">
-                <div class="flex items-center justify-between mb-1.5">
-                  <span class="text-[10px] md:text-[11px] font-black text-indigo-800 flex items-center gap-1.5"><i class="fas fa-credit-card text-indigo-600"></i> ตารางผ่อนชำระ 0% (บัตรเครดิตที่ร่วมรายการ)</span>
-                  <span class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[8px] font-black uppercase">0% Interest</span>
-                </div>
-                <div class="grid grid-cols-3 gap-1.5 text-center">
-                  <div class="bg-white border border-indigo-100 rounded-lg p-1.5 shadow-2xs">
-                    <div class="text-[9px] font-bold text-slate-500">ผ่อน 6 เดือน</div>
-                    <div class="text-[11px] md:text-xs font-black text-indigo-700">฿${Math.ceil(priceNum / 6).toLocaleString()}<span class="text-[9px] font-semibold text-slate-400">/ด.</span></div>
-                  </div>
-                  <div class="bg-white border-2 border-indigo-500 rounded-lg p-1.5 shadow-2xs relative">
-                    <div class="text-[9px] font-black text-indigo-600">ผ่อน 10 เดือน (ฮิต)</div>
-                    <div class="text-[11px] md:text-xs font-black text-[#E11D48]">฿${Math.ceil(priceNum / 10).toLocaleString()}<span class="text-[9px] font-semibold text-slate-400">/ด.</span></div>
-                  </div>
-                  <div class="bg-white border border-indigo-100 rounded-lg p-1.5 shadow-2xs">
-                    <div class="text-[9px] font-bold text-slate-500">ผ่อน 24 เดือน</div>
-                    <div class="text-[11px] md:text-xs font-black text-indigo-700">฿${Math.ceil(priceNum / 24).toLocaleString()}<span class="text-[9px] font-semibold text-slate-400">/ด.</span></div>
-                  </div>
-                </div>
-              </div>` : ''}
-              <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 md:p-3">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <span class="text-[10px] md:text-[11px] font-black text-slate-800 flex items-center gap-1.5"><i class="fas fa-microchip text-[#E11D48]"></i> ข้อมูลสเปคเด่น (Key Specifications)</span>
-                  <div class="flex items-center gap-1.5">
-                    <button type="button" onclick="window.app.pos.openTradeInStandalone('${escJs(prod.SKU)}');" class="px-2.5 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-black flex items-center gap-1 hover:bg-amber-200 transition-colors shadow-2xs"><i class="fas fa-retweet text-[#E11D48]"></i> คำนวณเก่าแลกใหม่</button>
-                    <button type="button" onclick="window.app.hideModal('addToCartModal'); window.app.pos.addCompareFromSelect('${escJs(cKey)}');" class="px-2.5 py-1 rounded-lg bg-[#141416] text-[#FF6B00] text-[10px] font-black flex items-center gap-1 hover:bg-slate-800 transition-colors shadow-2xs"><i class="fas fa-scale-balanced text-[#E11D48]"></i> เทียบสเปคกับรุ่นอื่น</button>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10px] text-slate-700">
-                  <div class="bg-white p-1.5 rounded-lg border border-slate-100"><strong class="text-slate-900"><i class="fas fa-mobile-screen text-slate-400 mr-1"></i>หน้าจอ:</strong> ${esc(sp.display)}</div>
-                  <div class="bg-white p-1.5 rounded-lg border border-slate-100"><strong class="text-slate-900"><i class="fas fa-microchip text-slate-400 mr-1"></i>ชิปเซ็ต:</strong> ${esc(sp.chipset)}</div>
-                  <div class="bg-white p-1.5 rounded-lg border border-slate-100"><strong class="text-slate-900"><i class="fas fa-camera text-slate-400 mr-1"></i>กล้อง:</strong> ${esc(sp.rearCamera)}</div>
-                  <div class="bg-white p-1.5 rounded-lg border border-slate-100"><strong class="text-slate-900"><i class="fas fa-battery-full text-slate-400 mr-1"></i>แบตเตอรี่:</strong> ${esc(sp.battery)}</div>
-                </div>
-              </div>
-            </div>
-          `;
-        } else {
-          instBox.classList.add('hidden');
-          instBox.innerHTML = '';
-        }
+      // หน้ารายละเอียดสินค้า: เส้นทาง / แบรนด์ / ราคาเดิม+ประหยัด / ปุ่มเสริม / แท็บสเปค + ผ่อนชำระ / แถบล่าง — อัปเดตทุกครั้งที่เปลี่ยนสีหรือความจุ
+      {
+        const esc = window.app.esc, escJs = window.app.escAttrJs;
+        const isGiftProd = (prod.Category || '').includes('ของแถม');
+        const cat = (prod.Category || '').toString().trim();
+        const modelName = (prod.Model && prod.Model !== '-') ? prod.Model : prod['Product Name'];
+        const setHtml = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+        const sepIco = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
+        setHtml('pdCrumb', '<button type="button" onclick="window.app.hideModal(\'addToCartModal\')">หน้าร้าน</button>' + sepIco
+          + (cat ? '<button type="button" onclick="window.app.hideModal(\'addToCartModal\');window.app.pos.setStoreCategory(\'' + escJs(cat) + '\')">' + esc(cat) + '</button>' + sepIco : '')
+          + '<span>' + esc(modelName) + '</span>');
+        const bKey = this.brandOf(prod);
+        setHtml('pdBrand', bKey ? esc(this.brandLabel_(bKey)) : esc(cat));
+        const origNum = parseFloat(String(prod['Original Price'] || '0').replace(/[^\d.\-]/g, '')) || 0;
+        setHtml('pdPriceMeta', origNum > priceNum ? '<span class="pd-strike tabular-nums">฿' + origNum.toLocaleString() + '</span><span class="pd-save">ประหยัด ฿' + (origNum - priceNum).toLocaleString() + '</span>' : '');
+        const canInstall = !isGiftProd && priceNum >= 3000;
+        setHtml('pdInstLine', canInstall ? '<i class="far fa-credit-card"></i> ผ่อน 0% ฿' + Math.ceil(priceNum / 10).toLocaleString() + '/เดือน นาน 10 เดือน <button type="button" onclick="window.app.pos.setDetailTab(\'install\', true)">ดูตารางผ่อน</button>' : '');
+        const cKey = (prod.Model && prod.Model !== '-') ? prod.Model : ('SKU:' + prod.SKU);
+        setHtml('pdActions', isGiftProd ? '' :
+          '<button type="button" onclick="window.app.pos.openTradeInStandalone(\'' + escJs(prod.SKU) + '\')"><i class="fas fa-retweet"></i> คำนวณเก่าแลกใหม่</button>'
+          + '<button type="button" onclick="window.app.hideModal(\'addToCartModal\'); window.app.pos.addCompareFromSelect(\'' + escJs(cKey) + '\');"><i class="fas fa-scale-balanced"></i> เทียบสเปคกับรุ่นอื่น</button>');
+
+        // แท็บสเปค: ทุกหัวข้อที่มีข้อมูล (ค่าจากคอลัมน์สเปคในชีต Products; ช่องที่ว่างใช้ค่าประมาณตามรุ่นจาก getDeviceSpecs)
+        const sp = isGiftProd ? {} : this.getDeviceSpecs({ variant: prod, variants: this.currentGroupProducts || [prod] });
+        const specRows = [['หน้าจอ', sp.display], ['ชิปเซ็ต', sp.chipset], ['หน่วยความจำ', sp.memory], ['กล้องหลัง', sp.rearCamera], ['กล้องหน้า', sp.frontCamera], ['แบตเตอรี่', sp.battery], ['ระบบปฏิบัติการ', sp.osAi], ['การเชื่อมต่อ', sp.connectivity], ['การรับประกัน', sp.warranty]]
+          .filter(r => r[1] && String(r[1]).trim() !== '' && String(r[1]).trim() !== '-');
+        setHtml('pdSpecs', specRows.length
+          ? '<dl class="pd-spec">' + specRows.map(r => '<div><dt>' + r[0] + '</dt><dd>' + esc(r[1]) + '</dd></div>').join('') + '</dl>'
+          : '<p class="pd-empty">ยังไม่มีข้อมูลสเปคของสินค้านี้</p>');
+
+        // แท็บผ่อนชำระ
+        const instOpt = (m, hot) => '<div class="pd-inst-opt' + (hot ? ' hot' : '') + '"><span>ผ่อน ' + m + ' เดือน' + (hot ? ' · ยอดนิยม' : '') + '</span><b class="tabular-nums">฿' + Math.ceil(priceNum / m).toLocaleString() + '<small>/เดือน</small></b></div>';
+        setHtml('modalInstallmentBox', canInstall
+          ? '<div class="pd-inst">' + instOpt(6) + instOpt(10, true) + instOpt(24) + '</div><p class="pd-hint">ผ่อน 0% สำหรับบัตรเครดิตที่ร่วมรายการ ยอดต่อเดือนเป็นการประมาณจากราคาสินค้า เงื่อนไขจริงเป็นไปตามที่สาขาแจ้ง</p>'
+          : '<p class="pd-empty">สินค้านี้ไม่มีรายการผ่อนชำระ</p>');
+
+        // แถบล่างติดขอบจอ
+        const barName = document.getElementById('pdBarName'); if (barName) barName.textContent = prod['Product Name'] || '';
+        const barPrice = document.getElementById('pdBarPrice'); if (barPrice) barPrice.textContent = '฿' + priceNum.toLocaleString();
+        const barImg = document.getElementById('pdBarImg'); if (barImg) { barImg.style.visibility = ''; barImg.src = window.app.formatImageUrl(prod['Image URL']); }
       }
 
       this.currentImages = window.app.parseImageUrls(prod['Image URL']);
@@ -2463,7 +2465,7 @@ window.app.pos = {
       
       if (thumbContainer) {
           if (this.currentImages.length > 1) {
-              thumbContainer.innerHTML = this.currentImages.map((u, i) => `<img src="${window.app.esc(u)}" onclick="window.app.pos.setModalImage(${i})" class="w-12 h-12 md:w-16 md:h-16 object-cover rounded-xl border-2 border-slate-200 hover:border-indigo-500 cursor-pointer shadow-sm transition-all">`).join('');
+              thumbContainer.innerHTML = this.currentImages.map((u, i) => `<img src="${window.app.esc(u)}" onclick="window.app.pos.setModalImage(${i})" alt="" class="border-slate-200">`).join('');
               thumbContainer.classList.remove('hidden');
               if(btnPrev) btnPrev.classList.remove('hidden');
               if(btnNext) btnNext.classList.remove('hidden');

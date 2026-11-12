@@ -806,94 +806,84 @@
       </div>
     </div>
 
-    <div id="addToCartModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="เลือกสินค้าลงตะกร้า">
-      <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('addToCartModal')"></div>
-      
-      <div class="fixed inset-0 z-10 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4 text-center">
-          <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-4xl border border-slate-200 flex flex-col max-h-[90vh]">
-            
-            <div class="sf-dlg-head px-6 py-4 flex justify-between items-center">
-               <h3 class="text-base font-black text-white flex items-center gap-2"><i class="fas fa-bolt sf-dlg-ico"></i> เลือกสเปคสินค้าและของแถม</h3>
-               <div class="flex items-center gap-1">
-               <button type="button" aria-label="คัดลอกลิงก์สินค้ารุ่นนี้" title="คัดลอกลิงก์สินค้ารุ่นนี้" id="shareProductBtn" class="text-slate-300 hover:text-[#FF6B00] focus:outline-none transition-colors h-9 px-2.5 flex items-center justify-center gap-1.5 rounded-lg hover:bg-white/10 text-xs font-bold" onclick="window.app.pos.copyProductLink()"><i class="fas fa-link"></i><span class="hidden sm:inline">คัดลอกลิงก์</span></button>
-               <button type="button" aria-label="ปิดหน้าต่างเลือกสินค้า" class="text-slate-300 hover:text-[#FF6B00] focus:outline-none transition-colors w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 -mr-1" onclick="window.app.hideModal('addToCartModal')"><i class="fas fa-times text-lg"></i></button>
-               </div>
-            </div>
-            
-            <div class="p-6 md:p-8 overflow-y-auto custom-scrollbar flex-1 bg-white">
-               
-               <div class="flex flex-col md:flex-row gap-6 md:gap-8 mb-6">
-                  <!-- Left side: Image -->
-                  <div class="w-full md:w-4/12 flex flex-col justify-start items-center shrink-0">
-                     <div class="w-full max-w-[300px] aspect-square p-4 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center justify-center sticky top-0 hover:shadow-md transition-shadow relative group overflow-hidden cursor-zoom-in">
-                        <img id="modalProdImg" src="" alt="" onerror="if(this.getAttribute('src')&&this.src!==window.app.NO_IMG)this.src=window.app.NO_IMG" class="max-h-full max-w-full object-contain drop-shadow-md transition-transform duration-500 hover:scale-[1.5]">
-                        <button id="btnPrevImg" onclick="window.app.pos.prevImage(event)" aria-label="รูปก่อนหน้า" class="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-left"></i></button>
-                        <button id="btnNextImg" onclick="window.app.pos.nextImage(event)" aria-label="รูปถัดไป" class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-md hover:bg-white text-slate-600 hover:text-indigo-600 flex items-center justify-center hidden opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-right"></i></button>
-                     </div>
-                     <div id="modalThumbnails" class="flex gap-2 justify-center w-full max-w-[240px] mx-auto overflow-x-auto p-1 mt-3 hidden"></div>
-                  </div>
-                  
-                  <!-- Right side: Details & Variants -->
-                  <div class="w-full md:w-8/12 flex flex-col">
-                     <div class="mb-4 pb-3 border-b border-slate-100">
-                        <div class="pm-eyebrow">ราคาพิเศษ Pre Booking</div>
-                        <h4 id="modalProdName" class="font-black text-slate-900 mb-1.5 leading-snug text-base md:text-lg"></h4>
-                        <div class="text-xl md:text-2xl font-black text-[#E11D48] tabular-nums" id="modalProdPrice"></div>
-                        <input type="hidden" id="modalProdSKU">
-                     </div>
+    <!-- หน้ารายละเอียดสินค้า (เต็มจอ): id ยังเป็น addToCartModal และเปิด/ปิดด้วย showModal/hideModal เหมือนเดิม — โค้ดเดิมทุกจุดจึงใช้ต่อได้
+         โครง: แถบบน (กลับ + เส้นทาง + คัดลอกลิงก์) / เนื้อหาเลื่อนได้ (รูป + ข้อมูล + แท็บ) / แถบล่างติดขอบจอ (ราคา + เพิ่มลงตะกร้า) -->
+    <div id="addToCartModal" class="pd-page fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="รายละเอียดสินค้า">
+      <div class="pd-shell">
+        <div class="sf-dlg-head pd-head">
+           <button type="button" class="pd-back" aria-label="กลับไปหน้ารายการสินค้า" onclick="window.app.hideModal('addToCartModal')"><i class="fas fa-arrow-left"></i><span>กลับ</span></button>
+           <nav id="pdCrumb" class="pd-crumb" aria-label="เส้นทาง"></nav>
+           <button type="button" aria-label="คัดลอกลิงก์สินค้ารุ่นนี้" title="คัดลอกลิงก์สินค้ารุ่นนี้" id="shareProductBtn" class="pd-head-btn" onclick="window.app.pos.copyProductLink()"><i class="fas fa-link"></i><span>คัดลอกลิงก์</span></button>
+           <button type="button" aria-label="ปิดหน้ารายละเอียดสินค้า" class="pd-head-btn pd-x" onclick="window.app.hideModal('addToCartModal')"><i class="fas fa-times"></i></button>
+        </div>
 
-                     <!-- ตารางจำลองการผ่อนชำระ 0% (Installment Simulator) -->
-                     <div id="modalInstallmentBox" class="hidden mb-4 p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80"></div>
-                     
-                     <div id="modalVariantSelection" class="mb-5 md:mb-6 hidden text-left bg-slate-50 p-4 md:p-5 rounded-2xl border border-slate-200/80">
-                        <div class="mb-4">
-                           <label class="block text-[10px] font-extrabold text-slate-600 mb-2 uppercase tracking-wider"><i class="fas fa-hdd text-amber-500 mr-1"></i> ความจุ (Capacity)</label>
-                           <div id="modalCapacityOptions" class="flex flex-wrap gap-2"></div>
-                        </div>
-                        <div>
-                           <label class="block text-[10px] font-extrabold text-slate-600 mb-2 uppercase tracking-wider"><i class="fas fa-palette text-[#E11D48] mr-1"></i> สี (Color)</label>
-                           <div id="modalColorOptions" class="flex flex-wrap gap-2"></div>
-                        </div>
-                     </div>
-                     
-                     <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 mt-auto flex items-center justify-between gap-2">
-                        <label class="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">จำนวนที่สั่งจอง <span class="font-bold text-emerald-600 ml-1" id="modalProdStock"></span></label>
-                        <div class="flex items-center gap-2">
-                            <input type="number" class="w-14 text-center font-black text-xs md:text-sm text-slate-900 bg-white border border-slate-300 rounded-lg py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-amber-400 shadow-sm" id="modalProdQty" value="1" min="1">
-                            <span class="text-xs font-bold text-slate-500">ชิ้น</span>
-                        </div>
-                     </div>
+        <div class="pd-scroll custom-scrollbar" id="pdScroll">
+          <div class="pd-wrap">
+            <div class="pd-top">
+              <div class="pd-gallery">
+                 <div class="pd-stage group">
+                    <img id="modalProdImg" src="" alt="" onerror="if(this.getAttribute('src')&&this.src!==window.app.NO_IMG)this.src=window.app.NO_IMG">
+                    <button type="button" id="btnPrevImg" onclick="window.app.pos.prevImage(event)" aria-label="รูปก่อนหน้า" class="pd-nav pd-prev hidden"><i class="fas fa-chevron-left"></i></button>
+                    <button type="button" id="btnNextImg" onclick="window.app.pos.nextImage(event)" aria-label="รูปถัดไป" class="pd-nav pd-next hidden"><i class="fas fa-chevron-right"></i></button>
+                 </div>
+                 <div id="modalThumbnails" class="pd-thumbs hidden"></div>
+              </div>
+
+              <div class="pd-info">
+                 <div id="pdBrand" class="pd-brand"></div>
+                 <h1 id="modalProdName" class="pd-name"></h1>
+                 <div class="pd-pricebox">
+                    <div class="pm-eyebrow">ราคาพิเศษ Pre Booking</div>
+                    <div class="pd-pricerow"><span id="modalProdPrice" class="tabular-nums"></span><span id="pdPriceMeta" class="pd-pricemeta"></span></div>
+                    <div id="pdInstLine" class="pd-instline"></div>
+                 </div>
+                 <input type="hidden" id="modalProdSKU">
+
+                 <div id="modalVariantSelection" class="pd-vars hidden">
+                    <div class="pd-var"><div class="pd-var-lb">ความจุ</div><div id="modalCapacityOptions" class="pd-opts"></div></div>
+                    <div class="pd-var"><div class="pd-var-lb">สี</div><div id="modalColorOptions" class="pd-opts"></div></div>
+                 </div>
+
+                 <div class="pd-qty">
+                    <label for="modalProdQty">จำนวนที่สั่งจอง <span id="modalProdStock"></span></label>
+                    <div class="pd-qty-in"><input type="number" id="modalProdQty" value="1" min="1"><span>ชิ้น</span></div>
+                 </div>
+                 <div id="pdActions" class="pd-actions"></div>
+              </div>
+            </div>
+
+            <div class="pd-tabs" role="tablist" aria-label="ข้อมูลสินค้า">
+               <button type="button" role="tab" class="pd-tab on" data-tab="gifts" aria-selected="true" onclick="window.app.pos.setDetailTab('gifts')">ของแถม</button>
+               <button type="button" role="tab" class="pd-tab" data-tab="specs" aria-selected="false" onclick="window.app.pos.setDetailTab('specs')">สเปคสินค้า</button>
+               <button type="button" role="tab" class="pd-tab" data-tab="install" aria-selected="false" onclick="window.app.pos.setDetailTab('install')">ผ่อนชำระ</button>
+               <button type="button" role="tab" class="pd-tab" data-tab="terms" aria-selected="false" onclick="window.app.pos.setDetailTab('terms')">เงื่อนไขการจอง</button>
+            </div>
+
+            <div id="pdPanel-gifts" class="pd-panel" role="tabpanel">
+               <p class="pd-hint">ติ๊กเลือกของแถมที่ต้องการรับก่อนกดเพิ่มลงตะกร้า</p>
+               <div class="pd-gifts">
+                  <div class="pd-giftbox">
+                     <h3><i class="fas fa-gem"></i> ของแถมจากแบรนด์</h3>
+                     <div id="modalBrandGifts"></div>
+                  </div>
+                  <div class="pd-giftbox">
+                     <h3><i class="fas fa-store"></i> ของแถมจากช่องทาง</h3>
+                     <div id="modalChannelGifts"></div>
                   </div>
                </div>
-               
-               <div class="flex items-center gap-3 mb-4 md:mb-5">
-                   <div class="flex-1 h-px bg-slate-200"></div>
-                   <h5 class="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-1.5"><i class="fas fa-gifts text-[#E11D48]"></i> เลือกรับของแถมสุดพิเศษ</h5>
-                   <div class="flex-1 h-px bg-slate-200"></div>
-               </div>
-               
-               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div class="bg-emerald-50/40 p-3.5 md:p-4 rounded-2xl border border-emerald-200/60">
-                      <label class="block text-[10px] md:text-[11px] font-extrabold text-emerald-700 mb-2.5 uppercase tracking-wider"><i class="fas fa-gem mr-1.5"></i> ของแถมจากแบรนด์</label>
-                      <div id="modalBrandGifts" class="space-y-1.5 pr-1"></div>
-                   </div>
-                   
-                   <div class="bg-amber-50/40 p-3.5 md:p-4 rounded-2xl border border-amber-200/60">
-                      <label class="block text-[10px] md:text-[11px] font-extrabold text-amber-800 mb-2.5 uppercase tracking-wider"><i class="fas fa-store mr-1.5"></i> ของแถมจากช่องทาง</label>
-                      <div id="modalChannelGifts" class="space-y-1.5 pr-1"></div>
-                   </div>
-               </div>
             </div>
-            
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between items-center gap-3 rounded-b-3xl">
-               <button type="button" class="sf-btn-2 px-4 py-2.5 text-xs md:text-sm rounded-xl flex items-center gap-1.5" onclick="window.app.pos.openQuoteModal('product')"><i class="fas fa-file-invoice-dollar"></i> ออกใบเสนอราคา / ส่ง LINE</button>
-               <div class="flex items-center gap-2 ml-auto">
-                  <button type="button" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm" onclick="window.app.hideModal('addToCartModal')">ยกเลิก</button>
-                  <button type="button" class="px-6 py-2.5 bg-[#FF6B00] hover:bg-[#E05300] text-white text-sm font-black rounded-xl shadow-md transition-all flex items-center gap-2" onclick="window.app.pos.confirmAddToCart()"><i class="fas fa-cart-plus"></i> เพิ่มลงตะกร้า</button>
-               </div>
-            </div>
-            
+            <div id="pdPanel-specs" class="pd-panel hidden" role="tabpanel"><div id="pdSpecs"></div></div>
+            <div id="pdPanel-install" class="pd-panel hidden" role="tabpanel"><div id="modalInstallmentBox"></div></div>
+            <div id="pdPanel-terms" class="pd-panel hidden" role="tabpanel"><div id="pdTerms" class="pd-terms"></div></div>
+          </div>
+        </div>
+
+        <div class="pd-bar">
+          <div class="pd-bar-in">
+             <img id="pdBarImg" src="" alt="" onerror="this.style.visibility='hidden'">
+             <div class="pd-bar-txt"><div id="pdBarName"></div><div id="pdBarPrice" class="tabular-nums"></div></div>
+             <button type="button" class="sf-btn-2 pd-bar-quote" onclick="window.app.pos.openQuoteModal('product')"><i class="fas fa-file-invoice-dollar"></i><span>ออกใบเสนอราคา / ส่ง LINE</span></button>
+             <button type="button" class="pd-bar-cta" onclick="window.app.pos.confirmAddToCart()"><i class="fas fa-cart-plus"></i> เพิ่มลงตะกร้า</button>
           </div>
         </div>
       </div>
