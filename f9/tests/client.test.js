@@ -658,6 +658,23 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await ev("document.documentElement.classList.remove('dark');window.location.hash='#pos';true"); await sleep(600);
   // #pos is website mode (sidebar hidden) — drop the class (CSS only, POS state kept) so the admin sidebar can be measured
   await ev("document.documentElement.classList.remove('sf-site');true"); await sleep(200);
+  await T('shop logo: shown in the sidebar after data loads (settings arrive after the layout), swaps when changed, default icon when removed or broken', async () => {
+    const r = JSON.parse(await ev(`(()=>{const a=window.app,g=a.globalData,bak=g.settings,px='https://logo.invalid/a.png';const out={};
+      const st=()=>{const b=document.getElementById('sidebarLogoBox'),i=b.querySelector('img.app-logo-img');return {img:i?i.getAttribute('src'):'',icon:document.getElementById('sidebarLogoIcon').style.display!=='none',n:b.querySelectorAll('img').length}};
+      g.settings=Object.assign({},bak,{LogoUrl:px});a.applyAppLogos();a.applyAppLogos();out.set=st();out.mob=!!document.querySelector('#mobileLogoBox img.app-logo-img');
+      g.settings=Object.assign({},bak,{LogoUrl:px+'#2'});a.applyAppLogos();out.changed=st();
+      out.remembered=localStorage.getItem('f9_logo_url');
+      const real=a.globalData;a.globalData={products:[]};document.querySelector('#sidebarLogoBox img.app-logo-img').remove();a.applyAppLogos();out.early=st();a.globalData=real;
+      g.settings=Object.assign({},bak,{LogoUrl:''});a.applyAppLogos();out.removed=st();out.forgot=localStorage.getItem('f9_logo_url');
+      g.settings=Object.assign({},bak,{LogoUrl:px});a.applyAppLogos();document.querySelector('#sidebarLogoBox img.app-logo-img').onerror();out.broken=st();
+      g.settings=bak;a.applyAppLogos();return JSON.stringify(out)})()`));
+    ok(r.set.img==='https://logo.invalid/a.png' && !r.set.icon && r.set.n === 1 && r.mob, 'set: ' + JSON.stringify(r.set));
+    ok(r.changed.img.endsWith('#2') && r.changed.n === 1, 'changed: ' + JSON.stringify(r.changed));
+    ok(r.remembered && r.remembered.endsWith('#2') && r.early.img.endsWith('#2'), 'remembered logo must show before settings arrive: ' + JSON.stringify(r.early));
+    ok(!r.removed.img && r.removed.icon && r.forgot === null, 'removed: ' + JSON.stringify(r.removed));
+    ok(!r.broken.img && r.broken.icon, 'broken: ' + JSON.stringify(r.broken));
+  });
+  await T('dashboard has no banner slider / campaign grid (the storefront shows them)', async () => { ok(await ev("!document.getElementById('dashHeroWrap') && !document.getElementById('dashPromoGridWrap') && !document.getElementById('tmpl-dashboard').innerHTML.includes('แคมเปญ / ประกาศ')")); });
   await T('menu: items are Thai on top, English below (dashboard / pos / orders)', async () => { const r = JSON.parse(await ev("JSON.stringify(['dashboard','pos','orders'].map(id=>{const a=document.getElementById('nav-desk-'+id);return [a.querySelector('.nav-th').textContent,a.querySelector('.nav-sub').textContent]}))")); ok(JSON.stringify(r) === JSON.stringify([['แดชบอร์ด','Dashboard'],['สั่งจองสินค้า','Pre Booking'],['รายการใบจอง','Orders']]), JSON.stringify(r)); });
   await T('menu: every Thai label is a single line (no wrapping), no horizontal overflow', async () => { const r = JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('#desktopMenu .nav-link')].filter(a=>a.offsetParent).map(a=>{const t=a.querySelector('.nav-th');return {id:a.id,h:Math.round(t.getBoundingClientRect().height),over:a.scrollWidth>a.clientWidth+1}}))")); const bad = r.filter(x => x.h > 24 || x.over); ok(r.length >= 8 && !bad.length, JSON.stringify(bad)); });
   await T('menu: active item gets the orange accent bar', async () => { const c = await ev("(()=>{const a=document.getElementById('nav-desk-pos');return JSON.stringify([a.classList.contains('active-link'),getComputedStyle(a,'::before').backgroundColor,getComputedStyle(a,'::before').content])})()"); const [act, bg, ct] = JSON.parse(c); ok(act && bg === 'rgb(255, 107, 0)' && ct !== 'none', c); });
@@ -908,7 +925,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.location.hash='#dashboard';true"); await sleep(1500);
     const cut = JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('[id^=dashKpi]')].filter(e=>e.offsetParent&&e.scrollWidth>e.clientWidth+1).map(e=>e.id+':'+e.textContent))"));
     if (cut.length) bad.push('KPI numbers cut off: ' + cut.join(','));
-    for (const [r, sel] of [['products', '.cms-actions .cms-btn:not(.hidden), #gridTitle, .cms-bar label, #dataGridBody td'], ['orders', '#gridTitle, .cms-search-h, .cms-fl label, #dataGridBody .cms-empty-pin h3, #dataGridBody .cms-empty-pin p'], ['dashboard', '#dashPromoGridWrap h2, #dashSyncStatus']]) {
+    for (const [r, sel] of [['products', '.cms-actions .cms-btn:not(.hidden), #gridTitle, .cms-bar label, #dataGridBody td'], ['orders', '#gridTitle, .cms-search-h, .cms-fl label, #dataGridBody .cms-empty-pin h3, #dataGridBody .cms-empty-pin p'], ['dashboard', '#dashSyncStatus']]) {
       await ev("window.location.hash='#" + r + "';true"); await sleep(1500);
       const res = JSON.parse(await ev("(()=>{" + lum + ";return JSON.stringify([...document.querySelectorAll(" + JSON.stringify(sel) + ")].filter(e=>e.offsetParent&&e.textContent.trim()&&!e.disabled).slice(0,40).map(e=>[e.textContent.trim().slice(0,20),Math.round(cr(e)*10)/10]).filter(x=>x[1]<3))})()"));
       if (res.length) bad.push(r + ': ' + JSON.stringify(res));

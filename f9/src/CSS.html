@@ -2325,4 +2325,63 @@
   .co-consent button:hover { color: #9a3412; }
   html.dark .co-consent { background: #1e293b; border-top-color: #334155; }
   html.dark .co-consent button { color: #FFB37A; }
+  /* ===================================================
+     SIDEBAR v2 — แถบเมนูหลังร้าน (เดสก์ท็อป #desktopSidebar): พื้นขาวล้วน, ไอคอนในกรอบสี่เหลี่ยมมน, รายการที่เลือก = พื้นฟ้าอ่อน + กรอบไอคอนกรมท่า + แถบส้ม
+     ทับ utility class ของ Tailwind ที่ buildMenu/route ใส่ไว้ (bg-indigo-600 / text-white ...) จึงต้องใช้ !important — เมนูมือถือ (#mobileMenu) ไม่เกี่ยว
+     =================================================== */
+  #desktopSidebar { background: #ffffff; -webkit-backdrop-filter: none; backdrop-filter: none; border-right: 1px solid #e8ecf1; box-shadow: none; }
+  #desktopSidebar > div:first-child { padding: 16px 14px 14px 16px; border-bottom-color: #eef1f5; }
+  #desktopSidebar #sidebarLogoBox { width: 38px; height: 38px; border-radius: 11px; box-shadow: none; }
+  #desktopSidebar #sidebarLogoBox:has(.app-logo-img) { border: 1px solid #e8ecf1; }
+  #desktopSidebar > div:first-child span.font-black { font-size: 15px; font-weight: 700; letter-spacing: 0; color: #0f172a; }
+  .sb-tag { font-size: 11px; font-weight: 500; line-height: 1.3; color: #94a3b8; }
+  #desktopMenu { padding: 10px 10px 16px; }
+  #desktopMenu > * + * { margin-top: 2px !important; }
+  #desktopMenu .nav-link, #desktopMenu > div > button { min-height: 44px; padding: 6px 10px 6px 8px !important; border-radius: 11px; font-size: 13.5px !important; font-weight: 600 !important; color: #334155 !important; background: transparent; transition: background-color .15s, color .15s; }
+  #desktopMenu .nav-link:hover, #desktopMenu > div > button:hover { background: #f4f6f9 !important; color: #0f2a43 !important; }
+  #desktopMenu .nav-link > i, #desktopMenu > div > button > span > i { flex: 0 0 auto; width: 30px; height: 30px; margin-right: 10px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #f1f4f8; color: #475569; font-size: 13px; opacity: 1; transition: background-color .15s, color .15s; }
+  #desktopMenu .nav-link:hover > i, #desktopMenu > div > button:hover > span > i { background: #e6ebf2; color: #0f2a43; }
+  #desktopMenu .nav-th { line-height: 1.3; }
+  #desktopMenu .nav-sub { margin-top: 1px; font-size: 10.5px !important; font-weight: 500 !important; line-height: 1.3; color: #94a3b8; opacity: 1 !important; }
+  #desktopMenu > div > button > i.fa-chevron-down { color: #94a3b8; opacity: 1; margin-left: 6px; }
+  /* รายการที่เลือกอยู่ */
+  #desktopMenu .nav-link.active-link { background: #eef3f8 !important; color: #0f2a43 !important; font-weight: 700 !important; }
+  #desktopMenu .nav-link.active-link > i { background: #0f2a43; color: #ffffff; }
+  #desktopMenu .nav-link.active-link .nav-sub { color: #64748b; }
+  #desktopMenu .nav-link.active-link::before { left: 0; top: 11px; bottom: 11px; width: 3px; border-radius: 0 3px 3px 0; }
+  /* หัวข้อกลุ่มเมนู */
+  #desktopMenu > div[class*="uppercase"] { padding: 16px 10px 6px !important; margin-top: 0 !important; font-size: 10.5px !important; font-weight: 700 !important; letter-spacing: .08em; color: #94a3b8 !important; }
+  /* เมนูย่อย: เส้นนำสายตาด้านซ้ายแทนกล่องสีเทา */
+  #desktopMenu [id^="desk-sub-"] { margin: 2px 0 6px 22px !important; padding: 0 0 0 10px !important; background: transparent !important; border-left: 1px solid #e2e8f0; border-radius: 0 !important; }
+  #desktopMenu [id^="desk-sub-"] > * + * { margin-top: 1px !important; }
+  #desktopMenu [id^="desk-sub-"] .nav-link { min-height: 38px; padding: 5px 8px !important; font-size: 13px !important; }
+  #desktopMenu [id^="desk-sub-"] .nav-link > i { width: 18px; height: auto; margin-right: 8px; background: transparent !important; color: #94a3b8; font-size: 12px; }
+  #desktopMenu [id^="desk-sub-"] .nav-link.active-link > i { color: #0f2a43; }
+  #desktopMenu [id^="desk-sub-"] .nav-link.active-link::before { left: -11px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; }
+  #desktopMenu [id^="desk-sub-"] > div[class*="uppercase"] { padding: 10px 8px 4px !important; margin-top: 0 !important; font-size: 10px !important; font-weight: 700 !important; letter-spacing: .08em; color: #94a3b8 !important; }
+  /* การ์ดผู้ใช้ด้านล่าง */
+  #desktopSidebar #userMenuWrap { padding: 10px; background: #ffffff; border-top-color: #eef1f5; }
+  #desktopSidebar #userMenuBtn { padding: 8px; border-radius: 12px; }
+  #desktopSidebar #userMenuBtn:hover { background: #f4f6f9; border-color: transparent; box-shadow: none; }
+  #desktopSidebar #userMenuBtn > div:first-child { width: 36px; height: 36px; background: #eef3f8; border: 0; box-shadow: none; }
+  #desktopSidebar #userMenuBtn > div:first-child i { color: #0f2a43; }
+  #desktopSidebar #headerRole { color: #94a3b8; font-weight: 600; letter-spacing: .06em; }
+  /* โหมดมืด */
+  html.dark #desktopSidebar { background: #0f172a; border-right-color: #1e293b; }
+  html.dark #desktopSidebar > div:first-child { border-bottom-color: #1e293b; }
+  html.dark #desktopSidebar > div:first-child span.font-black { color: #f1f5f9; }
+  html.dark #desktopMenu .nav-link, html.dark #desktopMenu > div > button { color: #cbd5e1 !important; }
+  html.dark #desktopMenu .nav-link:hover, html.dark #desktopMenu > div > button:hover { background: #1e293b !important; color: #ffffff !important; }
+  html.dark #desktopMenu .nav-link > i, html.dark #desktopMenu > div > button > span > i { background: #1e293b; color: #cbd5e1; }
+  html.dark #desktopMenu .nav-link:hover > i, html.dark #desktopMenu > div > button:hover > span > i { background: #334155; color: #ffffff; }
+  html.dark #desktopMenu .nav-sub { color: #64748b; }
+  html.dark #desktopMenu .nav-link.active-link { background: #1e293b !important; color: #ffffff !important; }
+  html.dark #desktopMenu .nav-link.active-link > i { background: #f1f5f9; color: #0f172a; }
+  html.dark #desktopMenu .nav-link.active-link .nav-sub { color: #94a3b8; }
+  html.dark #desktopMenu [id^="desk-sub-"] { border-left-color: #334155; }
+  html.dark #desktopMenu [id^="desk-sub-"] .nav-link.active-link > i { color: #ffffff; }
+  html.dark #desktopSidebar #userMenuWrap { background: #0f172a; border-top-color: #1e293b; }
+  html.dark #desktopSidebar #userMenuBtn:hover { background: #1e293b; }
+  html.dark #desktopSidebar #userMenuBtn > div:first-child { background: #1e293b; }
+  html.dark #desktopSidebar #userMenuBtn > div:first-child i { color: #cbd5e1; }
 </style>

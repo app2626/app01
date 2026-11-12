@@ -346,7 +346,30 @@ window.app = {
       img.className = 'app-logo-img w-full h-full object-contain p-0.5';
       box.appendChild(img);
     }
-    img.src = window.app.formatImageUrl(trimmed);
+    // รูปโหลดไม่ได้ (ลิงก์เสีย/Drive ไม่ให้สิทธิ์) = กลับไปใช้ไอคอนเริ่มต้น ไม่ทิ้งกรอบรูปแตกไว้
+    img.onerror = function() { img.remove(); if (icon) icon.style.display = ''; box.style.backgroundColor = ''; };
+    const src = window.app.formatImageUrl(trimmed);
+    if (img.getAttribute('src') !== src) img.src = src;
+  },
+  // โลโก้ร้านทุกจุดของ layout หลัก (แถบเมนู / แถบบนมือถือ / ท้ายหน้า) — เรียกทุกครั้งที่ได้ข้อมูลตั้งค่าใหม่
+  // ตอนเพิ่งวาด layout ข้อมูลตั้งค่ายังไม่มา จึงใช้ลิงก์ที่จำไว้จากครั้งก่อน (localStorage) ไปก่อน แล้วอัปเดตเมื่อข้อมูลจริงมาถึง
+  applyAppLogos: function() {
+    const st = window.app.globalData && window.app.globalData.settings;
+    let url = '';
+    if (st) {
+      url = String(st.LogoUrl == null ? '' : st.LogoUrl).replace(/^'+/, '').trim();
+      try { if (url) localStorage.setItem('f9_logo_url', url); else localStorage.removeItem('f9_logo_url'); } catch (e) {}
+    } else {
+      try { url = localStorage.getItem('f9_logo_url') || ''; } catch (e) {}
+    }
+    [['sidebarLogoBox', 'sidebarLogoIcon'], ['mobileLogoBox', 'mobileLogoIcon'], ['footerLogoBox', 'footerLogoIcon']].forEach(function(p) {
+      if (url) return window.app.applyLogo(p[0], p[1], url);
+      // ไม่มีโลโก้ (ลบออกจากตั้งค่าแล้ว) = คืนไอคอนเริ่มต้น
+      const box = document.getElementById(p[0]); if (!box) return;
+      const old = box.querySelector('img.app-logo-img'); if (old) old.remove();
+      const ic = document.getElementById(p[1]); if (ic) ic.style.display = '';
+      box.style.backgroundColor = '';
+    });
   },
 
   // ===== Export กราฟ Chart.js เป็นภาพ (ดาวน์โหลด + คัดลอกคลิปบอร์ด) =====
@@ -677,6 +700,7 @@ window.app = {
       const res = await window.app.api('GET_ALL_DATA', {});
       if (res && res.status === 'success') {
         window.app.globalData = res;
+        window.app.applyAppLogos();
         window.app.preloadBanners();
       }
     } catch(e) {
@@ -1423,10 +1447,7 @@ window.app = {
     if(document.getElementById('mobileUserName')) document.getElementById('mobileUserName').innerText = window.app.user.Name;
     if(document.getElementById('mobileRole')) document.getElementById('mobileRole').innerText = window.app.user.Role;
 
-    const appLogoUrl = (window.app.globalData.settings || {}).LogoUrl;
-    window.app.applyLogo('sidebarLogoBox', 'sidebarLogoIcon', appLogoUrl);
-    window.app.applyLogo('mobileLogoBox', 'mobileLogoIcon', appLogoUrl);
-    window.app.applyLogo('footerLogoBox', 'footerLogoIcon', appLogoUrl);
+    window.app.applyAppLogos();
     window.app.renderFooterContact();
     window.app.applySidebarPref();
     // footer ปีปัจจุบัน + ปุ่มกลับขึ้นบน (อยู่ใน <template> จึงใส่สคริปต์ inline ไม่ได้ — ต้องผูกที่นี่หลัง clone)
@@ -1459,6 +1480,7 @@ window.app = {
       Swal.close();
       if(res && res.status === 'success') {
          window.app.globalData = res;
+         window.app.applyAppLogos();
          window.app.preloadBanners();
          window.app.renderFooterCategories();
          // ลิงก์สินค้าที่แชร์ (?p=) ไม่มี hash → พาไปหน้าสั่งจอง (pos) แทน dashboard
@@ -1859,7 +1881,6 @@ window.app = {
 
   logout: function() {
     if(window.app.dashboard.refreshTimer) clearInterval(window.app.dashboard.refreshTimer);
-    if(window.app.dashboard.slider.timer) clearInterval(window.app.dashboard.slider.timer);
     if(window.app.pos && window.app.pos.countdownInterval) clearInterval(window.app.pos.countdownInterval);
     window.app.user = null; window.app.clearSavedRoute_(); localStorage.removeItem('tg_pos_user'); sessionStorage.removeItem('tg_pos_user'); window.location.hash = ''; window.app.renderLogin();
     sessionStorage.removeItem('tg_popup_shown');

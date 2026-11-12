@@ -3,81 +3,6 @@
 window.app.dashboard = {
     rawOrders: [], filteredOrders: [], charts: {}, refreshTimer: null,
     
-    slider: {
-        index: 0, count: 0, timer: null,
-        init: function(data) {
-            this.count = data.length; this.index = 0;
-            let track = document.getElementById('sliderTrack'); let dots = document.getElementById('sliderDots');
-            if(!track || !dots) return;
-            
-            let trackHtml = ''; let dotsHtml = '';
-            data.forEach((item, i) => {
-                let img = window.app.esc(window.app.formatImageUrl(item.url, 'w1600'));
-                let linkTag = item.link ? `<a href="${window.app.esc(item.link)}" target="_blank" class="block w-full h-full relative">` : `<div class="w-full h-full relative">`;
-                let endLinkTag = item.link ? `</a>` : `</div>`;
-                // ตัวหนังสือทับภาพ — หัวข้อ (Title) + คำโปรย (Details/Subtitle) แยกกัน 2 บรรทัด (พอร์ตแนวคิดจาก pbzf8's HeroBanner.jsx title/subtitle ตรงๆ, 2026-09-19 เปลี่ยนจากรวมช่องเดียวเป็นแยก 2 ช่องตามตัวอย่างจริงที่ i7 Store)
-                // ใช้ gradient-caption แบบเดียวกับ promo grid (renderBanners ด้านล่าง) เพื่อความสม่ำเสมอ — Title คอลัมน์เดียวกับที่ Popup ใช้ (เพิ่มไว้แล้ววันนี้) แค่ใช้ซ้ำ ไม่ต้องเพิ่มคอลัมน์ใหม่
-                const heroTitleHtml = item.title ? `<h2 class="text-white text-lg md:text-2xl font-black drop-shadow-md leading-tight break-words">${window.app.esc(item.title)}</h2>` : '';
-                const heroSubtitleHtml = item.details ? `<p class="text-white/90 text-sm md:text-base font-medium drop-shadow-md leading-relaxed whitespace-pre-wrap break-words mt-1">${window.app.esc(item.details)}</p>` : '';
-                let textOverlay = (item.title || item.details) ? `<div class="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end pointer-events-none">${heroTitleHtml}${heroSubtitleHtml}</div>` : '';
-                trackHtml += `<div class="w-full h-full shrink-0 skeleton">${linkTag}<img src="${img}" loading="eager" fetchpriority="high" class="w-full h-full object-cover opacity-0 transition-opacity duration-500" onload="this.style.opacity=1; var s=this.closest('.skeleton'); if(s) s.classList.remove('skeleton');">${textOverlay}${endLinkTag}</div>`;
-                dotsHtml += `<button onclick="window.app.dashboard.slider.goTo(${i})" class="h-2.5 rounded-full transition-all duration-300 focus:outline-none ${i===0?'bg-white w-8 shadow-sm':'bg-white/50 w-2.5 hover:bg-white/80'}"></button>`;
-            });
-            track.innerHTML = trackHtml; dots.innerHTML = dotsHtml;
-            this.startAuto();
-        },
-        updateDOM: function() {
-            let track = document.getElementById('sliderTrack'); let dots = document.getElementById('sliderDots');
-            if(track) track.style.transform = `translateX(-${this.index * 100}%)`;
-            if(dots) {
-                Array.from(dots.children).forEach((dot, i) => {
-                    dot.className = i === this.index ? "h-2.5 rounded-full transition-all duration-300 focus:outline-none bg-white w-8 shadow-sm" : "h-2.5 rounded-full transition-all duration-300 focus:outline-none bg-white/50 w-2.5 hover:bg-white/80";
-                });
-            }
-        },
-        next: function() { this.index = (this.index + 1) % this.count; this.updateDOM(); this.startAuto(); },
-        prev: function() { this.index = (this.index - 1 + this.count) % this.count; this.updateDOM(); this.startAuto(); },
-        goTo: function(idx) { this.index = idx; this.updateDOM(); this.startAuto(); },
-        startAuto: function() {
-            if(this.timer) clearInterval(this.timer);
-            if(this.count > 1) { this.timer = setInterval(() => { this.next(); }, 5000); }
-        }
-    },
-
-    renderBanners: function() {
-        const heroData = window.app.globalData.heroBanners || [];
-        const gridData = window.app.globalData.gridBanners || [];
-
-        const heroWrap = document.getElementById('dashHeroWrap');
-        if(heroData.length > 0) {
-            if(heroWrap) heroWrap.classList.remove('hidden');
-            this.slider.init(heroData);
-        } else {
-            if(heroWrap) heroWrap.classList.add('hidden');
-        }
-
-        const gridWrap = document.getElementById('dashPromoGridWrap');
-        const gridBox = document.getElementById('dashPromoGrid');
-        if(gridData.length > 0) {
-            if(gridWrap) gridWrap.classList.remove('hidden');
-            let html = '';
-            gridData.forEach((item, idx) => {
-                let formattedUrl = window.app.esc(window.app.formatImageUrl(item.url, 'w1000'));
-                let baseClass = "rounded-2xl overflow-hidden shadow-sm group relative bg-white border border-slate-100 h-[120px] md:h-[150px] skeleton";
-                if(idx === 0 && gridData.length >= 3) baseClass += " md:col-span-2 md:row-span-2 md:h-full";
-
-                let linkTag = item.link ? `<a href="${window.app.esc(item.link)}" target="_blank" class="block w-full h-full relative">` : `<div class="w-full h-full relative">`;
-                let endLinkTag = item.link ? `</a>` : `</div>`;
-                let textOverlay = item.details ? `<div class="absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end max-h-full overflow-y-auto custom-scrollbar"><p class="text-white text-sm md:text-base font-bold drop-shadow-md text-shadow-sm leading-relaxed whitespace-pre-wrap break-words">${window.app.esc(item.details)}</p></div>` : '';
-
-                html += `<div class="${baseClass}">${linkTag}<img src="${formattedUrl}" loading="eager" class="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 opacity-0" style="transition: opacity .5s, transform .7s;" onload="this.style.opacity=1; var s=this.closest('.skeleton'); if(s) s.classList.remove('skeleton');">${textOverlay}${endLinkTag}</div>`;
-            });
-            if(gridBox) gridBox.innerHTML = html;
-        } else {
-            if(gridWrap) gridWrap.classList.add('hidden');
-        }
-    },
-
     // ตัวเลข KPI 7 ช่องต่อแถวแคบ — ยอดหลักแสนขึ้นไปเคยโดนตัดเป็น "฿99,4…" (truncate) จึงย่อฟอนต์ลงทีละขั้นจนพอดีช่อง
     // (ไม่ต่ำกว่า 13px) และใส่ title ให้เห็นตัวเลขเต็มเมื่อชี้ — เรียกซ้ำเมื่อเปลี่ยนขนาดหน้าต่าง
     fitKpis: function() {
@@ -109,7 +34,6 @@ window.app.dashboard = {
              return o;
           });
           
-          this.renderBanners();
           this.lastBuiltAt = res.data.builtAt || Date.now(); this.updateFreshness();
 
           const bSel = document.getElementById('dashBranch'); const sSel = document.getElementById('dashSales');
