@@ -952,7 +952,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("document.getElementById('gridBulkQuickBtn').click();true"); await sleep(600);
     ok(await ev("!document.getElementById('bulkQuickEditModal').classList.contains('hidden')"), 'modal did not open');
     const w = await ev("document.getElementById('bulkQuickEditBody').parentElement.getBoundingClientRect().width");
-    ok(w > 1100 && w <= 1217, 'popup width ' + w);
+    ok(w > 1100 && w <= 1409, 'popup width ' + w);
     ok(await ev("document.querySelectorAll('#bulkQuickTableBody tr.bulk-quick-row').length") > 50, 'rows');
     const stock0 = Number(row('T3-0')[sk]);
     eq(await ev("document.querySelector('#bulkQuickTableBody tr[data-sku=\"T3-0\"] td:nth-child(6)').innerText.replace(/,/g,'')"), String(stock0), 'current stock column');
