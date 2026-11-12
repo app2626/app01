@@ -262,6 +262,8 @@
                 <nav class="pf-links" aria-label="ลิงก์ด่วน" id="footerQuickLinks">
                   <button type="button" onclick="window.app.pos && window.app.pos.openOrderTrackModal && window.app.pos.openOrderTrackModal()"><i class="fas fa-qrcode"></i>เช็คสถานะใบจอง</button>
                   <button type="button" onclick="window.app.pos && window.app.pos.openTradeInStandalone && window.app.pos.openTradeInStandalone()"><i class="fas fa-retweet"></i>เก่าแลกใหม่</button>
+                  <button type="button" onclick="window.app.openPolicy('booking')"><i class="fas fa-file-lines"></i>เงื่อนไขการจอง</button>
+                  <button type="button" onclick="window.app.openPolicy('privacy')"><i class="fas fa-user-shield"></i>นโยบายความเป็นส่วนตัว</button>
                 </nav>
               </section>
               <section class="pf-col" id="footerContactCol">
@@ -1077,6 +1079,11 @@
 
             </div>
             
+            <div class="co-consent">
+               <label for="coConsent"><input type="checkbox" id="coConsent">
+                 <span>ลูกค้ารับทราบและยอมรับ <button type="button" onclick="window.app.openPolicy('booking')">เงื่อนไขการจอง</button> และ <button type="button" onclick="window.app.openPolicy('privacy')">นโยบายความเป็นส่วนตัว</button> แล้ว <b class="text-rose-500">*</b></span>
+               </label>
+            </div>
             <div class="px-8 py-5 bg-white border-t border-slate-200 flex justify-between items-center rounded-b-3xl">
                <button type="button" class="px-5 py-3 text-slate-500 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors text-sm flex items-center gap-2" onclick="window.app.hideModal('checkoutModal')">
                   <i class="fas fa-arrow-left text-xs"></i> ย้อนกลับ

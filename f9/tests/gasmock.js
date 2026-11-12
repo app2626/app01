@@ -60,7 +60,7 @@ const ctx = {
   HtmlService: {
     XFrameOptionsMode: { DEFAULT: 0 },
     createHtmlOutputFromFile: n => ({ getContent: () => fs.readFileSync(SRC + n + '.html', 'utf8') }),
-    createTemplateFromFile: n => { const t = { _name: n, evaluate: () => ({ setTitle() { return this; }, addMetaTag() { return this; }, setXFrameOptionsMode() { return this; }, html: fs.readFileSync(SRC + n + '.html', 'utf8') }) }; ctx.__lastTemplate = t; return t; },
+    createTemplateFromFile: n => { const t = { _name: n, evaluate: () => ({ setTitle() { return this; }, addMetaTag() { return this; }, setXFrameOptionsMode() { return this; }, setFaviconUrl(u) { if (/bad-favicon/.test(u)) throw new Error('The favicon icon image type is not supported.'); ctx.__lastFavicon = u; return this; }, html: fs.readFileSync(SRC + n + '.html', 'utf8') }) }; ctx.__lastTemplate = t; return t; },
   },
   DriveApp: {}, UrlFetchApp: {}, ScriptApp: {}, Logger: { log() {} },
 };

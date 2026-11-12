@@ -710,6 +710,51 @@ window.app = {
     if (modalId === 'addToCartModal' && window.app.pos && window.app.pos.setSharedModel) window.app.pos.setSharedModel('');
   },
 
+  // เงื่อนไขการจอง / นโยบายความเป็นส่วนตัว: Admin แก้ได้ที่ ตั้งค่าระบบ (Settings: PolicyBooking / PolicyPrivacy) — เว้นว่างใช้ข้อความมาตรฐานด้านล่าง
+  POLICY_TITLES: { booking: 'เงื่อนไขการจอง', privacy: 'นโยบายความเป็นส่วนตัว' },
+  POLICY_KEYS: { booking: 'PolicyBooking', privacy: 'PolicyPrivacy' },
+  POLICY_DEFAULTS: {
+    booking: [
+      '1. การจองจะสมบูรณ์เมื่อร้านบันทึกใบจองและแจ้งเลขที่ใบจองให้ลูกค้าแล้ว',
+      '2. ราคา ของแถม และสิทธิพิเศษ เป็นไปตามที่ระบุในใบจอง ณ วันที่จอง',
+      '3. เงินมัดจำ (ถ้ามี) จะนำไปหักจากราคาสินค้าในวันรับสินค้า เงื่อนไขการคืนเงินมัดจำและการยกเลิกการจองเป็นไปตามที่สาขาแจ้ง กรุณาสอบถามสาขาก่อนชำระเงิน',
+      '4. กรุณารับสินค้าตามรอบวันที่ที่ร้านแจ้ง พร้อมแสดงเลขที่ใบจอง และบัตรประชาชนหรือหนังสือเดินทางที่ใช้จอง',
+      '5. สินค้าและของแถมมีจำนวนจำกัด หากรายการใดไม่สามารถจัดหาได้ ร้านจะติดต่อลูกค้าเพื่อแจ้งทางเลือก',
+      '6. หากมีข้อสงสัย ติดต่อร้านได้ตามช่องทางที่แสดงท้ายหน้าเว็บ'
+    ].join('\n'),
+    privacy: [
+      '<b>ข้อมูลที่ร้านเก็บ</b>',
+      'ชื่อ-นามสกุล เบอร์โทรศัพท์ อีเมล เลขบัตรประชาชนหรือหนังสือเดินทาง และรายการสินค้าที่จอง',
+      '',
+      '<b>วัตถุประสงค์</b>',
+      'เพื่อยืนยันตัวตนผู้จอง จัดทำใบจองและเอกสารที่เกี่ยวข้อง ติดต่อแจ้งสถานะการจอง และนัดรับสินค้า',
+      '',
+      '<b>การเปิดเผยข้อมูล</b>',
+      'ร้านใช้ข้อมูลเพื่อการจองนี้ และเปิดเผยเฉพาะแก่พนักงานและผู้ให้บริการที่เกี่ยวข้องกับการจอง หรือเมื่อกฎหมายกำหนด',
+      '',
+      '<b>ระยะเวลาเก็บข้อมูล</b>',
+      'เก็บไว้เท่าที่จำเป็นต่อการให้บริการและตามที่กฎหมายกำหนด',
+      '',
+      '<b>สิทธิของเจ้าของข้อมูล</b>',
+      'ลูกค้าขอเข้าถึง แก้ไข ลบข้อมูล หรือถอนความยินยอมได้ โดยติดต่อร้านตามช่องทางที่แสดงท้ายหน้าเว็บ'
+    ].join('\n')
+  },
+  policyText: function(kind) {
+    const st = (window.app.globalData && window.app.globalData.settings) || {};
+    const v = String(st[window.app.POLICY_KEYS[kind]] == null ? '' : st[window.app.POLICY_KEYS[kind]]).replace(/^'+/, '').trim();
+    return v || window.app.POLICY_DEFAULTS[kind] || '';
+  },
+  // text = ข้อความที่จะแสดงแทนค่าที่บันทึกไว้ (ใช้ดูตัวอย่างจากหน้าตั้งค่าก่อนบันทึก)
+  openPolicy: function(kind, text) {
+    if (!window.app.POLICY_TITLES[kind]) return;
+    const body = (typeof text === 'string' && text.trim()) ? text.trim() : window.app.policyText(kind);
+    Swal.fire({
+      title: window.app.esc(window.app.POLICY_TITLES[kind]),
+      html: '<div class="pol-body" id="policyBody">' + window.app.safeRichText(body).replace(/\r?\n/g, '<br>') + '</div>',
+      width: 640, confirmButtonText: 'ปิด', confirmButtonColor: '#0f2a43'
+    });
+  },
+
   // ข้อมูลติดต่อร้านใน footer (ตั้งค่าที่ ตั้งค่าระบบ › ข้อมูลติดต่อร้าน: ContactPhone / ContactLine / ContactHours)
   // footer: ลิงก์หมวดสินค้า (เหมือนเมนูหมวดใน header) — กดจากหน้าไหนก็ได้ พาไปหน้าร้านพร้อมกรองหมวดนั้น
   renderFooterCategories: function() {

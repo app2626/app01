@@ -8,7 +8,8 @@ function doGet(e) {
   // ชื่อเว็บแอปตั้งค่าได้จากเมนู "ตั้งค่าระบบ" (Settings sheet, key SystemName) — เพื่อให้สำเนาโปรเจกต์ไปใช้ที่อื่น
   // เปลี่ยนชื่อได้จากหน้าเว็บล้วนๆ โดยไม่ต้องแก้โค้ด/deploy ใหม่
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const appName = (getKeyValueSettings(ss).SystemName || '').toString().trim() || 'Mobile Pre Booking System';
+  const settingsAll = getKeyValueSettings(ss);
+  const appName = (settingsAll.SystemName || '').toString().trim() || 'Mobile Pre Booking System';
   const template = HtmlService.createTemplateFromFile('Index');
   template.appName = appName;
   // เลขใบจองจากลิงก์ ?track= / ?orderId= — กรองเหลือเฉพาะอักขระปลอดภัยก่อนฝังลงสคริปต์ (กัน script injection)
@@ -20,10 +21,23 @@ function doGet(e) {
   template.deepModel = rawP.length <= 120 ? rawP.replace(/[<>&\u0000-\u001f\u2028\u2029]/g, '') : '';
   // URL /exec ของ deployment ปัจจุบัน — ใช้สร้างลิงก์แชร์สินค้า (?p=รุ่น); ใน iframe ของ GAS หน้าเว็บอ่าน URL ชั้นนอกเองไม่ได้
   try { template.appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) { template.appUrl = ''; }
-  return template.evaluate()
+  const out = template.evaluate()
     .setTitle(appName)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT); // กัน clickjacking — เปลี่ยนกลับ ALLOWALL เฉพาะถ้าตั้งใจ embed ใน iframe
+  // ไอคอนบนแท็บเบราว์เซอร์: GAS รับเฉพาะลิงก์รูปที่บอกชนิดไฟล์ได้ (ลิงก์ไม่ถูกชนิดจะ throw) — ผิดพลาดต้องไม่ทำให้เปิดเว็บไม่ได้
+  const fav = faviconUrlFor_(settingsAll);
+  if (fav) { try { out.setFaviconUrl(fav); } catch (favErr) { console.warn('favicon ใช้ไม่ได้: ' + favErr); } }
+  return out;
+}
+
+// ลิงก์ favicon: ใช้ FaviconUrl ที่ตั้งไว้ก่อน ไม่มีจึงใช้โลโก้เว็บแอป — ลิงก์ Google Drive ถูกแปลงเป็นลิงก์ดาวน์โหลดตรงที่ระบุชนิด png
+function faviconUrlFor_(settings) {
+  const clean = v => (v === null || v === undefined ? '' : String(v)).replace(/^'+/, '').trim();
+  const raw = clean(settings && settings.FaviconUrl) || clean(settings && settings.LogoUrl);
+  if (!/^https:\/\/[^\s<>"']+$/i.test(raw)) return '';
+  const m = raw.match(/drive\.google\.com\/(?:file\/d\/|thumbnail\?id=|uc\?(?:[^#]*&)?id=|open\?id=)([A-Za-z0-9_-]{10,100})/) || raw.match(/googleusercontent\.com\/d\/([A-Za-z0-9_-]{10,100})/);
+  return m ? 'https://drive.google.com/uc?id=' + m[1] + '&export=download&format=png' : raw;
 }
 
 function include(filename) {
@@ -3086,7 +3100,11 @@ var SETTING_RULES_ = {
   ApproverName:          { label: 'ชื่อผู้อนุมัติ', max: 120 },
   ContactPhone:          { label: 'เบอร์โทร', type: 'phone' },
   ContactLine:           { label: 'LINE', type: 'line', max: 120 },
-  ContactHours:          { label: 'เวลาทำการ', max: 120 }
+  ContactHours:          { label: 'เวลาทำการ', max: 120 },
+  FaviconUrl:            { label: 'ไอคอนเว็บ (Favicon)', type: 'https', max: 500 },
+  // ข้อความที่ลูกค้าอ่านจากลิงก์ท้ายหน้าเว็บและตอนยืนยันการจอง — เว้นว่าง = หน้าเว็บใช้ข้อความมาตรฐาน (window.app.POLICY_DEFAULTS)
+  PolicyBooking:         { label: 'เงื่อนไขการจอง', max: 6000 },
+  PolicyPrivacy:         { label: 'นโยบายความเป็นส่วนตัว', max: 6000 }
 };
 
 // คืนค่าที่ผ่านการตรวจ/ทำให้เป็นมาตรฐานแล้ว หรือ throw Error ข้อความไทย — current = ค่าที่เก็บอยู่ในชีต (ถ้าไม่เปลี่ยนจากเดิมจะไม่ตรวจซ้ำ

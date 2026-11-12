@@ -183,6 +183,23 @@ t('B: booking window order enforced server-side, even when only one side is sent
   eq(saveSet({ ReserveEnd: '2026-05-01T00:00' }).status, 'error'); eq(saveSet({ ReserveStart: '2026-08-01T00:00' }).status, 'error');
 });
 t('B: valid contact settings accepted and stored', () => { const r = saveSet({ ContactPhone: '02-123-4567', ContactLine: '@mystore', ContactHours: '10:00 - 21:00' }); eq(r.status, 'success', JSON.stringify(r)); eq(ksv().ContactLine, '@mystore'); eq(saveSet({ ContactLine: 'https://line.me/R/ti/p/@x' }).status, 'success'); });
+t('B: policy texts + favicon are saveable settings, reach the storefront, favicon must be https', () => {
+  eq(saveSet({ PolicyBooking: 'มัดจำ 1,000 บาท\nคืนไม่ได้', PolicyPrivacy: 'เก็บชื่อและเบอร์โทร', FaviconUrl: 'https://example.com/icon.png' }).status, 'success');
+  eq(ksv().PolicyBooking, 'มัดจำ 1,000 บาท\nคืนไม่ได้'); eq(ctx.publicSettings_(ksv()).PolicyPrivacy, 'เก็บชื่อและเบอร์โทร');
+  ok(saveSet({ PolicyBooking: 'x'.repeat(6001) }).status !== 'success', 'over-long policy must be rejected');
+  ok(saveSet({ FaviconUrl: 'javascript:alert(1)' }).status !== 'success', 'non-https favicon must be rejected');
+  eq(saveSet({ PolicyBooking: '', PolicyPrivacy: '' }).status, 'success'); eq(ksv().PolicyBooking, '');
+});
+t('doGet sets the favicon: FaviconUrl first, else the logo (Drive link -> direct png link); a rejected icon never breaks the page', () => {
+  eq(ctx.faviconUrlFor_({ FaviconUrl: 'https://example.com/icon.png', LogoUrl: 'https://example.com/logo.png' }), 'https://example.com/icon.png');
+  eq(ctx.faviconUrlFor_({ FaviconUrl: '', LogoUrl: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOp/view?usp=sharing' }), 'https://drive.google.com/uc?id=1AbCdEfGhIjKlMnOp&export=download&format=png');
+  eq(ctx.faviconUrlFor_({ LogoUrl: 'https://drive.google.com/thumbnail?id=1AbCdEfGhIjKlMnOp&sz=w500' }), 'https://drive.google.com/uc?id=1AbCdEfGhIjKlMnOp&export=download&format=png');
+  eq(ctx.faviconUrlFor_({ FaviconUrl: 'http://example.com/a.png' }), ''); eq(ctx.faviconUrlFor_({}), '');
+  ctx.__lastFavicon = null; ctx.doGet({}); eq(ctx.__lastFavicon, 'https://example.com/icon.png');
+  eq(saveSet({ FaviconUrl: 'https://example.com/bad-favicon.txt' }).status, 'success');
+  ctx.__lastFavicon = null; const o = ctx.doGet({}); ok(o.html.includes('tmpl-pos'), 'page must still render'); eq(ctx.__lastFavicon, null);
+  eq(saveSet({ FaviconUrl: '' }).status, 'success');
+});
 t('B: unchanged legacy value is not re-validated (does not block saving other fields)', () => eq(ctx.validateSettingValue_('LogoUrl', 'weird-legacy', 'weird-legacy'), 'weird-legacy'));
 t('B: restore original booking window', () => { eq(saveSet(origWindow).status, 'success'); });
 t('B: unknown banner type rejected, no row appended', () => { const n = sheets.UI_Banners.getLastRow(); eq(api('SAVE_SETTINGS_ITEM', { type: 'foo', url: 'https://x.com/a.png' }, admin).status, 'error'); eq(sheets.UI_Banners.getLastRow(), n); });

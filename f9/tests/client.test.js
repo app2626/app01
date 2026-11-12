@@ -318,7 +318,9 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const hd = sheets.Products.rows[0], sc = hd.indexOf('SKU'), kc = hd.indexOf('Stock');
     const stock = (sku) => Number(sheets.Products.rows.find(r => r[sc] === sku)[kc]);
     const s1 = stock('T3-0'), s2 = stock('CASE-T3'), n0 = sheets.Orders.rows.length;
-    await P(`(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};set('coCustomer','ลูกค้า ซื้อคู่');set('coPhone','0812345678');set('coEmail','a@b.co');set('coIdCard','1234567890121');set('bkStaffName','พนักงาน ทดสอบ');set('bkPhone','0899999999');document.getElementById('radResF').checked=true;window.app.pos.submitCheckout();return true})()`);
+    // ยังไม่ติ๊กรับทราบเงื่อนไข/นโยบาย = ห้ามไปต่อ (หน้ายืนยันต้องยังเปิดอยู่) แล้วค่อยติ๊กและส่งจริง
+    const blocked = await P(`(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};set('coCustomer','ลูกค้า ซื้อคู่');set('coPhone','0812345678');set('coEmail','a@b.co');set('coIdCard','1234567890121');set('bkStaffName','พนักงาน ทดสอบ');set('bkPhone','0899999999');document.getElementById('radResF').checked=true;document.getElementById('coConsent').checked=false;let warned=0;const ot=window.app.toast;window.app.toast=function(m){if(/รับทราบ/.test(m))warned++;return ot.apply(this,arguments)};window.app.pos.submitCheckout();window.app.toast=ot;const blocked=warned===1&&!window.app.pos.isSubmitting;document.getElementById('coConsent').checked=true;window.app.pos.submitCheckout();return blocked})()`);
+    if (!blocked) throw new Error('checkout must stay blocked until the consent box is ticked');
     await sleep(900);
     const dbg = await P("JSON.stringify({vis:Swal.isVisible(),title:(Swal.getTitle()||{}).textContent,html:(Swal.getHtmlContainer()||{}).textContent,confirm:!!Swal.getConfirmButton(),cartLen:window.app.pos.cartData.length,sub:window.app.pos.isSubmitting})");
     if (!(await P("!!(Swal.isVisible() && Swal.getConfirmButton() && /ยืนยัน/.test(Swal.getConfirmButton().textContent))"))) throw new Error('confirm dialog not shown: ' + dbg);
@@ -708,6 +710,18 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   console.log('== FOOTER / BACK-TO-TOP / META');
   curPhase = 'footer';
   await ev("document.documentElement.classList.remove('dark');true");
+  await T('policy links in footer open booking terms / privacy policy (default text, then Admin text from Settings, HTML escaped)', async () => {
+    const labels = await ev("[...document.querySelectorAll('#footerQuickLinks button')].map(b=>b.textContent.trim()).join('|')");
+    ok(labels.includes('เงื่อนไขการจอง') && labels.includes('นโยบายความเป็นส่วนตัว'), labels);
+    await ev("[...document.querySelectorAll('#footerQuickLinks button')].find(b=>b.textContent.trim()==='นโยบายความเป็นส่วนตัว').click();true"); await sleep(350);
+    const d = JSON.parse(await ev("JSON.stringify({title:(Swal.getTitle()||{}).textContent,body:(document.getElementById('policyBody')||{}).textContent||''})"));
+    eq(d.title, 'นโยบายความเป็นส่วนตัว'); ok(d.body.includes('เลขบัตรประชาชน') && d.body.includes('สิทธิของเจ้าของข้อมูล'), d.body.slice(0, 120));
+    await ev("Swal.close();true"); await sleep(250);
+    await ev("(()=>{const g=window.app.globalData;g.__bakPol=g.settings;g.settings=Object.assign({},g.settings,{PolicyBooking:\"'=มัดจำ 1,000 บาท\\n<b>คืนไม่ได้</b><img src=x onerror=window.__polXss=1>\"});window.app.openPolicy('booking');return true})()"); await sleep(350);
+    const c = JSON.parse(await ev("JSON.stringify({title:(Swal.getTitle()||{}).textContent,html:(document.getElementById('policyBody')||{}).innerHTML||'',xss:!!window.__polXss})"));
+    eq(c.title, 'เงื่อนไขการจอง'); ok(c.html.startsWith('=มัดจำ 1,000 บาท<br><b>คืนไม่ได้</b>') && !/<img/i.test(c.html) && !c.xss, c.html.slice(0, 160));
+    await ev("(()=>{Swal.close();const g=window.app.globalData;g.settings=g.__bakPol;return true})()"); await sleep(250);
+  });
   await T('footer: year is current year, brand copyright present', async () => { const t = await ev("document.querySelector('footer').textContent"); ok(t.includes(String(new Date().getFullYear())) && t.includes('สงวนลิขสิทธิ์'), t.slice(0, 120)); });
   await T('status history: renders timeline, escapes HTML, hides staff name on public view', async () => {
     const r = await ev("(function(){const h=[{time:'2026-11-05 10:00',from:'',to:'Pending',by:'somchai'},{time:'2026-11-05 12:30',from:'Pending',to:'<img src=x onerror=1>',by:'somchai'}];return JSON.stringify({pub:window.app.statusHistoryHtml(h,false),staff:window.app.statusHistoryHtml(h,true),empty:window.app.statusHistoryHtml([],false)});})()");

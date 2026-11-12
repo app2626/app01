@@ -3033,6 +3033,9 @@ window.app.pos = {
       }
       
       let rs=null; document.getElementsByName('resStatus').forEach(r=>{if(r.checked) rs=r.value;}); if(!rs) return Swal.fire('เลือกเงื่อนไขจอง','กรุณาระบุว่าเป็นการจอง T หรือ จอง F','warning');
+      // ต้องแจ้งเงื่อนไขการจอง + นโยบายความเป็นส่วนตัวให้ลูกค้าทราบก่อนเก็บข้อมูลส่วนบุคคล (ชื่อ/เบอร์/เลขบัตร)
+      const consentEl = document.getElementById('coConsent');
+      if (consentEl && !consentEl.checked) { consentEl.focus(); return window.app.toast('กรุณาติ๊กยืนยันว่าลูกค้ารับทราบเงื่อนไขการจองและนโยบายความเป็นส่วนตัว', 'warning'); }
 
       const receiptNo = (document.getElementById('coReceiptNo') ? document.getElementById('coReceiptNo').value : '').trim();
       const depositAmount = parseFloat(document.getElementById('coDeposit') ? document.getElementById('coDeposit').value : 0) || 0;
@@ -3118,6 +3121,7 @@ window.app.pos = {
                   window.app.pos.custLookupSeq++;
                   const lkSpin = document.getElementById('coPhoneSpin'); if (lkSpin) lkSpin.classList.add('hidden');
                   ['coCustomer','coPhone','coEmail','coIdCard','coPreOrderNo','coPickupDate','coCodeHandraiser','bkStaffName','bkPhone','coRemark','coReceiptNo','coDeposit'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
+                  if (document.getElementById('coConsent')) document.getElementById('coConsent').checked = false; // ลูกค้ารายถัดไปต้องยืนยันใหม่
                   document.getElementsByName('resStatus').forEach(r => r.checked = false);
                   
                   const pContainer = document.getElementById('cartPromosContainer');
