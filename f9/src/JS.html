@@ -252,9 +252,10 @@ window.app = {
   },
   hideLoading: function() { Swal.close(); },
 
+  // ข้อความแจ้งเตือนสั้นๆ แบบเดียวทั้งระบบ — หน้าร้าน (html.sf-site) ขึ้นมุมขวาบนใต้ตะกร้า (มุมล่างมีแถบตะกร้ามือถือ/แถบเปรียบเทียบอยู่), หลังร้านขึ้นมุมขวาล่าง
   toast: function(title, icon = 'success') {
     Swal.fire({
-      toast: true, position: 'bottom-end', showConfirmButton: false, timer: 3000,
+      toast: true, position: document.documentElement.classList.contains('sf-site') ? 'top-end' : 'bottom-end', showConfirmButton: false, timer: 3000,
       timerProgressBar: true, icon: icon, title: title,
       customClass: { popup: '!rounded-xl shadow-lg border border-slate-100', title: '!text-sm !font-bold !text-slate-800' }
     });

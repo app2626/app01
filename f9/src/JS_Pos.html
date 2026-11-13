@@ -308,7 +308,7 @@ window.app.pos = {
         inp.value = '';
         this.renderCouponChips();
         this.updateTotal();
-        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200 }).fire({ icon: 'success', title: 'ใช้โค้ด ' + res.coupon.code + ' ลด ฿' + Number(res.coupon.discount).toLocaleString() });
+        window.app.toast('ใช้โค้ด ' + res.coupon.code + ' ลด ฿' + Number(res.coupon.discount).toLocaleString(), 'success');
       } catch (e) {
         Swal.fire('ระบบขัดข้อง', 'ตรวจสอบโค้ดไม่สำเร็จ กรุณาลองใหม่', 'error');
       }
@@ -564,7 +564,7 @@ window.app.pos = {
             sel.value = '';
           }
           this.updateTotal();
-          Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 }).fire({ icon: 'info', title: 'ยกเลิกคูปอง ' + promoName });
+          window.app.toast('ยกเลิกคูปอง ' + promoName, 'info');
           return;
         }
       }
@@ -588,7 +588,7 @@ window.app.pos = {
 
       if (matched) {
         this.updateTotal();
-        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200 }).fire({ icon: 'success', title: 'ใช้คูปอง "' + promoName + '" แล้ว!' });
+        window.app.toast('ใช้คูปอง "' + promoName + '" แล้ว!', 'success');
       }
     },
 
@@ -905,7 +905,7 @@ window.app.pos = {
         this.compareList.splice(idx, 1);
       } else {
         if (this.compareList.length >= 3) {
-          Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2200 }).fire({ icon: 'warning', title: 'เปรียบเทียบได้สูงสุด 3 รุ่นพร้อมกัน' });
+          window.app.toast('เปรียบเทียบได้สูงสุด 3 รุ่นพร้อมกัน', 'warning');
           this.openCompareModal();
           return;
         }
@@ -1936,7 +1936,7 @@ window.app.pos = {
       }
       if(products.length === 0 && searchEl && searchEl.value === '') {
          let skel = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 pb-4">';
-         for(let k=0; k<10; k++) { skel += '<div class="pm-skel"><div class="skeleton mb-3" style="aspect-ratio:1/1; width:100%; border-radius:18px;"></div><div class="skeleton mb-2" style="height:12px; width:85%;"></div><div class="skeleton mb-3" style="height:16px; width:45%;"></div><div class="skeleton" style="height:32px; width:100%; border-radius:0.75rem;"></div></div>'; }
+         for(let k=0; k<10; k++) { skel += '<div class="pm-skel" aria-hidden="true"><div class="skeleton mb-3" style="aspect-ratio:1/1; width:100%; border-radius:12px;"></div><div class="skeleton mb-2" style="height:10px; width:30%;"></div><div class="skeleton mb-3" style="height:14px; width:80%;"></div><div class="skeleton mb-2" style="height:18px; width:45%;"></div><div class="skeleton" style="height:10px; width:65%;"></div></div>'; }
          skel += '</div>'; row.innerHTML = skel; return;
       }
 
@@ -2346,7 +2346,7 @@ window.app.pos = {
         let capHtml = '';
         capacities.forEach(cap => {
             let isSelected = cap === selectedCapacity;
-            let btnClass = isSelected ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600';
+            let btnClass = isSelected ? 'pd-on bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600';
             capHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" onclick="window.app.pos.selectVariant('${window.app.escAttrJs(cap)}', '${window.app.escAttrJs(selectedColor)}')">${window.app.esc(cap)}</button>`;
         });
         const capOptEl = document.getElementById('modalCapacityOptions');
@@ -2362,14 +2362,16 @@ window.app.pos = {
             let isSelected = col === selectedColor;
             let p = productsForCap.find(x => x.Color === col);
             let outOfStock = p && this.stockOf(p) <= 0;
-            
+            // จุดสีจริงคู่ชื่อสี (colorHex คืนค่าสีจากชื่อ; ผ่าน esc เพราะลงใน attribute style)
+            const dot = `<i class="pd-dot" aria-hidden="true" style="background:${window.app.esc(this.colorHex(col))}"></i>`;
+
             let btnClass = '';
             if (outOfStock) {
                 btnClass = 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed';
-                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" disabled>${window.app.esc(col)}</button>`;
+                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" disabled>${dot}${window.app.esc(col)}</button>`;
             } else {
-                btnClass = isSelected ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600';
-                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" onclick="window.app.pos.selectVariant('${window.app.escAttrJs(selectedCapacity)}', '${window.app.escAttrJs(col)}')">${window.app.esc(col)}</button>`;
+                btnClass = isSelected ? 'pd-on bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600';
+                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" onclick="window.app.pos.selectVariant('${window.app.escAttrJs(selectedCapacity)}', '${window.app.escAttrJs(col)}')">${dot}${window.app.esc(col)}</button>`;
             }
         });
         const colOptEl = document.getElementById('modalColorOptions');
@@ -2404,6 +2406,44 @@ window.app.pos = {
     },
     prevImage: function(e) { if(e) e.stopPropagation(); this.setModalImage(this.currentImageIndex - 1); },
     nextImage: function(e) { if(e) e.stopPropagation(); this.setModalImage(this.currentImageIndex + 1); },
+    renderRelated: function(prod) {
+      const el = document.getElementById('pdRelated');
+      if (!el) return;
+      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      const chEl = document.getElementById('posChannelSelect');
+      const channel = chEl ? chEl.value : '';
+      const priceOf = (p) => parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
+      const keyOf = (p) => (p.Model && p.Model !== '-') ? p.Model : ('SKU:' + p.SKU);
+      const myKey = keyOf(prod), myCat = (prod.Category || '').toString().trim(), mySeries = (prod['Product Group'] || '').toString().trim();
+      const pool = (myCat.includes('ของแถม') ? [] : (window.app.globalData.products || [])).filter(p => p.Status === 'เปิด' && !(p.Category || '').includes('ของแถม')
+        && window.app.channelOk(p.Channel, channel) && this.stockOf(p) > 0 && keyOf(p) !== myKey);
+      const pick = (list) => {
+        const byModel = {};
+        list.forEach(p => { const k = keyOf(p); if (!byModel[k] || priceOf(p) < priceOf(byModel[k])) byModel[k] = p; });
+        return Object.keys(byModel).map(k => byModel[k]);
+      };
+      let items = mySeries && mySeries !== '-' ? pick(pool.filter(p => (p['Product Group'] || '').toString().trim() === mySeries)) : [];
+      if (items.length < 2) items = pick(pool.filter(p => (p.Category || '').toString().trim() === myCat));
+      // เรียงตามราคาที่ใกล้กับรุ่นที่กำลังดู
+      const base = priceOf(prod);
+      items.sort((a, b) => Math.abs(priceOf(a) - base) - Math.abs(priceOf(b) - base));
+      items = items.slice(0, 6);
+      if (items.length < 2) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      let html = '<h2 class="pd-rel-h">สินค้าใกล้เคียง</h2><div class="pd-rel-row custom-scrollbar">';
+      items.forEach(p => {
+        const nm = (p.Model && p.Model !== '-') ? p.Model : (p['Product Name'] || '');
+        html += '<button type="button" class="pd-rel-card" onclick="window.app.pos.openRelated(\'' + escJs(p.SKU) + '\')">'
+          + '<span class="pd-rel-img"><img src="' + esc(window.app.formatImageUrl(p['Image URL'])) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;"></span>'
+          + '<span class="pd-rel-name">' + esc(nm) + '</span>'
+          + '<span class="pd-rel-price tabular-nums">฿' + priceOf(p).toLocaleString() + '</span></button>';
+      });
+      el.innerHTML = html + '</div>';
+      el.classList.remove('hidden');
+    },
+    openRelated: function(sku) {
+      this.openAddToCartModal(sku);
+      const sc = document.getElementById('pdScroll'); if (sc) sc.scrollTop = 0;
+    },
     updateModalWithProduct: function(prod) {
       if (!prod) return;
       this.pushRecentlyViewed(prod.SKU);
@@ -2450,6 +2490,9 @@ window.app.pos = {
         setHtml('modalInstallmentBox', canInstall
           ? '<div class="pd-inst">' + instOpt(6) + instOpt(10, true) + instOpt(24) + '</div><p class="pd-hint">ผ่อน 0% สำหรับบัตรเครดิตที่ร่วมรายการ ยอดต่อเดือนเป็นการประมาณจากราคาสินค้า เงื่อนไขจริงเป็นไปตามที่สาขาแจ้ง</p>'
           : '<p class="pd-empty">สินค้านี้ไม่มีรายการผ่อนชำระ</p>');
+
+        // สินค้าใกล้เคียง: รุ่นอื่นในซีรีส์เดียวกัน (Product Group) ถ้าไม่พอ 2 รุ่นใช้หมวดเดียวกัน — เฉพาะที่เปิดขาย มีสต๊อก และขายในช่องทางที่เลือก
+        this.renderRelated(prod);
 
         // แถบล่างติดขอบจอ
         const barName = document.getElementById('pdBarName'); if (barName) barName.textContent = prod['Product Name'] || '';
@@ -2610,7 +2653,7 @@ window.app.pos = {
       window.app.hideModal('addToCartModal'); 
       this.saveAndRender();
       if (!this.promptCompanions(p)) {
-        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 }).fire({ icon: 'success', title: 'เพิ่มลงตะกร้าแล้ว' });
+        window.app.toast('เพิ่มลงตะกร้าแล้ว', 'success');
       }
     },
     // ===== แนะนำสินค้าซื้อคู่ (Frequently Bought Together) =====
@@ -2863,7 +2906,7 @@ window.app.pos = {
       const mobCnt = document.getElementById('mobileStickyCount');
       if(!cD) return;
       if(this.cartData.length===0){ 
-          cD.innerHTML='<div class="h-full min-h-[200px] flex flex-col items-center justify-center text-slate-400 opacity-75"><div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-3"><i class="fas fa-shopping-basket text-3xl text-slate-300"></i></div><p class="text-xs font-extrabold uppercase tracking-wider text-slate-500">ยังไม่มีสินค้าในตะกร้า Pre Booking</p><p class="text-[11px] text-slate-400 mt-1">เลือกสินค้าและกดปุ่ม "จองด่วน" เพื่อเพิ่มลงตะกร้า</p></div>'; 
+          cD.innerHTML='<div class="sf-blank"><i class="fas fa-shopping-basket" aria-hidden="true"></i><p class="sf-blank-t">ยังไม่มีสินค้าในตะกร้า</p><p class="sf-blank-s">เปิดหน้าสินค้าแล้วกด "เพิ่มลงตะกร้า"</p><button type="button" class="sf-btn-2 sf-blank-btn" onclick="window.app.pos.toggleCart()">เลือกสินค้าต่อ</button></div>';
           if(cL) cL.innerText='0'; 
           if(hdC) hdC.innerText='0';
           if(mobCnt) mobCnt.innerText='0';
@@ -3702,15 +3745,7 @@ window.app.pos = {
       const prods = (window.app.globalData.products || []).filter(p => skus.includes(p.SKU));
 
       if (prods.length === 0) {
-        listContainer.innerHTML = `
-          <div class="h-full flex flex-col items-center justify-center py-16 text-center text-slate-400">
-             <div class="w-16 h-16 rounded-full bg-rose-50 text-rose-300 flex items-center justify-center text-2xl mb-3 shadow-2xs">
-               <i class="far fa-heart"></i>
-             </div>
-             <div class="text-sm font-black text-slate-700 mb-1">ยังไม่มีรายการที่บันทึกไว้</div>
-             <p class="text-xs text-slate-400 max-w-xs">กดไอคอนรูปหัวใจ ❤️ ที่การ์ดสินค้าในหน้าแรก เพื่อเก็บรุ่นที่สนใจไว้ดูเปรียบเทียบหรือสั่งจองภายหลัง</p>
-          </div>
-        `;
+        listContainer.innerHTML = '<div class="sf-blank"><i class="far fa-heart" aria-hidden="true"></i><p class="sf-blank-t">ยังไม่มีรายการโปรด</p><p class="sf-blank-s">กดรูปหัวใจบนการ์ดสินค้าเพื่อเก็บรุ่นที่สนใจไว้</p><button type="button" class="sf-btn-2 sf-blank-btn" onclick="window.app.pos.toggleWishlistDrawer()">เลือกสินค้าต่อ</button></div>';
         return;
       }
 
@@ -3792,10 +3827,7 @@ window.app.pos = {
         this.saveAndRender();
         this.toggleWishlistDrawer();
         this.toggleCart();
-        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500 }).fire({ 
-          icon: 'success', 
-          title: 'เพิ่มสินค้า ' + addedCount + ' รายการลงตะกร้าแล้ว' 
-        });
+        window.app.toast('เพิ่มสินค้า ' + addedCount + ' รายการลงตะกร้าแล้ว', 'success');
       } else {
         Swal.fire('ข้อจำกัดการจอง', 'ไม่สามารถเพิ่มสินค้าประเภทโมบายเกิน 1 เครื่องต่อออเดอร์ได้', 'warning');
       }

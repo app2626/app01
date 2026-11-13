@@ -850,6 +850,11 @@
                     <div class="pd-qty-in"><input type="number" id="modalProdQty" value="1" min="1"><span>ชิ้น</span></div>
                  </div>
                  <div id="pdActions" class="pd-actions"></div>
+                 <ul class="pd-trust" aria-label="บริการของร้าน">
+                    <li><i class="fas fa-shield-halved" aria-hidden="true"></i>ของแท้ ประกันศูนย์</li>
+                    <li><i class="fas fa-lock" aria-hidden="true"></i>ล็อกราคา Pre Booking</li>
+                    <li><i class="fas fa-gift" aria-hidden="true"></i>รับสิทธิ์ของแถม</li>
+                 </ul>
               </div>
             </div>
 
@@ -876,6 +881,8 @@
             <div id="pdPanel-specs" class="pd-panel hidden" role="tabpanel"><div id="pdSpecs"></div></div>
             <div id="pdPanel-install" class="pd-panel hidden" role="tabpanel"><div id="modalInstallmentBox"></div></div>
             <div id="pdPanel-terms" class="pd-panel hidden" role="tabpanel"><div id="pdTerms" class="pd-terms"></div></div>
+            <!-- สินค้าใกล้เคียง (pos.renderRelated — รุ่นอื่นในซีรีส์/หมวดเดียวกัน; ซ่อนเมื่อมีไม่ถึง 2 รุ่น) -->
+            <section id="pdRelated" class="pd-related hidden" aria-label="สินค้าใกล้เคียง"></section>
           </div>
         </div>
 

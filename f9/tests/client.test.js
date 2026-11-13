@@ -834,6 +834,24 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("document.getElementById('posVoucherStripWrap').scrollIntoView({block:'start',behavior:'instant'});true"); await sleep(250); await shot('pos-after-grid');
     await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(150);
   });
+  await T('detail page: selected option is outlined (not a solid fill), colour options carry a colour dot, trust row and related products render and open', async () => {
+    await ev("window.app.pos.openAddToCartModal('MODEL:Galaxy Test1');true"); await sleep(400);
+    const r = JSON.parse(await ev("(()=>{const on=document.querySelector('#modalColorOptions button.pd-on');const rel=document.getElementById('pdRelated');const cards=[...rel.querySelectorAll('.pd-rel-card')];return JSON.stringify({on:!!on,bg:on?getComputedStyle(on).backgroundColor:'',dot:!!document.querySelector('#modalColorOptions .pd-dot'),txt:on?on.textContent.trim():'',trust:document.querySelectorAll('#addToCartModal .pd-trust li').length,relHidden:rel.classList.contains('hidden'),n:cards.length,self:cards.some(c=>/Galaxy Test1$/.test(c.querySelector('.pd-rel-name').textContent.trim())),name:document.getElementById('modalProdName').textContent})})()"));
+    ok(r.on, 'no selected colour option'); ok(/255, 255, 255/.test(r.bg), 'selected option should be white with a border: ' + r.bg); ok(r.dot, 'colour dot missing'); eq(r.txt, 'Black');
+    eq(r.trust, 3); ok(!r.relHidden && r.n >= 2 && r.n <= 6, 'related products: ' + JSON.stringify(r)); ok(!r.self, 'the viewed model must not be in its own related list');
+    await ev("document.querySelector('#pdRelated .pd-rel-card').click();true"); await sleep(400);
+    const after = JSON.parse(await ev("JSON.stringify({open:!document.getElementById('addToCartModal').classList.contains('hidden'),name:document.getElementById('modalProdName').textContent,top:document.getElementById('pdScroll').scrollTop})"));
+    ok(after.open && after.name !== r.name, 'related card did not switch product'); eq(after.top, 0);
+    await ev("document.getElementById('pdRelated').scrollIntoView({block:'center',behavior:'instant'});true"); await sleep(200); await shot('pos-detail-related');
+    await ev("window.app.hideModal('addToCartModal');true"); await sleep(300);
+  });
+  await T('empty cart / wishlist show one line + one secondary button; storefront toasts go through window.app.toast (top-end)', async () => {
+    const r = JSON.parse(await ev("(()=>{const pos=window.app.pos;const bak=pos.cartData,bw=pos.wishlist;pos.cartData=[];pos.renderCart();pos.wishlist=[];pos.renderWishlistDrawer&&pos.renderWishlistDrawer();const c=document.querySelector('#cartItems .sf-blank'),w=document.querySelector('#wishlistDrawerItems .sf-blank');const out={c:!!c,cb:c?c.querySelectorAll('button').length:0,ct:c?c.innerText:'',w:!!w};pos.cartData=bak;pos.wishlist=bw;pos.renderCart();pos.renderWishlistDrawer&&pos.renderWishlistDrawer();return JSON.stringify(out)})()"));
+    ok(r.c, 'cart empty state missing'); eq(r.cb, 1); ok(!/จองด่วน/.test(r.ct), 'stale button name in empty cart text'); ok(r.w, 'wishlist empty state missing');
+    await ev("window.app.toast('ทดสอบ','success');true"); await sleep(250);
+    ok(await ev("!!document.querySelector('.swal2-container.swal2-top-end .swal2-toast')"), 'storefront toast is not top-end'); await shot('pos-toast');
+    await ev("Swal.close();true"); await sleep(200);
+  });
   await T('website mode on #pos: admin sidebar/topbar hidden, store header with brand + account menu linking to back office', async () => {
     const r = JSON.parse(await ev("JSON.stringify({site:document.documentElement.classList.contains('sf-site'),side:getComputedStyle(document.getElementById('desktopSidebar')).display,brand:getComputedStyle(document.querySelector('#posStoreHeader .sf-home')).display,top:getComputedStyle(document.getElementById('sfTopbar')).display,fs:!!document.getElementById('posFullscreenBtn')})"));
     ok(r.site && r.side === 'none' && r.brand !== 'none' && r.top !== 'none' && !r.fs, JSON.stringify(r));
