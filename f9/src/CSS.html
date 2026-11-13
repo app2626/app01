@@ -1698,8 +1698,11 @@
   .cms-actions { align-items: center; }
   .cms-actions .cms-grow { flex: 1 1 auto; }
   .cms-btn { border-radius: 8px; font-weight: 600; transition: background .15s, border-color .15s, color .15s, opacity .15s; }
-  .cms-btn-green { background: #16a34a; }
-  .cms-btn-green:hover { background: #15803d; filter: none; }
+  /* ปุ่มหลักของหลังบ้าน = น้ำเงินเข้ม (ชื่อคลาส cms-btn-green คงไว้เพราะใช้หลายที่ — เดิมเป็นสีเขียว) */
+  .cms-btn-green { background: #0f2a43; }
+  .cms-btn-green:hover { background: #1c4468; filter: none; }
+  html.dark .cms-btn-green { background: #3b6ea5; }
+  html.dark .cms-btn-green:hover { background: #4a80ba; }
   .cms-btn-red { background: #fff; color: #dc2626; border-color: #fecaca; }
   .cms-btn-red:hover:not(:disabled) { background: #fef2f2; border-color: #f87171; filter: none; }
   .cms-btn-line:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; filter: none; }
