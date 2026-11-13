@@ -7,6 +7,7 @@ document.addEventListener('keydown', function(e) {
   if (window.app.pos && window.app.pos.openPopover) { window.app.pos.closeFilterPopovers(); return; }
   const popup = document.getElementById('popupBannerModal');
   if (popup && !popup.classList.contains('hidden')) { window.app.closePopupBanner(); return; }
+  if (window.app.pos && window.app.pos.sidebarOpen && window.innerWidth < 1024 && window.app.currentRoute === 'pos') { window.app.pos.toggleStoreSidebar(false); return; }
   const modalOrder = ['orderDoneModal', 'promoHubModal', 'formModal', 'checkoutModal', 'addToCartModal'];
   for (let i = 0; i < modalOrder.length; i++) {
     const el = document.getElementById(modalOrder[i]);

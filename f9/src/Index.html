@@ -616,6 +616,7 @@
 
               <!-- 6B — category tiles + sub-chips รุ่น + filter chips (render โดย pos.renderStoreHeader) -->
               <div class="lg:flex-1 lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-6">
+                <div id="storeSheetBackdrop" class="hidden" onclick="window.app.pos.toggleStoreSidebar(false)"></div>
                 <aside id="storeSidebar" class="pos-storefront hidden lg:block lg:w-60 xl:w-64 shrink-0 lg:overflow-y-auto custom-scrollbar"></aside>
                 <div class="flex-1 min-w-0 flex flex-col lg:min-h-0">
                   <div id="storeFilterBar" class="pos-storefront shrink-0"></div>

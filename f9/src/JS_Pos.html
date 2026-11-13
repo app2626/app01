@@ -187,6 +187,8 @@ window.app.pos = {
     },
 
     init: function() {
+      // หน้าร้านถูกวาดใหม่ทุกครั้งที่เข้า #pos — แผ่นตัวกรอง (มือถือ) ต้องเริ่มในสถานะปิดเสมอ
+      this.sidebarOpen = false; document.documentElement.classList.remove('sf-sheet-open');
       // ตะกร้าใน localStorage อาจเสีย/parse ไม่ได้ (เจอบนมือถือ) — ห้ามปล่อยให้ล้ม ไม่งั้นทั้งหน้า POS ไม่ init ต่อ
       try { const c = localStorage.getItem('tg_cart'); if(c) this.cartData = JSON.parse(c) || []; }
       catch(e) { console.warn('tg_cart อ่านไม่ได้ — เริ่มตะกร้าใหม่:', e); this.cartData = []; localStorage.removeItem('tg_cart'); }
@@ -1455,7 +1457,7 @@ window.app.pos = {
       const opt = (checked, label, onclick, prefixHtml) => '<button type="button" class="sf-opt' + (checked ? ' on' : '') + '" onclick="' + onclick + '" aria-pressed="' + (checked ? 'true' : 'false') + '">'
         + '<span class="sf-box">' + (checked ? '<i class="fas fa-check"></i>' : '') + '</span>' + (prefixHtml || '') + '<span class="sf-lbl">' + esc(label) + '</span></button>';
       const grp = (title, body) => '<details open class="sf-group"><summary><span>' + title + '</span><i class="fas fa-chevron-down"></i></summary><div class="sf-body">' + body + '</div></details>';
-      let sh = '<div class="sf-panel">';
+      let sh = '<div class="sf-sheet-head"><strong>ตัวกรอง</strong><button type="button" aria-label="ปิดตัวกรอง" onclick="window.app.pos.toggleStoreSidebar(false)"><i class="fas fa-xmark"></i></button></div><div class="sf-panel">';
       sh += '<div class="sf-title"><i class="fas fa-sliders"></i> กรองข้อมูลสินค้า</div>';
       sh += '<button type="button" class="sf-switch' + (f.inStock ? ' on' : '') + '" onclick="window.app.pos.setStoreFilter(\'inStock\', ' + (f.inStock ? 'false' : 'true') + ')" role="switch" aria-checked="' + (f.inStock ? 'true' : 'false') + '"><span>แสดงสินค้าพร้อมขาย</span><span class="sf-knob"></span></button>';
       sh += grp('หมวดสินค้า', opt(f.category === '', 'สินค้าทั้งหมด', "window.app.pos.setStoreCategory('')")
@@ -1477,10 +1479,12 @@ window.app.pos = {
       }
       sh += '<button type="button" class="sf-clear" onclick="window.app.pos.clearStoreFilters(false)"' + (this.storeFiltersActive() ? '' : ' disabled') + '>ลบการกรองสินค้าที่เลือก</button>';
       sh += '</div>';
+      sh += '<div class="sf-sheet-foot"><button type="button" class="sf-btn-2" onclick="window.app.pos.clearStoreFilters(false)"' + (this.storeFiltersActive() ? '' : ' disabled') + '>ล้างทั้งหมด</button><button type="button" class="sf-sheet-go" onclick="window.app.pos.toggleStoreSidebar(false)">ดูสินค้า <span id="sfSheetCount"></span></button></div>';
       if (side) {
         side.innerHTML = sh;
         side.classList.toggle('hidden', !this.sidebarOpen);
         side.classList.add('lg:block');
+        this.syncSheetCount();
       }
 
       // --- ส่วนหัวรายการ: breadcrumb + ชื่อหมวด + จำนวน + แถบเรียงตาม ---
@@ -1497,13 +1501,40 @@ window.app.pos = {
         + '<label class="sf-sort"><span>เรียงตาม:</span><select onchange="window.app.pos.setStoreFilter(\'sort\', this.value)" aria-label="เรียงตาม">'
         + sortOpts.map(o => '<option value="' + o.val + '"' + (f.sort === o.val ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('')
         + '</select></label></div>';
+      html += this.activeChipsHtml();
       bar.innerHTML = html;
       this.renderCatNav(cats);
     },
-    toggleStoreSidebar: function() {
-      this.sidebarOpen = !this.sidebarOpen;
+    // ป้ายตัวกรองที่เลือกอยู่ (ใต้แถบเรียงตาม) — กดที่ป้าย = เอาตัวกรองนั้นออก; ไม่รวมการเรียงลำดับและคำค้น
+    activeChipsHtml: function() {
+      const f = this.storeFilters, esc = window.app.esc, escJs = window.app.escAttrJs, chips = [];
+      const add = (label, onclick) => chips.push('<button type="button" class="sf-achip" onclick="' + onclick + '" aria-label="' + esc('เอาออก ' + label) + '"><span>' + esc(label) + '</span><i class="fas fa-xmark" aria-hidden="true"></i></button>');
+      const baht = (n) => '฿' + Number(n).toLocaleString('en-US');
+      if (f.category) add(f.category, "window.app.pos.setStoreCategory('')");
+      if (f.brand) add(f.brand, "window.app.pos.setStoreFilter('brand','')");
+      f.groups.forEach(g => add(g, "window.app.pos.setStoreGroup('" + escJs(g) + "')"));
+      f.capacities.forEach(c => add(c, "window.app.pos.setStoreFilter('capacity','" + escJs(c) + "')"));
+      f.colors.forEach(c => add(c, "window.app.pos.setStoreFilter('color','" + escJs(c) + "')"));
+      const pr = { lt10: 'ต่ำกว่า ' + baht(10000), '10-30': baht(10000) + ' - ' + baht(30000), '30-50': baht(30000) + ' - ' + baht(50000), gt50: 'มากกว่า ' + baht(50000) }[f.priceRange];
+      if (pr) add(pr, "window.app.pos.setStoreFilter('priceRange','')");
+      else if (f.priceMin !== '' || f.priceMax !== '') add(f.priceMin !== '' && f.priceMax !== '' ? baht(f.priceMin) + ' - ' + baht(f.priceMax) : (f.priceMin !== '' ? 'ตั้งแต่ ' + baht(f.priceMin) : 'ไม่เกิน ' + baht(f.priceMax)), "window.app.pos.setStoreFilter('priceRange','')");
+      if (f.inStock) add('พร้อมขาย', "window.app.pos.setStoreFilter('inStock', false)");
+      if (!chips.length) return '';
+      return '<div class="sf-achips" id="storeActiveChips" aria-label="ตัวกรองที่เลือกอยู่">' + chips.join('') + (chips.length > 1 ? '<button type="button" class="sf-achip-clear" onclick="window.app.pos.clearStoreFilters(false)">ล้างทั้งหมด</button>' : '') + '</div>';
+    },
+    // จอ < 1024px: แถบตัวกรองเป็นแผ่นเลื่อนขึ้นจากขอบล่าง (CSS บล็อก INTL 4) + ฉากหลัง #storeSheetBackdrop; จอกว้างแถบข้างแสดงตลอด (lg:block) ค่านี้ไม่มีผล
+    toggleStoreSidebar: function(open) {
+      this.sidebarOpen = typeof open === 'boolean' ? open : !this.sidebarOpen;
       const side = document.getElementById('storeSidebar');
       if (side) side.classList.toggle('hidden', !this.sidebarOpen);
+      const bd = document.getElementById('storeSheetBackdrop');
+      if (bd) bd.classList.toggle('hidden', !this.sidebarOpen);
+      document.documentElement.classList.toggle('sf-sheet-open', this.sidebarOpen);
+      if (this.sidebarOpen) this.syncSheetCount();
+    },
+    syncSheetCount: function() {
+      const el = document.getElementById('sfSheetCount'), src = document.getElementById('storeResultCount');
+      if (el && src) el.textContent = (src.textContent || '').trim();
     },
     goStorePage: function(n) {
       this.storePage = n;
@@ -1915,6 +1946,7 @@ window.app.pos = {
       const hasQuery = searchEl && searchEl.value.trim() !== '';
       if(products.length === 0 && (hasQuery || this.storeFiltersActive())) {
         if (resultCountEl) resultCountEl.textContent = '0 รายการ';
+        this.syncSheetCount();
         row.innerHTML = window.app.emptyState({
           icon: 'fa-search',
           title: 'ไม่พบสินค้า Pre Booking ตามเงื่อนไข',
@@ -1927,6 +1959,7 @@ window.app.pos = {
       // ข้อมูลโหลดเสร็จแล้วแต่ไม่มีสินค้าให้ช่องทาง/สาขานี้ — ต้องบอกผู้ใช้ ไม่ใช่โชว์โครงโหลดค้างตลอดไป
       if (products.length === 0 && (window.app.globalData.products || []).length > 0) {
         if (resultCountEl) resultCountEl.textContent = '0 รายการ';
+        this.syncSheetCount();
         row.innerHTML = window.app.emptyState({
           icon: 'fa-box-open',
           title: 'ยังไม่มีสินค้าสำหรับช่องทางนี้',
@@ -1980,6 +2013,7 @@ window.app.pos = {
 
       // 6B — "ผลลัพธ์ n รายการ" นับตามการ์ดที่แสดงจริง (รุ่นเดียวกันหลาย SKU นับเป็น 1 การ์ด)
       if (resultCountEl) resultCountEl.textContent = '(' + renderedList.length + ' รายการ)';
+      this.syncSheetCount();
 
       // 6A — POS storefront: สไตล์ scoped ด้วย .pos-storefront เท่านั้น ห้ามรั่วไปหน้าอื่น
       // ถ้าสร้างการ์ดใบใดล้มกลางทาง ห้ามทิ้งกริดว่างเงียบๆ (เคยเจอบน iOS) — โชว์ error state มาตรฐาน + ลองใหม่ (rule 12)

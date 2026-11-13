@@ -662,6 +662,23 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   await T('mobile: no horizontal page overflow', async () => { const w = await ev("[document.documentElement.scrollWidth, window.innerWidth]"); ok(w[0] <= w[1] + 1, 'scrollWidth=' + w[0] + ' vs ' + w[1]); });
   await T('mobile: sidebar hidden, filter button visible', async () => ok(await ev("(()=>{const s=document.getElementById('storeSidebar');const b=document.querySelector('.sf-filter-btn');return getComputedStyle(s).display==='none'&&getComputedStyle(b).display!=='none'})()")));
   await T('mobile: filter button opens sidebar', async () => { await ev("document.querySelector('.sf-filter-btn').click();true"); await sleep(300); ok(await ev("getComputedStyle(document.getElementById('storeSidebar')).display!=='none'")); await ev("document.querySelector('.sf-filter-btn').click();true"); });
+  await T('mobile: filters open as a bottom sheet (backdrop, sticky footer with result count), stay open while picking, close from the footer button / backdrop / Escape', async () => {
+    await ev("window.app.pos.clearStoreFilters(false);document.querySelector('.sf-filter-btn').click();true"); await sleep(400);
+    const o = JSON.parse(await ev("(()=>{const s=document.getElementById('storeSidebar'),cs=getComputedStyle(s),r=s.getBoundingClientRect(),f=s.querySelector('.sf-sheet-foot').getBoundingClientRect();return JSON.stringify({pos:cs.position,bottom:Math.round(r.bottom),vh:innerHeight,w:Math.round(r.width),vw:innerWidth,foot:Math.round(f.bottom),bd:getComputedStyle(document.getElementById('storeSheetBackdrop')).display,lock:document.documentElement.classList.contains('sf-sheet-open'),count:document.getElementById('sfSheetCount').textContent})})()"));
+    eq(o.pos, 'fixed'); ok(Math.abs(o.bottom - o.vh) <= 1 && o.w === o.vw && Math.abs(o.foot - o.vh) <= 1, 'sheet not docked to the bottom ' + JSON.stringify(o)); ok(o.bd !== 'none' && o.lock, JSON.stringify(o)); ok(/\d/.test(o.count), 'result count missing: ' + o.count);
+    await shot('pos-filter-sheet');
+    await ev("window.app.pos.setStoreFilter('capacity','128GB');true"); await sleep(300);
+    const p = JSON.parse(await ev("JSON.stringify({open:!document.getElementById('storeSidebar').classList.contains('hidden'),count:document.getElementById('sfSheetCount').textContent,list:document.getElementById('storeResultCount').textContent,clear:document.querySelector('#storeSidebar .sf-sheet-foot .sf-btn-2').disabled})"));
+    ok(p.open, 'sheet closed after picking a filter'); eq(p.count, p.list.trim(), 'count in the sheet differs from the list'); ok(!p.clear, 'clear button should be enabled');
+    await ev("document.querySelector('#storeSidebar .sf-sheet-go').click();true"); await sleep(300);
+    const c = JSON.parse(await ev("JSON.stringify({side:getComputedStyle(document.getElementById('storeSidebar')).display,bd:getComputedStyle(document.getElementById('storeSheetBackdrop')).display,lock:document.documentElement.classList.contains('sf-sheet-open'),chips:document.querySelectorAll('#storeActiveChips .sf-achip').length})"));
+    eq(c.side, 'none'); eq(c.bd, 'none'); ok(!c.lock, 'scroll lock left on'); eq(c.chips, 1); await shot('pos-filter-chips-mobile');
+    await ev("window.app.pos.toggleStoreSidebar(true);document.getElementById('storeSheetBackdrop').click();true"); await sleep(200);
+    ok(await ev("document.getElementById('storeSidebar').classList.contains('hidden')"), 'backdrop click must close the sheet');
+    await ev("window.app.pos.toggleStoreSidebar(true);document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));true"); await sleep(200);
+    ok(await ev("document.getElementById('storeSidebar').classList.contains('hidden')"), 'Escape must close the sheet');
+    await ev("window.app.pos.clearStoreFilters(false);true"); await sleep(250);
+  });
   await T('mobile: 2-column card grid', async () => { const cols = await ev("getComputedStyle(document.querySelector('#productGrid .pos-storefront.grid')).gridTemplateColumns.split(' ').length"); ok(cols === 2, 'cols=' + cols); });
   await shot('pos-mobile'); await ev("document.getElementById('posStoreHeader').scrollIntoView({block:'start',behavior:'instant'});window.scrollTo({top:0,behavior:'instant'});true"); await sleep(250); await shot('pos-top-mobile'); await ev("window.scrollTo({top:1200,behavior:'instant'});true"); await sleep(450); { const m = JSON.parse(await ev("JSON.stringify({top:document.getElementById('posStoreHeader').getBoundingClientRect().top,stuck:document.getElementById('posStoreHeader').classList.contains('is-stuck'),where:getComputedStyle(document.querySelector('.pos-where')).display})")); await T('sticky header (mobile): pinned at the top edge (website mode, no app topbar), channel/branch row hidden while stuck', async () => { ok(Math.abs(m.top) <= 2, JSON.stringify(m)); ok(m.stuck && m.where === 'none', JSON.stringify(m)); }); await shot('pos-sticky-mobile'); await ev("(()=>{const g=window.app.globalData;g.__bakS1=g.settings;g.settings=Object.assign({},g.settings,{ContactPhone:'02-123-4567',ContactLine:'@teststore',ContactHours:'10:00-20:00'});window.app.renderFooterContact();document.querySelector('footer').scrollIntoView({block:'end',behavior:'instant'});return true})()"); await sleep(300); await shot('footer-mobile'); await ev("(()=>{const g=window.app.globalData;g.settings=g.__bakS1;window.app.renderFooterContact();return true})()"); await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(250); }
   await T('mobile: product detail page fits the screen, add-to-cart button fully visible', async () => {
@@ -871,6 +888,19 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.app.toast('ทดสอบ','success');true"); await sleep(250);
     ok(await ev("!!document.querySelector('.swal2-container.swal2-top-end .swal2-toast')"), 'storefront toast is not top-end'); await shot('pos-toast');
     await ev("Swal.close();true"); await sleep(200);
+  });
+  await T('active filter chips: one chip per selected filter, clicking a chip removes only that filter, clear-all shows from 2 chips, text escaped', async () => {
+    await ev("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('capacity','128GB');window.app.pos.setStoreFilter('inStock',true);true"); await sleep(300);
+    const a = JSON.parse(await ev("JSON.stringify({chips:[...document.querySelectorAll('#storeActiveChips .sf-achip')].map(b=>b.textContent.trim()),clear:!!document.querySelector('#storeActiveChips .sf-achip-clear')})"));
+    eq(a.chips.length, 2, JSON.stringify(a)); eq(a.chips[0], '128GB'); ok(a.clear, 'clear-all missing with 2 chips'); await shot('pos-filter-chips');
+    await ev("document.querySelector('#storeActiveChips .sf-achip').click();true"); await sleep(300);
+    const b = JSON.parse(await ev("JSON.stringify({caps:window.app.pos.storeFilters.capacities.length,stock:window.app.pos.storeFilters.inStock,chips:document.querySelectorAll('#storeActiveChips .sf-achip').length,clear:!!document.querySelector('#storeActiveChips .sf-achip-clear')})"));
+    eq(b.caps, 0); ok(b.stock === true, 'other filter must stay'); eq(b.chips, 1); ok(!b.clear, 'clear-all should hide with a single chip');
+    await ev("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('color','<img src=x onerror=window.__chipX=1>');true"); await sleep(300);
+    const c = JSON.parse(await ev("JSON.stringify({img:!!document.querySelector('#storeActiveChips img'),x:!!window.__chipX,t:(document.querySelector('#storeActiveChips .sf-achip')||{}).textContent||''})"));
+    ok(!c.img && !c.x && c.t.includes('<img'), JSON.stringify(c));
+    await ev("window.app.pos.clearStoreFilters(false);true"); await sleep(250);
+    eq(await ev("!!document.getElementById('storeActiveChips')"), false, 'chip row must disappear with no filters');
   });
   await T('website mode on #pos: admin sidebar/topbar hidden, store header with brand + account menu linking to back office', async () => {
     const r = JSON.parse(await ev("JSON.stringify({site:document.documentElement.classList.contains('sf-site'),side:getComputedStyle(document.getElementById('desktopSidebar')).display,brand:getComputedStyle(document.querySelector('#posStoreHeader .sf-home')).display,top:getComputedStyle(document.getElementById('sfTopbar')).display,fs:!!document.getElementById('posFullscreenBtn')})"));

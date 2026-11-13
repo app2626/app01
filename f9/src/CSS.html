@@ -2718,6 +2718,43 @@
   html.dark .br-grp h4, html.dark .br-grp li span, html.dark .br-none { color: #94a3b8; }
 
   /* ===================================================
+     INTL 4 — ป้ายตัวกรองที่เลือกอยู่ (.sf-achips, pos.activeChipsHtml) + แผ่นตัวกรองบนมือถือ
+     จอ < 1024px: #storeSidebar เปิดเป็นแผ่นเลื่อนขึ้นจากขอบล่าง (pos.toggleStoreSidebar) มีหัว/ท้ายติดขอบ + ฉากหลัง #storeSheetBackdrop
+     จอกว้าง: แถบข้างเหมือนเดิม หัว/ท้ายของแผ่นถูกซ่อน
+     =================================================== */
+  .sf-achips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -8px 0 20px; }
+  .sf-achip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 32px; padding: 0 10px 0 12px; border: 1px solid #cfd5dd; border-radius: 999px; background: #ffffff; font-size: 13px; font-weight: 500; color: #0f172a; transition: border-color .15s, background-color .15s; }
+  .sf-achip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sf-achip i { flex: 0 0 auto; font-size: 11px; color: #64748b; }
+  .sf-achip:hover { border-color: #0f2a43; background: #f5f6f8; }
+  .sf-achip-clear { height: 32px; padding: 0 6px; font-size: 13px; font-weight: 500; color: #454b57; text-decoration: underline; text-underline-offset: 3px; }
+  .sf-achip-clear:hover { color: #0f172a; }
+  .sf-sheet-head, .sf-sheet-foot { display: none; }
+  @media (max-width: 1023px) {
+    #storeSheetBackdrop:not(.hidden) { display: block; position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .5); }
+    #storeSidebar:not(.hidden) { display: flex; flex-direction: column; position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 86vh; background: #ffffff; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(15, 23, 42, .18); animation: sfSheetUp .22s ease-out; }
+    #storeSidebar .sf-sheet-head { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #e8ecf1; font-size: 16px; color: #0f172a; }
+    #storeSidebar .sf-sheet-head button { width: 36px; height: 36px; margin: -6px -8px -6px 0; border-radius: 8px; font-size: 16px; color: #454b57; }
+    #storeSidebar .sf-panel, html.sf-site #storeSidebar .sf-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 16px; border: 0; border-radius: 0; background: transparent; }
+    #storeSidebar .sf-title, #storeSidebar .sf-clear { display: none; }
+    #storeSidebar .sf-sheet-foot { display: flex; flex: 0 0 auto; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #e8ecf1; }
+    #storeSidebar .sf-sheet-foot .sf-btn-2 { flex: 0 0 auto; height: 46px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+    #storeSidebar .sf-sheet-foot .sf-btn-2:disabled { opacity: .45; cursor: not-allowed; }
+    #storeSidebar .sf-sheet-go { flex: 1 1 auto; height: 46px; border-radius: 8px; background: #0f2a43; color: #ffffff; font-size: 15px; font-weight: 700; }
+    html.sf-site.sf-sheet-open, html.sf-site.sf-sheet-open body { overflow: hidden; }
+    html.dark #storeSidebar:not(.hidden) { background: #0f172a; }
+    html.dark #storeSidebar .sf-sheet-head { color: #f1f5f9; border-color: #1e293b; }
+    html.dark #storeSidebar .sf-sheet-head button { color: #cbd5e1; }
+    html.dark #storeSidebar .sf-sheet-foot { border-color: #1e293b; }
+    html.dark #storeSidebar .sf-sheet-go { background: #f1f5f9; color: #0f172a; }
+  }
+  @keyframes sfSheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #storeSidebar:not(.hidden) { animation: none; } }
+  html.dark .sf-achip { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+  html.dark .sf-achip:hover { background: #273449; border-color: #94a3b8; }
+  html.dark .sf-achip i, html.dark .sf-achip-clear { color: #94a3b8; }
+
+  /* ===================================================
      INTL 3 — หน้าสั่งจองเต็มจอ (#checkoutModal.co-page) + หน้ายืนยันใบจอง (#orderDoneModal.co-page)
      โครง: หัว (.pd-head ใช้ร่วมกับหน้ารายละเอียด) / .co-scroll (ฟอร์ม 3 ตอน + สรุปรายการ) / .co-consent / .co-bar (ยอดสุทธิ + ปุ่มยืนยัน ติดขอบล่าง)
      ฟอร์มพื้นขาวล้วน เส้นแบ่งบาง — ไม่มีกล่องสีเขียว/แดง/ฟ้า; ปุ่มส้มมีปุ่มเดียวคือ .co-cta
