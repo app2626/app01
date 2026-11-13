@@ -346,6 +346,10 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const stock = (sku) => Number(sheets.Products.rows.find(r => r[sc] === sku)[kc]);
     const s1 = stock('T3-0'), s2 = stock('CASE-T3'), n0 = sheets.Orders.rows.length;
     // ยังไม่ติ๊กรับทราบเงื่อนไข/นโยบาย = ห้ามไปต่อ (หน้ายืนยันต้องยังเปิดอยู่) แล้วค่อยติ๊กและส่งจริง
+    // full-page checkout: opens with an order summary (both items, bundle discount, net total) and keeps every field id
+    await P("window.app.pos.openCheckoutModal();true"); await sleep(350);
+    const co = JSON.parse(await P("(()=>{const m=document.getElementById('checkoutModal');const r=m.querySelector('.co-shell').getBoundingClientRect();return JSON.stringify({open:!m.classList.contains('hidden'),full:r.width>=innerWidth-2&&r.height>=innerHeight-2,items:m.querySelectorAll('#coSummary .co-items li').length,disc:m.querySelectorAll('#coSummary .co-disc').length,tot:document.getElementById('coBarTotal').textContent,cart:document.getElementById('cartTotal').textContent,ids:['coCustomer','coPhone','coEmail','coIdCard','coPreOrderNo','coCodeHandraiser','radResT','radResF','coPickupDate','bkStaffName','bkPhone','coReceiptNo','coDeposit','coRemark','coConsent','dynamicInterests'].filter(i=>!m.querySelector('#'+i)),orange:[...m.querySelectorAll('button')].filter(b=>/255, 107, 0/.test(getComputedStyle(b).backgroundColor)).length})})()"));
+    ok(co.open && co.full, 'checkout is not a full-screen page ' + JSON.stringify(co)); eq(co.items, 2); ok(co.disc >= 1, 'bundle discount missing from the summary'); eq(co.tot, co.cart, 'summary total differs from the cart total'); eq(co.ids.join(','), '', 'missing field ids'); eq(co.orange, 1, 'exactly one orange button'); await shot('pos-checkout-page');
     const blocked = await P(`(()=>{const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};set('coCustomer','ลูกค้า ซื้อคู่');set('coPhone','0812345678');set('coEmail','a@b.co');set('coIdCard','1234567890121');set('bkStaffName','พนักงาน ทดสอบ');set('bkPhone','0899999999');document.getElementById('radResF').checked=true;document.getElementById('coConsent').checked=false;let warned=0;const ot=window.app.toast;window.app.toast=function(m){if(/รับทราบ/.test(m))warned++;return ot.apply(this,arguments)};window.app.pos.submitCheckout();window.app.toast=ot;const blocked=warned===1&&!window.app.pos.isSubmitting;document.getElementById('coConsent').checked=true;window.app.pos.submitCheckout();return blocked})()`);
     if (!blocked) throw new Error('checkout must stay blocked until the consent box is ticked');
     await sleep(900);
@@ -360,7 +364,13 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const disc = rows.find(r => r[skuI] === 'DISCOUNT'); ok(disc, 'no discount row');
     ok(/Auto Bundle/.test(disc[nameI]), disc[nameI]); ok(Math.abs(Number(disc[upI]) + 9999.9) < 0.02, 'discount value=' + disc[upI]);
     eq(stock('T3-0'), s1 - 1, 'main stock'); eq(stock('CASE-T3'), s2 - 1, 'companion stock');
-    await sleep(600); await P("window.Swal&&Swal.close();true");
+    await sleep(600);
+    // success = confirmation PAGE with the order number + summary (no success popup); checkout page closed, form cleared
+    const done = JSON.parse(await P("(()=>{const d=document.getElementById('orderDoneModal');return JSON.stringify({open:!d.classList.contains('hidden'),id:document.getElementById('doneOrderId').textContent,items:d.querySelectorAll('#doneSummary .co-items li').length,meta:document.getElementById('doneMeta').textContent,co:document.getElementById('checkoutModal').classList.contains('hidden'),swal:Swal.isVisible()&&!!Swal.getConfirmButton()&&Swal.getConfirmButton().offsetParent!==null,name:document.getElementById('coCustomer').value,link:!!window.app.pos.lastOrder})})()"));
+    const oidI = sheets.Orders.rows[0].indexOf('OrderID');
+    ok(done.open && done.co, 'confirmation page not shown / checkout still open ' + JSON.stringify(done)); eq(done.id, String(rows[0][oidI]), 'order number on the confirmation page'); eq(done.items, 2); ok(/ลูกค้า ซื้อคู่/.test(done.meta), done.meta); ok(!done.swal, 'old success popup still shown'); eq(done.name, '', 'form not cleared');
+    await shot('pos-order-done');
+    await P("window.app.hideModal('orderDoneModal');window.Swal&&Swal.close();true"); await sleep(200);
     eq(await P("window.app.pos.cartData.length"), 0, 'cart not cleared'); ok(await P("document.getElementById('cartCompanions').classList.contains('hidden')"), 'panel stale after checkout');
   });
 

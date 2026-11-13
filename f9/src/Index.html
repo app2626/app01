@@ -982,99 +982,95 @@
     </div>
 
     <!-- Modal บันทึกใบจอง -->
-    <div id="checkoutModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="ยืนยันการสั่งจอง">
-      <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.hideModal('checkoutModal')"></div>
-      
-      <div class="fixed inset-0 z-10 overflow-y-auto py-6">
-        <div class="flex min-h-full items-center justify-center px-4 text-center">
-          <div class="relative transform overflow-hidden rounded-3xl bg-slate-50 text-left shadow-xl transition-all w-full max-w-5xl flex flex-col max-h-[90vh]">
-            
-            <div class="sf-dlg-head px-6 md:px-8 py-4 flex justify-between items-center relative overflow-hidden">
-               <h3 class="text-lg font-bold tracking-wide relative z-10 flex items-center gap-3">
-                 <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
-                   <i class="fas fa-file-invoice text-sm"></i>
-                 </div>
-                 ข้อมูลลูกค้า
-               </h3>
-               <button type="button" aria-label="ปิดหน้าต่างสั่งจอง" class="relative z-10 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition" onclick="window.app.hideModal('checkoutModal')"><i class="fas fa-times text-sm"></i></button>
-            </div>
-            
-            <div class="p-5 md:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-5 md:space-y-0 md:grid md:grid-cols-12 md:gap-5">
-              
-              <!-- Left Column: Customer & Interests -->
-              <div class="md:col-span-7 flex flex-col gap-5">
-                  <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                     <h4 class="text-sm font-bold text-slate-800 mb-4 flex items-center"><i class="fas fa-user-circle text-indigo-500 mr-2 text-lg"></i> ข้อมูลลูกค้า</h4>
-                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">ชื่อ-นามสกุล <span class="text-rose-500">*</span></label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coCustomer" required></div>
-                        <div class="relative"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">เบอร์โทรศัพท์ <span class="text-rose-500">*</span></label><input type="tel" maxlength="12" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all" id="coPhone" oninput="window.app.formatPhone(this); window.app.pos.onPhoneInput()" required><i id="coPhoneSpin" class="fas fa-spinner fa-spin absolute right-3 bottom-3 text-indigo-500 text-xs hidden pointer-events-none" aria-hidden="true"></i></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">อีเมล (Email) <span class="text-rose-500">*</span></label><input type="email" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coEmail" required></div>
-                        <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">บัตรประชาชน / Passport <span class="text-rose-500">*</span></label><input type="text" maxlength="17" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all" id="coIdCard" oninput="window.app.formatIdCard(this)" required></div>
-                        <div class="sm:col-span-2"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">เลขที่ Pre Booking</label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coPreOrderNo" placeholder="เว้นว่างได้ถ้าไม่มี"></div>
-                        <div class="sm:col-span-2"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">รหัสลงทะเบียน (Code Handraiser)</label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coCodeHandraiser" placeholder="เว้นว่างได้ถ้าไม่มี"></div>
-                     </div>
-                  </div>
-    
-                  <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex-1">
-                     <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center"><i class="fas fa-heart text-rose-500 mr-2 text-lg"></i> ความสนใจและพฤติกรรมลูกค้า</h4>
-                     <div id="dynamicInterests" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
-                  </div>
-              </div>
-              
-              <!-- Right Column: Conditions & Remarks -->
-              <div class="md:col-span-5 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
-                 <h4 class="text-sm font-bold text-slate-800 mb-4 flex items-center"><i class="fas fa-file-contract text-emerald-500 mr-2 text-lg"></i> เงื่อนไขและหมายเหตุ</h4>
-                 
-                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
-                    <label class="block text-xs font-bold text-slate-700 mb-2">ประเภทสิทธิ์การจอง <span class="text-rose-500">*</span></label>
-                    <div class="space-y-2">
-                       <label class="flex items-center cursor-pointer p-2 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
-                          <input type="radio" name="resStatus" id="radResT" value="จอง T (มีการจอง)" class="w-4 h-4 text-blue-600 bg-white border-slate-300 focus:ring-blue-500">
-                          <span class="ml-2 text-xs font-bold text-blue-700">จอง T <span class="font-normal text-blue-500 ml-1">(มัดจำจองจริง)</span></span>
-                       </label>
-                       <label class="flex items-center cursor-pointer p-2 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
-                          <input type="radio" name="resStatus" id="radResF" value="จอง F (สวมสิทธิ์การจอง)" class="w-4 h-4 text-red-600 bg-white border-slate-300 focus:ring-red-500">
-                          <span class="ml-2 text-xs font-bold text-red-700">จอง F <span class="font-normal text-red-500 ml-1">(สวมสิทธิ์แคมเปญ)</span></span>
-                       </label>
-                    </div>
-                 </div>
+    <!-- หน้าสั่งจองเต็มจอ (เดิมเป็น popup) — คง id checkoutModal และ id ช่องกรอกทุกช่อง เปิด/ปิดด้วย showModal/hideModal เหมือนเดิม
+         ซ้าย: ฟอร์ม 3 ตอนในหน้าเดียว (ไม่แบ่งหลายหน้า พนักงานไม่ต้องคลิกเพิ่ม) · ขวา: สรุปรายการ (pos.renderCheckoutSummary) · ล่าง: ยอมรับเงื่อนไข + ปุ่มยืนยัน -->
+    <div id="checkoutModal" class="co-page fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="ยืนยันการสั่งจอง">
+      <div class="co-shell">
+        <div class="sf-dlg-head pd-head">
+           <button type="button" class="pd-back" aria-label="กลับไปหน้าร้าน" onclick="window.app.hideModal('checkoutModal')"><i class="fas fa-arrow-left"></i><span>กลับ</span></button>
+           <h3 class="co-title">สั่งจอง</h3>
+           <button type="button" aria-label="ปิดหน้าต่างสั่งจอง" class="pd-head-btn pd-x" onclick="window.app.hideModal('checkoutModal')"><i class="fas fa-times"></i></button>
+        </div>
 
-                 <div class="mb-4"><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">รอบรับเครื่องลูกค้าวันที่</label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="coPickupDate" placeholder="เช่น 1-5 (ช่วงวันที่)"></div>
-
-                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">พนักงานรับจอง <span class="text-rose-500">*</span></label><input type="text" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="bkStaffName" required></div>
-                    <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">เบอร์พนักงาน <span class="text-rose-500">*</span></label><input type="tel" maxlength="12" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors" id="bkPhone" oninput="window.app.formatPhone(this)" required></div>
+        <div class="co-scroll custom-scrollbar" id="coScroll">
+          <div class="co-wrap">
+            <div class="co-main">
+              <section class="co-sec">
+                 <h4 class="co-h"><span class="co-n">1</span>ข้อมูลลูกค้า</h4>
+                 <div class="co-grid">
+                    <div><label class="co-lb" for="coCustomer">ชื่อ-นามสกุล <b>*</b></label><input type="text" class="co-in" id="coCustomer" autocomplete="off" required></div>
+                    <div class="relative"><label class="co-lb" for="coPhone">เบอร์โทรศัพท์ <b>*</b></label><input type="tel" maxlength="12" class="co-in" id="coPhone" oninput="window.app.formatPhone(this); window.app.pos.onPhoneInput()" autocomplete="off" required><i id="coPhoneSpin" class="fas fa-spinner fa-spin absolute right-3 bottom-3.5 text-indigo-500 text-xs hidden pointer-events-none" aria-hidden="true"></i></div>
+                    <div><label class="co-lb" for="coEmail">อีเมล <b>*</b></label><input type="email" class="co-in" id="coEmail" autocomplete="off" required></div>
+                    <div><label class="co-lb" for="coIdCard">บัตรประชาชน / Passport <b>*</b></label><input type="text" maxlength="17" class="co-in" id="coIdCard" oninput="window.app.formatIdCard(this)" autocomplete="off" required></div>
+                    <div><label class="co-lb" for="coPreOrderNo">เลขที่ Pre Booking</label><input type="text" class="co-in" id="coPreOrderNo" placeholder="เว้นว่างได้ถ้าไม่มี"></div>
+                    <div><label class="co-lb" for="coCodeHandraiser">รหัสลงทะเบียน (Code Handraiser)</label><input type="text" class="co-in" id="coCodeHandraiser" placeholder="เว้นว่างได้ถ้าไม่มี"></div>
                  </div>
+              </section>
 
-                 <div class="bg-emerald-50/50 border border-emerald-200 rounded-xl p-4 mb-4">
-                    <label class="block text-xs font-bold text-emerald-800 mb-3 flex items-center"><i class="fas fa-money-bill-wave mr-2"></i> เงินมัดจำ (Deposit)</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">เลขที่ใบเสร็จรับเงิน <span class="text-rose-500">*</span></label><input type="text" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors" id="coReceiptNo" placeholder="เช่น RC-00001"></div>
-                       <div><label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">จำนวนเงินมัดจำ (บาท) <span class="text-rose-500">*</span></label><input type="number" min="0" step="any" inputmode="decimal" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors" id="coDeposit" placeholder="0.00"></div>
-                    </div>
+              <section class="co-sec">
+                 <h4 class="co-h"><span class="co-n">2</span>เงื่อนไขการจองและมัดจำ</h4>
+                 <div class="co-lb">ประเภทสิทธิ์การจอง <b>*</b></div>
+                 <div class="co-radios">
+                    <label class="co-radio"><input type="radio" name="resStatus" id="radResT" value="จอง T (มีการจอง)"><span><strong>จอง T</strong><small>มัดจำจองจริง</small></span></label>
+                    <label class="co-radio"><input type="radio" name="resStatus" id="radResF" value="จอง F (สวมสิทธิ์การจอง)"><span><strong>จอง F</strong><small>สวมสิทธิ์แคมเปญ</small></span></label>
                  </div>
-                 <div class="flex-1 flex flex-col">
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">หมายเหตุ / ข้อมูลเพิ่มเติม</label>
-                    <textarea class="w-full flex-1 min-h-[80px] px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors custom-scrollbar" id="coRemark" placeholder="ระบุหมายเหตุ..."></textarea>
+                 <div class="co-grid">
+                    <div><label class="co-lb" for="coReceiptNo">เลขที่ใบเสร็จรับเงินมัดจำ <b>*</b></label><input type="text" class="co-in" id="coReceiptNo" placeholder="เช่น RC-00001"></div>
+                    <div><label class="co-lb" for="coDeposit">จำนวนเงินมัดจำ (บาท) <b>*</b></label><input type="number" min="0" step="any" inputmode="decimal" class="co-in" id="coDeposit" placeholder="0.00"></div>
+                    <div><label class="co-lb" for="bkStaffName">พนักงานรับจอง <b>*</b></label><input type="text" class="co-in" id="bkStaffName" required></div>
+                    <div><label class="co-lb" for="bkPhone">เบอร์พนักงาน <b>*</b></label><input type="tel" maxlength="12" class="co-in" id="bkPhone" oninput="window.app.formatPhone(this)" required></div>
+                    <div class="co-full"><label class="co-lb" for="coPickupDate">รอบรับเครื่องลูกค้าวันที่</label><input type="text" class="co-in" id="coPickupDate" placeholder="เช่น 1-5 (ช่วงวันที่)"></div>
+                    <div class="co-full"><label class="co-lb" for="coRemark">หมายเหตุ / ข้อมูลเพิ่มเติม</label><textarea class="co-in co-ta custom-scrollbar" id="coRemark" placeholder="ระบุหมายเหตุ..."></textarea></div>
                  </div>
-              </div>
+                 <p class="co-note">เลขที่ใบเสร็จและเงินมัดจำ จำเป็นเมื่อเลือก "จอง T"</p>
+              </section>
 
+              <section class="co-sec">
+                 <h4 class="co-h"><span class="co-n">3</span>ความสนใจของลูกค้า</h4>
+                 <div id="dynamicInterests" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+              </section>
             </div>
-            
-            <div class="co-consent">
-               <label for="coConsent"><input type="checkbox" id="coConsent">
-                 <span>ลูกค้ารับทราบและยอมรับ <button type="button" onclick="window.app.openPolicy('booking')">เงื่อนไขการจอง</button> และ <button type="button" onclick="window.app.openPolicy('privacy')">นโยบายความเป็นส่วนตัว</button> แล้ว <b class="text-rose-500">*</b></span>
-               </label>
-            </div>
-            <div class="px-8 py-5 bg-white border-t border-slate-200 flex justify-between items-center rounded-b-3xl">
-               <button type="button" class="px-5 py-3 text-slate-500 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors text-sm flex items-center gap-2" onclick="window.app.hideModal('checkoutModal')">
-                  <i class="fas fa-arrow-left text-xs"></i> ย้อนกลับ
-               </button>
-               <button type="button" class="px-8 py-3 bg-[#FF6B00] hover:bg-[#E05300] text-white font-black rounded-xl shadow-sm transition-all flex items-center" onclick="window.app.pos.submitCheckout()">
-                  ยืนยันการสั่งจอง <i class="fas fa-check-circle ml-2"></i>
-               </button>
-            </div>
-            
+
+            <aside class="co-side" aria-label="สรุปรายการ">
+               <details id="coSumBox" class="co-sum" open>
+                  <summary><span>สรุปรายการ</span><b id="coSumMini" class="tabular-nums"></b><i class="fas fa-chevron-down" aria-hidden="true"></i></summary>
+                  <div id="coSummary"></div>
+               </details>
+            </aside>
+          </div>
+        </div>
+
+        <div class="co-consent">
+           <label for="coConsent"><input type="checkbox" id="coConsent">
+             <span>ลูกค้ารับทราบและยอมรับ <button type="button" onclick="window.app.openPolicy('booking')">เงื่อนไขการจอง</button> และ <button type="button" onclick="window.app.openPolicy('privacy')">นโยบายความเป็นส่วนตัว</button> แล้ว <b class="text-rose-500">*</b></span>
+           </label>
+        </div>
+        <div class="co-bar">
+          <div class="co-bar-in">
+             <div class="co-bar-tot"><span>ยอดสุทธิ</span><b id="coBarTotal" class="tabular-nums"></b></div>
+             <button type="button" class="sf-btn-2 co-bar-back" onclick="window.app.hideModal('checkoutModal')">ย้อนกลับ</button>
+             <button type="button" class="co-cta" onclick="window.app.pos.submitCheckout()">ยืนยันการสั่งจอง</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- หน้ายืนยันหลังบันทึกใบจองสำเร็จ (pos.showOrderDone) — แทน popup "สำเร็จ" เดิม -->
+    <div id="orderDoneModal" class="co-page fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="บันทึกใบจองแล้ว">
+      <div class="co-shell">
+        <div class="co-scroll custom-scrollbar">
+          <div class="co-done">
+             <div class="co-done-ico"><i class="fas fa-check" aria-hidden="true"></i></div>
+             <h2 class="co-done-h">บันทึกใบจองแล้ว</h2>
+             <p class="co-done-s">เลขที่ใบจอง</p>
+             <div id="doneOrderId" class="co-done-id"></div>
+             <div id="doneMeta" class="co-done-meta"></div>
+             <div id="doneSummary" class="co-done-sum"></div>
+             <div class="co-done-act">
+                <button type="button" class="sf-btn-2" onclick="window.app.pos.printLastOrder()"><i class="fas fa-print" aria-hidden="true"></i> พิมพ์ใบจอง</button>
+                <button type="button" class="sf-btn-2" onclick="window.app.pos.copyLastOrderLink()"><i class="fas fa-link" aria-hidden="true"></i> คัดลอกลิงก์ติดตาม</button>
+                <button type="button" class="co-cta" onclick="window.app.hideModal('orderDoneModal')">กลับหน้าร้าน</button>
+             </div>
           </div>
         </div>
       </div>

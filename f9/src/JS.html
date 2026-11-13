@@ -1055,7 +1055,9 @@ window.app = {
   },
 
   copyPublicTrackLink: function(orderId) {
-    const url = window.location.href.split('?')[0] + '?track=' + encodeURIComponent(orderId);
+    // ใน GAS หน้าเว็บอยู่ใน iframe — window.location คือโดเมน googleusercontent ไม่ใช่ลิงก์ /exec ที่ลูกค้าเปิดได้ จึงต้องใช้ __APP_URL ที่ doGet ส่งมา
+    const base = window.__APP_URL || window.location.href.split('?')[0];
+    const url = base + (base.indexOf('?') === -1 ? '?' : '&') + 'track=' + encodeURIComponent(orderId);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(() => {
         this.toast('คัดลอกลิงก์สถานะใบจองแล้ว สามารถส่งต่อให้ลูกค้าทาง LINE / Chat ได้ทันที!');

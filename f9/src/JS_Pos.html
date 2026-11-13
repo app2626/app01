@@ -3047,8 +3047,63 @@ window.app.pos = {
       if (stEl && !stEl.value) stEl.value = sessionStorage.getItem('tg_bk_staff') || '';
       if (phEl && !phEl.value) phEl.value = sessionStorage.getItem('tg_bk_phone') || '';
 
+      this.updateTotal(); // ให้ส่วนลดอัตโนมัติ (cartAutoDiscount) เป็นค่าล่าสุดก่อนวาดสรุป
+      this.renderCheckoutSummary();
+      // มือถือ: สรุปรายการพับไว้ (เห็นยอดรวมที่หัวกล่อง) เพื่อให้ช่องกรอกแรกอยู่บนจอ
+      const sumBox = document.getElementById('coSumBox'); if (sumBox) sumBox.open = window.innerWidth >= 1024;
       window.app.showModal('checkoutModal');
+      const sc = document.getElementById('coScroll'); if (sc) sc.scrollTop = 0;
     },
+    // สรุปรายการในหน้าสั่งจอง / หน้ายืนยันใบจอง — คำนวณแบบเดียวกับ updateTotal (ราคา x จำนวน - ส่วนลดโปร - ส่วนลดอัตโนมัติ)
+    checkoutSummary: function() {
+      const esc = window.app.esc;
+      const num = (v) => parseFloat(String(v || '0').replace(/[^\d.\-]/g, '')) || 0;
+      let sub = 0, html = '<ul class="co-items">';
+      this.cartData.forEach(i => {
+        const unit = num(i.Price); sub += unit * i.qty;
+        const variantTxt = [i.Color, i.Capacity].map(v => (v === null || v === undefined) ? '' : String(v).trim()).filter(v => v && v !== '-').join(' · ');
+        const gifts = [].concat(i.brandGifts || [], i.channelGifts || []).map(g => esc(g.name) + (g.qty > 1 ? ' x' + g.qty : ''));
+        html += '<li><img src="' + esc(window.app.formatImageUrl(i['Image URL'] || '', 'w200')) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
+          + '<div class="co-it"><div class="co-it-n">' + esc(i['Product Name']) + '</div>'
+          + (variantTxt ? '<div class="co-it-v">' + esc(variantTxt) + '</div>' : '')
+          + '<div class="co-it-v tabular-nums">' + i.qty + ' x ฿' + unit.toLocaleString() + '</div>'
+          + (gifts.length ? '<div class="co-it-g"><i class="fas fa-gift" aria-hidden="true"></i> ' + gifts.join(', ') + '</div>' : '')
+          + '</div><b class="tabular-nums">฿' + (unit * i.qty).toLocaleString() + '</b></li>';
+      });
+      html += '</ul><dl class="co-tot"><div><dt>ยอดรวมก่อนลด</dt><dd class="tabular-nums">฿' + sub.toLocaleString() + '</dd></div>';
+      let disc = 0;
+      this.getPromoDiscounts().forEach(x => { if (x.value > 0) { disc += x.value; html += '<div class="co-disc"><dt>' + esc(x.name) + '</dt><dd class="tabular-nums">-฿' + x.value.toLocaleString() + '</dd></div>'; } });
+      const auto = this.cartAutoDiscount || 0;
+      if (auto > 0) { disc += auto; html += '<div class="co-disc"><dt>ส่วนลดพิเศษ (Auto Bundle)</dt><dd class="tabular-nums">-฿' + auto.toLocaleString() + '</dd></div>'; }
+      const total = Math.max(0, sub - disc);
+      html += '<div class="co-grand"><dt>ยอดสุทธิ</dt><dd class="tabular-nums">฿' + total.toLocaleString() + '</dd></div></dl>';
+      return { html: html, total: total };
+    },
+    renderCheckoutSummary: function() {
+      const s = this.checkoutSummary();
+      const box = document.getElementById('coSummary'); if (box) box.innerHTML = s.html;
+      const txt = '฿' + s.total.toLocaleString();
+      ['coSumMini', 'coBarTotal'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = txt; });
+    },
+    // หน้ายืนยันหลังบันทึกใบจองสำเร็จ: เลขที่ใบจอง + สรุป + พิมพ์ / คัดลอกลิงก์ติดตาม / กลับหน้าร้าน
+    lastOrder: null,
+    showOrderDone: function(orderId, pay, summaryHtml) {
+      const esc = window.app.esc;
+      this.lastOrder = { orderId: orderId, pay: pay };
+      const idEl = document.getElementById('doneOrderId'); if (idEl) idEl.textContent = orderId || '';
+      const meta = document.getElementById('doneMeta');
+      if (meta) {
+        const dep = Number(pay.depositAmount) || 0;
+        meta.innerHTML = '<div><span>ลูกค้า</span><b>' + esc(pay.customerName) + '</b></div>'
+          + '<div><span>สาขา</span><b>' + esc(pay.branch) + '</b></div>'
+          + '<div><span>ประเภท</span><b>' + esc(pay.resStatus) + '</b></div>'
+          + (dep > 0 ? '<div><span>มัดจำ</span><b class="tabular-nums">฿' + dep.toLocaleString() + (pay.receiptNo ? ' (' + esc(pay.receiptNo) + ')' : '') + '</b></div>' : '');
+      }
+      const sum = document.getElementById('doneSummary'); if (sum) sum.innerHTML = summaryHtml || '';
+      window.app.showModal('orderDoneModal');
+    },
+    printLastOrder: function() { if (this.lastOrder) window.app.printReceipt(this.lastOrder.orderId, this.lastOrder.pay); },
+    copyLastOrderLink: function() { if (this.lastOrder) window.app.copyPublicTrackLink(this.lastOrder.orderId); },
     submitCheckout: async function() {
       if (this.isSubmitting) return; // กันกดยืนยันซ้ำระหว่างรอผล CHECKOUT — ออเดอร์ซ้ำ
       const custName = document.getElementById('coCustomer').value;
@@ -3120,8 +3175,9 @@ window.app.pos = {
         depositAmount: depositAmount
       };
       
-      window.app.hideModal('checkoutModal'); 
-      
+      // หน้าสั่งจองเปิดค้างไว้ระหว่างถามยืนยัน/บันทึก (กล่องยืนยันอยู่ชั้นบน) — ถ้าบันทึกไม่ผ่าน ข้อมูลที่กรอกยังอยู่ให้แก้ต่อได้ทันที; ปิดเมื่อสำเร็จเท่านั้น
+      const summaryHtml = this.checkoutSummary().html; // เก็บก่อนล้างตะกร้า ใช้แสดงในหน้ายืนยันใบจอง
+
       setTimeout(async () => {
           if((await Swal.fire({ title: 'ยืนยันการบันทึกใบจอง?', text: "กรุณาตรวจสอบข้อมูลให้ถูกต้องก่อนกดยืนยันออเดอร์", icon: 'question', showCancelButton: true, confirmButtonColor: '#0f172a', confirmButtonText: 'ยืนยันการจอง', cancelButtonText: 'ย้อนกลับ' })).isConfirmed) {
              if (window.app.pos.isSubmitting) return;
@@ -3140,24 +3196,13 @@ window.app.pos = {
                   // 5B.2 — จำชื่อ/เบอร์พนักงานไว้ prefill ออเดอร์ถัดไป (per เครื่อง ไม่ใช่ per user — ล้างตอน logout)
                   sessionStorage.setItem('tg_bk_staff', bkStaffName);
                   sessionStorage.setItem('tg_bk_phone', bkPhone);
+                  window.app.hideLoading();
+                  window.app.hideModal('checkoutModal');
                   if (res.duplicate) {
-                    // ยิงซ้ำจาก timeout/คีย์ซ้ำ — ออเดอร์เดิมถูกบันทึกไปแล้ว ไม่ต้องเด้ง success dialog ซ้ำ
+                    // ยิงซ้ำจาก timeout/คีย์ซ้ำ — ออเดอร์เดิมถูกบันทึกไปแล้ว ไม่ต้องเปิดหน้ายืนยันซ้ำ
                     window.app.toast('ออเดอร์นี้ถูกบันทึกไปแล้ว (เลขที่ ' + res.orderId + ')', 'warning');
                   } else {
-                  Swal.fire({
-                    title: 'สำเร็จ',
-                    text: 'จัดเก็บข้อมูลใบจองเข้าระบบเรียบร้อยแล้ว',
-                    icon: 'success',
-                    showCancelButton: true,
-                    confirmButtonText: '<i class="fas fa-print mr-1"></i> พิมพ์ใบจอง',
-                    cancelButtonText: 'ปิด (Close)',
-                    confirmButtonColor: '#3b82f6',
-                    cancelButtonColor: '#94a3b8'
-                  }).then((result) => {
-                    if (result.isConfirmed) {
-                      window.app.printReceipt(res.orderId, pay);
-                    }
-                  });
+                    window.app.pos.showOrderDone(res.orderId, pay, summaryHtml);
                   }
                   localStorage.removeItem('tg_cart'); window.app.pos.cartData=[];
                   window.app.pos.saveAndRender(); 
