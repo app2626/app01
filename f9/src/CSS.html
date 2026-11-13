@@ -2794,6 +2794,9 @@
   html.dark .dash-delta.up { color: #6ee7b7; }
   html.dark .dash-delta.down { color: #fca5a5; }
 
+  /* ตั้งค่าระบบ: การ์ดของแท็บอื่นถูกซ่อนด้วย .hidden — ระยะห่างจึงใส่ที่ขอบล่างของการ์ดเอง (space-y ของ Tailwind เว้นขอบบนให้การ์ดที่ไม่ใช่ใบแรกแม้ใบก่อนหน้าถูกซ่อน) */
+  #ssTabContent [data-sec] { margin-top: 0 !important; margin-bottom: 24px; }
+
   /* ค้นหารวม (window.app.search, JS_Search.html): ปุ่มในแถบเมนู + หน้าต่างค้นหา #cmdk */
   .cmdk-btn { width: 100%; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px 0 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 13px; color: #64748b; text-align: left; transition: border-color .15s, background-color .15s; }
   .cmdk-btn:hover { border-color: #94a3b8; background: #ffffff; }

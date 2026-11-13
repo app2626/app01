@@ -987,6 +987,31 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.location.hash='#pos';true"); await sleep(1500);
     await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
   });
+  await T('system settings: five grouped tabs, each shows only its own cards, unsaved edits are confirmed before switching, old hashes still land on the right tab', async () => {
+    await ev("window.location.hash='#systemsettings';true"); await sleep(1500);
+    const vis = "[...document.querySelectorAll('#ssTabContent [data-sec]')].filter(e=>!e.classList.contains('hidden')).map(e=>e.getAttribute('data-sec')).join(',')";
+    const a = JSON.parse(await ev("JSON.stringify({tabs:[...document.querySelectorAll('[id^=ssTab-]')].map(b=>b.textContent.trim()),active:window.app.systemSettings.activeTab,vis:" + vis + "})"));
+    eq(a.tabs.length, 5, a.tabs.join('|')); eq(a.active, 'ss_shop'); eq(a.vis, 'appname,contact', 'shop tab cards');
+    await shot('admin-settings-shop');
+    await ev("window.app.systemSettings.openTab('ss_docs');true"); await sleep(900);
+    eq(await ev(vis), 'policies,company', 'documents tab cards'); ok(await ev("!!document.getElementById('policyBookingInput') && document.getElementById('policyBookingInput').offsetParent !== null"), 'policy editor not visible');
+    await ev("window.app.systemSettings.openTab('autosetup');true"); await sleep(900);
+    eq(await ev(vis), 'setup,drive', 'system tab cards');
+    await ev("window.app.systemSettings.openTab('bookingsettings');true"); await sleep(900);
+    eq(await ev("document.querySelectorAll('#ssTabContent [data-sec]').length"), 0, 'booking tab has its own form');
+    // unsaved edit -> switching asks first; declining keeps the tab and the typed value
+    await ev("(()=>{const i=document.querySelector('#ssTabContent input[type=text], #ssTabContent input[type=number]');i.value='7';i.dispatchEvent(new Event('input',{bubbles:true}));window.__ssIn=i.id;return true})()"); await sleep(100);
+    ok(await ev("window.app.systemSettings.dirty"), 'typing must mark the tab as unsaved');
+    await ev("window.app.systemSettings.openTab('ss_shop');true"); await sleep(400);
+    ok(await ev("Swal.isVisible()"), 'no unsaved-changes warning'); await ev("Swal.clickCancel();true"); await sleep(400);
+    eq(await ev("window.app.systemSettings.activeTab"), 'bookingsettings', 'declining must stay on the tab');
+    await ev("window.app.systemSettings.openTab('ss_shop');true"); await sleep(400); await ev("Swal.clickConfirm();true"); await sleep(1000);
+    eq(await ev("window.app.systemSettings.activeTab + '|' + window.app.systemSettings.dirty"), 'ss_shop|false');
+    await ev("window.location.hash='#loginbg';true"); await sleep(1500);
+    eq(await ev("location.hash + '|' + window.app.systemSettings.activeTab"), '#systemsettings|loginbg', 'old hash redirect');
+    await ev("window.Swal&&Swal.close();window.location.hash='#pos';true"); await sleep(1500);
+    await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
+  });
   await T('active filter chips: one chip per selected filter, clicking a chip removes only that filter, clear-all shows from 2 chips, text escaped', async () => {
     await ev("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('capacity','128GB');window.app.pos.setStoreFilter('inStock',true);true"); await sleep(300);
     const a = JSON.parse(await ev("JSON.stringify({chips:[...document.querySelectorAll('#storeActiveChips .sf-achip')].map(b=>b.textContent.trim()),clear:!!document.querySelector('#storeActiveChips .sf-achip-clear')})"));

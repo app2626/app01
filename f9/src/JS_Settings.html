@@ -6,16 +6,22 @@ window.app.systemSettings = {
     pendingTab: '',   // ตั้งโดย route() ตอน redirect จาก hash เก่า เพื่อเปิด tab ที่ตรงกัน
     activeTab: '',
     // id = hash/type เดิมทั้ง 6 — ใช้เป็นทั้ง redirect map ใน route() และ alias สิทธิ์ใน checkMenuAccess
+    // type = ชนิดที่ settingsManager.render รู้จัก (bookingsettings / loginbg / autosetup); secs = การ์ดของชนิด autosetup ที่แท็บนี้แสดง (data-sec)
+    // id สามตัวเดิม (bookingsettings / loginbg / autosetup) ต้องคงไว้ — เป็น hash เก่าที่ route() redirect มา และเป็นสิทธิ์เมนูเก่าใน checkMenuAccess
     tabs: [
-      { id: 'bookingsettings', icon: 'fa-clock',           label: 'เวลารับจอง' },
-      { id: 'loginbg',         icon: 'fa-image',           label: 'พื้นหลัง Login' },
-      { id: 'autosetup',       icon: 'fa-database',        label: 'ฐานข้อมูล' }
+      { id: 'ss_shop',         icon: 'fa-store',           label: 'ร้านค้า',            type: 'autosetup', secs: ['appname', 'contact'] },
+      { id: 'bookingsettings', icon: 'fa-clock',           label: 'การจอง',            type: 'bookingsettings' },
+      { id: 'ss_docs',         icon: 'fa-file-contract',   label: 'เอกสารและนโยบาย',   type: 'autosetup', secs: ['policies', 'company'] },
+      { id: 'loginbg',         icon: 'fa-image',           label: 'หน้า Login',         type: 'loginbg' },
+      { id: 'autosetup',       icon: 'fa-database',        label: 'ระบบ',              type: 'autosetup', secs: ['setup', 'drive'] }
     ],
+    dirty: false,
 
     init: function() {
       const content = document.getElementById('page-content');
       if (!content) return;
-      const startTab = this.tabs.some(t => t.id === this.pendingTab) ? this.pendingTab : 'bookingsettings';
+      const startTab = this.tabs.some(t => t.id === this.pendingTab) ? this.pendingTab : this.tabs[0].id;
+      this.dirty = false;
       this.pendingTab = '';
       // tab bar สไตล์ sub-chips ของ POS (เส้นใต้ตัว active) — icon/label เป็น literal จาก tabs ข้างบน ไม่ใช่ข้อมูลผู้ใช้
       const barHtml = this.tabs.map(t =>
@@ -27,13 +33,24 @@ window.app.systemSettings = {
             <h3 class="text-lg font-extrabold text-slate-800 mb-4"><i class="fas fa-sliders-h text-indigo-500 mr-2"></i> ตั้งค่าระบบ</h3>
             <div class="flex gap-5 overflow-x-auto custom-scrollbar" role="tablist">${barHtml}</div>
           </div>
-          <div id="ssTabContent"></div>
+          <div id="ssTabContent" oninput="window.app.systemSettings.dirty = true" onchange="window.app.systemSettings.dirty = true"></div>
         </div>`;
-      this.openTab(startTab);
+      this.showTab(startTab);
     },
 
-    openTab: function(tabId) {
-      this.activeTab = tabId;
+    // เปลี่ยนแท็บ — ถ้าพิมพ์แก้ไว้แล้วยังไม่กดบันทึก ถามก่อน (แต่ละการ์ดบันทึกแยกกัน การเปลี่ยนแท็บจะวาดฟอร์มใหม่และค่าที่พิมพ์ค้างจะหาย)
+    openTab: async function(tabId) {
+      if (tabId === this.activeTab) return;
+      if (this.dirty) {
+        const r = await Swal.fire({ icon: 'warning', title: 'ยังไม่ได้บันทึกการแก้ไข', text: 'ถ้าเปลี่ยนแท็บตอนนี้ ค่าที่พิมพ์ไว้ในแท็บนี้จะหายไป', showCancelButton: true, confirmButtonText: 'เปลี่ยนแท็บ ไม่บันทึก', cancelButtonText: 'กลับไปบันทึก', confirmButtonColor: '#0f2a43' });
+        if (!r.isConfirmed) return;
+      }
+      this.showTab(tabId);
+    },
+    activeSecs: function() { const t = this.tabs.find(x => x.id === this.activeTab); return (t && t.secs) || null; },
+
+    showTab: function(tabId) {
+      this.activeTab = tabId; this.dirty = false;
       this.tabs.forEach(t => {
         const btn = document.getElementById('ssTab-' + t.id);
         if (!btn) return;
@@ -46,7 +63,8 @@ window.app.systemSettings = {
         btn.classList.toggle('text-slate-500', !active);
       });
       // render เฉพาะ tab ที่เปิด — เรียก logic เดิมของหน้าเดิมลง container ของ tab
-      window.app.settingsManager.init(tabId, 'ssTabContent');
+      const cur = this.tabs.find(t => t.id === tabId) || this.tabs[0];
+      window.app.settingsManager.init(cur.type || cur.id, 'ssTabContent');
     }
   };
 
@@ -103,7 +121,7 @@ window.app.settingsManager = {
       if (this.currentType === 'autosetup') {
         html = `
           <div class="max-w-2xl mx-auto space-y-6 animate-fade-in-up">
-          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="appname" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
               <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-signature text-indigo-500 mr-2"></i> ชื่อเว็บแอป</h3>
               <p class="text-xs text-slate-500 mt-1">ชื่อที่แสดงบนแท็บเบราว์เซอร์ หน้า Login และเมนู — เปลี่ยนได้จากหน้านี้โดยไม่ต้องแก้โค้ด เผื่อนำโปรเจกต์นี้ไปทำสำเนาใช้กับร้าน/แบรนด์อื่น</p>
@@ -134,7 +152,7 @@ window.app.settingsManager = {
               </div>
             </div>
           </div>
-          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="contact" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
               <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-headset text-indigo-500 mr-2"></i> ข้อมูลติดต่อร้าน</h3>
               <p class="text-xs text-slate-500 mt-1">แสดงที่ส่วนท้ายของทุกหน้า — เว้นว่างช่องไหน ช่องนั้นจะไม่แสดง</p>
@@ -157,7 +175,7 @@ window.app.settingsManager = {
               </div>
             </div>
           </div>
-          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="policies" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
               <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-file-contract text-indigo-500 mr-2"></i> เงื่อนไขและนโยบาย</h3>
               <p class="text-xs text-slate-500 mt-1">ลูกค้าเปิดอ่านได้จากลิงก์ท้ายหน้าเว็บและตอนยืนยันการจอง — เว้นว่างช่องไหน ช่องนั้นใช้ข้อความมาตรฐานของระบบ (ควรตรวจและแก้ให้ตรงกับเงื่อนไขจริงของร้าน)</p>
@@ -197,7 +215,7 @@ window.app.settingsManager = {
               </div>
             </div>
           </div>
-          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="setup" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
               <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-database text-indigo-500 mr-2"></i> สร้างฐานข้อมูลครั้งแรก (Auto Setup)</h3>
               <p class="text-xs text-slate-500 mt-1">ใช้สำหรับการตั้งค่า Google Sheets และข้อมูลเริ่มต้นระบบทั้งหมด (ตาราง, สินค้าตัวอย่าง, บัญชีแอดมิน)</p>
@@ -220,7 +238,7 @@ window.app.settingsManager = {
             </div>
           </div>
 
-          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="drive" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
               <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-folder text-indigo-500 mr-2"></i> โฟลเดอร์เก็บรูปอัปโหลด (Drive Folder ID)</h3>
               <p class="text-xs text-slate-500 mt-1">กำหนดโฟลเดอร์ Google Drive ปลายทางของรูปที่อัปโหลดจากปุ่ม "อัปโหลดรูป" — เว้นว่างเพื่อใช้โฟลเดอร์อัตโนมัติ</p>
@@ -237,7 +255,7 @@ window.app.settingsManager = {
             </div>
           </div>
 
-          <div class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="company" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
               <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-building text-indigo-500 mr-2"></i> ข้อมูลบริษัท (ใบเสนอราคา/ใบแจ้งหนี้)</h3>
               <p class="text-xs text-slate-500 mt-1">ค่าเริ่มต้นของโลโก้/ชื่อบริษัท/ที่อยู่/อีเมล ที่จะขึ้นในหน้าสร้างใบเสนอราคา/ใบแจ้งหนี้ทุกครั้ง (แก้ไขเพิ่มเติมเฉพาะใบได้ที่หน้านั้น)</p>
@@ -405,6 +423,10 @@ window.app.settingsManager = {
       }
       
       content.innerHTML = html;
+      // หน้า "ตั้งค่าระบบ": ชนิด autosetup มี 6 การ์ด แบ่งไปอยู่ 3 แท็บ — แสดงเฉพาะการ์ดของแท็บที่เปิดอยู่
+      const ss = window.app.systemSettings, secs = (this.containerId === 'ssTabContent' && ss) ? ss.activeSecs() : null;
+      if (secs) content.querySelectorAll('[data-sec]').forEach(el => { el.classList.toggle('hidden', secs.indexOf(el.getAttribute('data-sec')) === -1); });
+      if (ss) ss.dirty = false;
     },
     
     testImage: function(inputId) {
