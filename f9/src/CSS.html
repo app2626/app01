@@ -2831,12 +2831,15 @@
   html:not(.sf-site) #page-content .cms-head { margin-bottom: 16px; }
   html:not(.sf-site) #page-content .cms-head h1,
   html:not(.sf-site) #page-content h2.text-xl { font-size: 20px; line-height: 1.3; font-weight: 700; letter-spacing: 0; }
+  /* หัวหน้าเพจแบบเดียว: ชื่อหน้า 20px ชิดซ้ายบน ไม่มีกล่องไอคอน ; หน้าตารางมีทางเดินหน้า (.cms-crumb) ทางขวา หน้ารายงาน (.rpt-head) มีคำอธิบายใต้ชื่อ */
+  html:not(.sf-site) #page-content .rpt-head { margin-bottom: 4px; }
+  html:not(.sf-site) #page-content .rpt-head p { margin-top: 2px; }
   html:not(.sf-site) #page-content .cms-card table:not(#invTable) thead th:first-child { border-top-left-radius: 8px; }
   html:not(.sf-site) #page-content .cms-card table:not(#invTable) thead th:last-child { border-top-right-radius: 8px; }
 
   /* ===================================================
      MOBILE BACK OFFICE (จอ < 640px)
-     - ตารางกลาง (.cms-grid, JS_Grid.html): แถว = การ์ด, ป้ายชื่อช่องมาจาก data-label, ช่อง .cms-more พับไว้จนกด .cms-more-btn
+     - ตารางกลาง (.cms-grid, JS_Grid.html) และตารางหน้าเนื้อหา (.cms-cards, JS_Cms.html): แถว = การ์ด, ป้ายชื่อช่องมาจาก data-label, ช่อง .cms-more พับไว้จนกด .cms-more-btn
      - แถบปุ่ม: ปุ่มที่ยัง disabled (ลบ/เปิด/ปิดที่เลือก) ซ่อนไว้จนเลือกรายการ
      - ช่องค้นหาเต็มความกว้าง, กล่องตัวกรองของหน้าเนื้อหา (.cms-search) พับได้, แถบแท็บไม่โชว์แถบเลื่อน
      =================================================== */
@@ -2855,37 +2858,39 @@
     .cms-search:not(.cms-open) .cms-search-h { border-bottom: 0; }
     .cms-search:not(.cms-open) .cms-search-b { display: none; }
 
-    #page-content .cms-grid .cms-wrap { max-height: none !important; overflow: visible !important; }
-    #page-content .cms-grid table:not(#invTable) { display: block; width: 100%; white-space: normal; }
-    #page-content .cms-grid table:not(#invTable) thead { display: none !important; }
-    #page-content .cms-grid table:not(#invTable) tbody { display: block; }
-    #page-content .cms-grid table:not(#invTable) tbody tr { display: block; position: relative; margin-bottom: 10px; padding: 12px 12px 10px; border: 1px solid #e2e8f0 !important; border-radius: 12px; background: #ffffff; }
-    #page-content .cms-grid table:not(#invTable) tbody tr:hover { background-color: #ffffff !important; }
-    #page-content .cms-grid table:not(#invTable) tbody tr.cms-sel-row { border-color: #0f2a43 !important; }
-    #page-content .cms-grid table:not(#invTable) tbody td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-width: 0; padding: 4px 0 !important; border: 0 !important; font-size: 13px; text-align: right !important; white-space: normal !important; overflow-wrap: anywhere; }
-    #page-content .cms-grid table:not(#invTable) tbody td[data-label]::before { content: attr(data-label); flex: 0 0 auto; max-width: 45%; font-size: 12px; color: #64748b; text-align: left; overflow-wrap: normal; }
-    #page-content .cms-grid table:not(#invTable) tbody td.cms-first { display: block; padding: 0 40px 6px 0 !important; font-size: 15px; font-weight: 700; color: #0f172a; text-align: left !important; }
-    #page-content .cms-grid table:not(#invTable) tbody td.cms-first::before { display: none; }
-    #page-content .cms-grid table:not(#invTable) tbody td.cms-c-chk { position: absolute; top: 13px; left: 12px; display: block; width: auto; padding: 0 !important; }
-    #page-content .cms-grid table:not(#invTable) tbody td.cms-c-chk input { width: 18px; height: 18px; }
-    #page-content .cms-grid table:not(#invTable) tbody td.cms-c-chk ~ td.cms-first { padding-left: 30px !important; }
-    #page-content .cms-grid table:not(#invTable) tbody td.cms-more { display: none; }
-    #page-content .cms-grid table:not(#invTable) tbody tr.cms-open td.cms-more { display: flex; }
-    #page-content .cms-grid table:not(#invTable) tbody td.cms-c-act { justify-content: flex-end; gap: 8px; margin-top: 6px; padding-top: 8px !important; border-top: 1px solid #eef1f5 !important; }
-    #page-content .cms-grid .cms-c-act .cms-ico { width: 40px; height: 36px; }
-    #page-content .cms-grid .cms-more-btn { position: absolute; top: 6px; right: 6px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; color: #475569; font-size: 12px; }
-    #page-content .cms-grid tr.cms-open .cms-more-btn i { transform: rotate(180deg); }
-    #page-content .cms-grid table:not(#invTable) tbody tr.cms-state { padding: 0; border: 0 !important; }
-    #page-content .cms-grid table:not(#invTable) tbody tr.cms-state td { display: block; text-align: center !important; }
-    #page-content .cms-grid .cms-empty-pin { position: static; width: auto !important; }
+    #page-content :is(.cms-grid, .cms-cards) .cms-wrap { max-height: none !important; overflow: visible !important; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) { display: block; width: 100%; white-space: normal; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) thead { display: none !important; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody { display: block; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr { display: block; position: relative; margin-bottom: 10px; padding: 12px 12px 10px; border: 1px solid #e2e8f0 !important; border-radius: 12px; background: #ffffff; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr:hover { background-color: #ffffff !important; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr.cms-sel-row { border-color: #0f2a43 !important; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-width: 0; padding: 4px 0 !important; border: 0 !important; font-size: 13px; text-align: right !important; white-space: normal !important; overflow-wrap: anywhere; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td[data-label]::before { content: attr(data-label); flex: 0 0 auto; max-width: 45%; font-size: 12px; color: #64748b; text-align: left; overflow-wrap: normal; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-first { display: block; padding: 0 40px 6px 0 !important; font-size: 15px; font-weight: 700; color: #0f172a; text-align: left !important; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-first::before { display: none; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-c-chk { position: absolute; top: 13px; left: 12px; display: block; width: auto; padding: 0 !important; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-c-chk input { width: 18px; height: 18px; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-c-chk ~ td.cms-first { padding-left: 30px !important; }
+    #page-content .cms-cards table:not(#invTable) tbody td[data-label]:empty { display: none; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td:has(img) { align-items: center; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-more { display: none; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr.cms-open td.cms-more { display: flex; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-c-act { justify-content: flex-end; gap: 8px; margin-top: 6px; padding-top: 8px !important; border-top: 1px solid #eef1f5 !important; }
+    #page-content :is(.cms-grid, .cms-cards) .cms-c-act .cms-ico { width: 40px; height: 36px; }
+    #page-content :is(.cms-grid, .cms-cards) .cms-more-btn { position: absolute; top: 6px; right: 6px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; color: #475569; font-size: 12px; }
+    #page-content :is(.cms-grid, .cms-cards) tr.cms-open .cms-more-btn i { transform: rotate(180deg); }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr.cms-state { padding: 0; border: 0 !important; }
+    #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr.cms-state td { display: block; text-align: center !important; }
+    #page-content :is(.cms-grid, .cms-cards) .cms-empty-pin { position: static; width: auto !important; }
 
-    html.dark #page-content .cms-grid table:not(#invTable) tbody tr { background: #0f172a; border-color: #334155 !important; }
-    html.dark #page-content .cms-grid table:not(#invTable) tbody tr:hover { background-color: #0f172a !important; }
-    html.dark #page-content .cms-grid table:not(#invTable) tbody tr.cms-sel-row { border-color: #93c5fd !important; }
-    html.dark #page-content .cms-grid table:not(#invTable) tbody td.cms-first { color: #f1f5f9; }
-    html.dark #page-content .cms-grid table:not(#invTable) tbody td[data-label]::before { color: #94a3b8; }
-    html.dark #page-content .cms-grid table:not(#invTable) tbody td.cms-c-act { border-top-color: #1e293b !important; }
-    html.dark #page-content .cms-grid .cms-more-btn { color: #cbd5e1; }
+    html.dark #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr { background: #0f172a; border-color: #334155 !important; }
+    html.dark #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr:hover { background-color: #0f172a !important; }
+    html.dark #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody tr.cms-sel-row { border-color: #93c5fd !important; }
+    html.dark #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-first { color: #f1f5f9; }
+    html.dark #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td[data-label]::before { color: #94a3b8; }
+    html.dark #page-content :is(.cms-grid, .cms-cards) table:not(#invTable) tbody td.cms-c-act { border-top-color: #1e293b !important; }
+    html.dark #page-content :is(.cms-grid, .cms-cards) .cms-more-btn { color: #cbd5e1; }
   }
 
   /* ค้นหารวม (window.app.search, JS_Search.html): ปุ่มในแถบเมนู + หน้าต่างค้นหา #cmdk */

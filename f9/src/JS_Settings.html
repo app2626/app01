@@ -29,8 +29,8 @@ window.app.systemSettings = {
       ).join('');
       content.innerHTML = `
         <div class="space-y-6 animate-fade-in-up">
-          <div class="bg-white border border-slate-200 shadow-sm rounded-3xl px-6 pt-5">
-            <h3 class="text-lg font-extrabold text-slate-800 mb-4"><i class="fas fa-sliders-h text-indigo-500 mr-2"></i> ตั้งค่าระบบ</h3>
+          <div class="cms-page"><div class="cms-head" style="margin-bottom:0"><h1>ตั้งค่าระบบ</h1><span class="cms-crumb">ตั้งค่า &gt; ตั้งค่าระบบ</span></div></div>
+          <div class="bg-white border border-slate-200 shadow-sm rounded-3xl px-6 pt-3" style="margin-top:16px">
             <div class="flex gap-5 overflow-x-auto custom-scrollbar" role="tablist">${barHtml}</div>
           </div>
           <div id="ssTabContent" oninput="window.app.systemSettings.dirty = true" onchange="window.app.systemSettings.dirty = true"></div>

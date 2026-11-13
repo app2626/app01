@@ -260,7 +260,7 @@
         + '<div class="cms-search-btns"><button type="button" class="cms-btn cms-btn-sm cms-btn-green" data-act="search"><i class="fas fa-search"></i> ค้นหา</button><button type="button" class="cms-btn cms-btn-sm cms-btn-outline" data-act="reset"><i class="fas fa-rotate"></i> รีเซ็ต</button></div></div></div>'
         + '<div class="cms-bar"><label>แสดง <select class="cms-sel" data-act="size">' + this.PAGE_SIZES.map(function(n) { return '<option value="' + n + '">' + n + '</option>'; }).join('') + '</select> แถว</label>'
         + '<label>ค้นหา : <input type="search" class="cms-quick" data-act="quick"></label></div>'
-        + '<div class="cms-wrap"><table class="cms-table"><thead id="cmsHead"></thead><tbody id="cmsBody"><tr><td class="cms-empty">กำลังโหลดข้อมูล...</td></tr></tbody></table></div>'
+        + '<div class="cms-cards"><div class="cms-wrap"><table class="cms-table"><thead id="cmsHead"></thead><tbody id="cmsBody"><tr class="cms-state"><td class="cms-empty">กำลังโหลดข้อมูล...</td></tr></tbody></table></div></div>'
         + '<div class="cms-foot"><div id="cmsInfo"></div><div id="cmsPager" class="cms-pager"></div></div>'
         + '</div></div>';
     },
@@ -280,7 +280,7 @@
         await cfg.load.call(this, st);
       } catch (e) {
         const body = document.getElementById('cmsBody');
-        if (body && this.kind === kind) body.innerHTML = '<tr><td class="cms-empty" colspan="20">' + this.esc(e.message || e) + '</td></tr>';
+        if (body && this.kind === kind) body.innerHTML = '<tr class="cms-state"><td class="cms-empty" colspan="20">' + this.esc(e.message || e) + '</td></tr>';
         return;
       }
       if (this.kind !== kind || !document.getElementById('cmsRoot')) return; // ผู้ใช้ย้ายหน้าไปแล้วระหว่างโหลด
@@ -332,9 +332,9 @@
         }, this).join('') + '<th>จัดการ</th></tr>';
       document.getElementById('cmsBody').innerHTML = slice.length ? slice.map(function(r) {
         return '<tr' + (st.selected[r.key] ? ' class="cms-sel-row"' : '') + '><td class="cms-c-chk"><input type="checkbox" data-act="sel" data-id="' + this.esc(r.key) + '"' + (st.selected[r.key] ? ' checked' : '') + '></td>'
-          + cfg.columns.map(function(c) { return '<td>' + c.cell(r) + '</td>'; }).join('')
+          + cfg.columns.map(function(c, ci) { return '<td' + (ci === 0 ? ' class="cms-first"' : '') + ' data-label="' + this.esc(c.label) + '">' + c.cell(r) + '</td>'; }, this).join('')
           + '<td class="cms-c-act"><button type="button" class="cms-ico" title="แก้ไข" data-act="edit" data-id="' + this.esc(r.key) + '"><i class="fas fa-pen"></i></button><button type="button" class="cms-ico cms-ico-red" title="ลบ" data-act="del" data-id="' + this.esc(r.key) + '"><i class="fas fa-trash"></i></button></td></tr>';
-      }, this).join('') : '<tr><td class="cms-empty" colspan="' + (cfg.columns.length + 2) + '">ไม่พบข้อมูล</td></tr>';
+      }, this).join('') : '<tr class="cms-state"><td class="cms-empty" colspan="' + (cfg.columns.length + 2) + '">ไม่พบข้อมูล</td></tr>';
       document.getElementById('cmsInfo').textContent = rows.length ? 'แสดง ' + (from + 1) + ' ถึง ' + (from + slice.length) + ' จากทั้งหมด ' + rows.length + ' รายการ' : 'แสดง 0 ถึง 0 จากทั้งหมด 0 รายการ';
       const nSel = Object.keys(st.selected).length;
       const delBtn = document.querySelector('#cmsRoot [data-act="delmany"]');
