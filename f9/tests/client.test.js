@@ -902,6 +902,11 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.app.pos.clearStoreFilters(false);true"); await sleep(250);
     eq(await ev("!!document.getElementById('storeActiveChips')"), false, 'chip row must disappear with no filters');
   });
+  await T('hero banner keeps a 3:1 box (banner art is 6000x2000) and asks Drive for a large image', async () => {
+    const r = JSON.parse(await ev("(()=>{const w=document.getElementById('posHeroBannerWrap').getBoundingClientRect();return JSON.stringify({ratio:w.width/w.height,w:w.width})})()"));
+    ok(r.w > 300 && Math.abs(r.ratio - 3) < 0.05, 'hero ratio ' + JSON.stringify(r));
+    eq(await ev("window.app.formatImageUrl('https://drive.google.com/file/d/ABC123/view','w2000').endsWith('sz=w2000')"), true);
+  });
   await T('website mode on #pos: admin sidebar/topbar hidden, store header with brand + account menu linking to back office', async () => {
     const r = JSON.parse(await ev("JSON.stringify({site:document.documentElement.classList.contains('sf-site'),side:getComputedStyle(document.getElementById('desktopSidebar')).display,brand:getComputedStyle(document.querySelector('#posStoreHeader .sf-home')).display,top:getComputedStyle(document.getElementById('sfTopbar')).display,fs:!!document.getElementById('posFullscreenBtn')})"));
     ok(r.site && r.side === 'none' && r.brand !== 'none' && r.top !== 'none' && !r.fs, JSON.stringify(r));

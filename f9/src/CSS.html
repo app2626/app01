@@ -2754,6 +2754,10 @@
   html.dark .sf-achip:hover { background: #273449; border-color: #94a3b8; }
   html.dark .sf-achip i, html.dark .sf-achip-clear { color: #94a3b8; }
 
+  /* แบนเนอร์หลักหน้าร้าน: สัดส่วนตายตัว 3:1 เท่ารูปที่ร้านทำ (6000x2000) ทุกขนาดจอ — เห็นเต็มรูป ไม่ถูกครอบตัด
+     (เดิมกำหนดความสูงตายตัว 110-320px ทำให้จอกว้างตัดบน-ล่างของรูปออกราวหนึ่งในสาม) */
+  html.sf-site #posHeroBannerWrap { height: auto; aspect-ratio: 3 / 1; }
+
   /* ===================================================
      INTL 3 — หน้าสั่งจองเต็มจอ (#checkoutModal.co-page) + หน้ายืนยันใบจอง (#orderDoneModal.co-page)
      โครง: หัว (.pd-head ใช้ร่วมกับหน้ารายละเอียด) / .co-scroll (ฟอร์ม 3 ตอน + สรุปรายการ) / .co-consent / .co-bar (ยอดสุทธิ + ปุ่มยืนยัน ติดขอบล่าง)
