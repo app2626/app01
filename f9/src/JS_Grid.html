@@ -115,13 +115,20 @@ window.app.grid = {
     // แถวข้อความว่าง/ผิดพลาดในตาราง — ตารางกว้างมาก (Orders ~2,700px) ข้อความจัดกลางเซลล์จะไปอยู่นอกจอทางขวา
     // จึงตรึง (sticky) กล่องข้อความไว้ที่ส่วนที่มองเห็นของกรอบเลื่อน และกว้างเท่ากรอบนั้น
     // วัดความกว้างหลังจัดหน้าเสร็จ (ตอน render หน้าอาจยังไม่ได้แสดงเมนูข้าง) และวัดใหม่เมื่อปรับขนาดหน้าต่าง
+    CARD_KEYS: ['Price', 'Stock', 'Stock Qty', 'Status', 'Order Status', 'Row Total'], // ช่องที่การ์ดแสดงเสมอ แม้อยู่ลำดับหลัง
+    CARD_COLS: 4, // จอมือถือ: จำนวนช่องที่การ์ดแสดงก่อนกด "ดูทั้งหมด"
+    toggleCard: function(btn) {
+      const tr = btn.closest('tr'); if (!tr) return;
+      const open = tr.classList.toggle('cms-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    },
     stateRow: function(inner) {
       const self = this;
       requestAnimationFrame(() => self.fitStateRow());
       // เมนูข้างเลื่อนเข้ามาแบบมี transition — ResizeObserver จับทุกครั้งที่กรอบตารางเปลี่ยนขนาด (กรอบสร้างใหม่ทุกครั้งที่เปิดหน้า)
       const wrap = document.querySelector('.cms-wrap');
       if (wrap && !wrap._fitObs && window.ResizeObserver) { wrap._fitObs = new ResizeObserver(() => self.fitStateRow()); wrap._fitObs.observe(wrap); }
-      return '<tr><td colspan="' + this.visibleColCount() + '" class="cms-empty-cell"><div class="cms-empty-pin">' + inner + '</div></td></tr>';
+      return '<tr class="cms-state"><td colspan="' + this.visibleColCount() + '" class="cms-empty-cell"><div class="cms-empty-pin">' + inner + '</div></td></tr>';
     },
     fitStateRow: function() {
       const wrap = document.querySelector('.cms-wrap');
@@ -198,6 +205,9 @@ window.app.grid = {
         // ตำแหน่งจริงใน filteredDataList — index ภายในหน้าเคยทำให้เปิดแก้ผิดเรคอร์ดเมื่ออยู่หน้า 2+ หรือหลังค้นหา/เรียงลำดับ
         const absIndex = startOffset + index;
         let tr = '<tr' + (this.canBulk() && this.selected[String(row[this.idField] === undefined || row[this.idField] === null ? '' : row[this.idField])] ? ' class="cms-sel-row"' : '') + '>';
+        // จอมือถือ (CSS: MOBILE BACK OFFICE) แถว = การ์ด: ช่องแรกเป็นหัวการ์ด, ช่องที่ 6 ขึ้นไป (cms-more) พับไว้จนกดปุ่มลูกศร
+        let visIdx = 0;
+        const moreCount = this.columns.filter((c, i, arr) => c.type !== 'hidden' && arr.filter(x => x.type !== 'hidden').indexOf(c) >= this.CARD_COLS && this.CARD_KEYS.indexOf(c.key) === -1).length;
         if (this.canBulk()) {
           const rid = String(row[this.idField] === undefined || row[this.idField] === null ? '' : row[this.idField]);
           tr += `<td class="cms-c-chk"><input type="checkbox" class="grid-sel" aria-label="เลือกรายการ" data-id="${window.app.esc(rid)}" ${this.selected[rid] ? 'checked' : ''} onchange="window.app.grid.toggleOne(this)"></td>`;
@@ -223,7 +233,10 @@ window.app.grid = {
             if(row.SKU === 'DISCOUNT') val = '<i class="fas fa-tag text-rose-500 mr-1.5" title="ส่วนลด" aria-label="ส่วนลด"></i>' + val;
             else if(num('Unit Price') === 0 && num('Row Total') === 0) val = '<i class="fas fa-gift text-emerald-500 mr-1.5" title="ของแถม" aria-label="ของแถม"></i>' + val;
           }
-          tr += `<td class="${c.resp || ''}">${val}</td>`;
+          const first = visIdx === 0;
+          if (first && moreCount > 0) val += '<button type="button" class="cms-more-btn" onclick="window.app.grid.toggleCard(this)" aria-expanded="false" aria-label="แสดงข้อมูลทั้งหมดของรายการนี้"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>';
+          tr += `<td class="${c.resp || ''}${first ? ' cms-first' : ''}${visIdx >= this.CARD_COLS && this.CARD_KEYS.indexOf(c.key) === -1 ? ' cms-more' : ''}" data-label="${window.app.esc(c.label || c.key)}">${val}</td>`;
+          visIdx++;
         });
         if(!this.isReadonly) {
             let act = `<button type="button" class="cms-ico" onclick="window.app.grid.editForm(${absIndex})" title="แก้ไข" aria-label="แก้ไขรายการ"><i class="fas fa-pen"></i></button>`;

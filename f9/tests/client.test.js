@@ -710,8 +710,17 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
       await ev("window.location.hash='#" + r + "';true"); await sleep(1300);
       const w = JSON.parse(await ev("JSON.stringify([document.documentElement.scrollWidth, window.innerWidth])"));
       if (w[0] > w[1] + 1) bad.push(r + ':' + w[0]);
-      if (['dashboard', 'products', 'invoice', 'systemsettings'].includes(r)) await shot('m-admin-' + r);
+      if (['dashboard', 'orders', 'products', 'invoice', 'analytics', 'systemsettings', 'banners'].includes(r)) await shot('m-admin-' + r);
+      if (r === 'orders') { await ev("(()=>{const o=window.app.orders.list[0];if(o)window.app.orders.openDrawer(o.id);return true})()"); await sleep(900); await shot('m-admin-orders-drawer'); await ev("window.app.orders.closeDrawer();window.app.search.open();true"); await sleep(400); await shot('m-admin-search'); await ev("window.app.search.close();window.app.toggleMobileMenu();true"); await sleep(400); await shot('m-admin-menu'); await ev("window.app.toggleMobileMenu();true"); await sleep(200); }
       if (r === 'dashboard') { const e = JSON.parse(await ev("JSON.stringify((()=>{const i=document.getElementById('dashEndDate').getBoundingClientRect();const c=document.getElementById('dashEndDate').closest('.rounded-2xl').getBoundingClientRect();return [i.right,c.right]})())")); if (e[0] > e[1] + 1) bad.push('dashboard end-date box sticks out of its card ' + e); }
+      if (r === 'products') {
+        const c = JSON.parse(await ev("JSON.stringify((()=>{const tr=document.querySelector('#dataGridBody tr'),w=document.querySelector('.cms-wrap');const f=tr.querySelector('td.cms-first'),m=tr.querySelector('td.cms-more'),b=tr.querySelector('.cms-more-btn');const before=getComputedStyle(m).display;b.click();const after=getComputedStyle(m).display;const lab=getComputedStyle(tr.querySelector('td[data-label]:not(.cms-first)'),'::before').content;b.click();return {disp:getComputedStyle(tr).display,head:getComputedStyle(document.querySelector('#dataTable thead')).display,sw:w.scrollWidth,cw:w.clientWidth,first:!!f,before,after,lab,exp:b.getAttribute('aria-expanded'),bulk:getComputedStyle(document.getElementById('gridBulkDeleteBtn')).display}})())"));
+        if (c.disp !== 'block' || c.head !== 'none' || c.sw > c.cw + 1 || c.before !== 'none' || c.after !== 'flex' || !c.lab || c.lab === 'none' || c.bulk !== 'none') bad.push('products card layout: ' + JSON.stringify(c));
+        await ev("document.querySelector('#dataGridBody .grid-sel').click();true"); await sleep(150);
+        if ((await ev("getComputedStyle(document.getElementById('gridBulkDeleteBtn')).display")) === 'none') bad.push('bulk delete must show once a row is selected');
+        await shot('m-admin-products-selected');
+        await ev("document.querySelector('#dataGridBody .grid-sel').click();true"); await sleep(150);
+      }
       if (r === 'products') { const h = await ev("Math.round(document.querySelector('.cms-actions').getBoundingClientRect().height)"); if (h > 140) bad.push('products toolbar too tall: ' + h + 'px'); }
     }
     ok(bad.length === 0, 'page wider than screen: ' + bad.join(', '));

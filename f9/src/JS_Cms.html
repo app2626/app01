@@ -256,7 +256,7 @@
         + '<div class="cms-card">'
         + '<div class="cms-actions"><button type="button" class="cms-btn cms-btn-green" data-act="add"><i class="fas fa-plus"></i> เพิ่มรายการ</button>'
         + '<button type="button" class="cms-btn cms-btn-red" data-act="delmany"><i class="fas fa-trash"></i> ลบรายการที่เลือก</button>' + (cfg.extraButtons || '') + '</div>'
-        + '<div class="cms-search"><div class="cms-search-h">ค้นหา</div><div class="cms-search-b"><div class="cms-filters">' + filt + '</div>'
+        + '<div class="cms-search"><div class="cms-search-h" onclick="this.parentNode.classList.toggle(\'cms-open\')">ค้นหา</div><div class="cms-search-b"><div class="cms-filters">' + filt + '</div>'
         + '<div class="cms-search-btns"><button type="button" class="cms-btn cms-btn-sm cms-btn-green" data-act="search"><i class="fas fa-search"></i> ค้นหา</button><button type="button" class="cms-btn cms-btn-sm cms-btn-outline" data-act="reset"><i class="fas fa-rotate"></i> รีเซ็ต</button></div></div></div>'
         + '<div class="cms-bar"><label>แสดง <select class="cms-sel" data-act="size">' + this.PAGE_SIZES.map(function(n) { return '<option value="' + n + '">' + n + '</option>'; }).join('') + '</select> แถว</label>'
         + '<label>ค้นหา : <input type="search" class="cms-quick" data-act="quick"></label></div>'
