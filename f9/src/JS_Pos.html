@@ -2201,16 +2201,16 @@ window.app.pos = {
         if (outOfStock) {
           bookBtn = '<button type="button" disabled class="pm-cta-off w-full">สินค้าหมด</button>';
         } else {
-          bookBtn = '<button type="button" class="bnn-buy-btn w-full flex items-center justify-center gap-1.5" onclick="window.app.pos.openAddToCartModal(\'' + escJs(variant.SKU) + '\')" aria-label="จอง ' + pName + '">จองเลย <i class="fas fa-arrow-right"></i></button>';
+          bookBtn = '<button type="button" class="bnn-buy-btn pm-view w-full flex items-center justify-center gap-1.5" onclick="window.app.pos.openAddToCartModal(\'' + escJs(variant.SKU) + '\')" aria-label="ดูรายละเอียด ' + pName + '">ดูรายละเอียด</button>';
         }
       }
 
-      let card = '<div class="pos-card pm-card group relative flex flex-col h-full' + (isGift ? ' opacity-80' : '') + '" data-card-key="' + esc(cardKey) + '">';
+      // ทั้งการ์ดกดได้ (openCardDetail ข้ามคลิกที่มาจากปุ่มบนการ์ด เช่น หัวใจ/เทียบสเปค/จุดสี/ความจุ) — รูปและชื่อจึงไม่มี onclick ของตัวเอง ไม่งั้นจะเปิดซ้ำสองครั้ง
+      const openable = !isGift && !outOfStock;
+      let card = '<div class="pos-card pm-card group relative flex flex-col h-full' + (isGift ? ' opacity-80' : '') + (openable ? ' pm-open' : '') + '" data-card-key="' + esc(cardKey) + '"' + (openable ? ' onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')"' : '') + '>';
       card +=      topLeftBadge;
       card +=      topRightBadge;
-      const openable = !isGift && !outOfStock;
-      const openAttr = openable ? ' onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')"' : '';
-      card += '    <div class="pm-media relative flex items-center justify-center overflow-hidden' + (openable ? ' cursor-pointer' : '') + '"' + openAttr + '>';
+      card += '    <div class="pm-media relative flex items-center justify-center overflow-hidden' + (openable ? ' cursor-pointer' : '') + '">';
       card +=        soldOutOverlay;
       card +=        compareBtnHtml;
       card +=        wishlistBtnHtml;
@@ -2219,7 +2219,7 @@ window.app.pos = {
       card += '    </div>';
       card += '    <div class="pm-body flex flex-col flex-1 gap-1.5">';
       card += '      <div class="sf-brand">' + brandLabel + '</div>';
-      const nameOpenAttr = openable ? ' role="link" tabindex="0" onclick="window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')" onkeydown="if(event.key===\'Enter\'){window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')}"' : '';
+      const nameOpenAttr = openable ? ' role="link" tabindex="0" onkeydown="if(event.key===\'Enter\'){window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')}"' : '';
       card += '      <div class="pm-name line-clamp-2' + (openable ? ' cursor-pointer' : '') + '"' + nameOpenAttr + ' title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
       // การ์ดแบบเรียบ: ชื่อ → ตัวเลือก (สี+ความจุ แถวเดียว) → ราคา → โปร 1 บรรทัด → สต๊อก → ปุ่ม (ชื่อเต็ม/ป้ายย่อยอยู่ในหน้ารายละเอียด)
       if (dotsHtml || chipsHtml) card += '<div class="pm-vars">' + dotsHtml + chipsHtml + '</div>';

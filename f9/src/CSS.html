@@ -2519,4 +2519,139 @@
   html.dark .pd-qty-in input { background: #1e293b; border-color: #334155; color: #f1f5f9; }
   html.dark .pd-actions button { background: #0f172a; border-color: #334155; color: #f1f5f9; }
   html.dark .pd-actions button:hover { background: #1e293b; }
+
+  /* ===================================================
+     INTL 1 — หน้าร้านแบบเว็บ e-commerce สากล (ต้องอยู่ท้ายสุด; ทับ PREMIUM / VIVID / MOTION / CLEAN CARD ด้านบน)
+     หลัก: (1) สีส้มใช้กับ "ปุ่มหลักหนึ่งปุ่มต่อหน้าจอ" เท่านั้น — ตะกร้าใน header และปุ่มบนการ์ดจึงไม่เป็นส้มทึบ
+           (2) มุมโค้ง 3 ระดับ: ปุ่ม/ช่องกรอก 8px, การ์ด/กล่อง 12px, ป้าย 6px — แคปซูลเหลือเฉพาะชิปตัวกรอง/แบรนด์และป้ายจำนวน
+           (3) การ์ดนิ่ง: ไม่เอียง 3 มิติ ไม่ลอย ไม่หรี่การ์ดข้างเคียง — ตอบสนองแค่สีพื้นรูปและขีดเส้นใต้ชื่อ
+     สีทั้งหมดอ้างตัวแปร --pm-* ซึ่งสลับตามโหมดมืดอยู่แล้ว (สีที่เขียนตรงๆ มีกฎ html.dark คู่ไว้ท้ายบล็อก)
+     =================================================== */
+  html.sf-site { --r-ctl: 8px; --r-card: 12px; --r-tag: 6px; }
+
+  /* แถบความคืบหน้าการเลื่อนหน้า (เส้นส้มเรืองแสงบนสุด) — เอาออก */
+  @supports (animation-timeline: scroll()) { html.sf-site::before { content: none; } }
+
+  /* วงโฟกัสคีย์บอร์ด (ช่องกรอกมีวงของตัวเองอยู่แล้ว) */
+  html.sf-site #page-content :is(button, a, summary, [role="link"]):focus-visible { outline: 2px solid #0f2a43; outline-offset: 2px; }
+  html.sf-site.dark #page-content :is(button, a, summary, [role="link"]):focus-visible { outline-color: #f1f5f9; }
+
+  /* ---------- Header ---------- */
+  html.sf-site .pos-search { border-radius: var(--r-ctl); }
+  html.sf-site .pos-search:focus { border-color: var(--pm-ink); box-shadow: 0 0 0 3px rgba(17, 19, 24, .08); }
+  html.sf-site .pos-search-wrap:focus-within .pos-search-ico { color: var(--pm-ink); }
+  html.sf-site .sf-icon-btn { border-radius: var(--r-ctl); font-weight: 600; }
+  /* ตะกร้า = ปุ่มไอคอนแบบเดียวกับรายการโปรด/บัญชี + ป้ายจำนวนสีส้ม */
+  html.sf-site .pos-cart-btn { position: relative; height: 46px; min-width: 46px; padding: 0 12px; border-radius: var(--r-ctl); background: transparent; color: var(--pm-ink); border: 0; box-shadow: none; font-size: 13px; font-weight: 600; transition: background .15s; }
+  html.sf-site .pos-cart-btn > i { font-size: 19px; }
+  html.sf-site .pos-cart-btn:hover { background: var(--pm-well); color: var(--pm-ink); transform: none; }
+  html.sf-site .pos-cart-btn:hover .fa-shopping-basket { animation: none; }
+  html.sf-site .pos-cart-lbl { display: none; color: inherit; }
+  html.sf-site .pos-cart-count, html.sf-site .pos-cart-btn:hover .pos-cart-count { position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 4px; background: #FF6B00; color: #fff; font-size: 10px; font-weight: 700; border: 0; box-shadow: 0 0 0 2px var(--sf-hdr, #fff); }
+  @media (min-width: 1280px) {
+    html.sf-site .pos-cart-lbl { display: inline; }
+    html.sf-site .pos-cart-count, html.sf-site .pos-cart-btn:hover .pos-cart-count { position: static; box-shadow: none; }
+  }
+  @media (max-width: 639px) { html.sf-site .pos-cart-btn { height: 42px; min-width: 40px; padding: 0 8px; } }
+  html.sf-site .pos-where-chip { border-radius: var(--r-ctl); }
+  html.sf-site .sf-nav-a { border-radius: var(--r-ctl); }
+  html.sf-site .sf-nav-a.on::after { height: 2px; border-radius: 0; }
+  html.sf-site .sf-acct-pop { border-radius: var(--r-card); }
+
+  /* ---------- แถบแคมเปญ + แบนเนอร์ ---------- */
+  html.sf-site #posTimerBanner { border-radius: var(--r-card); padding: 8px 14px; }
+  html.sf-site .bnn-flash-emblem { border-radius: var(--r-tag); }
+  html.sf-site .bnn-timer-box { border-radius: var(--r-tag); }
+  html.sf-site #posHeroBannerWrap { border: 0; border-radius: var(--r-card); box-shadow: none; }
+  html.sf-site #posHeroTrack img { animation: none; }
+  .pm-hero-cta { border-radius: var(--r-ctl); box-shadow: none; }
+  #posHeroTrack > div:hover .pm-hero-cta { transform: none; }
+
+  /* ---------- หัวข้อ section: ไม่มีขีดสีนำหน้า, คำอธิบายลงบรรทัดใหม่ ---------- */
+  .pm-sec-title::before { content: none; }
+  html.sf-site .pm-sec-head { flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin-bottom: 16px; }
+  html.sf-site .pm-sec-title { font-size: 20px; font-weight: 600; line-height: 1.3; }
+  @media (min-width: 768px) { html.sf-site .pm-sec-title { font-size: 24px; } }
+  html.sf-site .pm-sec-sub { order: 3; flex-basis: 100%; font-size: 13px; }
+  /* ส่วนที่อยู่ใต้รายการสินค้า (คูปอง/ข่าว/ดูล่าสุด) */
+  html.sf-site .sf-after { margin-top: 32px; margin-bottom: 0; }
+  @media (min-width: 768px) { html.sf-site .sf-after { margin-top: 48px; } }
+  html.sf-site .sf-after:empty { margin-top: 0; }
+
+  /* ---------- คูปอง / ชั้นสินค้า / ไทล์หมวด ---------- */
+  html.sf-site .bnn-voucher-card { border-radius: var(--r-card); padding-left: 16px; }
+  html.sf-site .bnn-voucher-card::before { content: none; }
+  html.sf-site .bnn-voucher-card:hover { transform: none; box-shadow: none; border-color: var(--pm-ink); }
+  html.sf-site .pm-v-btn { border-radius: var(--r-ctl); box-shadow: none; }
+  html.sf-site .bnn-voucher-card:hover .pm-v-btn { transform: none; }
+  html.sf-site .sf-pop-card { border-radius: var(--r-card); }
+  html.sf-site .sf-pop-card:hover, html.sf-site .pos-storefront .sf-pop-card:hover, html.sf-site .pos-storefront .sf-news-card:hover { transform: none; box-shadow: none; }
+  html.sf-site .sf-pop-card:hover { background: var(--pm-well-2); }
+  html.sf-site .sf-news-img { border-radius: var(--r-card); box-shadow: none; }
+  html.sf-site .sf-news-card:hover .sf-news-img { transform: none; }
+  html.sf-site .pm-recent-item { border-radius: var(--r-ctl); }
+  html.sf-site .pm-recent-item:hover { transform: none; box-shadow: none; }
+  html.sf-site .sf-cattiles .sf-tile { border-radius: var(--r-card); }
+  html.sf-site .sf-cattiles .sf-tile:hover { transform: none; box-shadow: none; }
+
+  /* ---------- ตัวกรอง / เลขหน้า ---------- */
+  html.sf-site .pos-storefront .sf-price-go { background: var(--pm-btn); color: var(--pm-btn-fg); border-radius: var(--r-ctl); }
+  html.sf-site .sf-pager .sf-pg { border-radius: var(--r-ctl); }
+
+  /* ---------- การ์ดสินค้า ---------- */
+  html.sf-site .pos-storefront .pm-card { animation: none; }
+  /* เดสก์ท็อป: ปุ่ม "ดูรายละเอียด" จองที่ไว้ใต้การ์ดแล้ว จึงลดระยะระหว่างแถว */
+  @media (hover: hover) and (pointer: fine) and (min-width: 1024px) { html.sf-site #productGrid .pos-storefront.grid { row-gap: 20px; } }
+  html.sf-site .pos-storefront .pm-card.pm-open { cursor: pointer; }
+  html.sf-site .pos-storefront :has(> .pm-card:hover) > .pm-card:not(:hover) { opacity: 1; filter: none; }
+  html.sf-site .pos-storefront .pm-media { border-radius: var(--r-card); background: var(--pm-well); transform: none; will-change: auto; transition: background .2s; }
+  html.sf-site .pos-storefront .pm-card:hover .pm-media, html.sf-site .pos-storefront .pm-card:active .pm-media { transform: none !important; box-shadow: none; background: var(--pm-well-2); }
+  html.sf-site .pos-storefront .pm-media::after { content: none; }
+  html.sf-site .pos-storefront .pm-media > img { filter: none; transition: transform .2s ease-out; }
+  html.sf-site .pos-storefront .pm-card:hover .pm-media > img { transform: scale(1.03); animation: none; }
+  html.sf-site .pos-storefront .pm-card:hover .pm-name, html.sf-site .pos-storefront .pm-name[role="link"]:hover { color: var(--pm-ink); }
+  html.sf-site .pos-storefront .pm-card.pm-open:hover .pm-name { text-decoration: underline; text-underline-offset: 3px; }
+  html.sf-site .pos-storefront .pm-price { font-size: 18px; }
+  @media (min-width: 768px) { html.sf-site .pos-storefront .pm-price { font-size: 20px; } }
+  html.sf-site .pos-storefront .pm-card:hover .pm-price { transform: none; }
+  html.sf-site .pos-storefront .pm-chip { border-radius: var(--r-tag); }
+  html.sf-site .pos-storefront .color-dot:hover, html.sf-site .pos-storefront .pm-card .sf-swatch:hover { transform: scale(1.15); box-shadow: none; }
+  html.sf-site .pos-storefront .bnn-discount-badge { top: 10px; left: 10px; border-radius: var(--r-tag); }
+  html.sf-site .pos-storefront .pm-card:hover .bnn-discount-badge, html.sf-site .pos-storefront .pm-card:hover .bnn-deal-badge { animation: none; }
+  html.sf-site .pm-flag, html.sf-site .sf-new-tag { border-radius: var(--r-tag); }
+  html.sf-site .pos-storefront .pm-soldout { border-radius: var(--r-ctl); box-shadow: none; }
+  html.sf-site .pos-storefront .pm-card .bnn-compare-btn { border-radius: var(--r-ctl); box-shadow: none; }
+  html.sf-site .pos-storefront .pm-card .bnn-compare-btn:hover { color: var(--pm-ink); border-color: var(--pm-ink); }
+  html.sf-site .pos-storefront .pm-card:hover .pm-wish, html.sf-site .pos-storefront .pm-card:hover .bnn-compare-btn { transform: none; }
+  /* ปุ่มบนการ์ด = ปุ่มรอง "ดูรายละเอียด" (ทั้งการ์ดกดได้อยู่แล้ว): จอที่มีเมาส์โผล่เมื่อชี้/โฟกัส, จอสัมผัสและจอแคบไม่แสดง */
+  html.sf-site .pos-storefront .pm-card .pm-view, html.sf-site .pos-storefront .pm-cta-off { height: 40px; border-radius: var(--r-ctl); }
+  html.sf-site .pos-storefront .pm-card .pm-view { background: var(--pm-bg); color: var(--pm-ink); border: 1px solid var(--pm-line); box-shadow: none; font-weight: 600; transition: opacity .15s, background .15s, border-color .15s; }
+  html.sf-site .pos-storefront .pm-card .pm-view::after { content: none; }
+  html.sf-site .pos-storefront .pm-card .pm-view:hover, html.sf-site .pos-storefront .pm-card .pm-view:active { background: var(--pm-well); color: var(--pm-ink); border-color: var(--pm-ink); transform: none; box-shadow: none; }
+  @media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+    html.sf-site .pos-storefront .pm-card .pm-view { opacity: 0; }
+    html.sf-site .pos-storefront .pm-card:hover .pm-view, html.sf-site .pos-storefront .pm-card:focus-within .pm-view { opacity: 1; }
+  }
+  @media (hover: none), (pointer: coarse), (max-width: 1023px) {
+    html.sf-site .pos-storefront .pm-card .pm-view, html.sf-site .pos-storefront .pm-cta-off { display: none; }
+    html.sf-site .pos-storefront .sf-stock { margin-bottom: 0; }
+  }
+
+  /* ---------- แถบบริการท้ายหน้า / footer: นิ่ง ---------- */
+  .pm-trust i { animation: none; }
+  .pm-trust li:hover { transform: none; }
+  html.sf-site .pf-links button:hover { transform: none; }
+
+  /* ---------- แถบเปรียบเทียบ: มือถือย่อเหลือ จำนวน + ปุ่มเปิดตาราง + ล้าง (ไม่บังสินค้า) ---------- */
+  html.sf-site #posCompareBar { border-radius: var(--r-card); box-shadow: 0 12px 28px -14px rgba(15, 23, 42, .35); }
+  html.sf-site #posCompareBar button[onclick*="openCompareModal"] { background: var(--pm-btn); color: var(--pm-btn-fg); border-radius: var(--r-ctl); box-shadow: none; }
+  html.sf-site #posCompareBar button[onclick*="openCompareModal"]:hover { opacity: .88; }
+  html.sf-site #posCompareBar button[onclick*="clearCompare"] { border-radius: var(--r-ctl); }
+  @media (max-width: 639px) {
+    html.sf-site #posCompareBar { padding: 6px 8px; gap: 8px; }
+    html.sf-site #posCompareBar #posCompareSlots { display: none; }
+    html.sf-site #posCompareBar > div:first-child { display: flex; border-right: 0; padding-right: 0; }
+  }
+  html.sf-site.dark #posCompareBar { background: #1e293b; border-color: #334155; }
+  html.sf-site.dark #posCompareBar > div:first-child div { color: #e2e8f0; }
 </style>

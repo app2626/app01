@@ -815,6 +815,25 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(!(await ev(isOpen)), 'compare button must not open the detail modal');
     await ev("(()=>{const b=document.querySelector('#productGrid .pos-card .bnn-compare-btn.active');if(b)b.click();window.app.pos.cartData=window.app.pos.__bakCart||[];true})()"); await sleep(200);
   });
+  await T('card: the whole card opens the detail page (price area too); card button is the quiet "ดูรายละเอียด", not an orange CTA', async () => {
+    await ev("window.app.hideModal('addToCartModal');true"); await sleep(300);
+    const isOpen = "!document.getElementById('addToCartModal').classList.contains('hidden')";
+    const r = JSON.parse(await ev("(()=>{const c=document.querySelector('#productGrid .pos-card.pm-open');if(!c)return JSON.stringify({none:true});const b=c.querySelector('.pm-view');const bg=b?getComputedStyle(b).backgroundColor:'';c.querySelector('.pm-price').click();return JSON.stringify({btn:b?b.textContent.trim():'',bg:bg,old:/จองเลย/.test(c.innerText)})})()"));
+    ok(!r.none, 'no openable card'); await sleep(350); ok(await ev(isOpen), 'clicking the price area did not open the detail page');
+    eq(r.btn, 'ดูรายละเอียด'); ok(!r.old, 'old จองเลย label still on the card'); ok(!/255, 107, 0/.test(r.bg), 'card button is still orange: ' + r.bg);
+    await ev("window.app.hideModal('addToCartModal');true"); await sleep(300);
+    // a chip/dot/heart click inside the card must still NOT open it
+    await ev("(()=>{const b=document.querySelector('#productGrid .pos-card.pm-open .pm-wish');b.click();return true})()"); await sleep(300);
+    ok(!(await ev(isOpen)), 'heart button must not open the detail page');
+    await ev("(()=>{const b=document.querySelector('#productGrid .pos-card.pm-open .pm-wish');b.click();return true})()"); await sleep(200);
+  });
+  await T('home order: product list comes before coupons / news / recently viewed; header cart is an icon button, not an orange pill', async () => {
+    const r = JSON.parse(await ev("(()=>{const g=document.getElementById('productGrid');const after=id=>{const e=document.getElementById(id);return !!e&&!!(g.compareDocumentPosition(e)&Node.DOCUMENT_POSITION_FOLLOWING)};const before=id=>{const e=document.getElementById(id);return !!e&&!!(g.compareDocumentPosition(e)&Node.DOCUMENT_POSITION_PRECEDING)};const cb=getComputedStyle(document.querySelector('.pos-cart-btn')).backgroundColor;return JSON.stringify({v:after('posVoucherStripWrap'),n:after('posNews'),rv:after('posRecentlyViewed'),pop:before('posPopular'),br:before('posBrands'),cb:cb})})()"));
+    ok(r.v && r.n && r.rv, 'coupons/news/recent must follow the grid ' + JSON.stringify(r)); ok(r.pop && r.br, 'popular/brands must precede the grid');
+    ok(!/255, 107, 0/.test(r.cb), 'cart button still orange: ' + r.cb);
+    await ev("document.getElementById('posVoucherStripWrap').scrollIntoView({block:'start',behavior:'instant'});true"); await sleep(250); await shot('pos-after-grid');
+    await ev("window.scrollTo({top:0,behavior:'instant'});true"); await sleep(150);
+  });
   await T('website mode on #pos: admin sidebar/topbar hidden, store header with brand + account menu linking to back office', async () => {
     const r = JSON.parse(await ev("JSON.stringify({site:document.documentElement.classList.contains('sf-site'),side:getComputedStyle(document.getElementById('desktopSidebar')).display,brand:getComputedStyle(document.querySelector('#posStoreHeader .sf-home')).display,top:getComputedStyle(document.getElementById('sfTopbar')).display,fs:!!document.getElementById('posFullscreenBtn')})"));
     ok(r.site && r.side === 'none' && r.brand !== 'none' && r.top !== 'none' && !r.fs, JSON.stringify(r));

@@ -576,7 +576,6 @@
                 <button type="button" onclick="window.app.pos.stepHero(1)" aria-label="แบนเนอร์ถัดไป" class="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"><i class="fas fa-chevron-right text-xs"></i></button>
                 <div id="posHeroDots" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10"></div>
              </div>
-             <div id="posVoucherStripWrap"></div>
           </div>
 
           <div class="lg:flex-1 lg:min-h-0 flex flex-col relative lg:overflow-hidden">
@@ -599,16 +598,13 @@
                   </div>
               </div>
               
-              <!-- แถบสินค้าที่ดูล่าสุด (Recently Viewed) -->
-              <div id="posRecentlyViewed" class="hidden mb-2 shrink-0"></div>
-
+              <!-- ลำดับหน้าแรก: แบนเนอร์ → ยอดนิยม → สินค้าใหม่ → แบรนด์ → รายการสินค้า → คูปอง → ข่าวสาร → ดูล่าสุด
+                   (สินค้าต้องมาก่อน — บนมือถือเดิมต้องเลื่อนผ่านคูปอง/ดูล่าสุด/แบรนด์/ข่าว กว่าจะเห็นสินค้าใบแรก) -->
               <!-- ชั้น "ยอดนิยมตอนนี้" (รุ่นที่ถูกจองมากสุด — pos.renderPopularShelf; ซ่อนเมื่อมีคำค้น/ตัวกรอง/หน้า 2+) -->
-              <!-- ข่าวสารร้าน (จากหน้าจัดการข่าวสาร — pos.renderNewsShelf; ซ่อนเมื่อไม่มีข่าว/กำลังค้นหา/กรอง) -->
-              <!-- แถบแบรนด์ (pos.renderBrandStrip — กดเลือกแบรนด์ = ตัวกรอง) และชั้น "สินค้าใหม่" (pos.renderNewShelf) -->
-              <div id="posBrands" class="hidden mb-3 shrink-0"></div>
-              <div id="posNews" class="hidden mb-3 shrink-0"></div>
-              <div id="posNewArrivals" class="hidden mb-3 shrink-0"></div>
               <div id="posPopular" class="hidden mb-3 shrink-0"></div>
+              <!-- ชั้น "สินค้าใหม่" (pos.renderNewShelf) และแถบแบรนด์ (pos.renderBrandStrip — กดเลือกแบรนด์ = ตัวกรอง) -->
+              <div id="posNewArrivals" class="hidden mb-3 shrink-0"></div>
+              <div id="posBrands" class="hidden mb-3 shrink-0"></div>
 
               <!-- 6B — category tiles + sub-chips รุ่น + filter chips (render โดย pos.renderStoreHeader) -->
               <div class="lg:flex-1 lg:min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-6">
@@ -618,6 +614,11 @@
                   <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto custom-scrollbar pr-1" id="productGrid"></div>
                 </div>
               </div>
+
+              <!-- ใต้รายการสินค้า: คูปอง (pos.renderVoucherStrip) → ข่าวสารร้าน (pos.renderNewsShelf; ซ่อนเมื่อไม่มีข่าว/กำลังค้นหา/กรอง) → ดูล่าสุด -->
+              <div id="posVoucherStripWrap" class="sf-after shrink-0"></div>
+              <div id="posNews" class="hidden sf-after shrink-0"></div>
+              <div id="posRecentlyViewed" class="hidden sf-after shrink-0"></div>
 
               <!-- BNN Trust & Guarantee Micro-Bar -->
               <ul class="pm-trust shrink-0" aria-label="บริการของร้าน">
