@@ -2798,6 +2798,40 @@
   #ssTabContent [data-sec] { margin-top: 0 !important; margin-bottom: 24px; }
 
   /* ===================================================
+     BACK OFFICE LOOK (ทุกหน้าหลังบ้าน = html:not(.sf-site) #page-content)
+     หลังบ้านเคยมีสองหน้าตา: หน้าตาราง (.cms-*, มุม 4px) กับหน้ารายงาน/แดชบอร์ด/ตั้งค่า (rounded-3xl + เงาหนา)
+     บล็อกนี้ทำให้เป็นชุดเดียวกับหน้าร้าน: การ์ด 12px (--r-card), ปุ่ม/ช่องกรอก 8px (--r-ctl), ป้าย 6px, เงาบาง, พื้นหลังเรียบ, หัวหน้าเพจขนาดเดียว
+     ใช้การ override คลาส Tailwind ภายใน #page-content — หน้าใหม่ที่ใช้คลาสเดิมจึงได้หน้าตานี้เอง ; ไม่แตะสี (โหมดมืดใช้กฎเดิม)
+     =================================================== */
+  html:not(.sf-site) .animate-blob { display: none !important; }
+  html:not(.sf-site) #page-content .rounded-3xl,
+  html:not(.sf-site) #page-content .rounded-2xl,
+  html:not(.sf-site) #page-content .chart-card,
+  html:not(.sf-site) #page-content .cms-card { border-radius: 12px !important; }
+  html:not(.sf-site) #page-content .rounded-xl,
+  html:not(.sf-site) #page-content .cms-btn,
+  html:not(.sf-site) #page-content .cms-sel,
+  html:not(.sf-site) #page-content .cms-quick,
+  html:not(.sf-site) #page-content .cms-ico,
+  html:not(.sf-site) #page-content .cms-pg,
+  html:not(.sf-site) #page-content .cms-search,
+  html:not(.sf-site) #page-content .cms-fl input,
+  html:not(.sf-site) #page-content .cms-fl select { border-radius: 8px !important; }
+  html:not(.sf-site) #page-content .cms-badge { border-radius: 6px; }
+  html:not(.sf-site) #page-content .cms-search { overflow: hidden; }
+  html:not(.sf-site) #page-content .shadow-xl,
+  html:not(.sf-site) #page-content .shadow-lg,
+  html:not(.sf-site) #page-content .shadow-2xl,
+  html:not(.sf-site) #page-content .chart-card,
+  html:not(.sf-site) #page-content .cms-card { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important; }
+  html:not(.sf-site) #page-content .cms-btn { box-shadow: none; }
+  html:not(.sf-site) #page-content .cms-head { margin-bottom: 16px; }
+  html:not(.sf-site) #page-content .cms-head h1,
+  html:not(.sf-site) #page-content h2.text-xl { font-size: 20px; line-height: 1.3; font-weight: 700; letter-spacing: 0; }
+  html:not(.sf-site) #page-content .cms-card table:not(#invTable) thead th:first-child { border-top-left-radius: 8px; }
+  html:not(.sf-site) #page-content .cms-card table:not(#invTable) thead th:last-child { border-top-right-radius: 8px; }
+
+  /* ===================================================
      MOBILE BACK OFFICE (จอ < 640px)
      - ตารางกลาง (.cms-grid, JS_Grid.html): แถว = การ์ด, ป้ายชื่อช่องมาจาก data-label, ช่อง .cms-more พับไว้จนกด .cms-more-btn
      - แถบปุ่ม: ปุ่มที่ยัง disabled (ลบ/เปิด/ปิดที่เลือก) ซ่อนไว้จนเลือกรายการ
