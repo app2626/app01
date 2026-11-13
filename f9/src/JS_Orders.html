@@ -1,0 +1,344 @@
+<script>
+// หน้ารายการใบจอง (#orders) — หนึ่งใบจอง = หนึ่งแถว (ชีต Orders เก็บหนึ่งใบจองเป็นหลายแถว: สินค้า / ของแถม / ส่วนลด)
+// อ่านข้อมูลด้วย GET_TABLE เดิม แล้วจัดกลุ่มตาม OrderID ฝั่ง client; เปลี่ยนสถานะผ่าน SET_ORDER_STATUS (server หาแถวจาก OrderID เอง + ตรวจสิทธิ์)
+// แก้รายละเอียดรายแถว / ลบ / ส่งออก CSV ยังอยู่ที่ "ตารางละเอียด" (grid เดิม — window.app.ordersTableInit)
+window.app.orders = {
+  rows: [], list: [], view: [], tab: '', resType: '', page: 1, pageSize: 20, selected: {}, openId: '', busy: false,
+  STATUS_TH: { Pending: 'รอดำเนินการ', Confirmed: 'ยืนยันแล้ว', Paid: 'ชำระแล้ว', Delivered: 'ส่งมอบแล้ว', Completed: 'เสร็จสิ้น', Cancelled: 'ยกเลิก' },
+  STATUS_COLOR: { Pending: '#b45309', Confirmed: '#1d4ed8', Paid: '#047857', Delivered: '#0f2a43', Completed: '#047857', Cancelled: '#be123c' },
+
+  canEdit: function() { return ['Admin', 'Manager'].includes((window.app.user || {}).Role); },
+  statusLabel: function(s) { return this.STATUS_TH[s] || s; },
+  statusColor: function(s) {
+    if (this.STATUS_COLOR[s]) return this.STATUS_COLOR[s];
+    const row = ((window.app.globalData || {}).orderStatuses || []).find(x => x && String(x['Status Name'] || '').trim() === s);
+    const c = row ? String(row['Color Code'] || '').trim() : '';
+    return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#475569';
+  },
+  statusOptions: function() { return window.app.getOrderStatusFlow().concat(['Cancelled']); },
+  num: function(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; },
+  baht: function(n) { return '฿' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); },
+  clean: function(v) { return String(v == null ? '' : v).replace(/^'+/, '').trim(); },
+  fmtDate: function(v) {
+    const s = this.clean(v); if (!s) return '';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  },
+  pill: function(s) {
+    return '<span class="od-pill" style="--od-c:' + window.app.esc(this.statusColor(s)) + '">' + window.app.esc(this.statusLabel(s)) + '</span>';
+  },
+
+  init: function() {
+    const content = document.getElementById('page-content'); if (!content) return;
+    this.tab = ''; this.resType = ''; this.page = 1; this.selected = {}; this.openId = '';
+    const edit = this.canEdit(), esc = window.app.esc;
+    const opts = this.statusOptions().map(s => '<option value="' + esc(s) + '">' + esc(this.statusLabel(s)) + '</option>').join('');
+    content.innerHTML = '<div class="cms-page od-page mb-8">'
+      + '<div class="cms-head"><h1 id="odTitle">รายการใบจอง</h1><span class="cms-crumb">ข้อมูลระบบ &gt; รายการใบจอง</span></div>'
+      + '<div class="cms-card">'
+      + '<div class="od-tabs" id="odTabs" role="tablist" aria-label="สถานะใบจอง"></div>'
+      + '<div class="cms-actions">'
+      + (edit ? '<select id="odBulkStatus" class="cms-sel od-bulk-sel" aria-label="สถานะที่จะเปลี่ยน" disabled><option value="">เปลี่ยนสถานะเป็น...</option>' + opts + '</select>'
+        + '<button type="button" class="cms-btn cms-btn-line" id="odBulkBtn" disabled onclick="window.app.orders.bulkApply()"><i class="fas fa-check-double"></i> <span id="odBulkLabel">ใช้กับที่เลือก</span></button>' : '')
+      + '<span class="cms-grow" aria-hidden="true"></span>'
+      + '<button type="button" class="cms-btn cms-btn-line" id="odRefreshBtn" onclick="window.app.orders.load()"><i class="fas fa-rotate"></i> รีเฟรช</button>'
+      + '<button type="button" class="cms-btn cms-btn-line" id="odTableBtn" title="ตารางทุกคอลัมน์ทุกแถว: แก้รายละเอียด ลบ และส่งออก CSV" onclick="window.app.orders.showTable()"><i class="fas fa-table"></i> ตารางละเอียด</button>'
+      + '</div>'
+      + '<div class="cms-bar">'
+      + '<label>แสดง <select class="cms-sel" id="odPageSize" onchange="window.app.orders.setPageSize(this.value)"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select> ใบ</label>'
+      + '<label>ประเภท <select class="cms-sel" id="odResType" onchange="window.app.orders.setResType(this.value)"><option value="">ทั้งหมด</option><option value="T">จอง T</option><option value="F">จอง F</option></select></label>'
+      + '<label>ค้นหา : <input type="search" class="cms-quick od-search" id="odSearch" placeholder="เลขที่ใบจอง / ชื่อ / เบอร์โทร / สินค้า" oninput="window.app.orders.applyFilter(true)"></label>'
+      + '</div>'
+      + '<div class="cms-wrap custom-scrollbar"><table class="cms-table od-table w-full text-left" id="odTable"><thead><tr>'
+      + (edit ? '<th class="cms-c-chk"><input type="checkbox" id="odSelAll" aria-label="เลือกทั้งหน้า" onchange="window.app.orders.toggleAll(this.checked)"></th>' : '')
+      + '<th>เลขที่ใบจอง</th><th>วันที่</th><th>ลูกค้า</th><th>สาขา</th><th>รายการ</th><th class="od-r">ยอดสุทธิ</th><th>ประเภท</th><th>สถานะ</th>'
+      + '</tr></thead><tbody id="odBody"></tbody></table></div>'
+      + '<div class="cms-foot" id="odFoot"></div>'
+      + '</div></div>'
+      + '<div id="odDrawer" class="od-drawer hidden" role="dialog" aria-modal="true" aria-label="รายละเอียดใบจอง">'
+      + '<div class="od-drawer-bd" onclick="window.app.orders.closeDrawer()"></div>'
+      + '<aside class="od-drawer-panel"><div id="odDrawerBody"></div></aside></div>';
+    this.load();
+  },
+
+  // ตารางละเอียด (grid เดิม) — q = คำค้นที่จะใส่ให้เลย (เช่นเลขที่ใบจองที่กำลังดู)
+  showTable: function(q) {
+    this.closeDrawer();
+    window.app.ordersTableInit();
+    const head = document.querySelector('#page-content .cms-head');
+    if (head) head.insertAdjacentHTML('beforeend', '<button type="button" class="cms-btn cms-btn-line cms-btn-sm" id="odBackBtn" onclick="window.app.orders.init()"><i class="fas fa-arrow-left"></i> กลับมุมมองใบจอง</button>');
+    const s = document.getElementById('gridSearch');
+    if (s && q) s.value = q;
+  },
+
+  load: async function() {
+    const body = document.getElementById('odBody');
+    if (body && !this.rows.length) body.innerHTML = this.stateRow('<i class="fas fa-circle-notch fa-spin"></i> กำลังโหลดใบจอง...');
+    try {
+      const res = await window.app.api('GET_TABLE', { tableName: 'Orders' });
+      if (!document.getElementById('odBody')) return; // ผู้ใช้ออกจากหน้านี้ไปแล้ว
+      if (!res || res.status !== 'success') { this.rows = []; this.list = []; this.renderError(res ? res.message : ''); return; }
+      this.rows = res.data || [];
+      this.list = this.group(this.rows);
+      const keep = {}; this.list.forEach(o => { if (this.selected[o.id]) keep[o.id] = true; }); this.selected = keep;
+      this.applyFilter(false);
+      if (this.openId) { if (this.list.some(o => o.id === this.openId)) this.openDrawer(this.openId); else this.closeDrawer(); }
+    } catch (e) {
+      if (document.getElementById('odBody')) this.renderError(e && e.message);
+    }
+  },
+
+  // จัดกลุ่มแถวของชีตเป็นใบจอง — ช่องข้อมูลลูกค้า/ประเภทการจองเขียนแค่แถวแรกของใบ จึงเก็บค่าแรกที่ไม่ว่างของแต่ละช่อง
+  group: function(rows) {
+    const map = {}, out = [], self = this;
+    const first = (o, key, val) => { const v = self.clean(val); if (v && !o[key]) o[key] = v; };
+    rows.forEach(r => {
+      const id = self.clean(r.OrderID); if (!id) return;
+      let o = map[id];
+      if (!o) { o = map[id] = { id: id, items: [], gifts: [], discounts: [], total: 0, deposit: 0, qty: 0 }; out.push(o); }
+      first(o, 'ts', r.Timestamp); first(o, 'channel', r.Channel); first(o, 'branch', r['Branch Code']);
+      first(o, 'customer', r['Customer Name']); first(o, 'phone', r['Contact Number']); first(o, 'email', r.Email);
+      first(o, 'idCard', r['ID Card_Passport']); first(o, 'preNo', r['Pre Order No']); first(o, 'handraiser', r['Code Handraiser']);
+      first(o, 'pickup', r['Pickup Date']); first(o, 'res', r['Reservation Status']); first(o, 'staff', r.Staff);
+      first(o, 'bookingPhone', r['Booking Phone']); first(o, 'interests', r['Customer Interests']); first(o, 'receipt', r['Receipt No']);
+      first(o, 'status', r['Order Status']);
+      const dep = self.num(r.Deposit); if (dep && !o.deposit) o.deposit = dep;
+      const sku = self.clean(r.SKU), name = self.clean(r['Product Name']), qty = parseInt(r.Qty, 10) || 0;
+      const price = self.num(r['Unit Price']), net = self.num(r['Row Total']), remark = self.clean(r.Remark);
+      o.total += net;
+      if (sku === 'DISCOUNT' || net < 0) o.discounts.push({ name: name || 'ส่วนลด', amount: Math.abs(net) });
+      else if (price === 0 && net === 0) o.gifts.push({ sku: sku, name: name, qty: qty || 1, remark: remark });
+      else { o.items.push({ sku: sku, name: name, qty: qty || 1, price: price, net: net, promo: self.clean(r.Promo), remark: remark }); o.qty += (qty || 1); if (remark && !o.remark) o.remark = remark; }
+    });
+    out.forEach(o => {
+      o.status = o.status || 'Pending';
+      o.resShort = /จอง\s*T/.test(o.res || '') ? 'T' : (/จอง\s*F/.test(o.res || '') ? 'F' : '');
+      o.hay = [o.id, o.customer, o.phone, o.email, o.preNo, o.receipt, o.branch, o.staff].concat(o.items.map(i => i.name + ' ' + i.sku)).join(' ').toLowerCase();
+    });
+    return out.reverse(); // ชีตเรียงเก่า -> ใหม่ ; หน้านี้แสดงใบล่าสุดก่อน
+  },
+
+  setTab: function(t) { this.tab = t; this.applyFilter(true); },
+  setResType: function(v) { this.resType = v; this.applyFilter(true); },
+  setPageSize: function(v) { this.pageSize = parseInt(v, 10) || 20; this.applyFilter(true); },
+  goPage: function(n) { this.page = n; this.render(); },
+
+  applyFilter: function(resetPage) {
+    const s = document.getElementById('odSearch'), q = s ? s.value.trim().toLowerCase() : '';
+    const qDigits = q.replace(/\D/g, '');
+    this.base = this.list.filter(o => (!this.resType || o.resShort === this.resType)
+      && (!q || o.hay.indexOf(q) !== -1 || (qDigits.length >= 4 && String(o.phone || '').replace(/\D/g, '').indexOf(qDigits) !== -1)));
+    this.view = this.tab ? this.base.filter(o => o.status === this.tab) : this.base;
+    if (resetPage) this.page = 1;
+    this.renderTabs(); this.render();
+  },
+
+  renderTabs: function() {
+    const el = document.getElementById('odTabs'); if (!el) return;
+    const esc = window.app.esc, escJs = window.app.escAttrJs, counts = {};
+    (this.base || []).forEach(o => { counts[o.status] = (counts[o.status] || 0) + 1; });
+    // สถานะตามลำดับงาน + สถานะอื่นที่มีอยู่จริงในข้อมูล (เช่นค่าจากระบบเก่า)
+    const names = this.statusOptions().slice();
+    Object.keys(counts).forEach(k => { if (names.indexOf(k) === -1) names.push(k); });
+    const tab = (val, label, n) => '<button type="button" role="tab" class="od-tab' + (this.tab === val ? ' on' : '') + '" aria-selected="' + (this.tab === val ? 'true' : 'false') + '" onclick="window.app.orders.setTab(\'' + escJs(val) + '\')">' + esc(label) + '<b>' + n + '</b></button>';
+    el.innerHTML = tab('', 'ทั้งหมด', (this.base || []).length) + names.map(s => tab(s, this.statusLabel(s), counts[s] || 0)).join('');
+  },
+
+  stateRow: function(html) { return '<tr><td colspan="9" class="cms-empty od-state">' + html + '</td></tr>'; },
+  renderError: function(msg) {
+    const body = document.getElementById('odBody'); if (!body) return;
+    body.innerHTML = this.stateRow('<i class="fas fa-triangle-exclamation"></i> โหลดใบจองไม่สำเร็จ' + (msg ? ' — ' + window.app.esc(msg) : '') + ' <button type="button" class="cms-btn cms-btn-line cms-btn-sm" onclick="window.app.orders.load()">ลองใหม่</button>');
+    const foot = document.getElementById('odFoot'); if (foot) foot.innerHTML = '';
+  },
+
+  render: function() {
+    const body = document.getElementById('odBody'); if (!body) return;
+    const esc = window.app.esc, escJs = window.app.escAttrJs, edit = this.canEdit();
+    const total = this.view.length, pages = Math.max(1, Math.ceil(total / this.pageSize));
+    if (this.page > pages) this.page = pages;
+    const start = (this.page - 1) * this.pageSize, pageRows = this.view.slice(start, start + this.pageSize);
+    this.pageIds = pageRows.map(o => o.id);
+    if (!total) {
+      const filtered = !!(this.tab || this.resType || ((document.getElementById('odSearch') || {}).value || '').trim());
+      body.innerHTML = this.stateRow(filtered
+        ? 'ไม่พบใบจองตามเงื่อนไข <button type="button" class="cms-btn cms-btn-line cms-btn-sm" onclick="window.app.orders.clearFilters()">ล้างตัวกรอง</button>'
+        : 'ยังไม่มีใบจองในระบบ');
+    } else {
+      const opts = this.statusOptions();
+      body.innerHTML = pageRows.map(o => {
+        const firstItem = o.items[0] || o.gifts[0] || null;
+        const more = o.items.length + o.gifts.length - 1;
+        const itemTxt = firstItem ? esc(firstItem.name || firstItem.sku) : '-';
+        const stOpts = (opts.indexOf(o.status) === -1 ? [o.status] : []).concat(opts);
+        const stCell = edit
+          ? '<select class="od-st" style="--od-c:' + esc(this.statusColor(o.status)) + '" aria-label="สถานะของ ' + esc(o.id) + '" onclick="event.stopPropagation()" onchange="window.app.orders.changeStatus(\'' + escJs(o.id) + '\', this.value, this)">'
+            + stOpts.map(s => '<option value="' + esc(s) + '"' + (s === o.status ? ' selected' : '') + '>' + esc(this.statusLabel(s)) + '</option>').join('') + '</select>'
+          : this.pill(o.status);
+        return '<tr class="od-row' + (this.selected[o.id] ? ' cms-sel-row' : '') + '" data-id="' + esc(o.id) + '" tabindex="0" onclick="window.app.orders.rowClick(event, \'' + escJs(o.id) + '\')" onkeydown="if(event.key===\'Enter\'&&event.target===this)window.app.orders.openDrawer(\'' + escJs(o.id) + '\')">'
+          + (edit ? '<td class="cms-c-chk"><input type="checkbox" aria-label="เลือก ' + esc(o.id) + '"' + (this.selected[o.id] ? ' checked' : '') + ' onchange="window.app.orders.toggleOne(\'' + escJs(o.id) + '\', this.checked)"></td>' : '')
+          + '<td><span class="od-id">' + esc(o.id) + '</span></td>'
+          + '<td class="od-date">' + esc(this.fmtDate(o.ts)) + '</td>'
+          + '<td><div class="od-cust">' + esc(o.customer || '-') + '</div><div class="od-sub">' + esc(o.phone || '') + '</div></td>'
+          + '<td>' + esc(o.branch || '-') + '</td>'
+          + '<td><div class="od-item">' + itemTxt + '</div>' + (more > 0 ? '<div class="od-sub">+ อีก ' + more + ' รายการ</div>' : '') + '</td>'
+          + '<td class="od-r od-total">' + esc(this.baht(o.total)) + '</td>'
+          + '<td>' + (o.resShort ? '<span class="od-type">จอง ' + o.resShort + '</span>' : '-') + '</td>'
+          + '<td>' + stCell + '</td></tr>';
+      }).join('');
+    }
+    const foot = document.getElementById('odFoot');
+    if (foot) {
+      let pg = '';
+      if (pages > 1) {
+        const btn = (n, label, on, dis) => '<button type="button" class="cms-pg' + (on ? ' cms-pg-on' : '') + '"' + (dis ? ' disabled' : '') + ' onclick="window.app.orders.goPage(' + n + ')">' + label + '</button>';
+        const from = Math.max(1, Math.min(this.page - 2, pages - 4)), to = Math.min(pages, from + 4);
+        pg += btn(this.page - 1, 'ก่อนหน้า', false, this.page <= 1);
+        for (let i = from; i <= to; i++) pg += btn(i, String(i), i === this.page, false);
+        pg += btn(this.page + 1, 'ถัดไป', false, this.page >= pages);
+      }
+      foot.innerHTML = '<span id="odCount">' + (total ? 'แสดง ' + (start + 1) + ' ถึง ' + Math.min(start + this.pageSize, total) + ' จาก ' + total + ' ใบจอง' : '') + '</span><div class="cms-pager">' + pg + '</div>';
+    }
+    this.syncSelection();
+  },
+
+  clearFilters: function() {
+    this.tab = ''; this.resType = '';
+    const s = document.getElementById('odSearch'); if (s) s.value = '';
+    const r = document.getElementById('odResType'); if (r) r.value = '';
+    this.applyFilter(true);
+  },
+
+  rowClick: function(e, id) {
+    if (e && e.target && e.target.closest && e.target.closest('input,select,button,a')) return;
+    this.openDrawer(id);
+  },
+
+  // ---- เลือกหลายใบ ----
+  toggleOne: function(id, on) { if (on) this.selected[id] = true; else delete this.selected[id]; this.syncSelection(); },
+  toggleAll: function(on) { (this.pageIds || []).forEach(id => { if (on) this.selected[id] = true; else delete this.selected[id]; }); this.render(); },
+  syncSelection: function() {
+    const n = Object.keys(this.selected).length;
+    const btn = document.getElementById('odBulkBtn'), sel = document.getElementById('odBulkStatus'), lab = document.getElementById('odBulkLabel');
+    if (btn) btn.disabled = n === 0;
+    if (sel) sel.disabled = n === 0;
+    if (lab) lab.textContent = n ? 'ใช้กับที่เลือก (' + n + ')' : 'ใช้กับที่เลือก';
+    const all = document.getElementById('odSelAll');
+    if (all) { const ids = this.pageIds || []; all.checked = ids.length > 0 && ids.every(id => this.selected[id]); }
+    document.querySelectorAll('#odBody tr.od-row').forEach(tr => tr.classList.toggle('cms-sel-row', !!this.selected[tr.getAttribute('data-id')]));
+  },
+
+  // ---- เปลี่ยนสถานะ ----
+  // ยกเลิก = คืนสต๊อก จึงถามยืนยันก่อนเสมอ; สถานะอื่นของใบเดียวเปลี่ยนทันที
+  changeStatus: async function(id, status, selectEl) {
+    const o = this.list.find(x => x.id === id); if (!o || !status || status === o.status) return;
+    const revert = () => { if (selectEl) selectEl.value = o.status; };
+    if (status === 'Cancelled' || o.status === 'Cancelled') {
+      const r = await Swal.fire({
+        icon: 'warning', title: window.app.esc(status === 'Cancelled' ? 'ยกเลิกใบจองนี้?' : 'นำใบจองที่ยกเลิกกลับมาใช้?'),
+        html: '<b>' + window.app.esc(id) + '</b><br>' + (status === 'Cancelled' ? 'สต๊อกของสินค้าในใบจองจะถูกคืนเข้าระบบ' : 'ระบบจะตัดสต๊อกสินค้าในใบจองอีกครั้ง (ถ้าสต๊อกไม่พอจะเปลี่ยนไม่ได้)'),
+        showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ไม่เปลี่ยน', confirmButtonColor: '#0f2a43'
+      });
+      if (!r.isConfirmed) { revert(); return; }
+    }
+    const res = await this.sendStatus([id], status);
+    if (!res) { revert(); return; }
+    if (res.failed.length) { revert(); Swal.fire({ icon: 'error', title: 'เปลี่ยนสถานะไม่สำเร็จ', text: res.failed[0].message || '' }); return; }
+    window.app.toast('เปลี่ยนสถานะ ' + id + ' เป็น ' + this.statusLabel(status) + ' แล้ว', 'success');
+    await this.load();
+  },
+
+  bulkApply: async function() {
+    const ids = Object.keys(this.selected), sel = document.getElementById('odBulkStatus'), status = sel ? sel.value : '';
+    if (!ids.length) return;
+    if (!status) { window.app.toast('เลือกสถานะที่จะเปลี่ยนก่อน', 'warning'); if (sel) sel.focus(); return; }
+    if (ids.length > 50) { Swal.fire({ icon: 'warning', title: 'เลือกได้ครั้งละไม่เกิน 50 ใบ', text: 'ตอนนี้เลือกไว้ ' + ids.length + ' ใบ' }); return; }
+    const r = await Swal.fire({
+      icon: status === 'Cancelled' ? 'warning' : 'question', title: 'เปลี่ยนสถานะ ' + ids.length + ' ใบจอง?',
+      html: 'เป็น <b>' + window.app.esc(this.statusLabel(status)) + '</b>' + (status === 'Cancelled' ? '<br>สต๊อกของสินค้าในใบจองที่ยกเลิกจะถูกคืนเข้าระบบ' : ''),
+      showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#0f2a43'
+    });
+    if (!r.isConfirmed) return;
+    const res = await this.sendStatus(ids, status);
+    if (!res) return;
+    this.selected = {};
+    res.failed.forEach(f => { this.selected[f.orderId] = true; }); // ใบที่ไม่ผ่านยังเลือกค้างไว้ให้ลองใหม่ได้
+    if (sel) sel.value = '';
+    await this.load();
+    if (res.failed.length) {
+      Swal.fire({ icon: 'warning', title: 'เปลี่ยนได้ ' + res.updated.length + ' ใบ ไม่สำเร็จ ' + res.failed.length + ' ใบ',
+        html: '<div class="od-fail">' + res.failed.map(f => '<div><b>' + window.app.esc(f.orderId) + '</b> ' + window.app.esc(f.message || '') + '</div>').join('') + '</div>' });
+    } else {
+      window.app.toast('เปลี่ยนสถานะ ' + res.updated.length + ' ใบจองแล้ว' + (res.unchanged.length ? ' (' + res.unchanged.length + ' ใบเป็นสถานะนี้อยู่แล้ว)' : ''), 'success');
+    }
+  },
+
+  sendStatus: async function(ids, status) {
+    if (this.busy) return null;
+    this.busy = true;
+    window.app.showLoading('กำลังเปลี่ยนสถานะ...');
+    try {
+      const res = await window.app.api('SET_ORDER_STATUS', { orderIds: ids, status: status });
+      window.app.hideLoading();
+      if (!res || res.status !== 'success') { Swal.fire({ icon: 'error', title: 'เปลี่ยนสถานะไม่สำเร็จ', text: (res && res.message) || '' }); return null; }
+      return { updated: res.updated || [], unchanged: res.unchanged || [], failed: res.failed || [] };
+    } catch (e) {
+      window.app.hideLoading();
+      Swal.fire({ icon: 'error', title: 'เปลี่ยนสถานะไม่สำเร็จ', text: (e && e.message) || '' });
+      return null;
+    } finally { this.busy = false; }
+  },
+
+  // ---- แผงรายละเอียดด้านข้าง ----
+  openDrawer: function(id) {
+    const o = this.list.find(x => x.id === id), box = document.getElementById('odDrawerBody'), dr = document.getElementById('odDrawer');
+    if (!o || !box || !dr) return;
+    this.openId = id;
+    const esc = window.app.esc, escJs = window.app.escAttrJs, edit = this.canEdit();
+    const row = (label, val) => val ? '<div><dt>' + esc(label) + '</dt><dd>' + esc(val) + '</dd></div>' : '';
+    const opts = this.statusOptions(), stOpts = (opts.indexOf(o.status) === -1 ? [o.status] : []).concat(opts);
+    let h = '<header class="od-dh"><div><p class="od-dh-s">ใบจอง</p><h2 id="odDrawerId">' + esc(o.id) + '</h2></div>'
+      + '<button type="button" class="od-x" aria-label="ปิด" onclick="window.app.orders.closeDrawer()"><i class="fas fa-xmark"></i></button></header>';
+    h += '<div class="od-db">';
+    h += '<div class="od-strow">' + this.pill(o.status)
+      + (edit ? '<select class="cms-sel" id="odDrawerStatus" aria-label="เปลี่ยนสถานะ" onchange="window.app.orders.changeStatus(\'' + escJs(o.id) + '\', this.value, this)">'
+        + stOpts.map(s => '<option value="' + esc(s) + '"' + (s === o.status ? ' selected' : '') + '>' + esc(this.statusLabel(s)) + '</option>').join('') + '</select>' : '')
+      + '</div>';
+    h += '<section class="od-sec"><h3>ลูกค้า</h3><dl class="od-dl">' + row('ชื่อ-นามสกุล', o.customer) + row('เบอร์โทร', o.phone) + row('อีเมล', o.email)
+      + row('บัตรประชาชน / Passport', o.idCard) + row('เลขที่ Pre Booking', o.preNo) + row('Code Handraiser', o.handraiser) + '</dl></section>';
+    h += '<section class="od-sec"><h3>การจอง</h3><dl class="od-dl">' + row('วันที่จอง', this.fmtDate(o.ts)) + row('ช่องทาง', o.channel) + row('สาขา', o.branch)
+      + row('ประเภท', o.res) + row('เลขที่ใบเสร็จมัดจำ', o.receipt) + (o.deposit ? row('เงินมัดจำ', this.baht(o.deposit)) : '') + row('รอบรับเครื่อง', o.pickup)
+      + row('พนักงาน', o.staff) + row('เบอร์พนักงาน', o.bookingPhone) + row('ความสนใจ', o.interests) + row('หมายเหตุ', o.remark) + '</dl></section>';
+    h += '<section class="od-sec"><h3>รายการ</h3><ul class="od-items">'
+      + o.items.map(i => '<li><div><b>' + esc(i.name || i.sku) + '</b><span>' + esc(i.sku) + ' · ' + i.qty + ' x ' + esc(this.baht(i.price)) + (i.promo ? ' · ' + esc(i.promo) : '') + '</span></div><em>' + esc(this.baht(i.net)) + '</em></li>').join('')
+      + o.gifts.map(g => '<li><div><b><i class="fas fa-gift" aria-hidden="true"></i> ' + esc(g.name || g.sku) + '</b><span>ของแถม · ' + g.qty + ' ชิ้น' + (g.remark ? ' · ' + esc(g.remark) : '') + '</span></div><em>-</em></li>').join('')
+      + o.discounts.map(d => '<li class="od-disc"><div><b>' + esc(d.name) + '</b></div><em>-' + esc(this.baht(d.amount)) + '</em></li>').join('')
+      + '</ul><div class="od-sum"><span>ยอดสุทธิ</span><b>' + esc(this.baht(o.total)) + '</b></div></section>';
+    h += '<section class="od-sec"><h3>ประวัติสถานะ</h3><div id="odHistory" class="od-hist"><span class="od-sub">กำลังโหลด...</span></div></section>';
+    h += '</div>';
+    h += '<footer class="od-df">'
+      + '<button type="button" class="cms-btn cms-btn-line" onclick="window.app.copyPublicTrackLink(\'' + escJs(o.id) + '\')"><i class="fas fa-link"></i> คัดลอกลิงก์ติดตาม</button>'
+      + (edit ? '<button type="button" class="cms-btn cms-btn-line" id="odEditBtn" onclick="window.app.orders.showTable(\'' + escJs(o.id) + '\')"><i class="fas fa-pen"></i> แก้ไขรายละเอียด</button>' : '')
+      + '</footer>';
+    box.innerHTML = h;
+    dr.classList.remove('hidden');
+    this.loadHistory(id);
+  },
+  closeDrawer: function() {
+    this.openId = '';
+    const dr = document.getElementById('odDrawer'); if (dr) dr.classList.add('hidden');
+  },
+  loadHistory: async function(id) {
+    let html = '<span class="od-sub">ไม่มีประวัติ</span>';
+    try {
+      const res = await window.app.api('TRACK_ORDER', { query: id });
+      const hit = res && res.status === 'success' ? (res.orders || []).find(x => x && x.orderId === id) : null;
+      const hh = hit && hit.history && hit.history.length ? window.app.statusHistoryHtml(hit.history, true) : '';
+      if (hh) html = hh;
+    } catch (e) { html = '<span class="od-sub">โหลดประวัติไม่สำเร็จ</span>'; }
+    const el = document.getElementById('odHistory');
+    if (el && this.openId === id) el.innerHTML = html;
+  }
+};
+</script>

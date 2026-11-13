@@ -730,6 +730,36 @@ t('BULK_UPDATE_PRODUCTS "Stock Add" adds to the live stock, never below 0, ignor
   } finally { row[si] = old; cache.remove('TABLE_Products'); }
 });
 t('BULK_UPDATE_PRODUCTS admin', () => { const r = api('BULK_UPDATE_PRODUCTS', { updates: [{ SKU: 'SKU-S24U', Stock: 77 }], rows: [{ SKU: 'SKU-S24U', Stock: 77 }] }, admin); ok(r && typeof r === 'object', JSON.stringify(r).slice(0, 150)); });
+console.log('== SET_ORDER_STATUS');
+{
+  const place = () => { const r = api('CHECKOUT', co({ clientRequestId: 'SOS-' + Math.random() }), sales); eq(r.status, 'success', JSON.stringify(r)); return r.orderId; };
+  const statusOf = (id) => [...new Set(tbl('Orders').filter(x => x.OrderID === id).map(x => x['Order Status']))].join(',');
+  let a, b;
+  t('SET_ORDER_STATUS: Sales cannot change a status', () => { a = place(); b = place(); const r = api('SET_ORDER_STATUS', { orderIds: [a], status: 'Confirmed' }, sales); eq(r.status, 'error', JSON.stringify(r)); eq(statusOf(a), 'Pending'); });
+  t('SET_ORDER_STATUS: Admin changes several orders by OrderID, every row of each order, history logged', () => {
+    const r = api('SET_ORDER_STATUS', { orderIds: [a, b, a], status: 'Confirmed' }, admin);
+    eq(r.status, 'success', JSON.stringify(r)); eq(r.updated.length, 2, JSON.stringify(r)); eq(r.failed.length, 0);
+    eq(statusOf(a), 'Confirmed'); eq(statusOf(b), 'Confirmed');
+    const log = sheets.OrderStatusLog.rows.filter(x => x[0] === a); ok(log.some(x => x[2] === 'Pending' && x[3] === 'Confirmed'), 'status log row missing: ' + JSON.stringify(log));
+  });
+  t('SET_ORDER_STATUS: same status = unchanged, unknown order = failed, the rest still updated', () => {
+    const r = api('SET_ORDER_STATUS', { orderIds: [a, 'ORD-NOPE-1'], status: 'Confirmed' }, admin);
+    eq(r.status, 'success', JSON.stringify(r)); eq(r.unchanged.join(), a); eq(r.failed.length, 1); eq(r.failed[0].orderId, 'ORD-NOPE-1'); eq(r.updated.length, 0);
+  });
+  t('SET_ORDER_STATUS: cancelling returns stock, un-cancelling takes it again', () => {
+    const s0 = stockOf('SKU-S24U');
+    eq(api('SET_ORDER_STATUS', { orderIds: [a], status: 'Cancelled' }, admin).updated.join(), a); eq(stockOf('SKU-S24U'), s0 + 1); eq(statusOf(a), 'Cancelled');
+    eq(api('SET_ORDER_STATUS', { orderIds: [a], status: 'Pending' }, admin).updated.join(), a); eq(stockOf('SKU-S24U'), s0);
+  });
+  t('SET_ORDER_STATUS: invalid status / bad id / empty list / over the limit rejected, nothing written', () => {
+    const r1 = api('SET_ORDER_STATUS', { orderIds: [b], status: '=HYPERLINK("x")' }, admin); ok(r1.status === 'error' || (r1.failed && r1.failed.length === 1), JSON.stringify(r1)); eq(statusOf(b), 'Confirmed');
+    eq(api('SET_ORDER_STATUS', { orderIds: ['bad id!'], status: 'Paid' }, admin).status, 'error');
+    eq(api('SET_ORDER_STATUS', { orderIds: [], status: 'Paid' }, admin).status, 'error');
+    eq(api('SET_ORDER_STATUS', { orderIds: [b], status: '' }, admin).status, 'error');
+    eq(api('SET_ORDER_STATUS', { orderIds: Array.from({ length: 51 }, (_, i) => 'ORD-X-' + i), status: 'Paid' }, admin).status, 'error');
+    eq(statusOf(b), 'Confirmed');
+  });
+}
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
 
 console.log('\n==== ' + pass + ' passed, ' + fail + ' failed');

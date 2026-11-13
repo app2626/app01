@@ -13,6 +13,8 @@ document.addEventListener('keydown', function(e) {
     const el = document.getElementById(modalOrder[i]);
     if (el && !el.classList.contains('hidden')) { window.app.hideModal(modalOrder[i]); return; }
   }
+  const od = document.getElementById('odDrawer');
+  if (od && !od.classList.contains('hidden') && window.app.orders) { window.app.orders.closeDrawer(); return; }
   const drawer = document.getElementById('cartDrawer');
   if (drawer && !drawer.classList.contains('translate-x-full')) window.app.pos.toggleCart();
 });

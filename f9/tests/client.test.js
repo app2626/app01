@@ -109,7 +109,14 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
       eq(await ev("document.documentElement.classList.contains('sf-site')"), r === 'pos', 'website mode class must be on #pos only');
       if (r === 'analytics') { const pts = JSON.parse(await ev("JSON.stringify([window.app.analytics && window.app.analytics.chartPoints, window.app.analytics && window.app.analytics.chartPeriod])")); ok(pts[0] > 0 && pts[0] <= 200, 'forecast chart is bucketed (got ' + pts + ')'); }
       if (['dashboard', 'orders', 'analytics', 'products', 'systemsettings', 'invoice', 'target', 'bookingsummary', 'salessummary', 'branchbookingsummary', 'allbookingsummary'].includes(r)) await shot('admin-' + r);
-      if (r === 'orders') ok(await ev("(()=>{const e=document.querySelector('#dataGridBody .cms-empty-pin');const w=document.querySelector('.cms-wrap').getBoundingClientRect();if(!e)return false;const b=e.getBoundingClientRect();return b.width>100&&b.left>=w.left-1&&b.right<=w.right+1})()"), 'empty orders table: message is inside the visible part of a wide table');
+      if (r === 'orders') {
+        ok(await ev("!!document.querySelector('#odTabs .od-tab') && !!document.querySelector('#odBody .od-state') && !document.getElementById('dataTable')"), 'orders page: new one-row-per-order view with an empty state');
+        await ev("window.app.orders.showTable();true"); await sleep(700);
+        ok(await ev("(()=>{const e=document.querySelector('#dataGridBody .cms-empty-pin');const w=document.querySelector('.cms-wrap').getBoundingClientRect();if(!e)return false;const b=e.getBoundingClientRect();return b.width>100&&b.left>=w.left-1&&b.right<=w.right+1})()"), 'empty orders table: message is inside the visible part of a wide table');
+        ok(await ev("!!document.getElementById('odBackBtn') && document.getElementById('gridExportBtn').classList.contains('flex')"), 'detailed table: back button + CSV export');
+        await ev("document.getElementById('odBackBtn').click();true"); await sleep(500);
+        ok(await ev("!!document.getElementById('odTabs')"), 'back button returns to the order view');
+      }
       // ปุ่มนำเข้า CSV ต้องโผล่เฉพาะหน้าสินค้า (Products) เท่านั้น
       if (['products', 'branches', 'channels', 'members', 'giftmappings'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !!b&&!b.classList.contains('hidden')})()"), 'import button must show on ' + r);
       else if (['promotions', 'coupons', 'interests', 'autopromotions'].includes(r)) ok(await ev("(()=>{const b=document.getElementById('gridImportBtn');return !b||b.classList.contains('hidden')})()"), 'import button must be hidden on ' + r);
@@ -889,6 +896,43 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(await ev("!!document.querySelector('.swal2-container.swal2-top-end .swal2-toast')"), 'storefront toast is not top-end'); await shot('pos-toast');
     await ev("Swal.close();true"); await sleep(200);
   });
+  await T('orders page: one row per order, status tabs with counts, search, detail drawer with items and history', async () => {
+    await ev("window.location.hash='#orders';true"); await sleep(1500);
+    const n = sheets.Orders.rows.length - 1, ids = [...new Set(sheets.Orders.rows.slice(1).map(x => x[0]))];
+    ok(ids.length >= 1 && n > ids.length, 'need at least one multi-row order (rows ' + n + ', orders ' + ids.length + ')');
+    const a = JSON.parse(await ev("JSON.stringify({rows:document.querySelectorAll('#odBody tr.od-row').length,list:window.app.orders.list.length,tabs:[...document.querySelectorAll('#odTabs .od-tab')].map(b=>b.textContent.trim()),all:document.querySelector('#odTabs .od-tab b').textContent,first:(document.querySelector('#odBody tr.od-row')||{getAttribute(){return ''}}).getAttribute('data-id')})"));
+    eq(a.list, ids.length, 'orders grouped by OrderID'); eq(a.rows, Math.min(ids.length, 20)); eq(a.all, String(ids.length)); ok(a.tabs.length >= 5, a.tabs.join('|')); eq(a.first, ids[ids.length - 1], 'newest order first');
+    await shot('admin-orders-list');
+    await ev("(()=>{const s=document.getElementById('odSearch');s.value='zzz-no-such-order';s.dispatchEvent(new Event('input'));return true})()"); await sleep(250);
+    ok(await ev("document.querySelectorAll('#odBody tr.od-row').length===0 && !!document.querySelector('#odBody .od-state')"), 'search with no match must show the empty state');
+    await ev("window.app.orders.clearFilters();true"); await sleep(250);
+    await ev("document.querySelector('#odBody tr.od-row td:nth-child(2)').click();true"); await sleep(900);
+    const d = JSON.parse(await ev("(()=>{const dr=document.getElementById('odDrawer');return JSON.stringify({open:!dr.classList.contains('hidden'),id:(document.getElementById('odDrawerId')||{}).textContent,items:dr.querySelectorAll('.od-items li').length,sum:(dr.querySelector('.od-sum b')||{}).textContent,hist:document.getElementById('odHistory').textContent,xss:!!window.__xss2,img:!!dr.querySelector('.od-items img')})})()"));
+    ok(d.open, 'drawer did not open'); eq(d.id, ids[ids.length - 1]); ok(d.items >= 1 && /\d/.test(d.sum), JSON.stringify(d)); ok(!d.xss && !d.img, 'order text must be escaped'); ok(d.hist && !/กำลังโหลด/.test(d.hist), 'history not loaded: ' + d.hist);
+    await shot('admin-orders-drawer');
+    await ev("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));true"); await sleep(200);
+    ok(await ev("document.getElementById('odDrawer').classList.contains('hidden')"), 'Escape must close the drawer');
+  });
+  await T('orders page: status change from the row and in bulk goes through the server, cancel asks first', async () => {
+    const idI = sheets.Orders.rows[0].indexOf('OrderID'), stI = sheets.Orders.rows[0].indexOf('Order Status');
+    const st = (id) => [...new Set(sheets.Orders.rows.slice(1).filter(x => x[idI] === id).map(x => x[stI]))].join(',');
+    const id = await ev("document.querySelector('#odBody tr.od-row').getAttribute('data-id')");
+    await ev("(()=>{const s=document.querySelector('#odBody tr.od-row .od-st');s.value='Confirmed';s.dispatchEvent(new Event('change'));return true})()"); await sleep(1200);
+    eq(st(id), 'Confirmed', 'row select must update every row of the order'); eq(await ev("document.querySelector('#odBody tr.od-row .od-st').value"), 'Confirmed');
+    await ev("(()=>{const s=document.querySelector('#odBody tr.od-row .od-st');s.value='Cancelled';s.dispatchEvent(new Event('change'));return true})()"); await sleep(400);
+    ok(await ev("Swal.isVisible()"), 'cancelling must ask for confirmation'); eq(st(id), 'Confirmed', 'nothing written before confirming');
+    await ev("Swal.clickCancel();true"); await sleep(400);
+    eq(st(id), 'Confirmed'); eq(await ev("document.querySelector('#odBody tr.od-row .od-st').value"), 'Confirmed', 'select must go back after declining');
+    eq(await ev("document.getElementById('odBulkBtn').disabled"), true, 'bulk button disabled with nothing selected');
+    await ev("document.getElementById('odSelAll').click();true"); await sleep(200);
+    const sel = await ev("Object.keys(window.app.orders.selected).length"); ok(sel >= 1, 'select all');
+    await ev("(()=>{document.getElementById('odBulkStatus').value='Paid';document.getElementById('odBulkBtn').click();return true})()"); await sleep(400);
+    ok(await ev("Swal.isVisible()"), 'bulk change must ask for confirmation'); await ev("Swal.clickConfirm();true"); await sleep(1800);
+    eq(st(id), 'Paid'); eq(await ev("Object.keys(window.app.orders.selected).length"), 0, 'selection cleared after a clean bulk change');
+    eq(await ev("[...document.querySelectorAll('#odTabs .od-tab')].find(b=>b.classList.contains('on')).textContent.replace(/\\d+/,'').trim()"), 'ทั้งหมด');
+    await ev("window.Swal&&Swal.close();window.location.hash='#pos';true"); await sleep(1500);
+    await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
+  });
   await T('active filter chips: one chip per selected filter, clicking a chip removes only that filter, clear-all shows from 2 chips, text escaped', async () => {
     await ev("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('capacity','128GB');window.app.pos.setStoreFilter('inStock',true);true"); await sleep(300);
     const a = JSON.parse(await ev("JSON.stringify({chips:[...document.querySelectorAll('#storeActiveChips .sf-achip')].map(b=>b.textContent.trim()),clear:!!document.querySelector('#storeActiveChips .sf-achip-clear')})"));
@@ -1053,7 +1097,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.location.hash='#dashboard';true"); await sleep(1500);
     const cut = JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('[id^=dashKpi]')].filter(e=>e.offsetParent&&e.scrollWidth>e.clientWidth+1).map(e=>e.id+':'+e.textContent))"));
     if (cut.length) bad.push('KPI numbers cut off: ' + cut.join(','));
-    for (const [r, sel] of [['products', '.cms-actions .cms-btn:not(.hidden), #gridTitle, .cms-bar label, #dataGridBody td'], ['orders', '#gridTitle, .cms-search-h, .cms-fl label, #dataGridBody .cms-empty-pin h3, #dataGridBody .cms-empty-pin p'], ['dashboard', '#dashSyncStatus']]) {
+    for (const [r, sel] of [['products', '.cms-actions .cms-btn:not(.hidden), #gridTitle, .cms-bar label, #dataGridBody td'], ['orders', '#odTitle, .od-tab, .cms-bar label, #odBody .od-state, #dataGridBody .cms-empty-pin h3, #dataGridBody .cms-empty-pin p'], ['dashboard', '#dashSyncStatus']]) {
       await ev("window.location.hash='#" + r + "';true"); await sleep(1500);
       const res = JSON.parse(await ev("(()=>{" + lum + ";return JSON.stringify([...document.querySelectorAll(" + JSON.stringify(sel) + ")].filter(e=>e.offsetParent&&e.textContent.trim()&&!e.disabled).slice(0,40).map(e=>[e.textContent.trim().slice(0,20),Math.round(cr(e)*10)/10]).filter(x=>x[1]<3))})()"));
       if (res.length) bad.push(r + ': ' + JSON.stringify(res));
@@ -1155,7 +1199,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(r.prevented === true, 'click must be handled by the app, got ' + JSON.stringify(r));
     await sleep(1300);
     eq(await ev('location.hash'), '#orders');
-    ok(await ev("!!document.getElementById('dataGridBody') && !document.documentElement.classList.contains('sf-site')"), 'orders page not rendered');
+    ok(await ev("!!document.getElementById('odBody') && !document.documentElement.classList.contains('sf-site')"), 'orders page not rendered');
     ok(await ev("(()=>{const a=document.createElement('a');a.href='#';document.body.appendChild(a);const e=new MouseEvent('click',{bubbles:true,cancelable:true});a.dispatchEvent(e);a.remove();return e.defaultPrevented===false})()"), 'a bare # link must be left alone');
   });
   console.log('== SALES USER');

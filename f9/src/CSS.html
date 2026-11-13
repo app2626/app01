@@ -2759,6 +2759,108 @@
   html.sf-site #posHeroBannerWrap { height: auto; aspect-ratio: 3 / 1; }
 
   /* ===================================================
+     ORDERS PAGE — หน้ารายการใบจอง (window.app.orders, JS_Orders.html): แท็บสถานะ, ตารางหนึ่งใบจองต่อแถว, แผงรายละเอียดด้านข้าง
+     ใช้โครง .cms-* ร่วมกับหน้าตารางอื่น; สีสถานะส่งมาทางตัวแปร --od-c
+     =================================================== */
+  .od-tabs { display: flex; gap: 4px; margin: -4px 0 16px; border-bottom: 1px solid #e2e8f0; overflow-x: auto; scrollbar-width: none; }
+  .od-tabs::-webkit-scrollbar { display: none; }
+  .od-tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; font-size: 13.5px; font-weight: 500; color: #475569; white-space: nowrap; }
+  .od-tab b { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #eef1f5; font-size: 12px; font-weight: 600; color: #475569; text-align: center; }
+  .od-tab:hover { color: #0f172a; }
+  .od-tab.on { border-bottom-color: #0f2a43; color: #0f172a; font-weight: 700; }
+  .od-tab.on b { background: #0f2a43; color: #ffffff; }
+  .od-bulk-sel { min-width: 180px; height: 36px; }
+  .od-search { width: 260px; max-width: 100%; }
+  #page-content .od-table { white-space: normal; }
+  #page-content .od-table th, #page-content .od-table td { vertical-align: middle; }
+  #page-content .od-table .od-r { text-align: right; }
+  .od-row { cursor: pointer; }
+  .od-row:hover td { background: #f8fafc; }
+  .od-row:focus-visible { outline: 2px solid #0f2a43; outline-offset: -2px; }
+  .od-id { font-weight: 600; color: #0f2a43; white-space: nowrap; }
+  .od-date { white-space: nowrap; color: #475569; }
+  .od-cust { font-weight: 600; color: #0f172a; }
+  .od-item { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-sub { font-size: 12px; color: #64748b; }
+  .od-total { font-weight: 700; white-space: nowrap; }
+  .od-type { display: inline-block; padding: 2px 8px; border: 1px solid #cfd5dd; border-radius: 6px; font-size: 12px; font-weight: 600; color: #334155; white-space: nowrap; }
+  .od-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--od-c) 12%, #ffffff); font-size: 12.5px; font-weight: 600; color: var(--od-c); white-space: nowrap; }
+  .od-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--od-c); }
+  .od-st { height: 32px; padding: 0 26px 0 10px; border: 1px solid color-mix(in srgb, var(--od-c) 35%, #ffffff); border-radius: 999px; background-color: color-mix(in srgb, var(--od-c) 10%, #ffffff); font-size: 12.5px; font-weight: 600; color: var(--od-c); cursor: pointer; }
+  .od-st:hover { border-color: var(--od-c); }
+  .od-st option { color: #0f172a; background: #ffffff; }
+  #page-content .od-table td.od-state { padding: 48px 16px !important; font-size: 14px; }
+  .od-state .cms-btn { margin-left: 8px; }
+  .od-fail { max-height: 240px; overflow-y: auto; text-align: left; font-size: 13px; }
+  .od-fail div { padding: 6px 0; border-top: 1px solid #eef1f5; }
+  /* แผงรายละเอียด */
+  .od-drawer:not(.hidden) { display: block; position: fixed; inset: 0; z-index: 70; }
+  .od-drawer-bd { position: absolute; inset: 0; background: rgba(15, 23, 42, .45); }
+  .od-drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(480px, 100%); background: #ffffff; box-shadow: -12px 0 32px rgba(15, 23, 42, .16); animation: odSlide .2s ease-out; }
+  .od-drawer-panel > div { height: 100%; display: flex; flex-direction: column; }
+  @keyframes odSlide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .od-drawer-panel { animation: none; } }
+  .od-dh { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e8ecf1; }
+  .od-dh-s { font-size: 12px; color: #64748b; }
+  .od-dh h2 { font-size: 18px; font-weight: 700; color: #0f172a; overflow-wrap: anywhere; }
+  .od-x { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 8px; font-size: 16px; color: #475569; }
+  .od-x:hover { background: #f1f5f9; }
+  .od-db { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 20px 24px; }
+  .od-strow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .od-strow .cms-sel { height: 36px; min-width: 160px; }
+  .od-sec { margin-top: 20px; }
+  .od-sec h3 { margin-bottom: 8px; font-size: 12px; font-weight: 700; letter-spacing: .04em; color: #64748b; }
+  .od-dl { margin: 0; }
+  .od-dl > div { display: flex; justify-content: space-between; gap: 16px; padding: 7px 0; border-top: 1px solid #eef1f5; font-size: 13.5px; }
+  .od-dl > div:first-child { border-top: 0; }
+  .od-dl dt { flex: 0 0 auto; color: #64748b; }
+  .od-dl dd { margin: 0; min-width: 0; font-weight: 500; color: #0f172a; text-align: right; overflow-wrap: anywhere; }
+  .od-items { list-style: none; margin: 0; padding: 0; }
+  .od-items li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid #eef1f5; font-size: 13.5px; }
+  .od-items li:first-child { border-top: 0; }
+  .od-items li > div { min-width: 0; }
+  .od-items b { display: block; font-weight: 600; color: #0f172a; overflow-wrap: anywhere; }
+  .od-items b i { margin-right: 4px; font-size: 11px; color: #64748b; }
+  .od-items span { display: block; font-size: 12px; color: #64748b; overflow-wrap: anywhere; }
+  .od-items em { flex: 0 0 auto; font-style: normal; font-weight: 600; white-space: nowrap; }
+  .od-items .od-disc em { color: #E11D48; }
+  .od-sum { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 14px; font-weight: 700; }
+  .od-sum b { font-size: 18px; }
+  .od-df { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #e8ecf1; }
+  @media (max-width: 767px) {
+    #page-content .od-table thead { display: none; }
+    #page-content .od-table tr.od-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 10px; padding: 12px 4px; border-top: 1px solid #e8ecf1; }
+    #page-content .od-table tr.od-row td { display: block; padding: 0 !important; border: 0 !important; background: transparent !important; }
+    #page-content .od-table tr.od-row td:nth-last-child(8) { grid-column: 2; grid-row: 1; }
+    #page-content .od-table tr.od-row td:nth-last-child(1) { grid-column: 3; grid-row: 1; justify-self: end; }
+    #page-content .od-table tr.od-row td:nth-last-child(6) { grid-column: 2; grid-row: 2; }
+    #page-content .od-table tr.od-row td:nth-last-child(3) { grid-column: 3; grid-row: 2; justify-self: end; }
+    #page-content .od-table tr.od-row td:nth-last-child(4) { grid-column: 2 / 4; grid-row: 3; font-size: 13px; color: #475569; }
+    #page-content .od-table tr.od-row td:nth-last-child(7) { grid-column: 2; grid-row: 4; font-size: 12px; }
+    #page-content .od-table tr.od-row td:nth-last-child(5), #page-content .od-table tr.od-row td:nth-last-child(2) { display: none; }
+    #page-content .od-table tr.od-row td.cms-c-chk { grid-column: 1; grid-row: 1 / 5; align-self: start; width: auto; padding-top: 2px !important; }
+    .od-item { max-width: none; }
+    .od-search { width: 100%; }
+  }
+  html.dark .od-tabs { border-color: #334155; }
+  html.dark .od-tab { color: #94a3b8; }
+  html.dark .od-tab b { background: #1e293b; color: #cbd5e1; }
+  html.dark .od-tab.on, html.dark .od-tab:hover { color: #f1f5f9; }
+  html.dark .od-tab.on { border-bottom-color: #f1f5f9; }
+  html.dark .od-tab.on b { background: #f1f5f9; color: #0f172a; }
+  html.dark .od-row:hover td { background: #1e293b; }
+  html.dark .od-id, html.dark .od-cust, html.dark .od-dh h2, html.dark .od-dl dd, html.dark .od-items b { color: #f1f5f9; }
+  html.dark .od-date, html.dark .od-sub, html.dark .od-dl dt, html.dark .od-items span, html.dark .od-sec h3, html.dark .od-dh-s { color: #94a3b8; }
+  html.dark .od-type { border-color: #475569; color: #cbd5e1; }
+  html.dark .od-pill { background: color-mix(in srgb, var(--od-c) 22%, #0f172a); color: color-mix(in srgb, var(--od-c) 45%, #ffffff); }
+  html.dark .od-st { background-color: color-mix(in srgb, var(--od-c) 22%, #0f172a); border-color: color-mix(in srgb, var(--od-c) 50%, #0f172a); color: color-mix(in srgb, var(--od-c) 45%, #ffffff); }
+  html.dark .od-drawer-panel { background: #0f172a; }
+  html.dark .od-dh, html.dark .od-df, html.dark .od-sum { border-color: #1e293b; }
+  html.dark .od-dl > div, html.dark .od-items li, html.dark .od-fail div { border-color: #1e293b; }
+  html.dark .od-x { color: #cbd5e1; }
+  html.dark .od-x:hover { background: #1e293b; }
+
+  /* ===================================================
      INTL 3 — หน้าสั่งจองเต็มจอ (#checkoutModal.co-page) + หน้ายืนยันใบจอง (#orderDoneModal.co-page)
      โครง: หัว (.pd-head ใช้ร่วมกับหน้ารายละเอียด) / .co-scroll (ฟอร์ม 3 ตอน + สรุปรายการ) / .co-consent / .co-bar (ยอดสุทธิ + ปุ่มยืนยัน ติดขอบล่าง)
      ฟอร์มพื้นขาวล้วน เส้นแบ่งบาง — ไม่มีกล่องสีเขียว/แดง/ฟ้า; ปุ่มส้มมีปุ่มเดียวคือ .co-cta

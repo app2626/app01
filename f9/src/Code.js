@@ -575,6 +575,7 @@ function apiHandlerInner_(action, payload, userToken) {
       case 'APPROVE_INVOICE': return approveInvoice(payload, secureUser, ss);
       case 'DELETE_INVOICE': return deleteInvoice(payload, secureUser, ss);
       case 'TRACK_ORDER': return trackOrderLookup(payload, secureUser, ss);
+      case 'SET_ORDER_STATUS': return setOrderStatus(payload, secureUser, ss);
       case 'PUBLIC_TRACK_ORDER': return publicTrackOrderLookup(payload, ss);
       case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts(payload, secureUser, ss);
       case 'IMPORT_PRODUCTS': return importProducts(payload, secureUser, ss);
@@ -2294,6 +2295,52 @@ function getCustomerByPhone(payload, secureUser, ss) {
     }
   }
   return { status: 'success', found: false };
+}
+
+// เปลี่ยนสถานะใบจองทีละใบหรือหลายใบจากหน้ารายการใบจอง (payload: { orderIds: [...], status })
+// - Admin/Manager เท่านั้น, สูงสุด SET_ORDER_STATUS_MAX_ ใบต่อครั้ง
+// - หาแถวจาก OrderID ฝั่ง server เอง (ไม่รับ _rowIndex จาก client — ตำแหน่งแถวที่ client ถืออยู่อาจเก่าถ้ามีคนลบแถวไปแล้ว)
+// - งานจริงทำโดย updateFullOrder ทีละใบ: ตรวจชื่อสถานะกับชีต OrderStatus, คืน/ตัดสต๊อกเมื่อยกเลิกหรือนำกลับมา, เขียน AuditLog + OrderStatusLog
+// - ใบที่ไม่ผ่าน (ไม่พบ / สต๊อกไม่พอ ฯลฯ) รายงานใน failed โดยไม่ทำให้ใบอื่นล้ม
+var SET_ORDER_STATUS_MAX_ = 50;
+function setOrderStatus(payload, secureUser, ss) {
+  try {
+    if (!['Admin', 'Manager'].includes(secureUser.Role)) throw new Error("ไม่มีสิทธิ์เปลี่ยนสถานะใบจอง");
+    const status = ((payload && payload.status) == null ? '' : payload.status).toString().trim();
+    if (!status) throw new Error("กรุณาเลือกสถานะ");
+    const rawIds = (payload && Array.isArray(payload.orderIds)) ? payload.orderIds : [];
+    const ids = [];
+    rawIds.forEach(v => {
+      const id = (v == null ? '' : v).toString().trim();
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new Error("เลขที่ใบจองไม่ถูกต้อง");
+      if (ids.indexOf(id) === -1) ids.push(id);
+    });
+    if (!ids.length) throw new Error("ไม่ได้เลือกใบจอง");
+    if (ids.length > SET_ORDER_STATUS_MAX_) throw new Error("เปลี่ยนสถานะได้ครั้งละไม่เกิน " + SET_ORDER_STATUS_MAX_ + " ใบ");
+
+    const sheet = ss.getSheetByName("Orders");
+    if (!sheet) throw new Error("ไม่พบชีต Orders");
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
+    const idCol = headers.indexOf("OrderID"), stCol = headers.indexOf("Order Status");
+    if (idCol === -1 || stCol === -1) throw new Error("โครงสร้างชีต Orders ไม่ถูกต้อง");
+
+    const updated = [], unchanged = [], failed = [];
+    ids.forEach(id => {
+      // อ่านตำแหน่งแถวใหม่ทุกใบ — ใบก่อนหน้าไม่ได้เพิ่ม/ลบแถว แต่ผู้ใช้อื่นอาจลบแถวระหว่างรอบได้
+      const col = sheet.getRange(1, idCol + 1, sheet.getLastRow(), 1).getValues();
+      let rowIdx = 0;
+      for (let i = 1; i < col.length; i++) { if ((col[i][0] || '').toString().trim() === id) { rowIdx = i + 1; break; } }
+      if (!rowIdx) { failed.push({ orderId: id, message: "ไม่พบใบจองนี้" }); return; }
+      const current = (sheet.getRange(rowIdx, stCol + 1).getValue() || 'Pending').toString().trim();
+      if (current === status) { unchanged.push(id); return; }
+      const r = updateFullOrder({ "_rowIndex": rowIdx, "Order Status": status }, secureUser, ss);
+      if (r && r.status === 'success') updated.push(id);
+      else failed.push({ orderId: id, message: ((r && r.message) || 'ไม่สำเร็จ').toString().replace(/^Error:\s*/, '') });
+    });
+    return { status: 'success', updated: updated, unchanged: unchanged, failed: failed };
+  } catch (e) {
+    return { status: 'error', message: e.toString().replace(/^Error:\s*/, '') };
+  }
 }
 
 function updateFullOrder(dataObj, secureUser, ss) {

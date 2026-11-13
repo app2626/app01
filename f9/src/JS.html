@@ -1825,7 +1825,16 @@ window.app = {
                window.app.invoice.init();
             }
             break;
-        case 'orders':
+        case 'orders': window.app.orders.init(); break; // มุมมองหนึ่งใบจองต่อแถว (JS_Orders.html); ตารางละเอียดเดิมเปิดจากปุ่มในหน้านั้น -> ordersTableInit
+      }
+    } catch(err) {
+      console.error(err);
+      Swal.fire('ข้อผิดพลาดระบบ', err.message, 'error');
+    }
+  },
+
+  // ตารางละเอียดของ Orders (ทุกคอลัมน์ ทุกแถว — แก้รายละเอียด / ลบ / ส่งออก CSV) เรียกจาก window.app.orders.showTable
+  ordersTableInit: function() {
           let isSalesRole = (window.app.user.Role === 'Sales');
           // resp: ซ่อน/แสดงคอลัมน์ตามขนาดจอ (owner request 2026-08-09 — ตาราง Orders 22 คอลัมน์ไม่มีทางพอดีจอเดียวกันหมด
           // ไม่ใส่ resp = แสดงทุกขนาดจอเสมอ (คอลัมน์หลักที่ต้องเห็นทันที) — ต้อง sync กับ th/td rendering ที่ grid.init/grid.renderTable
@@ -1859,12 +1868,7 @@ window.app = {
             { key: 'Order Status', label: 'สถานะออเดอร์', type: 'select', options: window.app.getOrderStatusFlow().concat(['Cancelled']) },
             { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text' },
             { key: 'Deposit', label: 'เงินมัดจำ', type: 'number' }
-          ], isSalesRole); break;
-      }
-    } catch(err) {
-      console.error(err);
-      Swal.fire('ข้อผิดพลาดระบบ', err.message, 'error');
-    }
+          ], isSalesRole);
   },
 
   api: function(action, payload) {
