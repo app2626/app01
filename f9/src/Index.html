@@ -151,6 +151,10 @@
           </button>
         </div>
         
+        <!-- ค้นหารวม (window.app.search — Ctrl+K) -->
+        <div class="px-4 pt-4">
+          <button type="button" id="cmdkBtn" class="cmdk-btn" onclick="window.app.search.open()" aria-label="ค้นหา (Ctrl+K)"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span>ค้นหา...</span><kbd>Ctrl K</kbd></button>
+        </div>
         <!-- Navigation Menu -->
         <div class="flex-1 overflow-y-auto custom-scrollbar px-4 py-5 flex flex-col space-y-1.5" id="desktopMenu"></div>
         
@@ -205,6 +209,9 @@
                 </div>
               </div>
               <div class="flex items-center">
+                <button type="button" id="cmdkBtnMobile" onclick="window.app.search.open()" aria-label="ค้นหา" class="text-slate-500 hover:text-indigo-600 focus:outline-none p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                  <i class="fas fa-magnifying-glass text-lg"></i>
+                </button>
                 <button onclick="window.app.toggleMobileMenu()" aria-label="เปิด/ปิดเมนู" class="text-slate-500 hover:text-indigo-600 focus:outline-none p-2 rounded-lg hover:bg-slate-100 transition-colors">
                   <i class="fas fa-bars text-xl"></i>
                 </button>
@@ -1755,6 +1762,7 @@
   <?!= include('JS_Import'); ?>
   <?!= include('JS_Cms'); ?>
   <?!= include('JS_Orders'); ?>
+  <?!= include('JS_Search'); ?>
   <?!= include('JS_Boot'); ?>
 </body>
 </html>

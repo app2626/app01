@@ -1226,6 +1226,8 @@ window.app.pos = {
     filter: function() {
       const searchEl = document.getElementById('searchProduct');
       if(!searchEl) return;
+      // คำค้นที่ส่งมาจากค้นหารวม (window.app.search) ตอนยังไม่อยู่หน้าร้าน
+      if (this.pendingSearch) { searchEl.value = this.pendingSearch; this.pendingSearch = ''; }
       const term = searchEl.value.trim().toLowerCase();
       const currentChannel = document.getElementById('posChannelSelect').value;
       window.app.globalData.products = window.app.globalData.products || [];

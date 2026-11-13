@@ -955,6 +955,38 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.location.hash='#pos';true"); await sleep(1500);
     await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
   });
+  await T('global search (Ctrl+K): menu / order / product results, keyboard selection, opens the order drawer and the product table with the search filled in', async () => {
+    await ev("window.location.hash='#dashboard';true"); await sleep(1500);
+    ok(await ev("!!document.getElementById('cmdkBtn') && getComputedStyle(document.getElementById('cmdkBtn')).display!=='none'"), 'search button missing from the sidebar');
+    await ev("document.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}));true"); await sleep(250);
+    const a = JSON.parse(await ev("JSON.stringify({open:window.app.search.isOpen(),items:document.querySelectorAll('#cmdkList .cmdk-it').length,focus:document.activeElement&&document.activeElement.id})"));
+    ok(a.open, 'Ctrl+K did not open the search'); ok(a.items >= 4, 'menu shortcuts missing'); eq(a.focus, 'cmdkInput');
+    const type = async (v) => { await ev("(()=>{const i=document.getElementById('cmdkInput');i.value=" + JSON.stringify(v) + ";i.dispatchEvent(new Event('input'));return true})()"); await sleep(900); };
+    await type('orders');
+    eq(await ev("(document.querySelector('#cmdkList .cmdk-it small')||{}).textContent"), 'Orders', 'menu match by its English name');
+    const oid = sheets.Orders.rows[sheets.Orders.rows.length - 1][0];
+    await type(oid);
+    const b = JSON.parse(await ev("JSON.stringify({orders:[...document.querySelectorAll('#cmdkList .cmdk-it')].filter(x=>x.querySelector('em')).map(x=>x.querySelector('b').textContent),heads:[...document.querySelectorAll('#cmdkList .cmdk-h')].map(x=>x.textContent)})"));
+    ok(b.orders.includes(oid), 'order not found by its number: ' + JSON.stringify(b));
+    await shot('admin-search');
+    await ev("(()=>{const i=[...document.querySelectorAll('#cmdkList .cmdk-it')].findIndex(x=>x.querySelector('em'));window.app.search.active=i;window.app.search.mark();document.getElementById('cmdkInput').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));return true})()"); await sleep(1800);
+    const c = JSON.parse(await ev("JSON.stringify({open:window.app.search.isOpen(),hash:location.hash,q:(document.getElementById('odSearch')||{}).value,drawer:document.getElementById('odDrawer')&&!document.getElementById('odDrawer').classList.contains('hidden'),id:(document.getElementById('odDrawerId')||{}).textContent})"));
+    ok(!c.open, 'search must close after choosing'); eq(c.hash, '#orders'); eq(c.q, oid); ok(c.drawer, 'order drawer not opened'); eq(c.id, oid);
+    await ev("window.app.orders.closeDrawer();window.app.search.open();true"); await sleep(250);
+    await type('<img src=x onerror=window.__sx=1>');
+    const x = JSON.parse(await ev("JSON.stringify({img:!!document.querySelector('#cmdkList img'),x:!!window.__sx,none:(document.querySelector('#cmdkList .cmdk-none')||{}).textContent||''})"));
+    ok(!x.img && !x.x && x.none.includes('<img'), 'query text must be escaped: ' + JSON.stringify(x));
+    await type('Galaxy Test1');
+    const pr = await ev("[...document.querySelectorAll('#cmdkList .cmdk-it b')].map(x=>x.textContent).indexOf('Galaxy Test1')"); ok(pr > -1, 'product model not listed');
+    await ev("window.app.search.run(" + pr + ");true"); await sleep(1800);
+    const g = JSON.parse(await ev("JSON.stringify({hash:location.hash,q:(document.getElementById('gridSearch')||{}).value,rows:window.app.grid.filteredDataList.length,all:window.app.grid.dataList.length})"));
+    eq(g.hash, '#products'); eq(g.q, 'Galaxy Test1'); ok(g.rows >= 1 && g.rows < g.all, 'product table not filtered: ' + g.rows + ' of ' + g.all);
+    await ev("window.app.search.open();true"); await sleep(200);
+    await ev("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));true"); await sleep(150);
+    ok(!(await ev("window.app.search.isOpen()")), 'Escape must close the search');
+    await ev("window.location.hash='#pos';true"); await sleep(1500);
+    await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
+  });
   await T('active filter chips: one chip per selected filter, clicking a chip removes only that filter, clear-all shows from 2 chips, text escaped', async () => {
     await ev("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('capacity','128GB');window.app.pos.setStoreFilter('inStock',true);true"); await sleep(300);
     const a = JSON.parse(await ev("JSON.stringify({chips:[...document.querySelectorAll('#storeActiveChips .sf-achip')].map(b=>b.textContent.trim()),clear:!!document.querySelector('#storeActiveChips .sf-achip-clear')})"));

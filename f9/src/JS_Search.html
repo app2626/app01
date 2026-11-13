@@ -1,0 +1,153 @@
+<script>
+// ค้นหารวม (Ctrl+K หรือปุ่ม "ค้นหา" ในแถบเมนู) — พิมพ์ครั้งเดียวหาได้ทั้ง เมนู / ใบจอง / สินค้า แล้วกด Enter ไปถึงเลย
+// - เมนู: จาก menuConfig ผ่าน checkMenuAccess (เห็นเฉพาะหน้าที่ผู้ใช้เข้าได้)
+// - ใบจอง: ถาม server ด้วย TRACK_ORDER เดิม (เลขที่ใบจอง / เบอร์โทร 4 หลักขึ้นไป / ชื่อ 3 ตัวขึ้นไป; Sales ได้เฉพาะสาขาตัวเอง)
+// - สินค้า: จาก globalData.products ที่เปิดขาย รวมเป็นรุ่น (Model)
+// ผลลัพธ์ทุกบรรทัดผ่าน esc(); การกดผลลัพธ์เรียก run(index) — ไม่มีข้อความจากชีตอยู่ใน onclick
+window.app.search = {
+  items: [], active: 0, orders: [], orderState: '', seq: 0, timer: 0,
+
+  ensure: function() {
+    if (document.getElementById('cmdk')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'cmdk'; wrap.className = 'cmdk hidden';
+    wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', 'ค้นหา');
+    wrap.innerHTML = '<div class="cmdk-bd" onclick="window.app.search.close()"></div>'
+      + '<div class="cmdk-box">'
+      + '<div class="cmdk-in"><i class="fas fa-magnifying-glass" aria-hidden="true"></i>'
+      + '<input type="search" id="cmdkInput" autocomplete="off" spellcheck="false" placeholder="ค้นหาเมนู เลขที่ใบจอง เบอร์โทร หรือสินค้า" aria-label="คำค้น" aria-controls="cmdkList" oninput="window.app.search.onInput()" onkeydown="window.app.search.onKey(event)">'
+      + '<kbd>Esc</kbd></div>'
+      + '<div class="cmdk-list" id="cmdkList" role="listbox"></div>'
+      + '<div class="cmdk-foot"><span><kbd>↑</kbd><kbd>↓</kbd> เลือก</span><span><kbd>Enter</kbd> เปิด</span></div>'
+      + '</div>';
+    document.body.appendChild(wrap);
+  },
+
+  isOpen: function() { const el = document.getElementById('cmdk'); return !!el && !el.classList.contains('hidden'); },
+  open: function() {
+    if (!window.app.user) return; // ยังไม่ได้เข้าสู่ระบบ
+    this.ensure();
+    const el = document.getElementById('cmdk'), inp = document.getElementById('cmdkInput');
+    el.classList.remove('hidden');
+    inp.value = ''; this.orders = []; this.orderState = ''; this.seq++;
+    this.build();
+    setTimeout(() => { try { inp.focus(); } catch (e) {} }, 30);
+  },
+  close: function() {
+    const el = document.getElementById('cmdk'); if (el) el.classList.add('hidden');
+    clearTimeout(this.timer); this.seq++;
+  },
+  toggle: function() { if (this.isOpen()) this.close(); else this.open(); },
+
+  query: function() { const i = document.getElementById('cmdkInput'); return i ? i.value.trim() : ''; },
+
+  menuItems: function() {
+    const out = [];
+    const walk = (list) => (list || []).forEach(m => {
+      if (m.children) { walk(m.children); return; }
+      if (!m.id || m.isCategory) return;
+      if (!window.app.checkMenuAccess(m.id, m.roles)) return;
+      out.push({ kind: 'menu', icon: m.icon || 'fa-circle', title: m.label, sub: m.sub || '', hay: (m.label + ' ' + (m.sub || '') + ' ' + m.id).toLowerCase(), id: m.id });
+    });
+    walk(window.app.menuConfig);
+    return out;
+  },
+  productItems: function(q) {
+    const seen = {}, out = [];
+    ((window.app.globalData || {}).products || []).forEach(p => {
+      if (!p || p.Status !== 'เปิด' || (p.Category || '').includes('ของแถม')) return;
+      const model = (p.Model || '').toString().trim(); if (!model || seen[model]) return;
+      const hay = (model + ' ' + (p['Marketing Model'] || '') + ' ' + (p.SKU || '') + ' ' + (p['Product Group'] || '')).toLowerCase();
+      if (hay.indexOf(q) === -1) return;
+      seen[model] = true;
+      out.push({ kind: 'product', icon: 'fa-mobile-screen', title: model, sub: (p.Category || '') + (p['Product Group'] && p['Product Group'] !== '-' ? ' · ' + p['Product Group'] : ''), model: model });
+    });
+    return out.slice(0, 6);
+  },
+
+  onInput: function() {
+    const q = this.query();
+    clearTimeout(this.timer);
+    const mySeq = ++this.seq;
+    this.orders = [];
+    const digits = q.replace(/\D/g, '');
+    const canAsk = window.app.checkMenuAccess('orders', ['Admin', 'Manager', 'Sales']) && (q.length >= 3 || digits.length >= 4);
+    this.orderState = canAsk ? 'loading' : '';
+    this.build();
+    if (!canAsk) return;
+    this.timer = setTimeout(async () => {
+      let list = [], failed = false;
+      try {
+        const res = await window.app.api('TRACK_ORDER', { query: q });
+        if (res && res.status === 'success') list = res.orders || []; else failed = true;
+      } catch (e) { failed = true; }
+      if (mySeq !== this.seq) return; // ผู้ใช้พิมพ์ต่อหรือปิดไปแล้ว — ทิ้งผลเก่า
+      this.orders = list.slice(0, 6);
+      this.orderState = failed ? 'error' : 'done';
+      this.build();
+    }, 350);
+  },
+
+  build: function() {
+    const q = this.query().toLowerCase(), items = [];
+    const menus = this.menuItems().filter(m => !q || m.hay.indexOf(q) !== -1);
+    (q ? menus.slice(0, 6) : menus.slice(0, 8)).forEach(m => items.push(m));
+    const orders = (this.orders || []).map(o => ({
+      kind: 'order', icon: 'fa-file-invoice', title: o.orderId,
+      sub: [o.customerName, o.maskedPhone, o.branch].filter(Boolean).join(' · '),
+      tag: window.app.orders ? window.app.orders.statusLabel((o.status || 'Pending').toString().trim()) : (o.status || ''), id: o.orderId
+    }));
+    orders.forEach(o => items.push(o));
+    const prods = q.length >= 2 ? this.productItems(q) : [];
+    prods.forEach(p => items.push(p));
+    this.items = items;
+    if (this.active >= items.length) this.active = 0;
+    this.render(menus.length ? (q ? Math.min(menus.length, 6) : Math.min(menus.length, 8)) : 0, orders.length, prods.length, q);
+  },
+
+  render: function(nMenu, nOrder, nProd, q) {
+    const box = document.getElementById('cmdkList'); if (!box) return;
+    const esc = window.app.esc;
+    const row = (it, i) => '<button type="button" role="option" class="cmdk-it' + (i === this.active ? ' on' : '') + '" data-i="' + i + '" aria-selected="' + (i === this.active ? 'true' : 'false') + '" onclick="window.app.search.run(' + i + ')" onmousemove="window.app.search.hover(' + i + ')">'
+      + '<i class="fas ' + esc(it.icon) + '" aria-hidden="true"></i><span class="cmdk-tx"><b>' + esc(it.title) + '</b>' + (it.sub ? '<small>' + esc(it.sub) + '</small>' : '') + '</span>'
+      + (it.tag ? '<em>' + esc(it.tag) + '</em>' : '') + '</button>';
+    let h = '', i = 0;
+    const sec = (title, n) => { if (!n) return; h += '<div class="cmdk-h">' + title + '</div>'; for (let k = 0; k < n; k++, i++) h += row(this.items[i], i); };
+    sec(q ? 'เมนู' : 'ไปที่หน้า', nMenu);
+    if (this.orderState === 'loading') h += '<div class="cmdk-h">ใบจอง</div><div class="cmdk-note"><i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> กำลังค้นหาใบจอง...</div>';
+    else if (this.orderState === 'error') h += '<div class="cmdk-h">ใบจอง</div><div class="cmdk-note">ค้นหาใบจองไม่สำเร็จ ลองพิมพ์ใหม่อีกครั้ง</div>';
+    else sec('ใบจอง', nOrder);
+    sec('สินค้า', nProd);
+    if (!this.items.length && this.orderState !== 'loading') h += '<div class="cmdk-none">' + (q ? 'ไม่พบผลลัพธ์สำหรับ "' + esc(this.query()) + '"' : 'พิมพ์เพื่อค้นหา') + '</div>';
+    box.innerHTML = h;
+  },
+
+  hover: function(i) { if (i === this.active) return; this.active = i; this.mark(); },
+  mark: function() {
+    document.querySelectorAll('#cmdkList .cmdk-it').forEach(b => { const on = Number(b.getAttribute('data-i')) === this.active; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); if (on && b.scrollIntoView) b.scrollIntoView({ block: 'nearest' }); });
+  },
+  onKey: function(e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const n = this.items.length; if (!n) return;
+      this.active = (this.active + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; this.mark();
+    } else if (e.key === 'Enter') { e.preventDefault(); this.run(this.active); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.close(); }
+  },
+
+  run: function(i) {
+    const it = this.items[i]; if (!it) return;
+    this.close();
+    if (it.kind === 'menu') { window.location.hash = '#' + it.id; return; }
+    if (it.kind === 'order') { window.app.orders.openWith({ q: it.id, open: it.id }); return; }
+    if (it.kind === 'product') {
+      // ผู้ที่เข้าหน้าจัดการสินค้าได้ -> ไปตารางสินค้าพร้อมคำค้น ; คนอื่น -> ไปหน้าร้านพร้อมคำค้น
+      if (window.app.checkMenuAccess('products', ['Admin'])) {
+        if (window.app.currentRoute === 'products') { const s = document.getElementById('gridSearch'); if (s) { s.value = it.model; window.app.grid.filter(); } }
+        else { window.app.grid.pendingSearch = it.model; window.location.hash = '#products'; }
+      } else if (window.app.currentRoute === 'pos') window.app.pos.applyBannerSearch(it.model);
+      else { window.app.pos.pendingSearch = it.model; window.location.hash = '#pos'; }
+    }
+  }
+};
+</script>

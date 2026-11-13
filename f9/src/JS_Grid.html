@@ -14,6 +14,8 @@ window.app.grid = {
       const content = document.getElementById('page-content');
       const tmpl = document.getElementById('tmpl-datagrid');
       if(content && tmpl) content.innerHTML = tmpl.innerHTML;
+      // คำค้นที่ส่งมาจากค้นหารวม (window.app.search) — ใส่ก่อนโหลดข้อมูล เพราะ loadData จบด้วย filter() ที่อ่านช่องนี้
+      if (this.pendingSearch) { const ps = document.getElementById('gridSearch'); if (ps) ps.value = this.pendingSearch; this.pendingSearch = ''; }
       const btn = document.getElementById('gridAddBtn');
       if(btn) btn.style.display = (readonly || table==='Orders') ? 'none' : 'inline-flex';
       const ttl = this.TITLES[table] || table;

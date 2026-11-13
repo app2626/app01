@@ -2,7 +2,13 @@
 // Global listeners + app bootstrap. MUST be included last (after every window.app.* module).
 // 5B.4 — กด Esc ปิด modal ที่เปิดอยู่บนสุดก่อน (ทีละชั้น) แล้วค่อยปิด cart drawer
 document.addEventListener('keydown', function(e) {
+  // ค้นหารวม: Ctrl+K / Cmd+K (เปิด-ปิด) — ใช้ได้ทุกหน้าหลังเข้าสู่ระบบ
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')) {
+    if (window.app.user && window.app.search) { e.preventDefault(); window.app.search.toggle(); }
+    return;
+  }
   if (e.key !== 'Escape') return;
+  if (window.app.search && window.app.search.isOpen()) { window.app.search.close(); return; }
   // 6B — filter popover เป็นชั้นบนสุดของหน้า POS: ปิดก่อนทุก modal
   if (window.app.pos && window.app.pos.openPopover) { window.app.pos.closeFilterPopovers(); return; }
   const popup = document.getElementById('popupBannerModal');

@@ -79,6 +79,8 @@ window.app.orders = {
       + '<div id="odDrawer" class="od-drawer hidden" role="dialog" aria-modal="true" aria-label="รายละเอียดใบจอง">'
       + '<div class="od-drawer-bd" onclick="window.app.orders.closeDrawer()"></div>'
       + '<aside class="od-drawer-panel"><div id="odDrawerBody"></div></aside></div>';
+    if (pre.q) { const qs = document.getElementById('odSearch'); if (qs) qs.value = String(pre.q); }
+    this.pendingOpen = pre.open || '';
     this.load();
   },
 
@@ -103,6 +105,7 @@ window.app.orders = {
       this.list = this.group(this.rows);
       const keep = {}; this.list.forEach(o => { if (this.selected[o.id]) keep[o.id] = true; }); this.selected = keep;
       this.applyFilter(false);
+      if (this.pendingOpen) { const po = this.pendingOpen; this.pendingOpen = ''; if (this.list.some(o => o.id === po)) this.openDrawer(po); }
       if (this.openId) { if (this.list.some(o => o.id === this.openId)) this.openDrawer(this.openId); else this.closeDrawer(); }
     } catch (e) {
       if (document.getElementById('odBody')) this.renderError(e && e.message);

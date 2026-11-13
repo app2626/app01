@@ -2794,6 +2794,46 @@
   html.dark .dash-delta.up { color: #6ee7b7; }
   html.dark .dash-delta.down { color: #fca5a5; }
 
+  /* ค้นหารวม (window.app.search, JS_Search.html): ปุ่มในแถบเมนู + หน้าต่างค้นหา #cmdk */
+  .cmdk-btn { width: 100%; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px 0 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 13px; color: #64748b; text-align: left; transition: border-color .15s, background-color .15s; }
+  .cmdk-btn:hover { border-color: #94a3b8; background: #ffffff; }
+  .cmdk-btn span { flex: 1 1 auto; min-width: 0; }
+  .cmdk-btn i { font-size: 12px; }
+  .cmdk kbd, .cmdk-btn kbd { padding: 1px 6px; border: 1px solid #d5dbe3; border-radius: 5px; background: #ffffff; font-family: inherit; font-size: 11px; font-weight: 600; color: #64748b; white-space: nowrap; }
+  .cmdk:not(.hidden) { display: block; position: fixed; inset: 0; z-index: 120; }
+  .cmdk-bd { position: absolute; inset: 0; background: rgba(15, 23, 42, .5); }
+  .cmdk-box { position: relative; width: min(600px, calc(100% - 24px)); max-height: min(560px, calc(100vh - 96px)); margin: 72px auto 0; display: flex; flex-direction: column; background: #ffffff; border-radius: 12px; box-shadow: 0 24px 60px rgba(15, 23, 42, .3); overflow: hidden; }
+  .cmdk-in { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid #e8ecf1; }
+  .cmdk-in > i { font-size: 15px; color: #64748b; }
+  .cmdk-in input { flex: 1 1 auto; min-width: 0; height: 52px; border: 0; outline: none; background: transparent; font-size: 16px; color: #0f172a; }
+  .cmdk-in input:focus, .cmdk-in input:focus-visible { outline: none !important; box-shadow: none !important; }
+  .cmdk-in input::placeholder { color: #94a3b8; }
+  .cmdk-in input::-webkit-search-cancel-button { display: none; }
+  .cmdk-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px 8px 8px; }
+  .cmdk-h { padding: 10px 8px 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: #64748b; }
+  .cmdk-it { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; text-align: left; }
+  .cmdk-it > i { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; background: #eef1f5; color: #0f2a43; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .cmdk-tx { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .cmdk-tx b { font-size: 14px; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmdk-tx small { font-size: 12px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmdk-it em { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #eef1f5; font-style: normal; font-size: 11.5px; font-weight: 600; color: #334155; }
+  .cmdk-it.on { background: #eef2f7; }
+  .cmdk-it.on > i { background: #0f2a43; color: #ffffff; }
+  .cmdk-note, .cmdk-none { padding: 12px 8px; font-size: 13px; color: #64748b; }
+  .cmdk-none { padding: 28px 8px; text-align: center; }
+  .cmdk-foot { flex: 0 0 auto; display: flex; gap: 16px; padding: 8px 16px; border-top: 1px solid #e8ecf1; font-size: 12px; color: #64748b; }
+  .cmdk-foot kbd { margin-right: 4px; }
+  @media (max-width: 639px) { .cmdk-box { margin-top: 12px; max-height: calc(100vh - 24px); } .cmdk-foot, .cmdk-in kbd { display: none; } }
+  html.dark .cmdk-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
+  html.dark .cmdk-btn:hover { background: #273449; border-color: #64748b; }
+  html.dark .cmdk kbd, html.dark .cmdk-btn kbd { background: #0f172a; border-color: #334155; color: #94a3b8; }
+  html.dark .cmdk-box { background: #0f172a; }
+  html.dark .cmdk-in, html.dark .cmdk-foot { border-color: #1e293b; }
+  html.dark .cmdk-in input, html.dark .cmdk-tx b { color: #f1f5f9; }
+  html.dark .cmdk-it > i, html.dark .cmdk-it em { background: #1e293b; color: #cbd5e1; }
+  html.dark .cmdk-it.on { background: #1e293b; }
+  html.dark .cmdk-it.on > i { background: #f1f5f9; color: #0f172a; }
+
   /* ===================================================
      ORDERS PAGE — หน้ารายการใบจอง (window.app.orders, JS_Orders.html): แท็บสถานะ, ตารางหนึ่งใบจองต่อแถว, แผงรายละเอียดด้านข้าง
      ใช้โครง .cms-* ร่วมกับหน้าตารางอื่น; สีสถานะส่งมาทางตัวแปร --od-c
