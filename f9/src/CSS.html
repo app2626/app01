@@ -2701,6 +2701,22 @@
   html.dark .pd-rel-h, html.dark .pd-rel-name, html.dark .pd-rel-price { color: #f1f5f9; }
   html.dark .pd-rel-img, html.dark .pd-rel-card:hover .pd-rel-img { background: #1e293b; }
 
+  /* Footer 5 คอลัมน์ (แบรนด์ / หมวดสินค้า / บริการลูกค้า / ช่วยเหลือ / ติดต่อร้าน) + หน้าต่าง "สาขาของเรา" (window.app.openBranches) */
+  @media (min-width: 768px) { .pf-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } .pf-brand { grid-column: 1 / -1; } }
+  @media (min-width: 1100px) { .pf-grid { grid-template-columns: 1.5fr 1fr 1fr 1fr 1.1fr; } .pf-brand { grid-column: auto; } }
+  .br-grp + .br-grp { margin-top: 20px; }
+  .br-grp h4 { margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #64748b; }
+  .br-grp ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+  .br-grp li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; }
+  .br-grp li i { margin-top: 3px; font-size: 13px; color: #0f2a43; }
+  .br-grp li b { display: block; font-size: 14px; font-weight: 600; color: #0f172a; }
+  .br-grp li span { display: block; font-size: 12.5px; color: #64748b; }
+  .br-none { padding: 24px 0; text-align: center; color: #64748b; }
+  html.dark .br-grp li { border-color: #334155; }
+  html.dark .br-grp li i { color: #cbd5e1; }
+  html.dark .br-grp li b { color: #f1f5f9; }
+  html.dark .br-grp h4, html.dark .br-grp li span, html.dark .br-none { color: #94a3b8; }
+
   /* ===================================================
      INTL 3 — หน้าสั่งจองเต็มจอ (#checkoutModal.co-page) + หน้ายืนยันใบจอง (#orderDoneModal.co-page)
      โครง: หัว (.pd-head ใช้ร่วมกับหน้ารายละเอียด) / .co-scroll (ฟอร์ม 3 ตอน + สรุปรายการ) / .co-consent / .co-bar (ยอดสุทธิ + ปุ่มยืนยัน ติดขอบล่าง)

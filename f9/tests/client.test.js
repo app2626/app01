@@ -774,9 +774,9 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   curPhase = 'footer';
   await ev("document.documentElement.classList.remove('dark');true");
   await T('policy links in footer open booking terms / privacy policy (default text, then Admin text from Settings, HTML escaped)', async () => {
-    const labels = await ev("[...document.querySelectorAll('#footerQuickLinks button')].map(b=>b.textContent.trim()).join('|')");
+    const labels = await ev("[...document.querySelectorAll('#footerHelpLinks button')].map(b=>b.textContent.trim()).join('|')");
     ok(labels.includes('เงื่อนไขการจอง') && labels.includes('นโยบายความเป็นส่วนตัว'), labels);
-    await ev("[...document.querySelectorAll('#footerQuickLinks button')].find(b=>b.textContent.trim()==='นโยบายความเป็นส่วนตัว').click();true"); await sleep(350);
+    await ev("[...document.querySelectorAll('#footerHelpLinks button')].find(b=>b.textContent.trim()==='นโยบายความเป็นส่วนตัว').click();true"); await sleep(350);
     const d = JSON.parse(await ev("JSON.stringify({title:(Swal.getTitle()||{}).textContent,body:(document.getElementById('policyBody')||{}).textContent||''})"));
     eq(d.title, 'นโยบายความเป็นส่วนตัว'); ok(d.body.includes('เลขบัตรประชาชน') && d.body.includes('สิทธิของเจ้าของข้อมูล'), d.body.slice(0, 120));
     await ev("Swal.close();true"); await sleep(250);
@@ -784,6 +784,16 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const c = JSON.parse(await ev("JSON.stringify({title:(Swal.getTitle()||{}).textContent,html:(document.getElementById('policyBody')||{}).innerHTML||'',xss:!!window.__polXss})"));
     eq(c.title, 'เงื่อนไขการจอง'); ok(c.html.startsWith('=มัดจำ 1,000 บาท<br><b>คืนไม่ได้</b>') && !/<img/i.test(c.html) && !c.xss, c.html.slice(0, 160));
     await ev("(()=>{Swal.close();const g=window.app.globalData;g.settings=g.__bakPol;return true})()"); await sleep(250);
+  });
+  await T('footer help: how-to / FAQ open with default text, a saved text replaces it (escaped), branches list comes from the Branches sheet', async () => {
+    const links = await ev("document.querySelectorAll('#footerHelpLinks button').length"); eq(links, 4);
+    await ev("window.app.openPolicy('howto');true"); await sleep(300);
+    const h = JSON.parse(await ev("JSON.stringify({title:(Swal.getTitle()||{}).textContent,len:(document.getElementById('policyBody')||{}).textContent.length})")); ok(h.len > 40, 'how-to default text missing'); ok(h.title && h.title.length > 3, 'title');
+    await ev("(()=>{Swal.close();const g=window.app.globalData;g.__bakH=g.settings;g.settings=Object.assign({},g.settings,{HelpFaq:'<b>Q1</b>\\nA1<img src=x onerror=window.__faqXss=1>'});window.app.openPolicy('faq');return true})()"); await sleep(300);
+    const q = JSON.parse(await ev("JSON.stringify({html:(document.getElementById('policyBody')||{}).innerHTML||'',xss:!!window.__faqXss})")); ok(q.html.startsWith('<b>Q1</b><br>A1') && !/<img/i.test(q.html) && !q.xss, q.html.slice(0, 120));
+    await ev("(()=>{Swal.close();const g=window.app.globalData;g.settings=g.__bakH;g.__bakB=g.branches;g.branches=[{Channel:'Retail','Branch Code':'B01','Branch Name':'<i>Central</i>',Province:'Bangkok',Mall:'CTW'},{Channel:'Online','Branch Code':'B01','Branch Name':'<i>Central</i>',Province:'Bangkok',Mall:'CTW'},{Channel:'Retail','Branch Code':'B02','Branch Name':'Chiang Mai',Province:'Chiang Mai'}];window.app.openBranches();return true})()"); await sleep(300);
+    const b = JSON.parse(await ev("(()=>{const el=document.getElementById('branchBody');return JSON.stringify({grp:el.querySelectorAll('.br-grp').length,li:el.querySelectorAll('li').length,raw:!!el.querySelector('li b i'),txt:el.textContent})})()")); eq(b.grp, 2); eq(b.li, 2, 'a branch listed once even with one row per channel'); ok(!b.raw && b.txt.includes('<i>Central</i>'), 'branch name must be escaped'); await shot('footer-branches');
+    await ev("(()=>{Swal.close();const g=window.app.globalData;g.branches=g.__bakB;return true})()"); await sleep(250);
   });
   await T('footer: year is current year, brand copyright present', async () => { const t = await ev("document.querySelector('footer').textContent"); ok(t.includes(String(new Date().getFullYear())) && t.includes('สงวนลิขสิทธิ์'), t.slice(0, 120)); });
   await T('status history: renders timeline, escapes HTML, hides staff name on public view', async () => {
@@ -875,7 +885,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   });
   await T('footer (store style): brand + service links + contact column, year/copyright, contact column hides with no settings', async () => {
     const r = JSON.parse(await ev("JSON.stringify({cols:document.querySelectorAll('footer .pf-grid > section').length,year:document.getElementById('footerYear').textContent,links:document.querySelectorAll('#footerQuickLinks button').length,trust:document.querySelectorAll('footer .pf-trust li').length})"));
-    eq(r.cols, 4); eq(r.year, String(new Date().getFullYear())); ok(r.links >= 2 && r.trust >= 3, JSON.stringify(r));
+    eq(r.cols, 5); eq(r.year, String(new Date().getFullYear())); ok(r.links >= 2 && r.trust >= 3, JSON.stringify(r));
     await ev("(()=>{const g=window.app.globalData;g.__bakS0=g.settings;g.settings=Object.assign({},g.settings,{ContactPhone:'02-123-4567',ContactLine:'@teststore',ContactHours:'10:00-20:00'});window.app.renderFooterContact();document.querySelector('footer').scrollIntoView({block:'end',behavior:'instant'});return true})()"); await sleep(300); await shot('footer-desktop');
     await ev("(()=>{const g=window.app.globalData;g.settings=g.__bakS0;window.app.renderFooterContact();return true})()");
     await ev("(()=>{const g=window.app.globalData;g.__bakS=g.settings;g.settings=Object.assign({},g.settings,{ContactPhone:'02-123-4567',ContactLine:'',ContactHours:''});window.app.renderFooterContact();return true})()");

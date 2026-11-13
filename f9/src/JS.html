@@ -736,9 +736,33 @@ window.app = {
   },
 
   // เงื่อนไขการจอง / นโยบายความเป็นส่วนตัว: Admin แก้ได้ที่ ตั้งค่าระบบ (Settings: PolicyBooking / PolicyPrivacy) — เว้นว่างใช้ข้อความมาตรฐานด้านล่าง
-  POLICY_TITLES: { booking: 'เงื่อนไขการจอง', privacy: 'นโยบายความเป็นส่วนตัว' },
-  POLICY_KEYS: { booking: 'PolicyBooking', privacy: 'PolicyPrivacy' },
+  // หน้าช่วยเหลือ "วิธีการจอง" / "คำถามที่พบบ่อย" ใช้กลไกเดียวกัน (Settings: HelpHowTo / HelpFaq) — เปิดจาก footer ด้วย openPolicy('howto' | 'faq')
+  POLICY_TITLES: { booking: 'เงื่อนไขการจอง', privacy: 'นโยบายความเป็นส่วนตัว', howto: 'วิธีการจอง', faq: 'คำถามที่พบบ่อย' },
+  POLICY_KEYS: { booking: 'PolicyBooking', privacy: 'PolicyPrivacy', howto: 'HelpHowTo', faq: 'HelpFaq' },
   POLICY_DEFAULTS: {
+    howto: [
+      '<b>1. เลือกสินค้า</b>',
+      'เลือกรุ่น สี และความจุที่ต้องการ เลือกของแถมที่มีสิทธิ์ แล้วกดเพิ่มลงตะกร้า',
+      '',
+      '<b>2. แจ้งข้อมูลการจอง</b>',
+      'แจ้งชื่อ เบอร์โทรศัพท์ อีเมล และเลขบัตรประชาชนหรือหนังสือเดินทางของผู้จอง พนักงานจะบันทึกใบจองให้',
+      '',
+      '<b>3. รับเลขที่ใบจอง</b>',
+      'เก็บเลขที่ใบจองไว้ ใช้ตรวจสอบสถานะได้จากเมนู "เช็คสถานะใบจอง" และใช้แสดงในวันรับสินค้า'
+    ].join('\n'),
+    faq: [
+      '<b>ตรวจสอบสถานะใบจองได้อย่างไร</b>',
+      'กดเมนู "เช็คสถานะใบจอง" ท้ายหน้าเว็บ แล้วกรอกเลขที่ใบจอง',
+      '',
+      '<b>วันรับสินค้าต้องเตรียมอะไร</b>',
+      'เลขที่ใบจอง และบัตรประชาชนหรือหนังสือเดินทางที่ใช้จอง',
+      '',
+      '<b>ยกเลิกการจองหรือขอคืนเงินมัดจำได้ไหม</b>',
+      'เป็นไปตามเงื่อนไขที่สาขาแจ้ง กรุณาสอบถามสาขาที่จองก่อนชำระเงิน',
+      '',
+      '<b>ต้องการเปลี่ยนสีหรือรุ่นหลังจองแล้ว</b>',
+      'ติดต่อสาขาที่จอง พร้อมแจ้งเลขที่ใบจอง'
+    ].join('\n'),
     booking: [
       '1. การจองจะสมบูรณ์เมื่อร้านบันทึกใบจองและแจ้งเลขที่ใบจองให้ลูกค้าแล้ว',
       '2. ราคา ของแถม และสิทธิพิเศษ เป็นไปตามที่ระบุในใบจอง ณ วันที่จอง',
@@ -778,6 +802,23 @@ window.app = {
       html: '<div class="pol-body" id="policyBody">' + window.app.safeRichText(body).replace(/\r?\n/g, '<br>') + '</div>',
       width: 640, confirmButtonText: 'ปิด', confirmButtonColor: '#0f2a43'
     });
+  },
+  // "สาขาของเรา" จากชีต Branches (globalData.branches) — จัดกลุ่มตามจังหวัด แสดงชื่อสาขา + ห้าง/พื้นที่; ผู้ใช้ Sales เห็นเฉพาะสาขาที่ server ส่งมาให้
+  openBranches: function() {
+    const esc = window.app.esc, clean = (v) => String(v == null ? '' : v).replace(/^'+/, '').trim();
+    const seen = {}, groups = {}, order = [];
+    ((window.app.globalData && window.app.globalData.branches) || []).forEach(b => {
+      const name = clean(b['Branch Name']) || clean(b['Branch Code']); if (!name) return;
+      const key = clean(b['Branch Code']) || name; if (seen[key]) return; seen[key] = true; // สาขาเดียวกันอาจมีหลายแถว (แถวละช่องทาง)
+      const prov = clean(b.Province) || 'สาขา';
+      if (!groups[prov]) { groups[prov] = []; order.push(prov); }
+      groups[prov].push({ name: name, sub: [clean(b.Mall), clean(b.Area)].filter((v, i, a) => v && v !== '-' && v !== name && a.indexOf(v) === i).join(' · ') });
+    });
+    order.sort((a, b) => a.localeCompare(b, 'th'));
+    const html = order.length
+      ? order.map(p => '<section class="br-grp"><h4>' + esc(p) + '</h4><ul>' + groups[p].map(x => '<li><i class="fas fa-store" aria-hidden="true"></i><div><b>' + esc(x.name) + '</b>' + (x.sub ? '<span>' + esc(x.sub) + '</span>' : '') + '</div></li>').join('') + '</ul></section>').join('')
+      : '<p class="br-none">ยังไม่มีข้อมูลสาขา</p>';
+    Swal.fire({ title: 'สาขาของเรา', html: '<div class="pol-body br-body" id="branchBody">' + html + '</div>', width: 640, confirmButtonText: 'ปิด', confirmButtonColor: '#0f2a43' });
   },
 
   // ข้อมูลติดต่อร้านใน footer (ตั้งค่าที่ ตั้งค่าระบบ › ข้อมูลติดต่อร้าน: ContactPhone / ContactLine / ContactHours)

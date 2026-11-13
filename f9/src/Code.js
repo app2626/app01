@@ -3104,7 +3104,10 @@ var SETTING_RULES_ = {
   FaviconUrl:            { label: 'ไอคอนเว็บ (Favicon)', type: 'https', max: 500 },
   // ข้อความที่ลูกค้าอ่านจากลิงก์ท้ายหน้าเว็บและตอนยืนยันการจอง — เว้นว่าง = หน้าเว็บใช้ข้อความมาตรฐาน (window.app.POLICY_DEFAULTS)
   PolicyBooking:         { label: 'เงื่อนไขการจอง', max: 6000 },
-  PolicyPrivacy:         { label: 'นโยบายความเป็นส่วนตัว', max: 6000 }
+  PolicyPrivacy:         { label: 'นโยบายความเป็นส่วนตัว', max: 6000 },
+  // หน้าช่วยเหลือท้ายหน้าเว็บ — เว้นว่าง = ใช้ข้อความมาตรฐานฝั่ง client (window.app.POLICY_DEFAULTS)
+  HelpHowTo:             { label: 'วิธีการจอง', max: 6000 },
+  HelpFaq:               { label: 'คำถามที่พบบ่อย', max: 6000 }
 };
 
 // คืนค่าที่ผ่านการตรวจ/ทำให้เป็นมาตรฐานแล้ว หรือ throw Error ข้อความไทย — current = ค่าที่เก็บอยู่ในชีต (ถ้าไม่เปลี่ยนจากเดิมจะไม่ตรวจซ้ำ

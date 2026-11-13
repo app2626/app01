@@ -187,6 +187,9 @@ t('B: policy texts + favicon are saveable settings, reach the storefront, favico
   eq(saveSet({ PolicyBooking: 'มัดจำ 1,000 บาท\nคืนไม่ได้', PolicyPrivacy: 'เก็บชื่อและเบอร์โทร', FaviconUrl: 'https://example.com/icon.png' }).status, 'success');
   eq(ksv().PolicyBooking, 'มัดจำ 1,000 บาท\nคืนไม่ได้'); eq(ctx.publicSettings_(ksv()).PolicyPrivacy, 'เก็บชื่อและเบอร์โทร');
   ok(saveSet({ PolicyBooking: 'x'.repeat(6001) }).status !== 'success', 'over-long policy must be rejected');
+  eq(saveSet({ HelpHowTo: 'step 1\nstep 2', HelpFaq: 'q\na' }).status, 'success'); eq(ctx.publicSettings_(ksv()).HelpHowTo, 'step 1\nstep 2'); eq(ksv().HelpFaq, 'q\na');
+  ok(saveSet({ HelpFaq: 'x'.repeat(6001) }).status !== 'success', 'over-long help text must be rejected');
+  eq(saveSet({ HelpHowTo: '', HelpFaq: '' }).status, 'success');
   ok(saveSet({ FaviconUrl: 'javascript:alert(1)' }).status !== 'success', 'non-https favicon must be rejected');
   eq(saveSet({ PolicyBooking: '', PolicyPrivacy: '' }).status, 'success'); eq(ksv().PolicyBooking, '');
 });
