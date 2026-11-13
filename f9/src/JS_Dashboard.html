@@ -157,7 +157,98 @@ window.app.dashboard = {
           emptyEl.innerHTML = '';
         }
       }
-      this.updateKPIs(); this.renderCharts(); this.renderPromotionsTable(); this.renderGiftsTable(); this.renderInterestsTable(); this.renderExecutiveRoiAndStockCards();
+      this.renderTodo(); this.updateKPIs(); this.renderDeltas(); this.renderCharts(); this.renderPromotionsTable(); this.renderGiftsTable(); this.renderInterestsTable(); this.renderExecutiveRoiAndStockCards();
+    },
+    // ---- "วันนี้ต้องทำ" ----
+    // นับจากใบจองทั้งหมดที่ผู้ใช้มีสิทธิ์เห็น (rawOrders — Sales ได้เฉพาะสาขาตัวเองจาก server) กรองตามสาขา/พนักงานที่เลือก แต่ไม่กรองช่วงวันที่
+    // แต่ละใบจองมีหลายแถวในชีต จึงนับตาม OrderID; สถานะและเวลาใช้ของแถวแรกที่มีค่า
+    STALE_DAYS_: 3,
+    todoStats: function() {
+      const elB = document.getElementById('dashBranch'), elS = document.getElementById('dashSales');
+      const b = elB ? elB.value : 'ALL', st = elS ? elS.value : 'ALL';
+      const map = {};
+      (this.rawOrders || []).forEach(o => {
+        const id = (o.OrderID || '').toString().trim(); if (!id) return;
+        if (b !== 'ALL' && o['Branch Code'] !== b) return;
+        const m = map[id] || (map[id] = { status: '', ts: '', staff: '' });
+        if (!m.status && o['Order Status']) m.status = o['Order Status'].toString().trim();
+        if (!m.ts && o.Timestamp) m.ts = o.Timestamp;
+        if (!m.staff && o.Staff) m.staff = o.Staff;
+      });
+      const now = new Date(), dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const staleBefore = now.getTime() - this.STALE_DAYS_ * 86400000;
+      const out = { pending: 0, stale: 0, today: 0, lowStock: 0 };
+      Object.keys(map).forEach(id => {
+        const m = map[id];
+        if (st !== 'ALL' && m.staff !== st) return;
+        const status = m.status || 'Pending', t = new Date(m.ts).getTime();
+        if (status === 'Cancelled' || status === 'ยกเลิก') return;
+        if (status === 'Pending') { out.pending++; if (!isNaN(t) && t < staleBefore) out.stale++; }
+        if (!isNaN(t) && t >= dayStart) out.today++;
+      });
+      const settings = (window.app.globalData && window.app.globalData.settings) || {};
+      const low = parseInt(settings.LowStockThreshold || '5', 10) || 5;
+      out.lowStock = (window.app.globalData.products || []).filter(p => p.Status === 'เปิด' && !(p.Category || '').includes('ของแถม')
+        && (parseInt(String(p.Stock || 0).replace(/,/g, ''), 10) || 0) <= low).length;
+      return out;
+    },
+    renderTodo: function() {
+      const el = document.getElementById('dashTodo'); if (!el) return;
+      const s = this.todoStats(), isAdmin = window.app.user.Role === 'Admin';
+      const card = (id, n, label, hint, icon, onclick, warn) => '<' + (onclick ? 'button type="button" onclick="' + onclick + '"' : 'div') + ' class="dash-todo-card' + (warn && n > 0 ? ' warn' : '') + (n === 0 ? ' zero' : '') + '" id="' + id + '">'
+        + '<span class="dash-todo-ic"><i class="fas ' + icon + '" aria-hidden="true"></i></span>'
+        + '<span class="dash-todo-tx"><b>' + n.toLocaleString() + '</b><span>' + label + '</span><small>' + hint + '</small></span>'
+        + (onclick ? '<i class="fas fa-chevron-right dash-todo-go" aria-hidden="true"></i>' : '') + '</' + (onclick ? 'button' : 'div') + '>';
+      el.innerHTML = '<h2 class="dash-todo-h">วันนี้ต้องทำ</h2><div class="dash-todo-grid">'
+        + card('dashTodoPending', s.pending, 'ใบจองรอดำเนินการ', 'ยังไม่ได้ยืนยัน', 'fa-inbox', "window.app.orders.openWith({tab:'Pending'})", false)
+        + card('dashTodoStale', s.stale, 'ค้างเกิน ' + this.STALE_DAYS_ + ' วัน', 'รอดำเนินการนานเกินกำหนด', 'fa-hourglass-half', "window.app.orders.openWith({tab:'Pending',quick:'stale'})", true)
+        + card('dashTodoToday', s.today, 'ใบจองใหม่วันนี้', 'ไม่รวมใบที่ยกเลิก', 'fa-calendar-day', "window.app.orders.openWith({quick:'today'})", false)
+        + card('dashTodoStock', s.lowStock, 'สินค้าใกล้หมด', 'สต๊อกเหลือน้อยกว่าเกณฑ์เตือน', 'fa-box-open', isAdmin ? "window.location.hash='#products'" : '', true)
+        + '</div>';
+      el.classList.remove('hidden');
+    },
+    // ---- เทียบกับช่วงก่อนหน้า ----
+    // ช่วงก่อนหน้า = จำนวนวันเท่ากัน ติดกันก่อนวันเริ่มที่เลือก (ต้องเลือกทั้งวันเริ่มและวันสิ้นสุด); ใช้ตัวกรองสาขา/พนักงานเดียวกัน
+    kpiCalc: function(list) {
+      let total = 0, mobiles = 0, acc = 0; const ids = new Set();
+      list.forEach(o => {
+        if (window.app.isOrderCancelled(o)) return;
+        const r = parseFloat((o['Row Total'] || '0').toString().replace(/,/g, '')); total += isNaN(r) ? 0 : r;
+        ids.add(o.OrderID);
+        let q = parseInt(String(o.Qty || 0).replace(/,/g, ''), 10); if (isNaN(q)) q = 0;
+        if (window.app.isMobileCat(o.Category)) mobiles += q;
+        else if (['อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง'].includes(o.Category)) acc += q;
+      });
+      return { total: total, mobiles: mobiles, acc: acc, aov: ids.size ? total / ids.size : 0 };
+    },
+    renderDeltas: function() {
+      const map = { Total: 'total', Mobiles: 'mobiles', Accessories: 'acc', Aov: 'aov' };
+      const sD = (document.getElementById('dashStartDate') || {}).value || '', eD = (document.getElementById('dashEndDate') || {}).value || '';
+      const elB = document.getElementById('dashBranch'), elS = document.getElementById('dashSales');
+      const b = elB ? elB.value : 'ALL', st = elS ? elS.value : 'ALL';
+      let cur = null, prev = null;
+      if (sD && eD) {
+        const s0 = new Date(sD + 'T00:00:00'), e0 = new Date(eD + 'T23:59:59');
+        const days = Math.round((e0.getTime() - s0.getTime()) / 86400000);
+        if (days >= 1) {
+          const pEnd = new Date(s0.getTime() - 1000), pStart = new Date(s0.getTime() - days * 86400000);
+          const prevList = (this.rawOrders || []).filter(o => {
+            const t = new Date(o.Timestamp);
+            return t >= pStart && t <= pEnd && (b === 'ALL' || o['Branch Code'] === b) && (st === 'ALL' || o.Staff === st);
+          });
+          cur = this.kpiCalc(this.filteredOrders || []); prev = this.kpiCalc(prevList);
+        }
+      }
+      Object.keys(map).forEach(k => {
+        const val = document.getElementById('dashKpi' + k); if (!val) return;
+        let d = document.getElementById('dashDelta' + k);
+        if (!d) { d = document.createElement('p'); d.id = 'dashDelta' + k; d.className = 'dash-delta'; val.insertAdjacentElement('afterend', d); }
+        const c = cur ? cur[map[k]] : 0, p = prev ? prev[map[k]] : 0;
+        if (!cur || !p) { d.textContent = ''; d.className = 'dash-delta'; return; }
+        const pct = (c - p) / p * 100, up = pct > 0.05, down = pct < -0.05;
+        d.className = 'dash-delta' + (up ? ' up' : (down ? ' down' : ''));
+        d.textContent = (up ? '▲ ' : (down ? '▼ ' : '')) + Math.abs(pct).toFixed(Math.abs(pct) >= 100 ? 0 : 1) + '% จากช่วงก่อน'; d.title = 'เทียบกับช่วงเวลายาวเท่ากันก่อนหน้านี้';
+      });
     },
     updateKPIs: function() {
       let t = 0; let u = new Set(); let completedOrders = new Set();

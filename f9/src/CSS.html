@@ -2758,6 +2758,42 @@
      (เดิมกำหนดความสูงตายตัว 110-320px ทำให้จอกว้างตัดบน-ล่างของรูปออกราวหนึ่งในสาม) */
   html.sf-site #posHeroBannerWrap { height: auto; aspect-ratio: 3 / 1; }
 
+  /* แดชบอร์ด: แถว "วันนี้ต้องทำ" (dashboard.renderTodo) + บรรทัดเทียบช่วงก่อนหน้าใต้ตัวเลขหลัก (dashboard.renderDeltas) */
+  .dash-todo:not(.hidden) { display: block; }
+  .dash-todo-h { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: #0f172a; }
+  .dash-todo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (min-width: 1024px) { .dash-todo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .dash-todo-card { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; text-align: left; transition: border-color .15s, background-color .15s; }
+  button.dash-todo-card:hover { border-color: #0f2a43; background: #f8fafc; }
+  .dash-todo-ic { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 10px; background: #eef1f5; color: #0f2a43; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .dash-todo-tx { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .dash-todo-tx b { font-size: 24px; font-weight: 700; line-height: 1.15; color: #0f172a; }
+  .dash-todo-tx > span { font-size: 13.5px; font-weight: 600; color: #0f172a; }
+  .dash-todo-tx small { font-size: 12px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash-todo-go { flex: 0 0 auto; font-size: 12px; color: #94a3b8; }
+  .dash-todo-card.warn { border-color: #fecaca; }
+  .dash-todo-card.warn .dash-todo-ic { background: #fef2f2; color: #be123c; }
+  .dash-todo-card.warn .dash-todo-tx b { color: #be123c; }
+  .dash-todo-card.zero .dash-todo-tx b { color: #94a3b8; }
+  @media (max-width: 479px) { .dash-todo-card { padding: 12px; gap: 10px; } .dash-todo-ic { width: 34px; height: 34px; font-size: 14px; } .dash-todo-go, .dash-todo-tx small { display: none; } }
+  .dash-delta { margin-top: 4px; font-size: 11.5px; font-weight: 600; line-height: 1.35; color: #64748b; }
+  .dash-delta:empty { display: none; }
+  .dash-delta.up { color: #047857; }
+  .dash-delta.down { color: #be123c; }
+  .od-quick:empty { display: none; }
+  .od-quick { margin-bottom: 12px; }
+  html.dark .dash-todo-h, html.dark .dash-todo-tx b, html.dark .dash-todo-tx > span { color: #f1f5f9; }
+  html.dark .dash-todo-card { background: #1e293b; border-color: #334155; }
+  html.dark button.dash-todo-card:hover { background: #273449; border-color: #94a3b8; }
+  html.dark .dash-todo-ic { background: #0f172a; color: #cbd5e1; }
+  html.dark .dash-todo-tx small, html.dark .dash-delta { color: #94a3b8; }
+  html.dark .dash-todo-card.warn { border-color: #7f1d1d; }
+  html.dark .dash-todo-card.warn .dash-todo-ic { background: #450a0a; color: #fca5a5; }
+  html.dark .dash-todo-card.warn .dash-todo-tx b { color: #fca5a5; }
+  html.dark .dash-todo-card.zero .dash-todo-tx b { color: #64748b; }
+  html.dark .dash-delta.up { color: #6ee7b7; }
+  html.dark .dash-delta.down { color: #fca5a5; }
+
   /* ===================================================
      ORDERS PAGE — หน้ารายการใบจอง (window.app.orders, JS_Orders.html): แท็บสถานะ, ตารางหนึ่งใบจองต่อแถว, แผงรายละเอียดด้านข้าง
      ใช้โครง .cms-* ร่วมกับหน้าตารางอื่น; สีสถานะส่งมาทางตัวแปร --od-c

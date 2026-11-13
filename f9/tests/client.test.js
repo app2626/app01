@@ -933,6 +933,28 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.Swal&&Swal.close();window.location.hash='#pos';true"); await sleep(1500);
     await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
   });
+  await T('dashboard: "to do today" row counts orders by OrderID, opens the orders page pre-filtered; KPI compares with the previous period', async () => {
+    await ev("window.location.hash='#dashboard';true"); await sleep(1800);
+    const idI = sheets.Orders.rows[0].indexOf('OrderID'), stI = sheets.Orders.rows[0].indexOf('Order Status');
+    const first = {}; sheets.Orders.rows.slice(1).forEach(x => { if (!(x[idI] in first)) first[x[idI]] = x[stI] || 'Pending'; });
+    const pend = Object.values(first).filter(v => v === 'Pending').length, live = Object.values(first).filter(v => v !== 'Cancelled').length;
+    const a = JSON.parse(await ev("JSON.stringify({vis:!document.getElementById('dashTodo').classList.contains('hidden'),cards:document.querySelectorAll('#dashTodo .dash-todo-card').length,pending:document.querySelector('#dashTodoPending b').textContent,today:document.querySelector('#dashTodoToday b').textContent,stale:document.querySelector('#dashTodoStale b').textContent,stock:document.querySelector('#dashTodoStock b').textContent,stats:window.app.dashboard.todoStats()})"));
+    ok(a.vis, 'to-do row hidden'); eq(a.cards, 4); eq(a.pending, String(pend), 'pending counted per order, not per sheet row'); eq(a.today, String(live), 'orders placed today'); eq(a.stale, '0'); ok(/^\d/.test(a.stock), a.stock);
+    await shot('admin-dashboard-todo');
+    // previous period: move every order 40 days back in memory -> current month empty, previous period has the sales
+    const d = JSON.parse(await ev("(()=>{const D=window.app.dashboard;const k1=D.kpiCalc(D.filteredOrders);const el=document.getElementById('dashDeltaTotal');const before=el?el.textContent:'(none)';const bak=D.rawOrders;const half=bak.map((o,i)=>Object.assign({},o,i%2?{}:{Timestamp:new Date(Date.now()-35*86400000).toString()}));D.rawOrders=half;D.applyFilters();const t=document.getElementById('dashDeltaTotal');const out={before:before,total:k1.total,txt:t.textContent,cls:t.className,stale:D.todoStats().stale};D.rawOrders=bak;D.applyFilters();return JSON.stringify(out)})()"));
+    ok(d.total > 0, 'kpiCalc total'); ok(/ช่วงก่อนหน้า/.test(d.before) || d.before === '', 'delta line: ' + d.before); ok(/%/.test(d.txt) && /up|down/.test(d.cls), 'delta with a previous period: ' + JSON.stringify(d)); ok(d.stale >= 0);
+    await ev("document.getElementById('dashTodoPending').click();true"); await sleep(1500);
+    const o = JSON.parse(await ev("JSON.stringify({hash:location.hash,tab:window.app.orders.tab,on:([...document.querySelectorAll('#odTabs .od-tab')].find(b=>b.classList.contains('on'))||{}).textContent||'',rows:document.querySelectorAll('#odBody tr.od-row').length})"));
+    eq(o.hash, '#orders'); eq(o.tab, 'Pending'); ok(/รอดำเนินการ/.test(o.on), o.on); eq(o.rows, Math.min(pend, 20));
+    await ev("window.app.orders.openWith({quick:'today'});true"); await sleep(1200);
+    const q = JSON.parse(await ev("JSON.stringify({chip:(document.querySelector('#odQuick .sf-achip')||{}).textContent||'',rows:document.querySelectorAll('#odBody tr.od-row').length,tab:window.app.orders.tab})"));
+    ok(/วันนี้/.test(q.chip), 'quick-filter chip: ' + q.chip); eq(q.rows, Math.min(live, 20)); eq(q.tab, '');
+    await ev("document.querySelector('#odQuick .sf-achip').click();true"); await sleep(300);
+    eq(await ev("window.app.orders.quick + '|' + document.querySelectorAll('#odQuick .sf-achip').length"), '|0', 'chip click clears the quick filter');
+    await ev("window.location.hash='#pos';true"); await sleep(1500);
+    await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
+  });
   await T('active filter chips: one chip per selected filter, clicking a chip removes only that filter, clear-all shows from 2 chips, text escaped', async () => {
     await ev("window.app.pos.clearStoreFilters(false);window.app.pos.setStoreFilter('capacity','128GB');window.app.pos.setStoreFilter('inStock',true);true"); await sleep(300);
     const a = JSON.parse(await ev("JSON.stringify({chips:[...document.querySelectorAll('#storeActiveChips .sf-achip')].map(b=>b.textContent.trim()),clear:!!document.querySelector('#storeActiveChips .sf-achip-clear')})"));
