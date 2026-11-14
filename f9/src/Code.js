@@ -2617,6 +2617,43 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
         }
       }
     }
+    // Members: สาขาต้องมีจริงในชีต Branches (หรือ ALL) และ Manager/Sales ห้ามว่าง — เดิมเป็นช่องพิมพ์อิสระ พิมพ์ผิดแล้วพนักงานล็อกอินได้แต่ไม่เห็นสาขา
+    // ค่าที่ไม่ได้เปลี่ยนจากที่เก็บอยู่ไม่ตรวจซ้ำ (แถวเก่าที่รหัสสาขาถูกลบไปแล้วยังแก้ชื่อ/รหัสผ่านได้)
+    if (tableName === "Members") {
+      const role = (dataObj.Role || '').toString().trim();
+      const rIdx = headers.indexOf("Role");
+      const prevRole = (rowIndex > -1 && rIdx > -1) ? data[rowIndex - 1][rIdx].toString().trim() : null;
+      if (role !== prevRole && IMPORT_MEMBER_ROLES_.indexOf(role) === -1) throw new Error("บทบาทต้องเป็น Admin, Manager หรือ Sales");
+      const bIdx = headers.indexOf("Branch Code");
+      let branch = (dataObj['Branch Code'] === undefined || dataObj['Branch Code'] === null ? '' : dataObj['Branch Code']).toString().trim();
+      const prevBranch = (rowIndex > -1 && bIdx > -1) ? data[rowIndex - 1][bIdx].toString().trim() : null;
+      if (branch !== prevBranch) {
+        if (!branch) {
+          if (role !== 'Admin') throw new Error("กรุณาเลือกสาขา (Manager/Sales ต้องระบุสาขา หรือ ALL ถ้าเห็นทุกสาขา)");
+          branch = 'ALL';
+        }
+        if (branch !== 'ALL') {
+          const bSheet = ss.getSheetByName("Branches");
+          const known = bSheet ? getTableDataAsJson(bSheet, true).some(b => (b['Branch Code'] === undefined || b['Branch Code'] === null ? '' : b['Branch Code']).toString().trim() === branch) : false;
+          if (!known) throw new Error("ไม่พบสาขา \"" + branch + "\" ในข้อมูลสาขา — เพิ่มสาขาก่อน หรือเลือกสาขาที่มีอยู่");
+        }
+      }
+      dataObj['Branch Code'] = branch;
+    }
+    // Coupons: วันที่เก็บเป็นข้อความ yyyy-MM-dd เสมอ (ค่าที่อ่านไม่ได้ถูกปฏิเสธ เว้นแต่เป็นค่าเดิมที่ไม่ได้แก้)
+    const couponDateCols = tableName === 'Coupons' ? ['Start Date', 'Expiry Date'] : [];
+    couponDateCols.forEach(k => {
+      const raw = (dataObj[k] === undefined || dataObj[k] === null ? '' : dataObj[k]).toString().trim();
+      const ci = headers.indexOf(k);
+      const prev = (rowIndex > -1 && ci > -1) ? data[rowIndex - 1][ci].toString().trim() : null;
+      if (!raw) { dataObj[k] = ''; return; }
+      const d = parseCouponDate_(raw, false);
+      if (!d) { if (raw === prev) return; throw new Error((k === 'Start Date' ? 'วันเริ่มใช้' : 'วันหมดอายุ') + " ไม่ถูกต้อง — ใช้รูปแบบ ปี-เดือน-วัน เช่น 2026-12-31"); }
+      dataObj[k] = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    });
+    if (couponDateCols.length && dataObj['Start Date'] && dataObj['Expiry Date'] && /^\d{4}-\d{2}-\d{2}$/.test(dataObj['Start Date']) && /^\d{4}-\d{2}-\d{2}$/.test(dataObj['Expiry Date']) && dataObj['Start Date'] > dataObj['Expiry Date']) {
+      throw new Error("วันเริ่มใช้ต้องไม่หลังวันหมดอายุ");
+    }
     let generatedPassword = null;
     if (tableName === "Members") {
       if (!dataObj.Password || dataObj.Password.trim() === "") {
@@ -2647,7 +2684,13 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     };
     const freeTextCols = SAVE_RECORD_FREE_TEXT_COLS_[tableName] || [];
     let rowData = headers.map(h => dataObj[h] !== undefined ? (freeTextCols.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]) : "");
-    if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); } const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions"]; if (cacheableTables.includes(tableName)) CacheService.getScriptCache().remove("TABLE_" + tableName);
+    if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); }
+    // วันที่ของคูปองต้องเป็นเซลล์ข้อความ — ไม่งั้น Sheets แปลงเป็น Date แล้วอ่านกลับเป็นรูปแบบตามภาษาของชีต (แบบเดียวกับ writeBannerDates_)
+    if (couponDateCols.length) {
+      const wRow = rowIndex > -1 ? rowIndex : sheet.getLastRow();
+      couponDateCols.forEach(k => { const ci = headers.indexOf(k); if (ci > -1 && dataObj[k]) { const cell = sheet.getRange(wRow, ci + 1); cell.setNumberFormat('@'); cell.setValue(dataObj[k]); } });
+    }
+    const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions"]; if (cacheableTables.includes(tableName)) CacheService.getScriptCache().remove("TABLE_" + tableName);
     return generatedPassword ? { status: 'success', generatedPassword: generatedPassword } : { status: 'success' };
   } catch(e) {
     return { status: 'error', message: e.toString() };

@@ -1041,7 +1041,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.app.systemSettings.openTab('ss_docs');true"); await sleep(900);
     eq(await ev(vis), 'policies,company', 'documents tab cards'); ok(await ev("!!document.getElementById('policyBookingInput') && document.getElementById('policyBookingInput').offsetParent !== null"), 'policy editor not visible');
     await ev("window.app.systemSettings.openTab('autosetup');true"); await sleep(900);
-    eq(await ev(vis), 'setup,drive', 'system tab cards');
+    eq(await ev(vis), 'notify,cache,drive,setup', 'system tab cards');
     await ev("window.app.systemSettings.openTab('bookingsettings');true"); await sleep(900);
     eq(await ev("document.querySelectorAll('#ssTabContent [data-sec]').length"), 0, 'booking tab has its own form');
     // unsaved edit -> switching asks first; declining keeps the tab and the typed value
@@ -1236,7 +1236,61 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const r = JSON.parse(await ev(`(()=>{const f=document.getElementById('field_Channel');const g=window.app.globalData;const bak=g.branches;g.branches=bak.concat([{Channel:'retail'},{Channel:'  Pop-Up '}]);const names=window.app.channelNames();g.branches=bak;return JSON.stringify({tag:f?f.tagName:'',opts:f?[...f.options].map(o=>o.value):[],names:names})})()`));
     eq(r.tag, 'SELECT', 'Channel must be a select'); ok(r.opts[0] === '' && r.opts.includes('Retail') && r.opts.includes('Online'), 'options: ' + r.opts.join('|'));
     ok(r.names.includes('Pop-Up') && r.names.filter(n => n.toLowerCase() === 'retail').length === 1, 'trimmed + de-duplicated ignoring case: ' + r.names.join('|'));
+    // free-text location fields suggest the values already used in the table
+    const sg = JSON.parse(await ev("(()=>{const i=document.getElementById('field_Area');const dl=i&&document.getElementById(i.getAttribute('list'));return JSON.stringify({list:!!dl,n:dl?dl.options.length:0})})()"));
+    ok(sg.list && sg.n > 0, 'Area must suggest existing values: ' + JSON.stringify(sg));
     await ev("document.querySelector('#formModal [aria-label=\"ปิดฟอร์ม\"]').click();true"); await sleep(300);
+  });
+  const closeForm = async () => { await ev("(()=>{try{Swal.close()}catch(e){}const b=document.querySelector('#formModal [aria-label=\"ปิดฟอร์ม\"]');if(b)b.click();return true})()"); await sleep(300); };
+  await T('admin menu: four task groups under one parent, ids unchanged', async () => {
+    const m = JSON.parse(await ev("(()=>{const sub=document.getElementById('desk-sub-admin_settings');return JSON.stringify({parent:document.querySelector('#nav-desk-admin_settings .nav-th').textContent.trim(),heads:[...sub.children].filter(e=>e.tagName==='DIV').map(e=>e.childNodes[0].textContent.trim()),ids:[...sub.querySelectorAll('a')].map(a=>a.id.replace('nav-desk-',''))})})()"));
+    eq(m.parent, 'จัดการร้าน'); eq(m.heads, ['สินค้า', 'ร้านและสาขา', 'โปรโมชั่น', 'เนื้อหาและระบบ']);
+    eq(m.ids.slice().sort(), ['auditlog', 'autopromotions', 'banners', 'branches', 'channels', 'coupons', 'giftmappings', 'interests', 'inventorylog', 'members', 'news', 'newscats', 'products', 'promotions', 'systemsettings']);
+    eq(m.ids[0], 'products', 'products stays the first page of the group');
+  });
+  await T('member form: branch is a list (blank / ALL / real branches), role shows what it can do, Sales without a branch is stopped before the form closes', async () => {
+    await ev("window.location.hash='#members';true"); await sleep(1400);
+    await ev("window.app.grid.handleAddClick();true"); await sleep(600);
+    const r = JSON.parse(await ev("(()=>{const b=document.getElementById('field_Branch Code'),ro=document.getElementById('field_Role');return JSON.stringify({tag:b.tagName,opts:[...b.options].map(o=>o.value),role:[...ro.options].map(o=>o.value+'|'+o.textContent)})})()"));
+    eq(r.tag, 'SELECT'); eq(r.opts.slice(0, 2), ['', 'ALL']); ok(r.opts.includes(await P("window.app.globalData.branches[0]['Branch Code']")), 'real branch missing: ' + r.opts.join('|'));
+    eq(r.opts.length, new Set(r.opts).size, 'one option per branch code');
+    ok(r.role[0].indexOf('Sales|') === 0 && /พนักงานขาย/.test(r.role[0]), 'role labels: ' + r.role.join(' / '));
+    await ev("(()=>{document.getElementById('field_Username').value='ui.nobranch';document.getElementById('field_Name').value='x';window.app.grid.saveForm();return true})()"); await sleep(500);
+    ok(await ev("Swal.isVisible() && /สาขา/.test(Swal.getTitle().textContent)"), 'missing-branch warning not shown');
+    ok(await ev("!document.getElementById('formModal').classList.contains('hidden') && document.getElementById('field_Username').value==='ui.nobranch'"), 'form must stay open with the typed data');
+    await closeForm();
+    // an existing member whose stored branch is not in the list keeps it as its own option
+    const kept = await ev("(()=>{const g=window.app.grid;g.openForm(Object.assign({},g.dataList[0],{'Branch Code':'OLD-99'}));const b=document.getElementById('field_Branch Code');return b.value+'|'+b.options[0].textContent})()");
+    ok(kept.indexOf('OLD-99|OLD-99') === 0, 'stored value must stay selected: ' + kept);
+    await closeForm();
+  });
+  await T('coupon form: dates are date pickers (sheet text in any known format is shown), discount type reads in Thai', async () => {
+    eq(await ev("JSON.stringify(['2026-12-31','31/12/2569','2026/1/5','สิ้นปี',''].map(v=>window.app.grid.isoDate(v)))"), '["2026-12-31","2026-12-31","2026-01-05","",""]');
+    await ev("window.location.hash='#coupons';true"); await sleep(1500);
+    const r = JSON.parse(await ev("(()=>{const g=window.app.grid;g.openForm(Object.assign({},g.dataList[0]||{Code:'X'},{'Start Date':'01/12/2569','Expiry Date':'สิ้นปี'}));const s=document.getElementById('field_Start Date'),e=document.getElementById('field_Expiry Date'),d=document.getElementById('field_Discount Type');return JSON.stringify({s:s.type+'|'+s.value,e:e.type+'|'+e.value,d:[...d.options].map(o=>o.value+'|'+o.textContent)})})()"));
+    eq(r.s, 'date|2026-12-01'); eq(r.e, 'text|สิ้นปี', 'an unreadable stored date must stay editable as text, not be blanked');
+    eq(r.d, ['Fixed|ลดเป็นบาท', 'Percent|ลดเป็นเปอร์เซ็นต์ (%)']);
+    await closeForm();
+  });
+  await T('gift set form: target suggestions are values the matching rule knows, and the hint says how many products match', async () => {
+    await ev("window.location.hash='#giftmappings';true"); await sleep(1500);
+    await ev("window.app.grid.handleAddClick();true"); await sleep(600);
+    const r = JSON.parse(await ev("(()=>{const G=window.app.grid,ps=window.app.globalData.products.filter(p=>p.Category!=='ของแถมแบรนด์'&&p.Category!=='ของแถมช่องทาง');const o=[...document.querySelectorAll('#targetList option')].map(x=>x.value);const i=document.getElementById('field_Target Mobile (SKU or Group)'),h=document.getElementById('giftTargetHint');const type=v=>{i.value=v;i.dispatchEvent(new Event('input',{bubbles:true}));return h.textContent+'|'+h.classList.contains('text-rose-600')};return JSON.stringify({opts:o,bad:o.filter(v=>v!=='*'&&G.targetProducts(v).length===0),all:G.targetProducts('*').length,n:ps.length,sku:G.targetProducts(ps[0].SKU).length,none:type('zz-no-such-model'),star:type('*')})})()"));
+    ok(r.opts[0] === '*' && r.opts.length > 2, 'suggestions: ' + r.opts.join('|')); eq(r.bad, [], 'every suggestion must match at least one product');
+    eq(r.all, r.n); ok(r.sku >= 1, 'a SKU must match itself');
+    ok(/ไม่ตรงกับสินค้าใดเลย/.test(r.none) && /\|true$/.test(r.none), 'no-match warning: ' + r.none);
+    ok(/ตรงกับสินค้า \d+ รายการ/.test(r.star) && /\|false$/.test(r.star), 'match count: ' + r.star);
+    await shot('admin-giftmapping-form');
+    await closeForm();
+  });
+  await T('system tab holds the technical cards (webhook, cache, drive, collapsed Auto Setup); booking tab keeps only booking fields', async () => {
+    await ev("window.location.hash='#systemsettings';true"); await sleep(1500);
+    await ev("window.app.systemSettings.showTab('autosetup');true"); await sleep(1000);
+    const a = JSON.parse(await ev("(()=>{const vis=id=>{const e=document.getElementById(id);return !!e&&e.offsetParent!==null};const d=document.querySelector('#ssTabContent [data-sec=setup]');return JSON.stringify({hook:vis('webhookUrlInput'),cache:!!document.querySelector('#ssTabContent [data-sec=cache]:not(.hidden) button'),tag:d.tagName,open:d.open})})()"));
+    ok(a.hook && a.cache, 'webhook + cache cards: ' + JSON.stringify(a)); eq(a.tag + '|' + a.open, 'DETAILS|false', 'Auto Setup must start collapsed');
+    await shot('admin-settings-system');
+    await ev("window.app.systemSettings.showTab('bookingsettings');true"); await sleep(1000);
+    eq(await ev("JSON.stringify([!!document.getElementById('reserveStartInput'),!!document.getElementById('webhookUrlInput'),/ล้างแคช/.test(document.getElementById('ssTabContent').textContent)])"), '[true,false,false]');
   });
   await T('forms: add forms open, fit the screen, close with the X button', async () => {
     await ev("window.location.hash='#channels';true"); await sleep(1400);

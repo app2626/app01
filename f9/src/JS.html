@@ -22,30 +22,30 @@ window.app = {
       { id: 'salessummary', icon: 'fa-layer-group', label: 'สรุปรุ่น/แอเรีย/ช่องทาง', sub: 'Model · Area · Channel', roles: ['Admin', 'Manager'] },
       { id: 'branchbookingsummary', icon: 'fa-store-alt', label: 'สรุปยอดจองตามสาขา', sub: 'Branch Bookings', roles: ['Admin', 'Manager'] },
       { id: 'allbookingsummary', icon: 'fa-boxes-stacked', label: 'สรุปข้อมูลจองทั้งหมด', sub: 'All Bookings', roles: ['Admin', 'Manager'] },
-      { label: 'ตั้งค่า', sub: 'Settings', isCategory: true, roles: ['Admin', 'Manager'] },
+      { label: 'หลังร้าน', sub: 'Back Office', isCategory: true, roles: ['Admin', 'Manager'] },
       {
-        id: 'admin_settings', icon: 'fa-cogs', label: 'ตั้งค่าระบบ', sub: 'System Settings', roles: ['Admin', 'Manager'],
+        // กลุ่มย่อยเรียงตามงาน: สินค้า / ร้านและสาขา / โปรโมชั่น / เนื้อหาและระบบ — id ของทุกเมนูคงเดิม (สิทธิ์ Accessible Menus และ route ผูกกับ id)
+        id: 'admin_settings', icon: 'fa-cogs', label: 'จัดการร้าน', sub: 'Store Admin', roles: ['Admin', 'Manager'],
         isParent: true,
         children: [
-          { label: 'ข้อมูลหลัก', sub: 'Master Data', isCategory: true, roles: ['Admin'] },
+          { label: 'สินค้า', sub: 'Products', isCategory: true, roles: ['Admin'] },
           { id: 'products', icon: 'fa-box-open', label: 'สินค้า', sub: 'Products', roles: ['Admin'] },
-          { id: 'branches', icon: 'fa-store-alt', label: 'สาขา', sub: 'Branches', roles: ['Admin'] },
+          { id: 'inventorylog', icon: 'fa-boxes', label: 'ประวัติสต็อก', sub: 'Stock History', roles: ['Admin'] },
+          { label: 'ร้านและสาขา', sub: 'Store & Branches', isCategory: true, roles: ['Admin'] },
           { id: 'channels', icon: 'fa-network-wired', label: 'ช่องทางขาย', sub: 'Channels', roles: ['Admin'] },
-          { id: 'members', icon: 'fa-users', label: 'สมาชิก', sub: 'Members', roles: ['Admin'] },
-          { id: 'inventorylog', icon: 'fa-boxes', label: 'ประวัติสต็อก', sub: 'Inventory', roles: ['Admin'] },
+          { id: 'branches', icon: 'fa-store-alt', label: 'สาขา', sub: 'Branches', roles: ['Admin'] },
+          { id: 'members', icon: 'fa-users', label: 'ผู้ใช้งาน', sub: 'Members', roles: ['Admin'] },
+          { id: 'interests', icon: 'fa-heart', label: 'ตัวเลือกความสนใจลูกค้า', sub: 'Booking Form Options', roles: ['Admin'] },
           { label: 'โปรโมชั่น', sub: 'Promotions', isCategory: true, roles: ['Admin', 'Manager'] },
-          { id: 'giftmappings', icon: 'fa-project-diagram', label: 'ชุดของแถม', sub: 'Set Premium', roles: ['Admin', 'Manager'] },
-          { id: 'autopromotions', icon: 'fa-magic', label: 'โปรโมชั่นอัตโนมัติ', sub: 'Auto Promotions', roles: ['Admin', 'Manager'] },
-          { id: 'promotions', icon: 'fa-tags', label: 'ส่วนลดและโปรโมชั่น', sub: 'Promotions', roles: ['Admin'] },
+          { id: 'giftmappings', icon: 'fa-project-diagram', label: 'ชุดของแถม', sub: 'Gift Sets', roles: ['Admin', 'Manager'] },
+          { id: 'autopromotions', icon: 'fa-magic', label: 'ส่วนลดซื้อคู่อัตโนมัติ', sub: 'Auto Promotions', roles: ['Admin', 'Manager'] },
+          { id: 'promotions', icon: 'fa-tags', label: 'ส่วนลดตอนจอง', sub: 'Checkout Discounts', roles: ['Admin'] },
           { id: 'coupons', icon: 'fa-ticket-alt', label: 'โค้ดส่วนลด', sub: 'Coupons', roles: ['Admin'] },
-          { id: 'interests', icon: 'fa-heart', label: 'ความสนใจลูกค้า', sub: 'Interests', roles: ['Admin'] },
-          { label: 'เนื้อหา', sub: 'Content', isCategory: true, roles: ['Admin'] },
-          { id: 'banners', icon: 'fa-images', label: 'จัดการแบนเนอร์', sub: 'Banners', roles: ['Admin'] },
-          { id: 'news', icon: 'fa-newspaper', label: 'จัดการข่าวสาร', sub: 'News', roles: ['Admin'] },
+          { label: 'เนื้อหาและระบบ', sub: 'Content & System', isCategory: true, roles: ['Admin'] },
+          { id: 'banners', icon: 'fa-images', label: 'แบนเนอร์', sub: 'Banners', roles: ['Admin'] },
+          { id: 'news', icon: 'fa-newspaper', label: 'ข่าวสาร', sub: 'News', roles: ['Admin'] },
           { id: 'newscats', icon: 'fa-tags', label: 'หมวดหมู่ข่าว', sub: 'News Categories', roles: ['Admin'] },
-          { label: 'การตั้งค่า', sub: 'Configuration', isCategory: true, roles: ['Admin'] },
-          { id: 'systemsettings', icon: 'fa-sliders-h', label: 'ตั้งค่าทั่วไป', sub: 'General Settings', roles: ['Admin'] },
-          { label: 'ระบบ', sub: 'System', isCategory: true, roles: ['Admin'] },
+          { id: 'systemsettings', icon: 'fa-sliders-h', label: 'ตั้งค่าระบบ', sub: 'System Settings', roles: ['Admin'] },
           { id: 'auditlog', icon: 'fa-history', label: 'บันทึกการใช้งาน', sub: 'Audit Log', roles: ['Admin'] }
         ]
       }
@@ -730,6 +730,19 @@ window.app = {
 
   // รายชื่อช่องทางขายชุดเดียวที่ทุกฟอร์มใช้ร่วมกัน: ค่า Channel ที่สาขาใช้อยู่จริง (หน้าร้านอ่านจากตรงนี้) + ชื่อในหน้า "ช่องทางขาย"
   // ตัดซ้ำแบบไม่สนตัวพิมพ์เล็ก/ใหญ่ เก็บตัวสะกดแรกที่เจอ — ฟอร์มสาขาและฟอร์มโปรโมชั่น/ชุดของแถมเลือกจากรายการนี้ จึงสะกดไม่ตรงกันไม่ได้
+  // ตัวเลือกสาขาของฟอร์มผู้ใช้งาน: ว่าง (ให้เลือกเอง) / ALL / หนึ่งรายการต่อ Branch Code (ชีตมีได้หลายแถวต่อรหัส — หนึ่งแถวต่อช่องทาง)
+  branchOptions: function() {
+    const seen = {}, out = [{ value: '', label: '- เลือกสาขา -' }, { value: 'ALL', label: 'ทุกสาขา (ALL)' }];
+    ((window.app.globalData || {}).branches || []).forEach(b => {
+      const code = String(b['Branch Code'] === undefined || b['Branch Code'] === null ? '' : b['Branch Code']).trim();
+      if (!code || code === 'ALL' || seen[code]) return;
+      seen[code] = true;
+      const name = String(b['Branch Name'] || '').trim();
+      out.push({ value: code, label: name ? code + ' - ' + name : code });
+    });
+    return out;
+  },
+
   channelNames: function() {
     const g = window.app.globalData || {}, seen = {}, out = [];
     (g.branches || []).map(b => b.Channel).concat((g.channels || []).map(c => c['Channel Name'])).forEach(v => {
@@ -1793,20 +1806,20 @@ window.app = {
         case 'products': 
           window.app.grid.init('Products', 'SKU', [
             { key: 'SKU', label: 'SKU', type: 'text' }, 
-            { key: 'Product Name', label: 'Product Name', type: 'text' },
-            { key: 'Model', label: 'Model', type: 'text' },
-            { key: 'Marketing Model', label: 'Marketing Model', type: 'text' },
-            { key: 'Product Group', label: 'Product Group', type: 'text' },
-            { key: 'Capacity', label: 'Capacity', type: 'text' }, 
-            { key: 'Color', label: 'Color', type: 'text' },
-            { key: 'Image URL', label: 'Image URL', type: 'text' }, 
-            { key: 'Price', label: 'Price', type: 'number' },
+            { key: 'Product Name', label: 'ชื่อสินค้า', type: 'text' },
+            { key: 'Model', label: 'รุ่น (Model)', type: 'text' },
+            { key: 'Marketing Model', label: 'ชื่อรุ่นทางการตลาด', type: 'text' },
+            { key: 'Product Group', label: 'กลุ่มสินค้า', type: 'text' },
+            { key: 'Capacity', label: 'ความจุ', type: 'text' }, 
+            { key: 'Color', label: 'สี', type: 'text' },
+            { key: 'Image URL', label: 'รูปสินค้า', type: 'text' }, 
+            { key: 'Price', label: 'ราคา', type: 'number' },
             { key: 'Original Price', label: 'ราคาเดิม (เว้นว่างถ้าไม่ลดราคา)', type: 'number' },
-            { key: 'Stock', label: 'Stock', type: 'number' },
-            { key: 'Unit', label: 'Unit', type: 'text' },
-            { key: 'Category', label: 'Category', type: 'select', options: ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'] },
-            { key: 'Status', label: 'Status', type: 'select', options: ['เปิด', 'ปิด'] },
-            { key: 'Channel', label: 'Channel Allowed', type: 'multi_select_channel' },
+            { key: 'Stock', label: 'สต็อก', type: 'number' },
+            { key: 'Unit', label: 'หน่วย', type: 'text' },
+            { key: 'Category', label: 'หมวดหมู่', type: 'select', options: ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'] },
+            { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] },
+            { key: 'Channel', label: 'ช่องทางที่ขาย', type: 'multi_select_channel' },
             { key: 'Display', label: 'หน้าจอ (Display)', type: 'text' },
             { key: 'Processor', label: 'ชิปประมวลผล (Processor)', type: 'text' },
             { key: 'RAM', label: 'หน่วยความจำ (RAM)', type: 'text' },
@@ -1834,15 +1847,15 @@ window.app = {
             { key: 'Buy Category', label: 'หมวดหมู่สินค้าที่ซื้อ', type: 'select', options: apCatOptions },
             { key: 'Get Discount Category', label: 'หมวดหมู่สินค้าที่ได้ส่วนลด', type: 'select', options: apCatOptions },
             { key: 'Discount Percent', label: 'เปอร์เซ็นต์ส่วนลด (%)', type: 'number' },
-            { key: 'Message Suggest', label: 'ข้อความเชียร์ขาย (รองรับ HTML)', type: 'text' },
-            { key: 'Message Apply', label: 'ข้อความเมื่อได้รับส่วนลด (รองรับ HTML)', type: 'text' },
+            { key: 'Message Suggest', label: 'ข้อความเชียร์ขาย (แสดงก่อนลูกค้าได้ส่วนลด)', type: 'text', hint: 'พิมพ์ข้อความธรรมดาได้เลย ต้องการตัวหนาให้ครอบด้วย <b>...</b>' },
+            { key: 'Message Apply', label: 'ข้อความเมื่อได้รับส่วนลดแล้ว', type: 'text', hint: 'พิมพ์ข้อความธรรมดาได้เลย ต้องการตัวหนาให้ครอบด้วย <b>...</b>' },
             { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] },
             { key: 'Channel', label: 'ช่องทางที่ร่วมรายการ (เว้นว่าง = ทุกช่องทาง)', type: 'multi_select_channel' }
           ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
         case 'giftmappings': 
           window.app.grid.init('GiftMappings', 'Mapping ID', [
             { key: 'Mapping ID', label: 'รหัสเงื่อนไข (สร้างอัตโนมัติ เช่น GM-001)', type: 'text' },
-            { key: 'Target Mobile (SKU or Group)', label: 'SKU/Product Name หรือ กลุ่มสินค้า (* = ทุกรุ่น)', type: 'text' }, 
+            { key: 'Target Mobile (SKU or Group)', label: 'ใช้กับสินค้า (รุ่น / กลุ่มสินค้า / SKU หรือ * = ทุกรุ่น)', type: 'text' }, 
             { key: 'Channel', label: 'ช่องทางการขาย', type: 'multi_select_channel' }, 
             { key: 'Brand Gifts', label: 'ของแถมแบรนด์', type: 'multi_select_brand_gifts' }, 
             { key: 'Channel Gifts', label: 'ของแถมช่องทาง ชุดที่ 1', type: 'multi_select_channel_gifts' },
@@ -1851,18 +1864,18 @@ window.app = {
             { key: 'Status', label: 'สถานะการใช้', type: 'select', options: ['เปิด', 'ปิด'] }
         ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
         case 'interests': window.app.grid.init('Interests', 'Interest Name', [{ key: 'Interest Name', label: 'ความสนใจ', type: 'text' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
-        case 'branches': window.app.grid.init('Branches', 'Branch Code', [{ key: 'Channel', label: 'ช่องทางขาย (เพิ่มช่องทางใหม่ได้ที่เมนู ช่องทางขาย)', type: 'select', options: [''].concat(window.app.channelNames()) }, { key: 'Branch Code', label: 'รหัสสาขา', type: 'text' }, { key: 'Branch Name', label: 'ชื่อสาขา', type: 'text' }, { key: 'Area', label: 'แอเรีย (Area)', type: 'text' }, { key: 'Mall', label: 'ห้าง (Mall)', type: 'text' }, { key: 'Region', label: 'ภาค (Region)', type: 'text' }, { key: 'Province', label: 'จังหวัด', type: 'text' }, { key: 'Type Name', label: 'ประเภทสาขา', type: 'text' }]); break;
+        case 'branches': window.app.grid.init('Branches', 'Branch Code', [{ key: 'Channel', label: 'ช่องทางขาย (เพิ่มช่องทางใหม่ได้ที่เมนู ช่องทางขาย)', type: 'select', options: [''].concat(window.app.channelNames()) }, { key: 'Branch Code', label: 'รหัสสาขา', type: 'text' }, { key: 'Branch Name', label: 'ชื่อสาขา', type: 'text' }, { key: 'Area', label: 'แอเรีย (Area)', type: 'suggest' }, { key: 'Mall', label: 'ห้าง (Mall)', type: 'suggest' }, { key: 'Region', label: 'ภาค (Region)', type: 'suggest' }, { key: 'Province', label: 'จังหวัด', type: 'suggest' }, { key: 'Type Name', label: 'ประเภทสาขา', type: 'suggest' }]); break;
         case 'channels': window.app.grid.init('Channels', 'Channel ID', [{ key: 'Channel ID', label: 'รหัสช่องทาง (สร้างอัตโนมัติ เช่น CH-01)', type: 'text' }, { key: 'Channel Name', label: 'ชื่อช่องทาง', type: 'text' }, { key: 'Description', label: 'คำอธิบาย', type: 'text' }]); break;
         case 'members': window.app.grid.init('Members', 'Username', [
             { key: 'Username', label: 'ชื่อผู้ใช้ (Username)', type: 'text' }, 
             { key: 'Password', label: 'รหัสผ่าน (เว้นว่างถ้าไม่เปลี่ยน)', type: 'password' }, 
-            { key: 'Role', label: 'บทบาท (Role)', type: 'select', options: ['Admin', 'Manager', 'Sales'] }, 
+            { key: 'Role', label: 'บทบาท', type: 'select', options: [{ value: 'Sales', label: 'Sales - พนักงานขาย (เห็นเฉพาะสาขาตัวเอง)' }, { value: 'Manager', label: 'Manager - ผู้จัดการ (เห็นทุกสาขา ดูรายงานได้)' }, { value: 'Admin', label: 'Admin - ผู้ดูแลระบบ (ทำได้ทุกอย่าง)' }] }, 
             { key: 'Name', label: 'ชื่อ-สกุล', type: 'text' }, 
-            { key: 'Branch Code', label: 'รหัสสาขา', type: 'text' },
-            { key: 'Accessible Menus', label: 'สิทธิ์การเข้าถึงเมนู (* = ให้ทั้งหมด)', type: 'multi_select_menu' }
+            { key: 'Branch Code', label: 'สาขา', type: 'select', options: window.app.branchOptions() },
+            { key: 'Accessible Menus', label: 'เมนูที่เข้าได้ (ไม่ติ๊กเลย = ตามบทบาท)', type: 'multi_select_menu' }
         ]); break;
-        case 'promotions': window.app.grid.init('Promotions', 'Promo ID', [{ key: 'Promo ID', label: 'รหัสโปรโมชัน (สร้างอัตโนมัติ เช่น P-001)', type: 'text' }, { key: 'Promo Name', label: 'ชื่อโปรโมชัน', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: ['Fixed', 'Percent'] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
-        case 'coupons': window.app.grid.init('Coupons', 'Code', [{ key: 'Code', label: 'โค้ดคูปอง (เช่น NEWYEAR500)', type: 'text' }, { key: 'Description', label: 'รายละเอียด', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: ['Fixed', 'Percent'] }, { key: 'Value', label: 'Value (บาท หรือ %)', type: 'number' }, { key: 'Min Spend', label: 'ยอดซื้อขั้นต่ำ', type: 'number' }, { key: 'Max Uses', label: 'ใช้ได้สูงสุด (0 = ไม่จำกัด)', type: 'number' }, { key: 'Used Count', label: 'ใช้ไปแล้ว', type: 'number' }, { key: 'Start Date', label: 'เริ่ม (yyyy-mm-dd)', type: 'text' }, { key: 'Expiry Date', label: 'หมดอายุ (yyyy-mm-dd)', type: 'text' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
+        case 'promotions': window.app.grid.init('Promotions', 'Promo ID', [{ key: 'Promo ID', label: 'รหัสโปรโมชัน (สร้างอัตโนมัติ เช่น P-001)', type: 'text' }, { key: 'Promo Name', label: 'ชื่อโปรโมชัน', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: [{ value: 'Fixed', label: 'ลดเป็นบาท' }, { value: 'Percent', label: 'ลดเป็นเปอร์เซ็นต์ (%)' }] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
+        case 'coupons': window.app.grid.init('Coupons', 'Code', [{ key: 'Code', label: 'โค้ดคูปอง (เช่น NEWYEAR500)', type: 'text' }, { key: 'Description', label: 'รายละเอียด', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: [{ value: 'Fixed', label: 'ลดเป็นบาท' }, { value: 'Percent', label: 'ลดเป็นเปอร์เซ็นต์ (%)' }] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Min Spend', label: 'ยอดซื้อขั้นต่ำ', type: 'number' }, { key: 'Max Uses', label: 'ใช้ได้สูงสุด (0 = ไม่จำกัด)', type: 'number' }, { key: 'Used Count', label: 'ใช้ไปแล้ว', type: 'number' }, { key: 'Start Date', label: 'วันเริ่มใช้ (เว้นว่าง = ใช้ได้ทันที)', type: 'date' }, { key: 'Expiry Date', label: 'วันหมดอายุ (เว้นว่าง = ไม่หมดอายุ)', type: 'date' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
         case 'inventorylog': window.app.grid.init('InventoryLog', 'Log ID', [{ key: 'Log ID', label: 'รหัสบันทึก', type: 'readonly' }, { key: 'Timestamp', label: 'วันเวลา', type: 'readonly' }, { key: 'SKU', label: 'SKU', type: 'readonly' }, { key: 'Action', label: 'การทำรายการ', type: 'readonly' }, { key: 'Qty', label: 'จำนวน', type: 'readonly' }, { key: 'Branch', label: 'สาขา', type: 'readonly' }, { key: 'User', label: 'ผู้ใช้', type: 'readonly' }], true); break;
         case 'auditlog': window.app.grid.init('AuditLog', 'Log ID', [{ key: 'Log ID', label: 'รหัสบันทึก', type: 'readonly' }, { key: 'Timestamp', label: 'วันเวลา', type: 'readonly' }, { key: 'User', label: 'ผู้ใช้', type: 'readonly' }, { key: 'Action', label: 'การทำรายการ', type: 'readonly' }, { key: 'Details', label: 'รายละเอียด', type: 'readonly' }], true); break;
         case 'invoice': 

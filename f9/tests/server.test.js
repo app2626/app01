@@ -791,6 +791,41 @@ console.log('== SET_ORDER_STATUS');
     eq(statusOf(b), 'Confirmed');
   });
 }
+console.log('== SAVE_RECORD field rules (Members branch / Coupons dates)');
+const mem = (d) => api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: Object.assign({ Password: 'Pass1234!', Name: 'ทดสอบ', 'Accessible Menus': '' }, d) }, admin);
+t('Members: unknown branch / blank branch for Sales / bad role rejected, nothing written', () => {
+  const n = tbl('Members').length;
+  ok(/ไม่พบสาขา/.test(mem({ Username: 'rule.a', Role: 'Sales', 'Branch Code': 'NO-SUCH' }).message), 'unknown branch');
+  ok(/เลือกสาขา/.test(mem({ Username: 'rule.b', Role: 'Sales', 'Branch Code': '' }).message), 'blank branch');
+  ok(/บทบาท/.test(mem({ Username: 'rule.c', Role: 'Boss', 'Branch Code': 'B01' }).message), 'bad role');
+  eq(tbl('Members').length, n);
+});
+t('Members: Admin with a blank branch is stored as ALL; ALL and a real branch accepted', () => {
+  eq(mem({ Username: 'rule.d', Role: 'Admin', 'Branch Code': '' }).status, 'success');
+  eq(tbl('Members').find(x => x.Username === 'rule.d')['Branch Code'], 'ALL');
+  eq(mem({ Username: 'rule.e', Role: 'Manager', 'Branch Code': 'ALL' }).status, 'success');
+  eq(mem({ Username: 'rule.f', Role: 'Sales', 'Branch Code': 'B01' }).status, 'success');
+});
+t('Members: a stored branch that no longer exists does not block editing other fields, but changing to another unknown one does', () => {
+  const sh = sheets.Members, h = sh.rows[0], bi = h.indexOf('Branch Code'), ri = sh.rows.findIndex(r => r[0] === 'rule.f');
+  sh.rows[ri][bi] = 'GONE-01';
+  const row = tbl('Members').find(x => x.Username === 'rule.f');
+  eq(api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: Object.assign({}, row, { Password: '', Name: 'เปลี่ยนชื่อ' }) }, admin).status, 'success');
+  const after = tbl('Members').find(x => x.Username === 'rule.f'); eq(after.Name, 'เปลี่ยนชื่อ'); eq(after['Branch Code'], 'GONE-01');
+  eq(api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: Object.assign({}, after, { Password: '', 'Branch Code': 'GONE-02' }) }, admin).status, 'error');
+});
+const cpn = (d) => api('SAVE_RECORD', { tableName: 'Coupons', idField: 'Code', data: Object.assign({ Description: 'ทดสอบ', 'Discount Type': 'Fixed', Value: 100, 'Min Spend': 0, 'Max Uses': 0, 'Used Count': 0, Status: 'เปิด' }, d) }, admin);
+t('Coupons: dates are stored as yyyy-MM-dd text (dd/mm/yyyy and Buddhist year accepted), blank stays blank', () => {
+  eq(cpn({ Code: 'RULE1', 'Start Date': '2026-12-01', 'Expiry Date': '31/12/2569' }).status, 'success');
+  const c = tbl('Coupons').find(x => x.Code === 'RULE1'); eq(c['Start Date'], '2026-12-01'); eq(c['Expiry Date'], '2026-12-31');
+  eq(cpn({ Code: 'RULE2', 'Start Date': '', 'Expiry Date': '' }).status, 'success');
+  eq(tbl('Coupons').find(x => x.Code === 'RULE2')['Expiry Date'], '');
+});
+t('Coupons: unreadable date and start-after-end rejected', () => {
+  ok(/ไม่ถูกต้อง/.test(cpn({ Code: 'RULE3', 'Start Date': 'สิ้นปี', 'Expiry Date': '' }).message));
+  ok(/ไม่หลัง/.test(cpn({ Code: 'RULE4', 'Start Date': '2026-12-31', 'Expiry Date': '2026-12-01' }).message));
+  ok(!tbl('Coupons').some(x => x.Code === 'RULE3' || x.Code === 'RULE4'));
+});
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
 
 console.log('\n==== ' + pass + ' passed, ' + fail + ' failed');

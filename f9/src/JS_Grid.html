@@ -1,7 +1,7 @@
 <script>
 // Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
 window.app.grid = {
-    TITLES: { Products: 'จัดการสินค้า', Branches: 'จัดการสาขา', Channels: 'จัดการช่องทางขาย', Members: 'จัดการสมาชิก', GiftMappings: 'จัดการชุดของแถม', AutoPromotions: 'จัดการโปรโมชั่นอัตโนมัติ', Promotions: 'จัดการส่วนลดและโปรโมชั่น', Interests: 'จัดการความสนใจ', Coupons: 'จัดการโค้ดส่วนลด', Orders: 'รายการจอง', InventoryLog: 'ประวัติสต๊อก', AuditLog: 'ประวัติการใช้งาน' },
+    TITLES: { Products: 'จัดการสินค้า', Branches: 'จัดการสาขา', Channels: 'จัดการช่องทางขาย', Members: 'จัดการผู้ใช้งาน', GiftMappings: 'จัดการชุดของแถม', AutoPromotions: 'จัดการส่วนลดซื้อคู่อัตโนมัติ', Promotions: 'จัดการส่วนลดตอนจอง', Interests: 'จัดการตัวเลือกความสนใจลูกค้า', Coupons: 'จัดการโค้ดส่วนลด', Orders: 'รายการจอง', InventoryLog: 'ประวัติสต๊อก', AuditLog: 'ประวัติการใช้งาน' },
     setPageSize: function(v) { const n = parseInt(v, 10); if (n > 0) { this.pageSize = n; this.renderPage(1); } },
     STATUS_TABLES: ['Products', 'GiftMappings', 'AutoPromotions', 'Promotions'],
     canBulkStatus: function() { return this.canBulk() && this.STATUS_TABLES.indexOf(this.tableName) > -1; },
@@ -20,7 +20,7 @@ window.app.grid = {
       if(btn) btn.style.display = (readonly || table==='Orders') ? 'none' : 'inline-flex';
       const ttl = this.TITLES[table] || table;
       const gt = document.getElementById('gridTitle'); if (gt) gt.textContent = ttl;
-      const gc = document.getElementById('gridCrumb'); if (gc) gc.textContent = 'ข้อมูลระบบ > ' + ttl;
+      const gc = document.getElementById('gridCrumb'); if (gc) gc.textContent = (table === 'Orders' ? 'ข้อมูลระบบ > ' : 'จัดการร้าน > ') + ttl;
       const delBtn = document.getElementById('gridBulkDeleteBtn');
       if (delBtn) { const on = this.canBulk(); delBtn.classList.toggle('hidden', !on); }
       ['gridBulkOnBtn', 'gridBulkOffBtn'].forEach(id => { const b = document.getElementById(id); if (b) b.classList.toggle('hidden', !this.canBulkStatus()); });
@@ -224,6 +224,11 @@ window.app.grid = {
           else if(c.key==='Order Status' || c.key==='Status') { 
               let clr = val==='เปิด'||val==='Completed'?'cms-b-green':(val==='Pending'?'cms-b-amber':'cms-b-gray'); 
               val=`<span class="cms-badge ${clr}">${val}</span>`; 
+          }
+          else if(c.type==='select' && c.options && c.options.some(o => o && typeof o === 'object')) {
+              // คอลัมน์ select ที่มีป้ายแสดงต่างจากค่าที่เก็บ (เช่น Fixed = ลดเป็นบาท) — ตารางแสดงป้ายเดียวกับฟอร์ม
+              const so = this.optList(c).find(o => o.value === String(row[c.key] === undefined || row[c.key] === null ? '' : row[c.key]));
+              if (so) val = window.app.esc(so.label);
           }
           if(c.key==='Image URL' && val.length>30) val = val.substring(0,30)+'...';
           // Orders: ติด icon หน้าชื่อสินค้าให้แถวส่วนลด/ของแถม อ่านบิลหลายแถวต่อ OrderID ง่ายขึ้น
@@ -437,30 +442,17 @@ window.app.grid = {
       if (this.tableName === 'Orders' && data) fHtml += this.orderTimelineHtml(data);
       if (this.tableName === 'Orders') fHtml += '<datalist id="customerList">' + [...new Set(this.dataList.map(o=>o['Customer Name']))].filter(Boolean).map(c=>'<option value="' + window.app.esc(c) + '">').join('') + '</datalist>';
       
-      let grouped = {};
-      let noGroup = [];
-      
-      window.app.globalData.products.forEach(p => {
-          if(p.Category==='โมบาย') {
-              const group = p['Product Group'] ? p['Product Group'].trim() : '';
-              const opt = `<option value="${window.app.esc(p.SKU + ' / ' + p['Product Name'])}">`;
-              if (group) {
-                  if (!grouped[group]) grouped[group] = [];
-                  grouped[group].push(opt);
-              } else {
-                  noGroup.push(opt);
-              }
-          }
-      });
-      
-      let datalistOpts = [];
-      for (const group in grouped) {
-          datalistOpts.push(`<option value="${window.app.esc(group)}">`);
-          datalistOpts.push(...new Set(grouped[group]));
+      // รายการแนะนำของช่อง "ใช้กับสินค้า" (GiftMappings) — ค่าที่เลือกต้องเป็นค่าที่กติกาจับคู่รู้จักจริง: กลุ่มสินค้า, รุ่น (เป็นส่วนหนึ่งของชื่อสินค้า) หรือ SKU
+      // เดิมเสนอ "SKU / ชื่อสินค้า" ซึ่งไม่ตรงกับกติกาข้อไหนเลย เลือกแล้วของแถมไม่ขึ้น
+      if (this.tableName === 'GiftMappings') {
+        const tSeen = {}, tOpts = ['<option value="*" label="ทุกรุ่น">'];
+        const tAdd = (v, label) => { const t = String(v === undefined || v === null ? '' : v).trim(); if (!t || tSeen[t.toLowerCase()]) return; tSeen[t.toLowerCase()] = true; tOpts.push('<option value="' + window.app.esc(t) + '" label="' + window.app.esc(label) + '">'); };
+        const tProds = (window.app.globalData.products || []).filter(p => p.Category !== 'ของแถมแบรนด์' && p.Category !== 'ของแถมช่องทาง');
+        tProds.forEach(p => tAdd(p['Product Group'], 'กลุ่มสินค้า'));
+        tProds.forEach(p => tAdd(p.Model, 'รุ่น'));
+        tProds.forEach(p => tAdd(p.SKU, 'SKU: ' + (p['Product Name'] || '')));
+        fHtml += '<datalist id="targetList">' + tOpts.join('') + '</datalist>';
       }
-      datalistOpts.push(...new Set(noGroup));
-      
-      fHtml += `<datalist id="targetList">${datalistOpts.join('')}</datalist>`;
 
       this.columns.forEach(c => {
         let val = data ? (data[c.key] || '') : ''; let inp = '';
@@ -526,7 +518,26 @@ window.app.grid = {
             });
             inp += `</div>`;
         }
-        else if(c.type==='select') { inp='<select class="'+inputClass+'" id="field_' + c.key + '" ' + dis + '>' + c.options.map(opt=>'<option value="' + window.app.esc(opt) + '" ' + (val===opt?'selected':'') + '>' + window.app.esc(opt) + '</option>').join('') + '</select>'; }
+        else if(c.type==='select') {
+          // ตัวเลือกเป็นข้อความธรรมดา หรือ {value,label} (ค่าที่เก็บ + ข้อความที่แสดง) — ค่าเดิมในชีตที่ไม่อยู่ในรายการถูกเพิ่มเป็นตัวเลือกของตัวเอง
+          // ไม่งั้น select จะเด้งไปตัวเลือกแรกแล้วบันทึกทับค่าเดิมเงียบๆ
+          const sOpts = this.optList(c);
+          if (String(val) !== '' && !sOpts.some(o => o.value === String(val))) sOpts.unshift({ value: String(val), label: String(val) + ' (ค่าเดิม)' });
+          inp='<select class="'+inputClass+'" id="field_' + c.key + '" ' + dis + '>' + sOpts.map(o=>'<option value="' + window.app.esc(o.value) + '" ' + (String(val)===o.value?'selected':'') + '>' + window.app.esc(o.label) + '</option>').join('') + '</select>';
+        }
+        else if(c.type==='suggest') {
+          // ช่องพิมพ์อิสระที่แนะนำค่าที่เคยใช้ในคอลัมน์เดียวกัน (กันสะกดต่างกันจนรายงานแตกกลุ่ม)
+          const sgId = 'sg_' + c.key.replace(/[^A-Za-z0-9]/g, '');
+          const seenSg = {}; let sgOpts = '';
+          (this.dataList || []).forEach(r => { const t = String(r[c.key] === undefined || r[c.key] === null ? '' : r[c.key]).trim(); if (t && !seenSg[t.toLowerCase()]) { seenSg[t.toLowerCase()] = true; sgOpts += '<option value="' + window.app.esc(t) + '">'; } });
+          inp = '<input type="text" class="'+inputClass+'" id="field_' + c.key + '" value="' + escVal + '" list="' + sgId + '" autocomplete="off" ' + dis + '><datalist id="' + sgId + '">' + sgOpts + '</datalist>';
+        }
+        else if(c.type==='date') {
+          // วันที่เก็บเป็นข้อความ yyyy-mm-dd — ค่าเดิมที่อ่านเป็นวันที่ไม่ได้ให้แก้เป็นข้อความตามเดิม (ช่อง date จะโชว์ว่างแล้วบันทึกทับเป็นค่าว่าง)
+          const iso = this.isoDate(val);
+          if (String(val).trim() !== '' && !iso) inp = '<input type="text" class="'+inputClass+'" id="field_' + c.key + '" value="' + escVal + '" placeholder="ปี-เดือน-วัน เช่น 2026-12-31" ' + dis + '>';
+          else inp = '<input type="date" class="'+inputClass+'" id="field_' + c.key + '" value="' + window.app.esc(iso) + '" ' + dis + '>';
+        }
         else if(c.type==='product_select') {
           if (data && data.SKU === 'DISCOUNT') {
             inp = '<input type="text" class="' + inputClass + ' bg-slate-100" id="field_' + c.key + '" value="' + escVal + '" readonly>';
@@ -550,7 +561,7 @@ window.app.grid = {
           let numVal = String(val === null || val === undefined ? '' : val).replace(/[^\d.\-]/g, '');
           inp='<input type="number" class="'+inputClass + ' ' + numDis +'" id="field_' + c.key + '" value="' + window.app.esc(numVal) + '" onkeyup="' + (c.onchange||'') + '" onchange="' + (c.onchange||'') + '" ' + (numDis?'readonly':'') + ' ' + dis + '>';
         }
-        else if(this.tableName === 'GiftMappings' && c.key === 'Target Mobile (SKU or Group)') inp=`<div class="relative"><input type="text" class="${inputClass} pr-8" id="field_${c.key}" value="${escVal}" list="targetList" placeholder="เช่น SKU-123, S24-Series หรือ *" ${dis}><button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none" onclick="document.getElementById('field_${c.key}').value=''"><i class="fas fa-times"></i></button></div>`;
+        else if(this.tableName === 'GiftMappings' && c.key === 'Target Mobile (SKU or Group)') inp=`<div class="relative"><input type="text" class="${inputClass} pr-8" id="field_${c.key}" value="${escVal}" list="targetList" autocomplete="off" placeholder="เลือกจากรายการ หรือพิมพ์ * = ทุกรุ่น" oninput="window.app.grid.targetHint(this.value)" ${dis}><button type="button" aria-label="ล้างค่า" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none" onclick="document.getElementById('field_${c.key}').value=''; window.app.grid.targetHint('')"><i class="fas fa-times"></i></button></div><p id="giftTargetHint" class="text-[11px] mt-1 text-slate-500" aria-live="polite"></p>`;
         else if((this.tableName === 'GiftMappings' && c.key === 'Mapping ID') || (this.tableName === 'Channels' && c.key === 'Channel ID') || (this.tableName === 'Promotions' && c.key === 'Promo ID') || (this.tableName === 'AutoPromotions' && c.key === 'Rule ID')) {
           // สร้างรหัสอัตโนมัติเฉพาะตอนเพิ่มแถวใหม่ (ไล่จากรหัสสูงสุดที่มีอยู่จริงในตาราง) — ล็อกไม่ให้พิมพ์เอง กันรหัสชนกัน/พิมพ์ผิดรูปแบบ
           const autoIdFormats = { 'Mapping ID': { prefix: 'GM-', pad: 3 }, 'Channel ID': { prefix: 'CH-', pad: 2 }, 'Promo ID': { prefix: 'P-', pad: 3 }, 'Rule ID': { prefix: 'AP-', pad: 3 } };
@@ -582,11 +593,46 @@ window.app.grid = {
         }
         else inp='<input type="' + c.type + '" class="'+inputClass+'" id="field_' + c.key + '" value="' + escVal + '" ' + dis + '>';
         
-        fHtml += '<div><label class="block text-xs font-bold text-slate-600 mb-1.5">' + c.label + '</label>' + inp + '</div>';
+        fHtml += '<div><label class="block text-xs font-bold text-slate-600 mb-1.5">' + c.label + '</label>' + inp + (c.hint ? '<p class="text-[11px] mt-1 text-slate-500">' + window.app.esc(c.hint) + '</p>' : '') + '</div>';
       });
       f.innerHTML = fHtml;
+      if (this.tableName === 'GiftMappings') this.targetHint(data ? data['Target Mobile (SKU or Group)'] : '');
       if(document.getElementById('formModalTitle')) { const subj = (this.TITLES[this.tableName] || '').replace(/^จัดการ/, '') || 'ข้อมูล'; document.getElementById('formModalTitle').innerText = (data ? 'แก้ไข' : 'เพิ่ม') + subj; }
       window.app.showModal('formModal');
+    },
+    // ตัวเลือกของคอลัมน์ select ในรูป [{value,label}] เสมอ
+    optList: function(c) {
+      return (c.options || []).map(o => (o && typeof o === 'object') ? { value: String(o.value), label: String(o.label === undefined ? o.value : o.label) } : { value: String(o), label: String(o) });
+    },
+    // แปลงวันที่จากชีต (yyyy-mm-dd, yyyy/mm/dd, dd/mm/yyyy, ปี พ.ศ.) เป็น yyyy-mm-dd สำหรับ input type=date — อ่านไม่ได้คืนค่าว่าง
+    isoDate: function(v) {
+      const s = String(v === undefined || v === null ? '' : v).trim();
+      let y, mo, d, m = s.match(/^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+      if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+      else { m = s.match(/^(\d{1,2})[-.\/](\d{1,2})[-.\/](\d{4})/); if (!m) return ''; y = +m[3]; mo = +m[2]; d = +m[1]; }
+      if (y > 2400) y -= 543;
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+      return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    },
+    // สินค้าที่เงื่อนไขของแถมจับคู่ได้ — กติกาเดียวกับหน้าร้าน (pos) และ processCheckout: SKU ตรงตัว, กลุ่มสินค้าตรงตัว, หรือเป็นส่วนหนึ่งของชื่อสินค้า
+    targetProducts: function(text) {
+      const t = String(text === undefined || text === null ? '' : text).trim();
+      if (!t) return [];
+      const prods = (window.app.globalData.products || []).filter(p => p.Category !== 'ของแถมแบรนด์' && p.Category !== 'ของแถมช่องทาง');
+      if (t === '*' || t.toUpperCase() === 'ALL') return prods;
+      const low = v => String(v === undefined || v === null ? '' : v).trim().toLowerCase();
+      const toks = t.split(',').map(low).filter(Boolean);
+      return prods.filter(p => { const sku = low(p.SKU), grp = low(p['Product Group']), name = low(p['Product Name']); return toks.includes(sku) || (grp !== '' && toks.includes(grp)) || toks.some(x => x !== '*' && name !== '' && name.includes(x)); });
+    },
+    targetHint: function(text) {
+      const el = document.getElementById('giftTargetHint'); if (!el) return;
+      const t = String(text === undefined || text === null ? '' : text).trim();
+      el.classList.remove('text-rose-600', 'font-bold');
+      if (!t) { el.textContent = 'เลือกรุ่น กลุ่มสินค้า หรือ SKU จากรายการ ใส่หลายค่าได้โดยคั่นด้วยจุลภาค'; return; }
+      const hit = this.targetProducts(t);
+      if (!hit.length) { el.classList.add('text-rose-600', 'font-bold'); el.textContent = 'ไม่ตรงกับสินค้าใดเลย ของแถมชุดนี้จะไม่แสดงในหน้าร้าน ตรวจตัวสะกดอีกครั้ง'; return; }
+      const models = []; hit.forEach(p => { const m = String(p.Model || p['Product Name'] || '').trim(); if (m && models.indexOf(m) === -1) models.push(m); });
+      el.textContent = 'ตรงกับสินค้า ' + hit.length + ' รายการ (' + models.length + ' รุ่น): ' + models.slice(0, 3).join(', ') + (models.length > 3 ? ' ...' : '');
     },
     onProductChange: function(sel) {
       const o = sel.options[sel.selectedIndex]; if(!o) return;
@@ -669,6 +715,13 @@ window.app.grid = {
       // ส่ง _rowIndex ของแถวเดิมไปด้วยตอนแก้ไข (ไม่ใช่ Orders — มี field '_rowIndex' hidden ของตัวเองอยู่แล้วในคอลัมน์ config) ให้ saveRecord (Code.js)
       // ใช้ชี้แถวที่จะอัปเดตตรงๆ แทนการไล่เทียบค่า ID เฉยๆ — กันกรณี ID ที่พิมพ์แก้ไขบังเอิญไปชนกับแถวอื่น
       if (this.editingData && this.tableName !== 'Orders') pay._rowIndex = this.editingData._rowIndex;
+
+      // ผู้ใช้งานที่ไม่ใช่ Admin ต้องมีสาขา (หรือ ALL) — ตรวจก่อนปิดฟอร์ม ไม่งั้นข้อความ error จาก server มาหลังฟอร์มปิดและค่าที่กรอกหาย (server ตรวจซ้ำใน saveRecord)
+      if (this.tableName === 'Members' && pay.Role !== 'Admin' && !String(pay['Branch Code'] || '').trim()) {
+        restoreBtn();
+        Swal.fire('ยังไม่ได้เลือกสาขา', 'Manager และ Sales ต้องเลือกสาขา หรือเลือก "ทุกสาขา (ALL)" ถ้าให้เห็นทุกสาขา', 'warning');
+        return;
+      }
 
       // กันสร้างรายการใหม่ด้วยรหัสที่มีอยู่แล้ว — saveRecord ฝั่ง server เจอรหัสซ้ำจะ "อัปเดตทับ" ของเดิมเงียบๆ
       // (เช่น เพิ่มสินค้าใหม่แต่พิมพ์ SKU เดิม = สินค้าเดิมถูกเขียนทับหาย) — บล็อกไว้ตั้งแต่ฝั่งฟอร์ม (server เพิ่ง throw ด้วยเหมือนกันแล้ว เป็นแค่ fast-path UX)

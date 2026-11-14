@@ -13,7 +13,7 @@ window.app.systemSettings = {
       { id: 'bookingsettings', icon: 'fa-clock',           label: 'การจอง',            type: 'bookingsettings' },
       { id: 'ss_docs',         icon: 'fa-file-contract',   label: 'เอกสารและนโยบาย',   type: 'autosetup', secs: ['policies', 'company'] },
       { id: 'loginbg',         icon: 'fa-image',           label: 'หน้า Login',         type: 'loginbg' },
-      { id: 'autosetup',       icon: 'fa-database',        label: 'ระบบ',              type: 'autosetup', secs: ['setup', 'drive'] }
+      { id: 'autosetup',       icon: 'fa-database',        label: 'ระบบ',              type: 'autosetup', secs: ['notify', 'cache', 'drive', 'setup'] }
     ],
     dirty: false,
 
@@ -29,7 +29,7 @@ window.app.systemSettings = {
       ).join('');
       content.innerHTML = `
         <div class="space-y-6 animate-fade-in-up">
-          <div class="cms-page"><div class="cms-head" style="margin-bottom:0"><h1>ตั้งค่าระบบ</h1><span class="cms-crumb">ตั้งค่า &gt; ตั้งค่าระบบ</span></div></div>
+          <div class="cms-page"><div class="cms-head" style="margin-bottom:0"><h1>ตั้งค่าระบบ</h1><span class="cms-crumb">จัดการร้าน &gt; ตั้งค่าระบบ</span></div></div>
           <div class="bg-white border border-slate-200 shadow-sm rounded-3xl px-6 pt-3" style="margin-top:16px">
             <div class="flex gap-5 overflow-x-auto custom-scrollbar" role="tablist">${barHtml}</div>
           </div>
@@ -215,30 +215,34 @@ window.app.settingsManager = {
               </div>
             </div>
           </div>
-          <div data-sec="setup" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="notify" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
-              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-database text-indigo-500 mr-2"></i> สร้างฐานข้อมูลครั้งแรก (Auto Setup)</h3>
-              <p class="text-xs text-slate-500 mt-1">ใช้สำหรับการตั้งค่า Google Sheets และข้อมูลเริ่มต้นระบบทั้งหมด (ตาราง, สินค้าตัวอย่าง, บัญชีแอดมิน)</p>
+              <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-bell text-indigo-500 mr-2"></i> แจ้งเตือนใบจองใหม่ (Webhook)</h3>
+              <p class="text-xs text-slate-500 mt-1">ส่งข้อความไปยังห้องแชตของทีม (Discord / Slack / Google Chat / Make) เมื่อมีใบจองใหม่หรือสต็อกใกล้หมด — ไม่ใช้ให้เว้นว่าง</p>
             </div>
-            <div class="p-8 space-y-6 text-center">
-              <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-50 mb-2">
-                 <i class="fas fa-database text-4xl text-indigo-600"></i>
+            <div class="p-8 space-y-4">
+              <div class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700" for="webhookUrlInput">Webhook URL</label>
+                <input type="url" id="webhookUrlInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.WebhookUrl) || '')}" placeholder="วางลิงก์ Webhook ที่ขึ้นต้นด้วย https">
+                <p class="text-[11px] text-slate-400">เมื่อจองสำเร็จ ระบบส่ง JSON (text, content, orderId, netTotal, lowStockWarnings) ไปยังลิงก์นี้</p>
               </div>
-              <div class="text-slate-600 text-sm max-w-md mx-auto space-y-3">
-                 <p class="font-bold text-slate-800">คำเตือนสำหรับระบบ!</p>
-                 <p>หากคุณกดดำเนินการ ระบบจะสร้างแผ่นงานที่จำเป็นสำหรับระบบขายของแบรนด์นี้ หากมีตารางเดิมอยู่แล้ว จะทำการตรวจสอบความสมบูรณ์และเสริมตารางที่หายไป</p>
-                 <p class="text-slate-500">ใช้เมื่อ<strong>ติดตั้งระบบครั้งแรก</strong> หรือเมื่อระบบเวอร์ชันใหม่<strong>มีตาราง/คอลัมน์เพิ่ม</strong>แล้วต้องการเติมส่วนที่หายไป — ข้อมูลเดิมไม่ถูกลบ</p>
-              </div>
-              
-              <div class="pt-6 border-t border-slate-100 flex justify-center">
-                <button type="button" class="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all" onclick="window.app.initDB()">
-                    <i class="fas fa-cogs mr-2"></i> เริ่มการดำเนินการ Auto Setup
-                </button>
+              <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button type="button" onclick="window.app.settingsManager.saveWebhook(this)" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center"><i class="fas fa-save mr-2"></i> บันทึกการแจ้งเตือน</button>
               </div>
             </div>
           </div>
 
-          <div data-sec="drive" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <div data-sec="cache" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <div class="p-6 flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0">
+                <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-broom text-indigo-500 mr-2"></i> ล้างแคชข้อมูล</h3>
+                <p class="text-xs text-slate-500 mt-1">ใช้หลังแก้ข้อมูลตรงๆ ใน Google Sheets เพื่อให้หน้าร้านเห็นข้อมูลล่าสุดทันที (ปกติแคชค้างได้ถึง 6 ชั่วโมง) การแก้ผ่านหน้าจอของระบบไม่ต้องล้างแคช</p>
+              </div>
+              <button type="button" onclick="window.app.settingsManager.clearCache()" class="cms-btn cms-btn-line shrink-0"><i class="fas fa-sync-alt"></i> ล้างแคชตอนนี้</button>
+            </div>
+          </div>
+
+          <div data-sec="drive"class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
               <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-folder text-indigo-500 mr-2"></i> โฟลเดอร์เก็บรูปอัปโหลด (Drive Folder ID)</h3>
               <p class="text-xs text-slate-500 mt-1">กำหนดโฟลเดอร์ Google Drive ปลายทางของรูปที่อัปโหลดจากปุ่ม "อัปโหลดรูป" — เว้นว่างเพื่อใช้โฟลเดอร์อัตโนมัติ</p>
@@ -254,6 +258,21 @@ window.app.settingsManager = {
               </div>
             </div>
           </div>
+
+          <details data-sec="setup" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+            <summary class="p-6 cursor-pointer">
+              <span class="text-lg font-extrabold text-slate-800"><i class="fas fa-database text-indigo-500 mr-2"></i> เครื่องมือติดตั้งระบบ (Auto Setup)</span>
+              <span class="block text-xs text-slate-500 mt-1">ใช้ตอนติดตั้งครั้งแรก หรือหลังอัปเดตระบบที่มีตารางหรือคอลัมน์เพิ่ม — กดเพื่อเปิด</span>
+            </summary>
+            <div class="p-6 border-t border-slate-100 space-y-4">
+              <p class="text-sm text-slate-600">ระบบจะสร้างแผ่นงานที่ยังไม่มีใน Google Sheets และเติมคอลัมน์ที่ขาด <strong>ข้อมูลเดิมไม่ถูกลบ</strong> ใช้งานประจำวันไม่ต้องกดปุ่มนี้</p>
+              <div class="flex justify-end">
+                <button type="button" class="inline-flex items-center justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all" onclick="window.app.initDB()">
+                    <i class="fas fa-cogs mr-2"></i> เริ่มการดำเนินการ Auto Setup
+                </button>
+              </div>
+            </div>
+          </details>
 
           <div data-sec="company" class="bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden">
             <div class="p-6 bg-slate-50 border-b border-slate-100">
@@ -309,17 +328,17 @@ window.app.settingsManager = {
         const end = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.ReserveEnd) || '');
         const campaignTitle = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.FlashCampaignTitle) || '');
         const lowStockThreshold = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.LowStockThreshold) || '3');
-        const webhookUrl = window.app.esc((this.data.keyValueSettings && this.data.keyValueSettings.WebhookUrl) || '');
+        // Webhook และล้างแคชย้ายไปแท็บ "ระบบ" (การ์ด data-sec notify / cache) — แท็บนี้เหลือเฉพาะเรื่องการรับจอง
         
         html = `
           <div class="max-w-2xl mx-auto bg-white border border-slate-200 shadow-xl rounded-3xl overflow-hidden animate-fade-in-up">
             <div class="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
               <div class="min-w-0">
-                <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-clock text-indigo-500 mr-2"></i> ตั้งเวลารับจอง & แคมเปญ Pre Booking</h3>
-                <p class="text-xs text-slate-500 mt-1">กำหนดวันเวลาเริ่มต้น-สิ้นสุด ชื่อแคมเปญ Pre Booking เกณฑ์เตือนสต๊อกต่ำ และ Webhook แจ้งเตือนออเดอร์</p>
+                <h3 class="text-lg font-extrabold text-slate-800"><i class="fas fa-clock text-indigo-500 mr-2"></i> ช่วงเวลารับจอง</h3>
+                <p class="text-xs text-slate-500 mt-1">กำหนดวันเวลาเริ่มและสิ้นสุดการรับจอง ชื่อแคมเปญบนแถบหน้าร้าน และเกณฑ์เตือนสต็อกต่ำ</p>
               </div>
               <span class="hidden sm:inline-flex shrink-0 whitespace-nowrap items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
-                <i class="fas fa-bolt mr-1"></i> แคมเปญ & แจ้งเตือน
+                <i class="fas fa-bolt mr-1"></i> การรับจอง
               </span>
             </div>
             
@@ -353,22 +372,6 @@ window.app.settingsManager = {
                   </label>
                   <input type="number" id="lowStockThresholdInput" min="1" max="100" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-extrabold text-rose-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${lowStockThreshold}">
                 </div>
-              </div>
-
-              <div class="space-y-2">
-                <label class="block text-xs font-bold text-slate-700 flex items-center">
-                  <i class="fas fa-bell text-emerald-600 mr-1.5 text-xs"></i> Webhook URL แจ้งเตือนออเดอร์ใหม่ & สต๊อกใกล้หมด (Discord / Slack / Google Chat / Make)
-                </label>
-                <input type="url" id="webhookUrlInput" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm" value="${webhookUrl}" placeholder="https:\/\/discord.com/api/webhooks/... หรือ Webhook URL อื่นๆ (เว้นว่างหากไม่ใช้งาน)">
-                <p class="text-[11px] text-slate-400">เมื่อมีการจองสำเร็จ ระบบจะยิง JSON (text, content, orderId, netTotal, lowStockWarnings) ไปยัง URL นี้อัตโนมัติ</p>
-              </div>
-              
-              <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <h4 class="text-sm font-bold text-slate-800 flex items-center"><i class="fas fa-broom text-slate-500 mr-1.5"></i> ล้างแคชข้อมูล</h4>
-                  <p class="text-[11px] text-slate-500 mt-1">ใช้หลังแก้ไขชีต Products / Promotions / Coupons ตรงๆ ใน Google Sheets เพื่อให้หน้า Pre Booking เห็นข้อมูลล่าสุดทันที (ปกติแคชค้าง 6 ชั่วโมง)</p>
-                </div>
-                <button type="button" onclick="window.app.settingsManager.clearCache()" class="cms-btn cms-btn-line shrink-0"><i class="fas fa-sync-alt"></i> ล้างแคชตอนนี้</button>
               </div>
 
               <div class="bg-indigo-50/50 border border-indigo-100/50 rounded-2xl p-5 space-y-3">
@@ -485,7 +488,6 @@ window.app.settingsManager = {
       const end = document.getElementById('reserveEndInput').value;
       const campaignTitle = (document.getElementById('flashCampaignTitleInput')?.value || '').trim();
       const lowStockThreshold = (document.getElementById('lowStockThresholdInput')?.value || '3').trim() || '3';
-      const webhookUrl = (document.getElementById('webhookUrlInput')?.value || '').trim();
       
       if (!start || !end) {
         return Swal.fire('แจ้งเตือน', 'กรุณาระบุวันเวลาให้ครบถ้วน', 'warning');
@@ -505,8 +507,7 @@ window.app.settingsManager = {
             ReserveStart: start,
             ReserveEnd: end,
             FlashCampaignTitle: campaignTitle,
-            LowStockThreshold: lowStockThreshold,
-            WebhookUrl: webhookUrl
+            LowStockThreshold: lowStockThreshold
           }
         });
         if(res && res.status==='success') {
@@ -521,6 +522,26 @@ window.app.settingsManager = {
       } finally {
         restoreBtn();
       }
+    },
+
+    // Webhook แจ้งเตือน (แท็บ ระบบ) — บันทึกแยกจากช่วงเวลารับจอง; server ตรวจรูปแบบลิงก์ซ้ำตาม SETTING_RULES_
+    saveWebhook: async function(btn) {
+      const el = document.getElementById('webhookUrlInput');
+      const url = el ? el.value.trim() : '';
+      if (url && !/^https:[/][/][^\s<>"']+$/i.test(url)) { Swal.fire('ลิงก์ไม่ถูกต้อง', 'Webhook URL ต้องขึ้นต้นด้วย https', 'warning'); return; }
+      const restoreBtn = window.app.buttonBusy(btn || document.activeElement) || function(){};
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { WebhookUrl: url } });
+        if (res && res.status === 'success') {
+          Swal.fire({ icon: 'success', title: 'บันทึกการแจ้งเตือนแล้ว', timer: 1500, showConfirmButton: false });
+          this.init(this.currentType);
+        } else {
+          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+        }
+      } catch (e) {
+        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+      } finally { restoreBtn(); }
     },
 
     saveContactInfo: async function(btn) {
