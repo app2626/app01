@@ -595,6 +595,23 @@ window.app.pos = {
       }
     },
 
+    // ของแถมช่องทาง 3 ชุด (GiftMappings): คอลัมน์เดิม = ชุดที่ 1, สองคอลัมน์ใหม่ = ชุดที่ 2/3 — ต้องตรงกับ GIFT_SET_COLS_ ใน Code.js
+    // ลูกค้าเลือกรับได้ชุดเดียวต่อสินค้า 1 รายการ (server ตรวจซ้ำใน processCheckout)
+    GIFT_SET_COLS: ['Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3'],
+    // ติ๊กของแถมช่องทาง: เปิด/ปิดช่องจำนวนของตัวเอง และถ้าติ๊กในชุดหนึ่ง ให้ยกเลิกที่ติ๊กไว้ในชุดอื่นทั้งหมด
+    onChannelGiftToggle: function(cb) {
+      const qtyOf = (c) => document.getElementById(c.id.replace('cgift', 'cgiftQty'));
+      const q = qtyOf(cb); if (q) q.disabled = !cb.checked;
+      const box = document.getElementById('modalChannelGifts');
+      if (!box) return;
+      if (cb.checked) {
+        box.querySelectorAll('input[type="checkbox"]').forEach(o => {
+          if (o !== cb && o.getAttribute('data-set') !== cb.getAttribute('data-set') && o.checked) { o.checked = false; const oq = qtyOf(o); if (oq) oq.disabled = true; }
+        });
+      }
+      box.querySelectorAll('.pd-giftset').forEach(s => s.classList.toggle('on', !!s.querySelector('input[type="checkbox"]:checked')));
+    },
+
     // คำนวณจำนวนของแถมที่มีสิทธิ์ได้รับของสินค้า 1 ตัว (ตรงตามเงื่อนไข GiftMappings + Channel ปัจจุบัน)
     countEligibleGifts: function(prod, currentChannel) {
       const res = { total: 0, brandCount: 0, channelCount: 0, giftNames: [] };
@@ -623,7 +640,7 @@ window.app.pos = {
       const allowedChannel = [];
       mappings.forEach(m => {
         if (m['Brand Gifts']) allowedBrand.push(...m['Brand Gifts'].split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
-        if (m['Channel Gifts']) allowedChannel.push(...m['Channel Gifts'].split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
+        this.GIFT_SET_COLS.forEach(col => { if (m[col]) allowedChannel.push(...m[col].split(',').map(s => s.trim().toLowerCase()).filter(Boolean)); });
       });
 
       (window.app.globalData.products || []).forEach(p => {
@@ -2566,6 +2583,8 @@ window.app.pos = {
 
       let allowedBrandGifts = [];
       let allowedChannelGifts = [];
+      const allowedSets = this.GIFT_SET_COLS.map(() => []);
+      const setHtml = this.GIFT_SET_COLS.map(() => '');
       let hasMapping = false;
 
       const mappings = (window.app.globalData.giftMappings || []).filter(m => {
@@ -2597,7 +2616,11 @@ window.app.pos = {
           hasMapping = true;
           mappings.forEach(m => {
               if(m['Brand Gifts']) allowedBrandGifts.push(...m['Brand Gifts'].split(',').map(s=>s.trim().toLowerCase()).filter(s=>s!==''));
-              if(m['Channel Gifts']) allowedChannelGifts.push(...m['Channel Gifts'].split(',').map(s=>s.trim().toLowerCase()).filter(s=>s!==''));
+              this.GIFT_SET_COLS.forEach((col, si) => {
+                  if(!m[col]) return;
+                  const names = m[col].split(',').map(s=>s.trim().toLowerCase()).filter(s=>s!=='');
+                  allowedChannelGifts.push(...names); allowedSets[si].push(...names);
+              });
           });
       }
 
@@ -2611,12 +2634,16 @@ window.app.pos = {
             bGiftsHTML += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-emerald-400 hover:bg-emerald-50/20 transition-all"><input class="w-4 h-4 text-emerald-500 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="bgift${idx}" onchange="document.getElementById('bgiftQty${idx}').disabled = !this.checked"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="bgift${idx}">${window.app.esc(p['Product Name'])} <span class="inline-block text-[9px] text-emerald-600 font-extrabold ml-1 bg-emerald-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="bgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
           } 
           else if(p.Category==='ของแถมช่องทาง' && hasMapping && allowedChannelGifts.some(g => g === '*' || pNameLower.includes(g))) {
-            cGiftsHTML += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all"><input class="w-4 h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${idx}" onchange="document.getElementById('cgiftQty${idx}').disabled = !this.checked"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="cgift${idx}">${window.app.esc(p['Product Name'])} <span class="inline-block text-[9px] text-indigo-600 font-extrabold ml-1 bg-indigo-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="cgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
+            allowedSets.forEach((names, si) => { if (names.some(g => g === '*' || pNameLower.includes(g))) setHtml[si] += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all"><input class="w-4 h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${si}_${idx}" data-set="${si + 1}" onchange="window.app.pos.onChannelGiftToggle(this)"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="cgift${si}_${idx}">${window.app.esc(p['Product Name'])} <span class="inline-block text-[9px] text-indigo-600 font-extrabold ml-1 bg-indigo-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="cgiftQty${si}_${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`; });
           }
         } 
       });
 
       if(!hasMapping || bGiftsHTML === '') bGiftsHTML = '<div class="text-sm font-medium text-slate-400 p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">ไม่มีของแถมสำหรับสินค้ารุ่นนี้</div>';
+      // ชุดเดียว (ข้อมูลเดิมที่ใช้แค่คอลัมน์ Channel Gifts) = รายการเรียบแบบเดิม; ตั้งแต่ 2 ชุดขึ้นไป = กล่องแยกชุด เลือกได้ชุดเดียว
+      const usedSets = setHtml.map((h, si) => ({ h: h, n: si + 1 })).filter(x => x.h !== '');
+      if (usedSets.length === 1) cGiftsHTML = usedSets[0].h;
+      else if (usedSets.length > 1) cGiftsHTML = '<p class="pd-giftset-note"><i class="fas fa-circle-info"></i> เลือกรับของแถมได้ 1 ชุด</p>' + usedSets.map(x => '<div class="pd-giftset" data-set="' + x.n + '"><div class="pd-giftset-h">ชุดที่ ' + x.n + '</div>' + x.h + '</div>').join('');
       if(!hasMapping || cGiftsHTML === '') cGiftsHTML = '<div class="text-sm font-medium text-slate-400 p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">ไม่มีของแถมสำหรับสินค้ารุ่นนี้</div>';
 
       if(bGifts) bGifts.innerHTML = bGiftsHTML;
@@ -2655,6 +2682,8 @@ window.app.pos = {
       });
       
       const cGifts = [];
+      const pickedSets = new Set([...document.querySelectorAll('#modalChannelGifts input[type="checkbox"]:checked')].map(cb => cb.getAttribute('data-set')));
+      if (pickedSets.size > 1) return Swal.fire('ข้อจำกัดของแถม', 'ของแถมจากช่องทางเลือกรับได้เพียง 1 ชุด', 'warning');
       document.querySelectorAll('#modalChannelGifts input[type="checkbox"]:checked').forEach(cb => {
          const gQty = parseInt(document.getElementById(cb.id.replace('cgift','cgiftQty')).value) || 1;
          const pData = window.app.globalData.products.find(x => x['Product Name'] === cb.value);

@@ -134,6 +134,17 @@ t('CHECKOUT unknown SKU rejected', () => eq(api('CHECKOUT', co({ cart: [{ SKU: '
 t('CHECKOUT invalid resStatus rejected', () => eq(api('CHECKOUT', co({ resStatus: 'hack' }), sales).status, 'error'));
 t('CHECKOUT จอง T needs receipt + deposit', () => { eq(api('CHECKOUT', co({ resStatus: TSTAT }), sales).status, 'error'); eq(api('CHECKOUT', co({ resStatus: TSTAT, receiptNo: 'R1', depositAmount: 0 }), sales).status, 'error'); eq(api('CHECKOUT', co({ resStatus: TSTAT, receiptNo: 'R1', depositAmount: 500 }), sales).status, 'success'); });
 t('CHECKOUT with brand gift + discount line', () => { const g = stockOf('GF-SAM-ADPT'); const r = api('CHECKOUT', co({ cart: [{ SKU: 'SKU-S24U', qty: 1, brandGifts: [{ name: 'Samsung Adapter 25W (Black)', qty: 1 }], channelGifts: [] }], discounts: [{ name: 'ส่วนลดลูกค้าเก่า 500 บาท', value: 500 }] }), sales); eq(r.status, 'success', JSON.stringify(r)); eq(stockOf('GF-SAM-ADPT'), g - 1, 'gift stock'); });
+t('CHECKOUT channel gifts: only one of the three sets per item; brandGifts cannot carry a channel gift', () => {
+  const gm = sheets.GiftMappings, h = gm.rows[0], c2 = h.indexOf('Channel Gifts 2'); ok(c2 > -1, 'Channel Gifts 2 column missing');
+  const row = gm.rows.find(r => r[0] === 'GM-001'), old = row[c2]; row[c2] = 'powerbank'; cache.remove('TABLE_GiftMappings');
+  const BAG = { name: 'TG Premium Bag (Canvas)', qty: 1 }, PB = { name: 'TG Powerbank 10000mAh', qty: 1 };
+  const run = (b, c) => api('CHECKOUT', co({ cart: [{ SKU: 'SKU-S24U', qty: 1, brandGifts: b, channelGifts: c }] }), sales);
+  try {
+    const both = run([], [BAG, PB]); eq(both.status, 'error', 'two sets must be rejected'); ok(/ชุดเดียว/.test(both.message || ''), 'message=' + both.message);
+    eq(run([], [BAG]).status, 'success', 'set 1 alone'); eq(run([], [PB]).status, 'success', 'set 2 alone');
+    eq(run([PB], [BAG]).status, 'error', 'channel gift smuggled through brandGifts');
+  } finally { row[c2] = old; cache.remove('TABLE_GiftMappings'); }
+});
 t('CHECKOUT PII formula-injection sanitized', () => { api('CHECKOUT', co({ customerName: '=cmd()' }), sales); ok(sheets.Orders.rows.some(r => r[4] === "'=cmd()")); });
 t('CHECKOUT closed booking window rejected', () => { const st = sheets.Settings; let rowE; for (let i = 2; i <= st.getLastRow(); i++) if (st._get(i, 1) === 'ReserveEnd') rowE = i; st._set(rowE, 2, '2020-02-01T00:00:00'); const r = api('CHECKOUT', co(), sales); st._set(rowE, 2, '2099-01-01T00:00:00'); eq(r.status, 'error', JSON.stringify(r)); });
 t('Sales checkout is forced to own branch', () => { api('CHECKOUT', co({ branch: 'O01', channel: 'Online' }), sales); const last = sheets.Orders.rows[sheets.Orders.rows.length - 1]; eq(last[3], 'B01', 'branch written=' + last[3]); });

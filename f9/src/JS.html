@@ -1833,7 +1833,9 @@ window.app = {
             { key: 'Target Mobile (SKU or Group)', label: 'SKU/Product Name หรือ กลุ่มสินค้า (* = ทุกรุ่น)', type: 'text' }, 
             { key: 'Channel', label: 'ช่องทางการขาย', type: 'multi_select_channel' }, 
             { key: 'Brand Gifts', label: 'ของแถมแบรนด์', type: 'multi_select_brand_gifts' }, 
-            { key: 'Channel Gifts', label: 'ของแถมช่องทาง', type: 'multi_select_channel_gifts' }, 
+            { key: 'Channel Gifts', label: 'ของแถมช่องทาง ชุดที่ 1', type: 'multi_select_channel_gifts' },
+            { key: 'Channel Gifts 2', label: 'ของแถมช่องทาง ชุดที่ 2 (ลูกค้าเลือกรับได้ชุดเดียว)', type: 'multi_select_channel_gifts' },
+            { key: 'Channel Gifts 3', label: 'ของแถมช่องทาง ชุดที่ 3', type: 'multi_select_channel_gifts' },
             { key: 'Status', label: 'สถานะการใช้', type: 'select', options: ['เปิด', 'ปิด'] }
         ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
         case 'interests': window.app.grid.init('Interests', 'Interest Name', [{ key: 'Interest Name', label: 'ความสนใจ', type: 'text' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;

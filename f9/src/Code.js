@@ -70,7 +70,7 @@ function setupDatabase(userToken) {
     "Channels": ["Channel ID", "Channel Name", "Description"],
     "Promotions": ["Promo ID", "Promo Name", "Discount Type", "Value", "Status"],
     "Interests": ["Interest Name", "Status"],
-    "GiftMappings": ["Mapping ID", "Target Mobile (SKU or Group)", "Channel", "Brand Gifts", "Channel Gifts", "Status"],
+    "GiftMappings": ["Mapping ID", "Target Mobile (SKU or Group)", "Channel", "Brand Gifts", "Channel Gifts", "Status", "Channel Gifts 2", "Channel Gifts 3"],
     // 🌟 จัดเรียงคอลัมน์ Orders ใหม่ตามที่ระบุ
     "Orders": ORDERS_HEADERS_,
     "OrderStatus": ["Status ID", "Status Name", "Color Code"],
@@ -112,9 +112,9 @@ function setupDatabase(userToken) {
       ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "Bag", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", "", "", "", "", "", "", "", "", "", ""]
     ],
     "GiftMappings": [
-      ["GM-001", "S24-Series", "Retail", "adapter, case", "bag", "เปิด"],
-      ["GM-002", "S24-Series", "Online", "adapter", "powerbank, bag", "เปิด"],
-      ["GM-003", "IP15-Series", "ALL", "*", "powerbank", "เปิด"]
+      ["GM-001", "S24-Series", "Retail", "adapter, case", "bag", "เปิด", "", ""],
+      ["GM-002", "S24-Series", "Online", "adapter", "powerbank, bag", "เปิด", "", ""],
+      ["GM-003", "IP15-Series", "ALL", "*", "powerbank", "เปิด", "", ""]
     ],
     "Channels": [
       ["CH-01", "Retail", "ช่องทางหน้าร้านปกติ"],
@@ -1005,6 +1005,24 @@ function inferDefaultProductSpecs_(rowObj) {
 }
 
 // Retrofit คอลัมน์สเปค 9 คอลัมน์ลงชีต Products อัตโนมัติ + เติมข้อมูลสเปคเริ่มต้นลงแถวเดิมที่ยังว่างอยู่
+// ของแถมช่องทาง 3 ชุด: คอลัมน์เดิม "Channel Gifts" = ชุดที่ 1, คอลัมน์ใหม่ต่อท้าย = ชุดที่ 2 และ 3 (ลูกค้าเลือกรับได้ชุดเดียวต่อสินค้า 1 รายการ)
+const GIFT_SET_COLS_ = ["Channel Gifts", "Channel Gifts 2", "Channel Gifts 3"];
+
+// เติมคอลัมน์ชุดที่ 2/3 ท้ายชีต GiftMappings ถ้ายังไม่มี (ชีตเก่าซ่อมตัวเองตอนบันทึก/นำเข้าครั้งแรก) — ชีตนี้อ่าน/เขียนตามชื่อหัวคอลัมน์ ต่อท้ายได้ปลอดภัย
+function ensureGiftSetColumns_(ss) {
+  try {
+    const sheet = ss.getSheetByName("GiftMappings");
+    if (!sheet) return;
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) return;
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
+    const missing = GIFT_SET_COLS_.filter(col => headers.indexOf(col) === -1);
+    if (missing.length === 0) return;
+    sheet.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]).setFontWeight("bold").setBackground("#4F46E5").setFontColor("#FFFFFF");
+    CacheService.getScriptCache().remove("TABLE_GiftMappings");
+  } catch (e) { console.error("ensureGiftSetColumns_: " + e); }
+}
+
 function ensureProductSpecColumns_(ss) {
   try {
     const sheet = ss.getSheetByName("Products");
@@ -1423,7 +1441,7 @@ function processCheckout(payload, secureUser, ss) {
       }
       if(!foundMain) throw new Error("ไม่พบสินค้า SKU: " + item.SKU);
 
-      const allowedGifts = { brand: [], channel: [] };
+      const allowedGifts = { brand: [], channel: [], channelSets: GIFT_SET_COLS_.map(() => []) };
       const mainProductRow = prodData.find(r => r[skuIdx] == item.SKU) || [];
       const groupIdx = headers.indexOf("Product Group");
       const addGiftNames = (value, target) => (value || '').toString().split(',').map(v => v.trim().toLowerCase()).filter(Boolean).forEach(v => target.push(v));
@@ -1443,7 +1461,7 @@ function processCheckout(payload, secureUser, ss) {
         const channelMatches = mapChannel === '*' || mapChannel === '' || mapChannel.toLowerCase() === 'all' || channelTokens.includes(actualChannel.toString().trim().toLowerCase());
         if (targetMatches && channelMatches && (mapping.Status || '').toString().trim().toLowerCase() === 'เปิด') {
           addGiftNames(mapping['Brand Gifts'], allowedGifts.brand);
-          addGiftNames(mapping['Channel Gifts'], allowedGifts.channel);
+          GIFT_SET_COLS_.forEach((col, si) => { addGiftNames(mapping[col], allowedGifts.channel); addGiftNames(mapping[col], allowedGifts.channelSets[si]); });
         }
       });
 
@@ -1536,6 +1554,17 @@ function processCheckout(payload, secureUser, ss) {
           ]);
         }
       };
+
+      // ของแถมช่องทางเลือกได้ชุดเดียว (ชุดที่ 1/2/3) ต่อสินค้า 1 รายการ — ต้องมีอย่างน้อยหนึ่งชุดที่ครอบคลุมของแถมช่องทางทุกชิ้นที่ส่งมา
+      // ของแถมในช่อง brandGifts ต้องอยู่ในรายการ Brand Gifts เท่านั้น ไม่งั้นย้ายของแถมช่องทางอีกชุดมาใส่ช่องนี้เพื่อเลี่ยงกฎได้
+      const giftInList = (list, nameLower) => list.includes('*') || list.some(v => v !== '*' && nameLower.includes(v));
+      const giftNamesOf = (arr) => (Array.isArray(arr) ? arr : []).filter(g => g && g.name).map(g => g.name.toString().trim().toLowerCase());
+      giftNamesOf(item.brandGifts).forEach(n => { if (!giftInList(allowedGifts.brand, n)) throw new Error("Gift is not allowed for this product/channel: " + n); });
+      const chGiftNames = giftNamesOf(item.channelGifts);
+      if (chGiftNames.length > 0 && chGiftNames.every(n => giftInList(allowedGifts.channel, n)) &&
+          !allowedGifts.channelSets.some(set => set.length > 0 && chGiftNames.every(n => giftInList(set, n)))) {
+        throw new Error("ของแถมช่องทางเลือกได้เพียงชุดเดียว (ชุดที่ 1, 2 หรือ 3) ต่อสินค้า 1 รายการ");
+      }
 
       if(item.brandGifts && Array.isArray(item.brandGifts)) {
          item.brandGifts.forEach(g => processGift(g));
@@ -2033,7 +2062,7 @@ var IMPORT_RECORD_TABLES_ = {
   Branches: { idField: 'Branch Code', textCols: ['Branch Code'], free: ['Channel', 'Branch Name', 'Area', 'Mall', 'Region', 'Province', 'Type Name'], cache: 'TABLE_Branches' },
   Channels: { idField: 'Channel ID', textCols: ['Channel ID'], free: ['Channel Name', 'Description'], autoId: { prefix: 'CH-', pad: 2 }, cache: 'TABLE_Channels' },
   Members: { idField: 'Username', textCols: ['Username'], free: ['Name'], ciId: true, cache: 'TABLE_Members' },
-  GiftMappings: { idField: 'Mapping ID', textCols: ['Mapping ID'], free: ['Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts'], autoId: { prefix: 'GM-', pad: 3 }, cache: 'TABLE_GiftMappings' }
+  GiftMappings: { idField: 'Mapping ID', textCols: ['Mapping ID'], free: ['Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3'], autoId: { prefix: 'GM-', pad: 3 }, cache: 'TABLE_GiftMappings' }
 };
 var IMPORT_MEMBER_ROLES_ = ['Admin', 'Manager', 'Sales'];
 
@@ -2058,6 +2087,7 @@ function importRecords(payload, secureUser, ss) {
     if (rowsIn.length > PRODUCT_IMPORT_MAX_ROWS_) throw new Error("นำเข้าได้ครั้งละไม่เกิน " + PRODUCT_IMPORT_MAX_ROWS_ + " แถว (ไฟล์มี " + rowsIn.length + " แถว)");
     const dryRun = payload.dryRun === true;
 
+    if (table === 'GiftMappings') ensureGiftSetColumns_(ss);
     const sheet = ss.getSheetByName(table);
     if (!sheet) throw new Error("ไม่พบชีต " + table + " กรุณากด Auto Setup ก่อน");
     const data = sheet.getDataRange().getDisplayValues();
@@ -2127,7 +2157,7 @@ function importRecords(payload, secureUser, ss) {
         knownChannelNames[obj['Channel Name'].toLowerCase()] = true;
       } else if (table === 'GiftMappings') {
         if (!obj['Target Mobile (SKU or Group)']) return fail('ไม่มี Target Mobile (SKU or Group) — ใส่ SKU/ชื่อสินค้า/กลุ่มสินค้า หรือ * = ทุกรุ่น');
-        if (!obj['Brand Gifts'] && !obj['Channel Gifts']) return fail('ไม่มีของแถม — ต้องมี Brand Gifts หรือ Channel Gifts อย่างน้อยหนึ่งช่อง');
+        if (!obj['Brand Gifts'] && !GIFT_SET_COLS_.some(c => obj[c])) return fail('ไม่มีของแถม — ต้องมี Brand Gifts หรือ Channel Gifts อย่างน้อยหนึ่งช่อง');
         const stIn = get('Status').toLowerCase();
         if (stIn === '' || stIn === 'เปิด' || stIn === 'active') obj['Status'] = 'เปิด';
         else if (stIn === 'ปิด' || stIn === 'inactive') obj['Status'] = 'ปิด';
@@ -2551,6 +2581,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
     if (tableName === 'Products') ensureProductSpecColumns_(ss);
     if (tableName === 'Coupons') ensureCouponsSheet_(ss);
+    if (tableName === 'GiftMappings') ensureGiftSetColumns_(ss);
     const sheet = ss.getSheetByName(tableName); const data = sheet.getDataRange().getDisplayValues(); const headers = data[0].map(h => h.toString().trim()); let idIndex = headers.indexOf(idField); let rowIndex = -1;
     // แก้ไข: ใช้ _rowIndex ที่ client ส่งมา (มาจากแถวจริงที่โหลดไว้ตอนเปิดฟอร์มแก้ไข) เป็นตัวชี้แถวหลัก แม่นยำกว่าไล่เทียบค่า ID เฉยๆ
     // สร้างใหม่ (ไม่มี _rowIndex ส่งมา): ถ้า ID ที่พิมพ์ตรงกับแถวที่มีอยู่แล้ว ต้อง "บล็อก" ไม่ใช่อัปเดตทับเงียบๆ — เดิมมีแค่เช็คฝั่ง client (saveForm, JS.html) ซึ่งข้ามได้ผ่านการยิง API ตรงๆ
@@ -2588,7 +2619,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
       "Channels": ["Channel Name", "Description"],
       "Promotions": ["Promo Name"],
       "Interests": ["Interest Name"],
-      "GiftMappings": ["Target Mobile (SKU or Group)", "Brand Gifts", "Channel Gifts"],
+      "GiftMappings": ["Target Mobile (SKU or Group)", "Brand Gifts", "Channel Gifts", "Channel Gifts 2", "Channel Gifts 3"],
       "AutoPromotions": ["Message Suggest", "Message Apply"],
       "Coupons": ["Code", "Description"],
       "Members": ["Name"]

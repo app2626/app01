@@ -31,14 +31,15 @@
       GiftMappings: {
         label: 'ชุดของแถม',
         requiredHeader: 'Target Mobile (SKU or Group)',
-        headers: ['Mapping ID', 'Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts', 'Status'],
-        example: ['', 'S24-Series', 'Retail', 'adapter, case', 'bag', 'เปิด'],
+        headers: ['Mapping ID', 'Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3', 'Status'],
+        example: ['', 'S24-Series', 'Retail', 'adapter, case', 'bag', 'powerbank', '', 'เปิด'],
         notes: [
           'ต้องมี <b>Target Mobile (SKU or Group)</b> (SKU/ชื่อสินค้า/กลุ่มสินค้า หรือ * = ทุกรุ่น) และของแถมอย่างน้อยหนึ่งช่อง (<b>Brand Gifts</b> หรือ <b>Channel Gifts</b>)',
           'เว้น <b>Mapping ID</b> ว่างได้ — ระบบออกเลขให้ต่อจากเลขสูงสุด (GM-001, GM-002, ...)',
           '<b>Channel</b> เว้นว่างหรือ * = ทุกช่องทาง; หลายช่องทางคั่นด้วยจุลภาค — ชื่อที่ไม่ตรงกับช่องทางในระบบจะมีคำเตือน',
           '<b>Status</b> เป็น เปิด / ปิด (เว้นว่าง = เปิด)',
-          'ชื่อของแถมหลายรายการคั่นด้วยจุลภาค'
+          'ชื่อของแถมหลายรายการคั่นด้วยจุลภาค',
+          '<b>Channel Gifts</b> = ชุดที่ 1, <b>Channel Gifts 2</b> / <b>Channel Gifts 3</b> = ชุดที่ 2 และ 3 (เว้นว่างได้) — ลูกค้าเลือกรับของแถมช่องทางได้ชุดเดียว'
         ]
       },
       Members: {
