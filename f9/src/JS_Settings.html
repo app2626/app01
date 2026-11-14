@@ -524,11 +524,13 @@ window.app.settingsManager = {
       }
     },
 
+    // ระวัง: regex ที่มีเครื่องหมายคำพูดไม่ครบคู่ (เช่น class ที่มีทั้ง double และ single quote) ทำให้ตัวตัดคอมเมนต์ของ GAS นับ string เพี้ยน
+    // แล้วตัดข้อความหลัง // ใน string ถัดๆ ไปทิ้ง (เคยทำทั้งแอปเปิดไม่ได้ @87-@88) — ใช้ " ' แทน
     // Webhook แจ้งเตือน (แท็บ ระบบ) — บันทึกแยกจากช่วงเวลารับจอง; server ตรวจรูปแบบลิงก์ซ้ำตาม SETTING_RULES_
     saveWebhook: async function(btn) {
       const el = document.getElementById('webhookUrlInput');
       const url = el ? el.value.trim() : '';
-      if (url && !/^https:[/][/][^\s<>"']+$/i.test(url)) { Swal.fire('ลิงก์ไม่ถูกต้อง', 'Webhook URL ต้องขึ้นต้นด้วย https', 'warning'); return; }
+      if (url && !/^https:[/][/][^\s<>\x22\x27]+$/i.test(url)) { Swal.fire('ลิงก์ไม่ถูกต้อง', 'Webhook URL ต้องขึ้นต้นด้วย https', 'warning'); return; }
       const restoreBtn = window.app.buttonBusy(btn || document.activeElement) || function(){};
       window.app.showLoading('กำลังบันทึกข้อมูล...');
       try {
@@ -550,7 +552,7 @@ window.app.settingsManager = {
       const hours = document.getElementById('contactHoursInput').value.trim();
       if (phone && !/^[0-9+\-\s().#,]{5,40}$/.test(phone)) { Swal.fire('เบอร์โทรไม่ถูกต้อง', 'ใช้ได้เฉพาะตัวเลข เว้นวรรค และเครื่องหมาย + - ( )', 'warning'); return; }
       if (line && /^(javascript|data|vbscript):/i.test(line)) { Swal.fire('LINE ไม่ถูกต้อง', 'ใส่ LINE ID หรือลิงก์ https เท่านั้น', 'warning'); return; }
-      if (/^[a-z][a-z0-9+.-]*:/i.test(line) && !/^https?:\/\//i.test(line)) { Swal.fire('LINE ไม่ถูกต้อง', 'ถ้าใส่เป็นลิงก์ ต้องขึ้นต้นด้วย https://', 'warning'); return; }
+      if (/^[a-z][a-z0-9+.-]*:/i.test(line) && !/^https?:\/\//i.test(line)) { Swal.fire('LINE ไม่ถูกต้อง', 'ถ้าใส่เป็นลิงก์ ต้องขึ้นต้นด้วย https', 'warning'); return; }
       const restoreBtn = window.app.buttonBusy(btn || document.activeElement) || function(){};
       window.app.showLoading('กำลังบันทึกข้อมูล...');
       try {
@@ -592,7 +594,7 @@ window.app.settingsManager = {
       const val = document.getElementById('webAppNameInput').value.trim();
       if (!val) { Swal.fire('กรอกไม่ครบ', 'กรุณากรอกชื่อเว็บแอป', 'warning'); return; }
       const favicon = (document.getElementById('faviconUrlInput') ? document.getElementById('faviconUrlInput').value : '').trim();
-      if (favicon && !/^https:[/][/][^\s<>"']+$/i.test(favicon)) { Swal.fire('ลิงก์ไอคอนไม่ถูกต้อง', 'ลิงก์ต้องขึ้นต้นด้วย https', 'warning'); return; }
+      if (favicon && !/^https:[/][/][^\s<>\x22\x27]+$/i.test(favicon)) { Swal.fire('ลิงก์ไอคอนไม่ถูกต้อง', 'ลิงก์ต้องขึ้นต้นด้วย https', 'warning'); return; }
       let logoUrl = (this.data.keyValueSettings && this.data.keyValueSettings.LogoUrl) || '';
       const hasPendingLogo = !!window.app.pendingImageUploads.webAppLogo;
 
