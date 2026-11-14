@@ -609,7 +609,23 @@ window.app.pos = {
           if (o !== cb && o.getAttribute('data-set') !== cb.getAttribute('data-set') && o.checked) { o.checked = false; const oq = qtyOf(o); if (oq) oq.disabled = true; }
         });
       }
-      box.querySelectorAll('.pd-giftset').forEach(s => s.classList.toggle('on', !!s.querySelector('input[type="checkbox"]:checked')));
+      this.syncGiftSetTabs_();
+    },
+    // แท็บชุดของแถมช่องทาง (ชุดที่ 1/2/3): สลับดูชุดได้อิสระ การติ๊กของในชุดไหน = เลือกชุดนั้น (แท็บนั้นได้เครื่องหมาย .has)
+    setGiftSetTab: function(n) {
+      const box = document.getElementById('modalChannelGifts');
+      if (!box) return;
+      n = String(n);
+      box.querySelectorAll('.pd-gs-tab').forEach(t => { const on = t.getAttribute('data-set') === n; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      box.querySelectorAll('.pd-giftset').forEach(s => s.classList.toggle('hidden', s.getAttribute('data-set') !== n));
+    },
+    syncGiftSetTabs_: function() {
+      const box = document.getElementById('modalChannelGifts');
+      if (!box) return;
+      box.querySelectorAll('.pd-gs-tab').forEach(t => {
+        const s = box.querySelector('.pd-giftset[data-set="' + t.getAttribute('data-set') + '"]');
+        t.classList.toggle('has', !!(s && s.querySelector('input[type="checkbox"]:checked')));
+      });
     },
 
     // คำนวณจำนวนของแถมที่มีสิทธิ์ได้รับของสินค้า 1 ตัว (ตรงตามเงื่อนไข GiftMappings + Channel ปัจจุบัน)
@@ -2334,10 +2350,16 @@ window.app.pos = {
       if (ev && ev.target && ev.target.closest && ev.target.closest('button, a, input, select')) return;
       this.openAddToCartModal(sku);
     },
-    openAddToCartModal: function(id) {
+    // opts.editIdx = แก้ของแถมของบรรทัดในตะกร้า (editCartGifts): เปิดเฉพาะ SKU นั้น ไม่ให้เปลี่ยนสี/ความจุ และข้ามเช็คสิทธิ์โมบาย 1 เครื่อง (เครื่องนั้นอยู่ในตะกร้าอยู่แล้ว)
+    openAddToCartModal: function(id, opts) {
       if (this.isBookingBlocked) {
         return Swal.fire('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
       }
+      const editIdx = (opts && Number.isInteger(opts.editIdx)) ? opts.editIdx : null;
+      const editLine = editIdx !== null ? this.cartData[editIdx] : null;
+      this.editingCartIdx = editLine ? editIdx : null;
+      const cta = document.getElementById('pdBarCta');
+      if (cta) cta.innerHTML = editLine ? '<i class="fas fa-check"></i> บันทึกของแถม' : '<i class="fas fa-cart-plus"></i> เพิ่มลงตะกร้า';
       
       const modalVarSel = document.getElementById('modalVariantSelection');
       let isModelGroup = id.startsWith('MODEL:');
@@ -2358,13 +2380,24 @@ window.app.pos = {
           
       } else {
           prod = window.app.globalData.products.find(p=>p.SKU==id); 
-          if(!prod||this.stockOf(prod)<=0) return Swal.fire('สินค้าหมด','สินค้าชิ้นนี้ไม่มีสต๊อกในระบบ','warning');
-          if (modalVarSel) modalVarSel.classList.add('hidden');
-          this.currentGroupProducts = null;
-          this.updateModalWithProduct(prod);
+          if(!prod||(!editLine && this.stockOf(prod)<=0)) return Swal.fire('สินค้าหมด','สินค้าชิ้นนี้ไม่มีสต๊อกในระบบ','warning');
+          // การ์ดสินค้า/ชั้นยอดนิยม/ดูล่าสุด เปิดด้วย SKU — ถ้ารุ่นนี้มีหลายสี/ความจุในช่องทางนี้ ต้องให้เลือกได้เหมือนเปิดด้วย MODEL: (เริ่มที่ตัวที่กดเข้ามา)
+          const chEl = document.getElementById('posChannelSelect');
+          const siblings = (!editLine && prod.Model && prod.Model !== '-' && !(prod.Category || '').includes('ของแถม'))
+            ? window.app.globalData.products.filter(p => p.Model === prod.Model && p.Status === 'เปิด' && window.app.channelOk(p.Channel, chEl ? chEl.value : ''))
+            : [];
+          if (siblings.length > 1 && siblings.some(p => p.SKU == prod.SKU)) {
+              if (modalVarSel) modalVarSel.classList.remove('hidden');
+              this.currentGroupProducts = siblings;
+              this.renderVariantOptions(prod.Capacity, prod.Color);
+          } else {
+              if (modalVarSel) modalVarSel.classList.add('hidden');
+              this.currentGroupProducts = null;
+              this.updateModalWithProduct(prod);
+          }
       }
       
-      if(prod && prod.Category === 'โมบาย') {
+      if(!editLine && prod && prod.Category === 'โมบาย') {
          let mobileCount = this.cartData.filter(i => i.Category === 'โมบาย').reduce((sum, i) => sum + i.qty, 0);
          if(mobileCount >= 1) {
              return Swal.fire('สิทธิ์ออเดอร์เต็ม', 'สามารถทำรายการจองสินค้าประเภท โมบาย ได้เพียง 1 เครื่อง ต่อ 1 ออเดอร์เท่านั้น', 'warning');
@@ -2378,6 +2411,30 @@ window.app.pos = {
       window.app.showModal('addToCartModal');
       const sc = document.getElementById('pdScroll'); if (sc) sc.scrollTop = 0;
       this.setSharedModel(prod && prod.Model ? prod.Model : '');
+      if (editLine) this.applyCartLineToModal_(editLine);
+    },
+    // ===== แก้ของแถมของสินค้าที่อยู่ในตะกร้าแล้ว =====
+    // เปิดหน้ารายละเอียดของบรรทัดนั้นอีกครั้ง ติ๊กของแถมที่เลือกไว้เดิมให้ แล้ว confirmAddToCart จะเขียนทับบรรทัดเดิม (ไม่เพิ่มบรรทัดใหม่)
+    editCartGifts: function(idx) {
+      const line = this.cartData[idx];
+      if (!line) return;
+      const drawer = document.getElementById('cartDrawer');
+      if (drawer && !drawer.classList.contains('translate-x-full')) this.toggleCart();
+      this.openAddToCartModal(line.SKU, { editIdx: idx });
+    },
+    applyCartLineToModal_: function(line) {
+      const qtyEl = document.getElementById('modalProdQty');
+      if (qtyEl) qtyEl.value = line.qty;
+      const tick = (cb, qty, prefix) => { cb.checked = true; const q = document.getElementById(cb.id.replace(prefix, prefix + 'Qty')); if (q) { q.disabled = false; q.value = qty; } };
+      (line.brandGifts || []).forEach(g => { const cb = [...document.querySelectorAll('#modalBrandGifts input[type="checkbox"]')].find(c => c.value === g.name); if (cb) tick(cb, g.qty, 'bgift'); });
+      // ของแถมช่องทาง: ของชิ้นเดียวกันอาจอยู่ได้หลายชุด — เลือกชุดแรกที่มีของแถมเดิมครบทุกชิ้น
+      const want = (line.channelGifts || []);
+      const cbs = [...document.querySelectorAll('#modalChannelGifts input[type="checkbox"]')];
+      const sets = [...new Set(cbs.map(c => c.getAttribute('data-set')))];
+      const setNo = sets.find(n => want.every(g => cbs.some(c => c.getAttribute('data-set') === n && c.value === g.name))) || sets[0];
+      want.forEach(g => { const cb = cbs.find(c => c.getAttribute('data-set') === setNo && c.value === g.name); if (cb) tick(cb, g.qty, 'cgift'); });
+      if (want.length && setNo) this.setGiftSetTab(setNo);
+      this.syncGiftSetTabs_();
     },
     // แท็บในหน้ารายละเอียดสินค้า (gifts / specs / install / terms) — scroll = เลื่อนลงมาที่แท็บด้วย (ใช้จากลิงก์ "ดูตารางผ่อน")
     setDetailTab: function(tab, scroll) {
@@ -2640,10 +2697,12 @@ window.app.pos = {
       });
 
       if(!hasMapping || bGiftsHTML === '') bGiftsHTML = '<div class="text-sm font-medium text-slate-400 p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">ไม่มีของแถมสำหรับสินค้ารุ่นนี้</div>';
-      // ชุดเดียว (ข้อมูลเดิมที่ใช้แค่คอลัมน์ Channel Gifts) = รายการเรียบแบบเดิม; ตั้งแต่ 2 ชุดขึ้นไป = กล่องแยกชุด เลือกได้ชุดเดียว
+      // ชุดเดียว (ข้อมูลเดิมที่ใช้แค่คอลัมน์ Channel Gifts) = รายการเรียบแบบเดิม; ตั้งแต่ 2 ชุดขึ้นไป = แท็บ ชุดที่ 1/2/3 (เห็นทีละชุด) เลือกได้ชุดเดียว
       const usedSets = setHtml.map((h, si) => ({ h: h, n: si + 1 })).filter(x => x.h !== '');
       if (usedSets.length === 1) cGiftsHTML = usedSets[0].h;
-      else if (usedSets.length > 1) cGiftsHTML = '<p class="pd-giftset-note"><i class="fas fa-circle-info"></i> เลือกรับของแถมได้ 1 ชุด</p>' + usedSets.map(x => '<div class="pd-giftset" data-set="' + x.n + '"><div class="pd-giftset-h">ชุดที่ ' + x.n + '</div>' + x.h + '</div>').join('');
+      else if (usedSets.length > 1) cGiftsHTML = '<p class="pd-giftset-note"><i class="fas fa-circle-info"></i> เลือกรับของแถมได้ 1 ชุด</p>'
+        + '<div class="pd-gs-tabs" role="tablist" aria-label="ชุดของแถมช่องทาง">' + usedSets.map((x, i) => '<button type="button" role="tab" class="pd-gs-tab' + (i === 0 ? ' on' : '') + '" data-set="' + x.n + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '" onclick="window.app.pos.setGiftSetTab(' + x.n + ')">ชุดที่ ' + x.n + '</button>').join('') + '</div>'
+        + usedSets.map((x, i) => '<div class="pd-giftset' + (i === 0 ? '' : ' hidden') + '" data-set="' + x.n + '" role="tabpanel">' + x.h + '</div>').join('');
       if(!hasMapping || cGiftsHTML === '') cGiftsHTML = '<div class="text-sm font-medium text-slate-400 p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">ไม่มีของแถมสำหรับสินค้ารุ่นนี้</div>';
 
       if(bGifts) bGifts.innerHTML = bGiftsHTML;
@@ -2657,8 +2716,11 @@ window.app.pos = {
       const p = window.app.globalData.products.find(x=>x.SKU==sku);
       if (!Number.isInteger(qty) || qty < 1) return Swal.fire('จำนวนไม่ถูกต้อง', 'กรุณาระบุจำนวนสินค้าเป็นตัวเลขอย่างน้อย 1', 'warning');
 
+      // กำลังแก้ของแถมของบรรทัดในตะกร้า (editCartGifts) — บรรทัดนั้นไม่นับซ้ำในเช็คโมบาย/สต๊อก และจะถูกเขียนทับแทนการเพิ่มบรรทัดใหม่
+      const editLine = (Number.isInteger(this.editingCartIdx) && this.cartData[this.editingCartIdx] && this.cartData[this.editingCartIdx].SKU == sku) ? this.cartData[this.editingCartIdx] : null;
+
       if (p.Category === 'โมบาย') {
-          let currentMobileQty = this.cartData.filter(i => i.Category === 'โมบาย').reduce((sum, i) => sum + i.qty, 0);
+          let currentMobileQty = this.cartData.filter(i => i !== editLine && i.Category === 'โมบาย').reduce((sum, i) => sum + i.qty, 0);
           if (currentMobileQty + qty > 1) {
               return Swal.fire('ข้อจำกัดการจอง', 'สินค้าประเภท โมบาย จำกัดสิทธิ์จองได้ออเดอร์ละ 1 เครื่อง', 'warning');
           }
@@ -2706,11 +2768,21 @@ window.app.pos = {
          }
       }
       
-      const ex = this.cartData.find(i=>i.SKU==sku && JSON.stringify(i.brandGifts)===JSON.stringify(bGifts) && JSON.stringify(i.channelGifts)===JSON.stringify(cGifts));
+      const ex = editLine ? null : this.cartData.find(i=>i.SKU==sku && JSON.stringify(i.brandGifts)===JSON.stringify(bGifts) && JSON.stringify(i.channelGifts)===JSON.stringify(cGifts));
       // เช็ค stock รวมทุกบรรทัดของ SKU นี้ในตะกร้า ไม่ใช่แค่บรรทัดที่กำลังจะเพิ่ม/รวม — เดิมถ้าหยิบ SKU เดียวกันแต่เลือกของแถมต่างกัน
       // จะแยกเป็นคนละบรรทัด แล้วแต่ละบรรทัดเช็ค stock อิสระจากกัน ทำให้จองรวมเกิน stock จริงได้ (ไปเจอ error ตอน checkout แทนที่จะเตือนตอนนี้)
-      const totalSkuQtyInCart = this.cartData.filter(i=>i.SKU==sku).reduce((s,i)=>s+i.qty,0);
+      const totalSkuQtyInCart = this.cartData.filter(i=>i !== editLine && i.SKU==sku).reduce((s,i)=>s+i.qty,0);
       if (totalSkuQtyInCart + qty > this.stockOf(p)) return Swal.fire('สต๊อกไม่พอ','','warning');
+      if (editLine) {
+        editLine.qty = qty; editLine.brandGifts = bGifts; editLine.channelGifts = cGifts;
+        this.editingCartIdx = null;
+        window.app.hideModal('addToCartModal');
+        this.saveAndRender();
+        window.app.toast('บันทึกของแถมแล้ว', 'success');
+        const drawer = document.getElementById('cartDrawer');
+        if (drawer && drawer.classList.contains('translate-x-full')) this.toggleCart();
+        return;
+      }
       if(ex){ ex.qty+=qty; }
       else { this.cartData.push({...p, qty:qty, brandGifts:bGifts, channelGifts:cGifts}); }
       
@@ -3001,6 +3073,7 @@ window.app.pos = {
         html+='    <div class="min-w-0"><span class="inline-block px-1.5 py-0.5 rounded bg-orange-50 text-[#E05300] border border-orange-200 text-[9px] font-black mb-1">ราคา Pre Booking</span><h6 class="text-xs md:text-sm font-extrabold text-slate-900 leading-snug mb-0.5">' + window.app.esc(i['Product Name']) + '</h6>' + (variantTxt ? '<div class="text-[11px] text-slate-500 font-semibold">' + window.app.esc(variantTxt) + '</div>' : '') + '</div>';
         html+='  </div>';
         html+=   gHtml;
+        html+='  <button type="button" class="pos-cart-gift-edit" onclick="window.app.pos.editCartGifts(' + idx + ')"><i class="fas fa-gift" aria-hidden="true"></i> ' + (gHtml ? 'แก้ไขของแถม' : 'เลือกของแถม') + '</button>';
         html+='  <div class="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">';
         html+='    <div><div class="text-[#E11D48] font-black text-base md:text-lg tabular-nums">฿' + pPrice + '</div>' + (i.qty > 1 ? '<div class="text-[11px] text-slate-500 font-semibold tabular-nums">รวม ฿' + (unitNum * i.qty).toLocaleString() + ' (' + i.qty + ' ชิ้น)</div>' : '') + '</div>';
         html+='    <div class="flex bg-slate-100 rounded-xl border border-slate-200 items-center overflow-hidden p-0.5">';
