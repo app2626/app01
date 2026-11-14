@@ -157,7 +157,7 @@ window.app.dashboard = {
           emptyEl.innerHTML = '';
         }
       }
-      this.renderTodo(); this.updateKPIs(); this.renderDeltas(); this.renderCharts(); this.renderPromotionsTable(); this.renderGiftsTable(); this.renderInterestsTable(); this.renderExecutiveRoiAndStockCards();
+      this.renderSetup(); this.renderTodo(); this.updateKPIs(); this.renderDeltas(); this.renderCharts(); this.renderPromotionsTable(); this.renderGiftsTable(); this.renderInterestsTable(); this.renderExecutiveRoiAndStockCards();
     },
     // ---- "วันนี้ต้องทำ" ----
     // นับจากใบจองทั้งหมดที่ผู้ใช้มีสิทธิ์เห็น (rawOrders — Sales ได้เฉพาะสาขาตัวเองจาก server) กรองตามสาขา/พนักงานที่เลือก แต่ไม่กรองช่วงวันที่
@@ -191,6 +191,65 @@ window.app.dashboard = {
       out.lowStock = (window.app.globalData.products || []).filter(p => p.Status === 'เปิด' && !(p.Category || '').includes('ของแถม')
         && (parseInt(String(p.Stock || 0).replace(/,/g, ''), 10) || 0) <= low).length;
       return out;
+    },
+    // ---- รายการตรวจการตั้งค่าระบบ (Admin เท่านั้น) ----
+    // คำนวณจาก globalData ที่มีอยู่แล้ว ไม่เรียก server เพิ่ม — แสดงเฉพาะข้อที่ยังไม่ครบ ครบทุกข้อ = ไม่แสดงเลย
+    // need = ต้องมีระบบถึงใช้งานได้, ที่เหลือ = แนะนำ; href เป็น #id ธรรมดา (ตัวดักคลิกใน init พาไปเอง)
+    setupItems: function() {
+      const g = window.app.globalData || {}, st = g.settings || {};
+      const txt = (v) => (v === null || v === undefined ? '' : v).toString().trim();
+      const isAll = (t) => /^(\*|all|ทั้งหมด)$/i.test(t);
+      const open = (r) => window.app.statusOn ? window.app.statusOn(r.Status) : txt(r.Status) === 'เปิด';
+      const branches = g.branches || [];
+      const sellable = (g.products || []).filter(p => txt(p.Status) === 'เปิด' && !txt(p.Category).includes('ของแถม'));
+      const noChannel = branches.filter(b => !txt(b.Channel)).length;
+      const noImg = sellable.filter(p => !txt(p['Image URL'])).length;
+      const noPrice = sellable.filter(p => !((parseFloat(txt(p.Price).replace(/[^\d.\-]/g, '')) || 0) > 0)).length;
+      const end = txt(st.ReserveEnd) ? new Date(st.ReserveEnd) : null;
+      const windowSet = !!txt(st.ReserveStart) && !!end && !isNaN(end.getTime());
+      // ช่องทางที่ชุดของแถม/โปรโมชั่นอัตโนมัติอ้างถึง แต่ไม่มีสาขาไหนใช้ = เงื่อนไขนั้นจะไม่ตรงกับช่องทางใดในหน้าร้าน
+      const used = {}; branches.forEach(b => { const c = txt(b.Channel).toLowerCase(); if (c) used[c] = true; });
+      const orphan = [];
+      (g.giftMappings || []).concat(g.autoPromotions || []).filter(open).forEach(r => txt(r.Channel).split(',').map(t => t.trim()).filter(t => t && !isAll(t)).forEach(t => { if (!used[t.toLowerCase()] && orphan.indexOf(t) === -1) orphan.push(t); }));
+      return [
+        { id: 'branches', need: true, ok: branches.length > 0, title: 'เพิ่มสาขา', detail: 'ยังไม่มีสาขา หน้าร้านจะเลือกช่องทางและสาขาไม่ได้', href: '#branches' },
+        { id: 'branchChannel', need: true, ok: noChannel === 0, title: 'ระบุช่องทางขายให้สาขา', detail: 'มี ' + noChannel + ' สาขาที่ยังไม่ได้เลือกช่องทาง สาขานั้นจะไม่ขึ้นในหน้าร้าน', href: '#branches' },
+        { id: 'products', need: true, ok: sellable.length > 0, title: 'เพิ่มสินค้าที่เปิดขาย', detail: 'ยังไม่มีสินค้าสถานะ เปิด ในหน้าร้าน', href: '#products' },
+        { id: 'window', need: true, ok: windowSet, title: 'กำหนดช่วงเวลารับจอง', detail: 'ยังไม่ได้ตั้งวันเริ่มและวันสิ้นสุดการจอง', href: '#bookingsettings' },
+        { id: 'windowEnded', need: true, ok: !windowSet || end.getTime() > Date.now(), title: 'ช่วงเวลารับจองสิ้นสุดแล้ว', detail: 'หน้าร้านปิดรับจองอยู่ ขยายวันสิ้นสุดเมื่อต้องการเปิดรับจองอีกครั้ง', href: '#bookingsettings' },
+        { id: 'price', need: true, ok: noPrice === 0, title: 'ใส่ราคาสินค้า', detail: 'มี ' + noPrice + ' รายการที่เปิดขายแต่ราคาเป็น 0', href: '#products' },
+        { id: 'orphanChannel', need: true, ok: orphan.length === 0, title: 'ช่องทางในโปรโมชั่นไม่ตรงกับสาขา', detail: 'ไม่มีสาขาใช้ช่องทาง: ' + orphan.slice(0, 4).join(', ') + (orphan.length > 4 ? ' ...' : '') + ' ชุดของแถมหรือโปรโมชั่นที่ตั้งไว้จะไม่แสดง', href: '#giftmappings' },
+        { id: 'image', need: false, ok: noImg === 0, title: 'ใส่รูปสินค้า', detail: 'มี ' + noImg + ' รายการที่เปิดขายแต่ยังไม่มีรูป', href: '#products' },
+        { id: 'logo', need: false, ok: !!txt(st.LogoUrl), title: 'ใส่โลโก้ร้าน', detail: 'โลโก้แสดงที่หัวหน้าร้าน เมนู และท้ายเว็บ', href: '#ss_shop' },
+        { id: 'contact', need: false, ok: !!(txt(st.ContactPhone) || txt(st.ContactLine)), title: 'ใส่ช่องทางติดต่อร้าน', detail: 'เบอร์โทรหรือ LINE แสดงที่หัวและท้ายหน้าร้าน', href: '#ss_shop' },
+        { id: 'gifts', need: false, ok: (g.giftMappings || []).some(open), title: 'ตั้งชุดของแถม', detail: 'ยังไม่มีเงื่อนไขของแถมที่เปิดใช้', href: '#giftmappings' },
+        { id: 'banner', need: false, ok: (g.heroBanners || []).length > 0, title: 'ใส่แบนเนอร์หน้าร้าน', detail: 'ยังไม่มีแบนเนอร์หลักที่กำลังแสดง (ขนาด 1200x400)', href: '#banners' }
+      ];
+    },
+    renderSetup: function() {
+      const el = document.getElementById('dashSetup'); if (!el) return;
+      el.classList.add('hidden'); el.innerHTML = '';
+      if (!window.app.user || window.app.user.Role !== 'Admin') return;
+      const esc = window.app.esc, items = this.setupItems(), todo = items.filter(i => !i.ok);
+      if (todo.length === 0) return;
+      // "ซ่อน" จำเฉพาะชุดข้อที่ค้างอยู่ตอนกด — มีข้อใหม่ค้างเพิ่ม = แสดงอีกครั้ง
+      const sig = todo.map(i => i.id).join(',');
+      let hidden = ''; try { hidden = localStorage.getItem('f9_setup_hidden') || ''; } catch (e) {}
+      if (hidden === sig) return;
+      el.innerHTML = '<div class="dash-setup-head"><h2 class="dash-todo-h">ตั้งค่าระบบให้พร้อมใช้งาน</h2><span class="dash-setup-n">เสร็จแล้ว ' + (items.length - todo.length) + ' จาก ' + items.length + ' ข้อ</span>'
+        + '<button type="button" class="dash-setup-hide" onclick="window.app.dashboard.hideSetup()">ซ่อน</button></div><ul class="dash-setup-list">'
+        + todo.map(i => '<li><a class="dash-setup-row' + (i.need ? ' need' : '') + '" href="' + esc(i.href) + '" data-setup="' + esc(i.id) + '">'
+          + '<i class="fas ' + (i.need ? 'fa-circle-exclamation' : 'fa-circle') + ' dash-setup-ic" aria-hidden="true"></i>'
+          + '<span class="dash-setup-tx"><b>' + esc(i.title) + '</b><small>' + esc(i.detail) + '</small></span>'
+          + '<span class="dash-setup-tag">' + (i.need ? 'จำเป็น' : 'แนะนำ') + '</span><i class="fas fa-chevron-right dash-todo-go" aria-hidden="true"></i></a></li>').join('')
+        + '</ul>';
+      el.setAttribute('data-sig', sig);
+      el.classList.remove('hidden');
+    },
+    hideSetup: function() {
+      const el = document.getElementById('dashSetup'); if (!el) return;
+      try { localStorage.setItem('f9_setup_hidden', el.getAttribute('data-sig') || ''); } catch (e) {}
+      el.classList.add('hidden');
     },
     renderTodo: function() {
       const el = document.getElementById('dashTodo'); if (!el) return;

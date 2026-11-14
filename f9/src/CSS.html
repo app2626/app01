@@ -2782,6 +2782,34 @@
 
   /* แดชบอร์ด: แถว "วันนี้ต้องทำ" (dashboard.renderTodo) + บรรทัดเทียบช่วงก่อนหน้าใต้ตัวเลขหลัก (dashboard.renderDeltas) */
   .dash-todo:not(.hidden) { display: block; }
+  /* รายการตรวจการตั้งค่าระบบบนแดชบอร์ด (dashboard.renderSetup, Admin) */
+  .dash-setup:not(.hidden) { display: block; margin-bottom: 20px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; }
+  .dash-setup-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .dash-setup-head .dash-todo-h { margin: 0; }
+  .dash-setup-n { font-size: 12.5px; color: #64748b; }
+  .dash-setup-hide { margin-left: auto; padding: 4px 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; font-size: 12.5px; font-weight: 600; color: #475569; cursor: pointer; }
+  .dash-setup-hide:hover { border-color: #0f2a43; color: #0f172a; }
+  .dash-setup-list { list-style: none; margin: 0; padding: 0; }
+  .dash-setup-list li + li { border-top: 1px solid #eef1f5; }
+  .dash-setup-row { display: flex; align-items: center; gap: 12px; padding: 10px 4px; color: inherit; text-decoration: none; border-radius: 8px; }
+  .dash-setup-row:hover { background: #f8fafc; }
+  .dash-setup-ic { flex: 0 0 auto; width: 18px; text-align: center; font-size: 13px; color: #cbd5e1; }
+  .dash-setup-row.need .dash-setup-ic { font-size: 16px; color: #be123c; }
+  .dash-setup-tx { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .dash-setup-tx b { font-size: 14px; font-weight: 600; color: #0f172a; }
+  .dash-setup-tx small { font-size: 12.5px; color: #64748b; }
+  .dash-setup-tag { flex: 0 0 auto; padding: 2px 8px; border-radius: 6px; background: #eef1f5; font-size: 11.5px; font-weight: 600; color: #475569; }
+  .dash-setup-row.need .dash-setup-tag { background: #fef2f2; color: #be123c; }
+  @media (max-width: 479px) { .dash-setup-tag { display: none; } }
+  html.dark .dash-setup:not(.hidden) { background: #1e293b; border-color: #334155; }
+  html.dark .dash-setup-tx b { color: #f1f5f9; }
+  html.dark .dash-setup-tx small, html.dark .dash-setup-n { color: #94a3b8; }
+  html.dark .dash-setup-list li + li { border-color: #334155; }
+  html.dark .dash-setup-row:hover { background: #273449; }
+  html.dark .dash-setup-hide { background: #0f172a; border-color: #334155; color: #cbd5e1; }
+  html.dark .dash-setup-tag { background: #0f172a; color: #cbd5e1; }
+  html.dark .dash-setup-row.need .dash-setup-tag { background: #450a0a; color: #fca5a5; }
+  html.dark .dash-setup-row.need .dash-setup-ic { color: #fca5a5; }
   .dash-todo-h { margin-bottom: 10px; font-size: 15px; font-weight: 700; color: #0f172a; }
   .dash-todo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   @media (min-width: 1024px) { .dash-todo-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

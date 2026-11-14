@@ -487,7 +487,7 @@ window.app.grid = {
             
             let opts = [];
             if(c.type === 'multi_select_channel') {
-                opts = [...new Set(window.app.globalData.channels.map(x=>x['Channel Name']))].filter(Boolean).map(n => ({id: n, label: n}));
+                opts = window.app.channelNames().map(n => ({id: n, label: n}));
             } else if (c.type === 'multi_select_menu') {
                 // ข้ามแถวหัวข้อ (isCategory) ที่ไม่มี id — ถ้าหลุดเข้า opts จะทำ opt.id.toLowerCase() พังทั้งฟอร์ม (ปุ่มแก้ไข Members เงียบ)
                 // ข้าม 'systemsettings' เสมอ — saveSettingsItem/deleteSettingsItem/uploadImage ล็อก Admin-only ทุกจุดไม่มีข้อยกเว้น

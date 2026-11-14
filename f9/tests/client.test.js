@@ -981,6 +981,11 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const a = JSON.parse(await ev("JSON.stringify({vis:!document.getElementById('dashTodo').classList.contains('hidden'),cards:document.querySelectorAll('#dashTodo .dash-todo-card').length,pending:document.querySelector('#dashTodoPending b').textContent,today:document.querySelector('#dashTodoToday b').textContent,stale:document.querySelector('#dashTodoStale b').textContent,stock:document.querySelector('#dashTodoStock b').textContent,stats:window.app.dashboard.todoStats()})"));
     ok(a.vis, 'to-do row hidden'); eq(a.cards, 4); eq(a.pending, String(pend), 'pending counted per order, not per sheet row'); eq(a.today, String(live), 'orders placed today'); eq(a.stale, '0'); ok(/^\d/.test(a.stock), a.stock);
     await shot('admin-dashboard-todo');
+    // setup checklist (Admin): only unfinished items are listed, required ones flagged, links are plain #id, "ซ่อน" hides until a new item appears
+    const su = JSON.parse(await ev(`(()=>{const D=window.app.dashboard,g=window.app.globalData;try{localStorage.removeItem('f9_setup_hidden')}catch(e){}const bak={b:g.branches,m:g.giftMappings,s:g.settings};const ids=()=>D.setupItems().filter(i=>!i.ok).map(i=>i.id);const base=ids();g.branches=bak.b.concat([{Channel:'','Branch Code':'ZZ9','Branch Name':'No channel'}]);g.giftMappings=(bak.m||[]).concat([{'Mapping ID':'ZZ',Channel:'Retail, NoSuchChannel',Status:'เปิด','Brand Gifts':'x'}]);g.settings=Object.assign({},bak.s,{ReserveEnd:'2020-01-01T00:00:00',LogoUrl:''});const bad=ids();D.renderSetup();const el=document.getElementById('dashSetup');const rows=[...el.querySelectorAll('.dash-setup-row')];const shown={vis:!el.classList.contains('hidden'),n:rows.length,need:el.querySelectorAll('.dash-setup-row.need').length,hrefs:rows.every(r=>/^#[a-z_]+$/.test(r.getAttribute('href'))),orphan:(rows.find(r=>r.getAttribute('data-setup')==='orphanChannel')||{}).textContent||''};D.hideSetup();D.renderSetup();const hid=el.classList.contains('hidden');g.branches=bak.b;g.giftMappings=bak.m;g.settings=bak.s;try{localStorage.removeItem('f9_setup_hidden')}catch(e){}window.app.user.Role='Sales';D.renderSetup();const sales=el.classList.contains('hidden');window.app.user.Role='Admin';D.renderSetup();return JSON.stringify({base:base,bad:bad,shown:shown,hid:hid,sales:sales})})()`));
+    ok(['branchChannel', 'windowEnded', 'orphanChannel', 'logo'].every(i => su.bad.includes(i)) && !su.base.includes('branchChannel') && !su.base.includes('orphanChannel'), 'setup items: ' + JSON.stringify(su));
+    ok(su.shown.vis && su.shown.n === su.bad.length && su.shown.need >= 3 && su.shown.hrefs && /NoSuchChannel/.test(su.shown.orphan) && !/Retail/.test(su.shown.orphan.replace('NoSuchChannel', '')), 'setup card: ' + JSON.stringify(su.shown));
+    ok(su.hid && su.sales, 'hide button / non-admin: ' + JSON.stringify(su));
     // previous period: move every order 40 days back in memory -> current month empty, previous period has the sales
     const d = JSON.parse(await ev("(()=>{const D=window.app.dashboard;const k1=D.kpiCalc(D.filteredOrders);const el=document.getElementById('dashDeltaTotal');const before=el?el.textContent:'(none)';const bak=D.rawOrders;const half=bak.map((o,i)=>Object.assign({},o,i%2?{}:{Timestamp:new Date(Date.now()-35*86400000).toString()}));D.rawOrders=half;D.applyFilters();const t=document.getElementById('dashDeltaTotal');const out={before:before,total:k1.total,txt:t.textContent,cls:t.className,stale:D.todoStats().stale};D.rawOrders=bak;D.applyFilters();return JSON.stringify(out)})()"));
     ok(d.total > 0, 'kpiCalc total'); ok(/ช่วงก่อนหน้า/.test(d.before) || d.before === '', 'delta line: ' + d.before); ok(/%/.test(d.txt) && /up|down/.test(d.cls), 'delta with a previous period: ' + JSON.stringify(d)); ok(d.stale >= 0);
@@ -1224,6 +1229,14 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     }
     await ev("document.documentElement.classList.remove('dark');true");
     ok(bad.length === 0, bad.join(' | '));
+  });
+  await T('one channel list: the branch form picks Channel from a list (branch channels + Channels page), promo forms use the same list', async () => {
+    await ev("window.location.hash='#branches';true"); await sleep(1400);
+    await ev("window.app.grid.handleAddClick();true"); await sleep(600);
+    const r = JSON.parse(await ev(`(()=>{const f=document.getElementById('field_Channel');const g=window.app.globalData;const bak=g.branches;g.branches=bak.concat([{Channel:'retail'},{Channel:'  Pop-Up '}]);const names=window.app.channelNames();g.branches=bak;return JSON.stringify({tag:f?f.tagName:'',opts:f?[...f.options].map(o=>o.value):[],names:names})})()`));
+    eq(r.tag, 'SELECT', 'Channel must be a select'); ok(r.opts[0] === '' && r.opts.includes('Retail') && r.opts.includes('Online'), 'options: ' + r.opts.join('|'));
+    ok(r.names.includes('Pop-Up') && r.names.filter(n => n.toLowerCase() === 'retail').length === 1, 'trimmed + de-duplicated ignoring case: ' + r.names.join('|'));
+    await ev("document.querySelector('#formModal [aria-label=\"ปิดฟอร์ม\"]').click();true"); await sleep(300);
   });
   await T('forms: add forms open, fit the screen, close with the X button', async () => {
     await ev("window.location.hash='#channels';true"); await sleep(1400);

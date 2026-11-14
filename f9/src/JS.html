@@ -728,6 +728,18 @@ window.app = {
     } catch (e) { console.warn('boot skeleton:', e); }
   },
 
+  // รายชื่อช่องทางขายชุดเดียวที่ทุกฟอร์มใช้ร่วมกัน: ค่า Channel ที่สาขาใช้อยู่จริง (หน้าร้านอ่านจากตรงนี้) + ชื่อในหน้า "ช่องทางขาย"
+  // ตัดซ้ำแบบไม่สนตัวพิมพ์เล็ก/ใหญ่ เก็บตัวสะกดแรกที่เจอ — ฟอร์มสาขาและฟอร์มโปรโมชั่น/ชุดของแถมเลือกจากรายการนี้ จึงสะกดไม่ตรงกันไม่ได้
+  channelNames: function() {
+    const g = window.app.globalData || {}, seen = {}, out = [];
+    (g.branches || []).map(b => b.Channel).concat((g.channels || []).map(c => c['Channel Name'])).forEach(v => {
+      const t = (v === null || v === undefined ? '' : v).toString().trim();
+      if (!t || seen[t.toLowerCase()]) return;
+      seen[t.toLowerCase()] = true; out.push(t);
+    });
+    return out;
+  },
+
   refreshGlobalData: async function() {
     try {
       const res = await window.app.api('GET_ALL_DATA', {});
@@ -1839,7 +1851,7 @@ window.app = {
             { key: 'Status', label: 'สถานะการใช้', type: 'select', options: ['เปิด', 'ปิด'] }
         ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
         case 'interests': window.app.grid.init('Interests', 'Interest Name', [{ key: 'Interest Name', label: 'ความสนใจ', type: 'text' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
-        case 'branches': window.app.grid.init('Branches', 'Branch Code', [{ key: 'Channel', label: 'ช่องทางขาย', type: 'text' }, { key: 'Branch Code', label: 'รหัสสาขา', type: 'text' }, { key: 'Branch Name', label: 'ชื่อสาขา', type: 'text' }, { key: 'Area', label: 'แอเรีย (Area)', type: 'text' }, { key: 'Mall', label: 'ห้าง (Mall)', type: 'text' }, { key: 'Region', label: 'ภาค (Region)', type: 'text' }, { key: 'Province', label: 'จังหวัด', type: 'text' }, { key: 'Type Name', label: 'ประเภทสาขา', type: 'text' }]); break;
+        case 'branches': window.app.grid.init('Branches', 'Branch Code', [{ key: 'Channel', label: 'ช่องทางขาย (เพิ่มช่องทางใหม่ได้ที่เมนู ช่องทางขาย)', type: 'select', options: [''].concat(window.app.channelNames()) }, { key: 'Branch Code', label: 'รหัสสาขา', type: 'text' }, { key: 'Branch Name', label: 'ชื่อสาขา', type: 'text' }, { key: 'Area', label: 'แอเรีย (Area)', type: 'text' }, { key: 'Mall', label: 'ห้าง (Mall)', type: 'text' }, { key: 'Region', label: 'ภาค (Region)', type: 'text' }, { key: 'Province', label: 'จังหวัด', type: 'text' }, { key: 'Type Name', label: 'ประเภทสาขา', type: 'text' }]); break;
         case 'channels': window.app.grid.init('Channels', 'Channel ID', [{ key: 'Channel ID', label: 'รหัสช่องทาง (สร้างอัตโนมัติ เช่น CH-01)', type: 'text' }, { key: 'Channel Name', label: 'ชื่อช่องทาง', type: 'text' }, { key: 'Description', label: 'คำอธิบาย', type: 'text' }]); break;
         case 'members': window.app.grid.init('Members', 'Username', [
             { key: 'Username', label: 'ชื่อผู้ใช้ (Username)', type: 'text' }, 
