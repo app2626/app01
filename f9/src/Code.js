@@ -70,7 +70,7 @@ function setupDatabase(userToken) {
     "Channels": ["Channel ID", "Channel Name", "Description"],
     "Promotions": ["Promo ID", "Promo Name", "Discount Type", "Value", "Status"],
     "Interests": ["Interest Name", "Status"],
-    "GiftMappings": ["Mapping ID", "Target Mobile (SKU or Group)", "Channel", "Brand Gifts", "Channel Gifts", "Status", "Channel Gifts 2", "Channel Gifts 3"],
+    "GiftMappings": ["Mapping ID", "Target Mobile (SKU or Group)", "Channel", "Brand Gifts", "Channel Gifts", "Channel Gifts 2", "Channel Gifts 3", "Status"],
     // 🌟 จัดเรียงคอลัมน์ Orders ใหม่ตามที่ระบุ
     "Orders": ORDERS_HEADERS_,
     "OrderStatus": ["Status ID", "Status Name", "Color Code"],
@@ -112,9 +112,9 @@ function setupDatabase(userToken) {
       ["GF-TG-BAG", "TG Premium Bag (Canvas)", "Bag", "Bag", "-", "-", "Black", "https://via.placeholder.com/150/000000/ffffff?text=TG+Bag", 390, 200, "ชิ้น", "ของแถมช่องทาง", "เปิด", "ALL", "", "", "", "", "", "", "", "", "", ""]
     ],
     "GiftMappings": [
-      ["GM-001", "S24-Series", "Retail", "adapter, case", "bag", "เปิด", "", ""],
-      ["GM-002", "S24-Series", "Online", "adapter", "powerbank, bag", "เปิด", "", ""],
-      ["GM-003", "IP15-Series", "ALL", "*", "powerbank", "เปิด", "", ""]
+      ["GM-001", "S24-Series", "Retail", "adapter, case", "bag", "", "", "เปิด"],
+      ["GM-002", "S24-Series", "Online", "adapter", "powerbank, bag", "", "", "เปิด"],
+      ["GM-003", "IP15-Series", "ALL", "*", "powerbank", "", "", "เปิด"]
     ],
     "Channels": [
       ["CH-01", "Retail", "ช่องทางหน้าร้านปกติ"],
@@ -521,6 +521,12 @@ function apiHandlerInner_(action, payload, userToken) {
         // Coupons: โค้ดส่วนลดเป็นความลับ — อ่านได้เฉพาะ Admin (ฝั่ง POS ตรวจโค้ดผ่าน VALIDATE_COUPON เท่านั้น)
         // AutoPromotions: Admin เปิดหน้านี้ครั้งแรกหลังอัปเดต → แปลง Active/Inactive เดิมเป็น เปิด/ปิด (idempotent)
         if (payload.tableName === 'AutoPromotions' && secureUser.Role === 'Admin' && migrateStatusColumn_(ss.getSheetByName('AutoPromotions'), 'Status') > 0) CacheService.getScriptCache().remove('TABLE_AutoPromotions');
+        // GiftMappings: Admin เปิดหน้านี้ครั้งแรกหลังอัปเดต → จัดคอลัมน์ชุดที่ 2/3 ให้อยู่ถัดจาก Channel Gifts (idempotent)
+        if (payload.tableName === 'GiftMappings' && secureUser.Role === 'Admin') {
+          const gLock = LockService.getScriptLock();
+          gLock.waitLock(10000);
+          try { ensureGiftSetColumns_(ss); } finally { gLock.releaseLock(); }
+        }
         if (payload.tableName === 'Coupons') {
           if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
           ensureCouponsSheet_(ss);
@@ -1008,19 +1014,34 @@ function inferDefaultProductSpecs_(rowObj) {
 // ของแถมช่องทาง 3 ชุด: คอลัมน์เดิม "Channel Gifts" = ชุดที่ 1, คอลัมน์ใหม่ต่อท้าย = ชุดที่ 2 และ 3 (ลูกค้าเลือกรับได้ชุดเดียวต่อสินค้า 1 รายการ)
 const GIFT_SET_COLS_ = ["Channel Gifts", "Channel Gifts 2", "Channel Gifts 3"];
 
-// เติมคอลัมน์ชุดที่ 2/3 ท้ายชีต GiftMappings ถ้ายังไม่มี (ชีตเก่าซ่อมตัวเองตอนบันทึก/นำเข้าครั้งแรก) — ชีตนี้อ่าน/เขียนตามชื่อหัวคอลัมน์ ต่อท้ายได้ปลอดภัย
+// จัดคอลัมน์ชุดที่ 2/3 ของชีต GiftMappings ให้อยู่ถัดจาก "Channel Gifts" (… Channel Gifts, Channel Gifts 2, Channel Gifts 3, Status)
+// ยังไม่มี = แทรกคอลัมน์ใหม่, มีแล้วแต่อยู่ผิดที่ (เช่น ต่อท้ายหลัง Status จากเวอร์ชันก่อน) = ย้ายทั้งคอลัมน์พร้อมข้อมูล — รันซ้ำได้ ไม่ทำอะไรถ้าเรียงถูกแล้ว
+// ชีตนี้อ่าน/เขียนตามชื่อหัวคอลัมน์ทุกจุด (getTableDataAsJson / saveRecord / importRecords / bulkSetStatus / deleteRecords) ตำแหน่งคอลัมน์จึงไม่กระทบระบบ
+// ผู้เรียกต้องถือ script lock อยู่แล้ว คืนค่า true เมื่อมีการเปลี่ยนโครงสร้างชีต
 function ensureGiftSetColumns_(ss) {
+  let changed = false;
   try {
     const sheet = ss.getSheetByName("GiftMappings");
-    if (!sheet) return;
-    const lastCol = sheet.getLastColumn();
-    if (lastCol < 1) return;
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => h.toString().trim());
-    const missing = GIFT_SET_COLS_.filter(col => headers.indexOf(col) === -1);
-    if (missing.length === 0) return;
-    sheet.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]).setFontWeight("bold").setBackground("#4F46E5").setFontColor("#FFFFFF");
-    CacheService.getScriptCache().remove("TABLE_GiftMappings");
+    if (!sheet || sheet.getLastColumn() < 1) return false;
+    const readHeaders = () => sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
+    let headers = readHeaders();
+    if (headers.indexOf(GIFT_SET_COLS_[0]) === -1) return false;
+    for (let i = 1; i < GIFT_SET_COLS_.length; i++) {
+      const prevPos = headers.indexOf(GIFT_SET_COLS_[i - 1]) + 1; // ตำแหน่ง (เริ่มที่ 1) ของชุดก่อนหน้า
+      const curPos = headers.indexOf(GIFT_SET_COLS_[i]) + 1;
+      if (curPos === prevPos + 1) continue;
+      if (curPos === 0) {
+        sheet.insertColumnAfter(prevPos);
+        sheet.getRange(1, prevPos + 1).setValue(GIFT_SET_COLS_[i]).setFontWeight("bold").setBackground("#4F46E5").setFontColor("#FFFFFF");
+      } else {
+        sheet.moveColumns(sheet.getRange(1, curPos, 1, 1), prevPos + 1);
+      }
+      changed = true;
+      headers = readHeaders();
+    }
   } catch (e) { console.error("ensureGiftSetColumns_: " + e); }
+  if (changed) CacheService.getScriptCache().remove("TABLE_GiftMappings");
+  return changed;
 }
 
 function ensureProductSpecColumns_(ss) {

@@ -145,6 +145,26 @@ t('CHECKOUT channel gifts: only one of the three sets per item; brandGifts canno
     eq(run([PB], [BAG]).status, 'error', 'channel gift smuggled through brandGifts');
   } finally { row[c2] = old; cache.remove('TABLE_GiftMappings'); }
 });
+t('GiftMappings: set 2/3 columns are moved/inserted right after Channel Gifts, data follows, system still works', () => {
+  const gm = sheets.GiftMappings, keep = gm.rows.map(r => r.slice());
+  const col = n => gm.rows[0].indexOf(n);
+  const order = () => ['Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3', 'Status'].map(col);
+  const consecutive = () => { const o = order(); return o[0] > -1 && o[1] === o[0] + 1 && o[2] === o[0] + 2 && o[3] === o[0] + 3; };
+  try {
+    ok(consecutive(), 'fresh sheet order ' + order());
+    // layout of the previous version: Status, then the two set columns appended at the end
+    const st = col('Status'); gm.rows.forEach(r => { while (r.length < gm.rows[0].length) r.push(''); const v = r.splice(st, 1)[0]; r.splice(col('Channel Gifts') + 1, 0, v); });
+    gm.rows.find(r => r[0] === 'GM-001')[col('Channel Gifts 2')] = 'powerbank'; cache.remove('TABLE_GiftMappings');
+    ok(!consecutive(), 'precondition: old layout');
+    const rows = tbl('GiftMappings', admin); ok(consecutive(), 'after admin GET_TABLE ' + order());
+    const g1 = rows.find(r => r['Mapping ID'] === 'GM-001'); eq(g1['Channel Gifts 2'], 'powerbank', 'data moved with its column'); eq(g1.Status, 'เปิด'); eq(g1['Channel Gifts'], 'bag');
+    eq(api('CHECKOUT', co({ cart: [{ SKU: 'SKU-S24U', qty: 1, brandGifts: [], channelGifts: [{ name: 'TG Powerbank 10000mAh', qty: 1 }] }] }), sales).status, 'success', 'checkout reads moved column');
+    // sheet that never had the new columns: they are inserted before Status
+    ['Channel Gifts 3', 'Channel Gifts 2'].forEach(n => { const ci = col(n); gm.rows.forEach(r => { r.splice(ci, 1); }); }); cache.remove('TABLE_GiftMappings');
+    eq(col('Channel Gifts 2'), -1); tbl('GiftMappings', admin); ok(consecutive(), 'inserted ' + order());
+    eq(tbl('GiftMappings', admin).find(r => r['Mapping ID'] === 'GM-002').Status, 'เปิด', 'Status intact after insert');
+  } finally { gm.rows.length = 0; keep.forEach(r => gm.rows.push(r)); cache.remove('TABLE_GiftMappings'); }
+});
 t('CHECKOUT PII formula-injection sanitized', () => { api('CHECKOUT', co({ customerName: '=cmd()' }), sales); ok(sheets.Orders.rows.some(r => r[4] === "'=cmd()")); });
 t('CHECKOUT closed booking window rejected', () => { const st = sheets.Settings; let rowE; for (let i = 2; i <= st.getLastRow(); i++) if (st._get(i, 1) === 'ReserveEnd') rowE = i; st._set(rowE, 2, '2020-02-01T00:00:00'); const r = api('CHECKOUT', co(), sales); st._set(rowE, 2, '2099-01-01T00:00:00'); eq(r.status, 'error', JSON.stringify(r)); });
 t('Sales checkout is forced to own branch', () => { api('CHECKOUT', co({ branch: 'O01', channel: 'Online' }), sales); const last = sheets.Orders.rows[sheets.Orders.rows.length - 1]; eq(last[3], 'B01', 'branch written=' + last[3]); });

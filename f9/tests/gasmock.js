@@ -25,7 +25,9 @@ class Sheet {
   appendRow(a) { this.rows.push(a.slice()); }
   deleteRow(i) { this.rows.splice(i - 1, 1); }
   deleteColumn(c) { this.rows.forEach(r => r.splice(c - 1, 1)); }
-  insertColumnAfter(c) { this.rows.forEach(r => r.splice(c, 0, '')); }
+  insertColumnAfter(c) { this.rows.forEach(r => { while (r.length < c) r.push(''); r.splice(c, 0, ''); }); }
+  // moveColumns(range, destinationIndex): destinationIndex is in pre-move coordinates (the block lands before the column currently there)
+  moveColumns(range, dest) { const from = range.c, n = range.nc, w = this.getLastColumn(); this.rows.forEach(r => { while (r.length < w) r.push(''); const cut = r.splice(from - 1, n); const at = (dest > from ? dest - n : dest) - 1; r.splice(at, 0, ...cut); }); }
   setFrozenRows() {}
   getMaxRows() { return 1000; }
 }
