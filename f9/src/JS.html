@@ -744,7 +744,7 @@ window.app = {
   // พรีโหลดรูป Banner ทันทีหลังได้ข้อมูล — browser จะ cache ไว้ก่อนถึงหน้า Dashboard
   preloadBanners: function() {
     const g = window.app.globalData || {};
-    (g.heroBanners || []).forEach(b => { const im = new Image(); im.src = window.app.formatImageUrl(b.url, 'w1500'); }); // ต้องเป็นขนาดเดียวกับที่ pos.renderPosHeroAndVouchers ขอ ไม่งั้นพรีโหลดไม่ถูกใช้
+    (g.heroBanners || []).forEach(b => { const im = new Image(); im.src = window.app.formatImageUrl(b.url, 'w1200'); }); // ต้องเป็นขนาดเดียวกับที่ pos.renderPosHeroAndVouchers ขอ ไม่งั้นพรีโหลดไม่ถูกใช้
     (g.gridBanners || []).forEach(b => { const im = new Image(); im.src = window.app.formatImageUrl(b.url, 'w1000'); });
     (g.popupBanners || []).forEach(b => { const im = new Image(); im.src = window.app.formatImageUrl(b.url); });
   },
