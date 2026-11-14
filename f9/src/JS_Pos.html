@@ -1971,9 +1971,7 @@ window.app.pos = {
         return;
       }
       if(products.length === 0 && searchEl && searchEl.value === '') {
-         let skel = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 pb-4">';
-         for(let k=0; k<10; k++) { skel += '<div class="pm-skel" aria-hidden="true"><div class="skeleton mb-3" style="aspect-ratio:1/1; width:100%; border-radius:12px;"></div><div class="skeleton mb-2" style="height:10px; width:30%;"></div><div class="skeleton mb-3" style="height:14px; width:80%;"></div><div class="skeleton mb-2" style="height:18px; width:45%;"></div><div class="skeleton" style="height:10px; width:65%;"></div></div>'; }
-         skel += '</div>'; row.innerHTML = skel; return;
+         row.innerHTML = window.app.skelCardsHtml(10); return;
       }
 
       // Group products

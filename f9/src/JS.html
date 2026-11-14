@@ -696,6 +696,38 @@ window.app = {
   },
 
 
+  // ===== โครงร่างระหว่างโหลด (skeleton) =====
+  // การ์ดสินค้าสีเทา n ใบ — ใช้ทั้งในกริดหน้าร้าน (pos.renderProducts) และโครงร่างตอนเปิดหน้า
+  skelCardsHtml: function(n) {
+    let h = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 pb-4">';
+    for (let k = 0; k < n; k++) { h += '<div class="pm-skel" aria-hidden="true"><div class="skeleton mb-3" style="aspect-ratio:1/1; width:100%; border-radius:12px;"></div><div class="skeleton mb-2" style="height:10px; width:30%;"></div><div class="skeleton mb-3" style="height:14px; width:80%;"></div><div class="skeleton mb-2" style="height:18px; width:45%;"></div><div class="skeleton" style="height:10px; width:65%;"></div></div>'; }
+    return h + '</div>';
+  },
+  // โครงร่างทั้งหน้าร้าน: header (โลโก้ / ค้นหา / ไอคอน) + แถวเมนูหมวด + แบนเนอร์ 3:1 + การ์ด
+  bootSkeletonHtml: function() {
+    const s = (cls) => '<span class="skeleton ' + cls + '"></span>';
+    return '<div class="sk-boot" role="status" aria-label="กำลังโหลดหน้าร้าน">'
+      + '<div class="sk-hdr">' + s('sk-logo') + s('sk-search') + s('sk-ic') + s('sk-ic') + s('sk-ic') + '</div>'
+      + '<div class="sk-nav">' + s('sk-navi') + s('sk-navi') + s('sk-navi') + s('sk-navi') + s('sk-navi') + s('sk-sel') + s('sk-sel') + '</div>'
+      + '<div class="skeleton sk-hero"></div>'
+      + window.app.skelCardsHtml(10)
+      + '</div>';
+  },
+  // เรียกจาก renderLayout ก่อนรอ GET_ALL_DATA — แสดงเฉพาะเมื่อหน้าที่กำลังจะเปิดคือหน้าร้าน (#pos) และผู้ใช้มีสิทธิ์
+  // route() จะวาดหน้าจริงทับ และตั้ง/ถอด sf-site เองอีกครั้งหลังข้อมูลมา
+  showBootSkeleton: function() {
+    try {
+      const target = window.location.hash.substring(1) || (window.__DEEP_MODEL ? 'pos' : (window.app.savedRoute_() || 'dashboard'));
+      if (target !== 'pos') return;
+      const m = window.app.menuConfig.flatMap(x => x.children || [x]).find(x => x.id === 'pos');
+      if (!m || !window.app.checkMenuAccess('pos', m.roles)) return;
+      const c = document.getElementById('page-content');
+      if (!c) return;
+      document.documentElement.classList.add('sf-site');
+      c.innerHTML = window.app.bootSkeletonHtml();
+    } catch (e) { console.warn('boot skeleton:', e); }
+  },
+
   refreshGlobalData: async function() {
     try {
       const res = await window.app.api('GET_ALL_DATA', {});
@@ -1517,8 +1549,9 @@ window.app = {
     
     window.app.buildMenu();
     window.app.updateThemeToggleUI();
+    window.app.showBootSkeleton();
     window.app.showLoading('กำลังเข้าสู่ระบบ...');
-    
+
     try {
       const res = await window.app.api('GET_ALL_DATA', {});
       Swal.close();

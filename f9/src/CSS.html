@@ -3141,4 +3141,31 @@
   html.dark .co-items img { background: #1e293b; }
   html.dark .co-it-g i { color: #cbd5e1; }
   html.dark .co-it-v, html.dark .co-it-g, html.dark .co-note, html.dark .co-radio small, html.dark .co-bar-tot span, html.dark .co-done-s, html.dark .co-done-meta span { color: #94a3b8; }
+
+  /* ===== BOOT SKELETON — โครงร่างหน้าร้านระหว่างรอ GET_ALL_DATA (window.app.bootSkeletonHtml) =====
+     สีเทามาจาก .skeleton (มีกฎ html.dark อยู่แล้ว) บล็อกนี้กำหนดแค่ขนาดและการจัดวางให้ใกล้ header/แบนเนอร์จริง */
+  .sk-boot { padding: 16px 0 8px; }
+  .sk-boot .skeleton { display: block; border-radius: 8px; }
+  .sk-hdr { display: flex; align-items: center; gap: 12px; }
+  .sk-logo { flex: 0 0 150px; height: 40px; }
+  .sk-search { flex: 1 1 auto; height: 44px; }
+  .sk-ic { flex: 0 0 44px; height: 44px; }
+  .sk-nav { display: flex; align-items: center; gap: 16px; margin-top: 14px; padding-bottom: 14px; }
+  .sk-navi { flex: 0 0 84px; height: 16px; }
+  .sk-sel { flex: 0 0 150px; height: 36px; }
+  .sk-navi + .sk-sel { margin-left: auto; }
+  .sk-boot .sk-hero { width: 100%; aspect-ratio: 3 / 1; border-radius: 12px; margin-bottom: 24px; }
+  @media (max-width: 1023px) {
+    .sk-navi { display: none !important; }
+    .sk-sel { flex: 1 1 0; }
+    .sk-navi + .sk-sel { margin-left: 0; }
+  }
+  @media (max-width: 639px) {
+    .sk-hdr { gap: 6px; }
+    .sk-logo { flex-basis: 40px; }
+    .sk-ic { flex-basis: 40px; height: 42px; }
+    .sk-search { height: 42px; }
+    .sk-boot .sk-hero { margin-bottom: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sk-boot .skeleton { animation: none; } }
 </style>
