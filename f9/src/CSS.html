@@ -3215,4 +3215,61 @@
     .sk-boot .sk-hero { margin-bottom: 16px; }
   }
   @media (prefers-reduced-motion: reduce) { .sk-boot .skeleton { animation: none; } }
+  /* ===== SETUP GUIDE (#setupguide, window.app.setupGuide) ===== */
+  .dash-setup-all { margin-left: auto; font-size: 12.5px; font-weight: 600; color: #0f2a43; text-decoration: underline; }
+  .dash-setup-all + .dash-setup-hide { margin-left: 0; }
+  .sg-page { max-width: 860px; }
+  .sg-sum { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px; border: 1px solid #fecdd3; border-radius: 12px; background: #fff1f2; margin-bottom: 16px; }
+  .sg-sum.ready { border-color: #bbf7d0; background: #f0fdf4; }
+  .sg-sum-tx { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .sg-sum-tx b { font-size: 15px; font-weight: 700; color: #0f172a; }
+  .sg-sum-tx span { font-size: 12.5px; color: #475569; }
+  .sg-bar { flex: 0 0 160px; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+  .sg-bar i { display: block; height: 100%; background: #0f2a43; border-radius: 999px; }
+  .sg-sum.ready .sg-bar i { background: #15803d; }
+  .sg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .sg-step { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; }
+  .sg-step.cur { border-color: #0f2a43; box-shadow: 0 0 0 1px #0f2a43; }
+  .sg-num { flex: 0 0 32px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #cbd5e1; font-size: 14px; font-weight: 700; color: #475569; background: #ffffff; }
+  .sg-step.done .sg-num { background: #15803d; border-color: #15803d; color: #ffffff; font-size: 13px; }
+  .sg-step.cur .sg-num { background: #0f2a43; border-color: #0f2a43; color: #ffffff; }
+  .sg-body { flex: 1 1 auto; min-width: 0; }
+  .sg-body h2 { margin: 3px 0 2px; font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.4; }
+  .sg-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 6px; background: #eef1f5; font-size: 11.5px; font-weight: 600; color: #475569; vertical-align: 1px; }
+  .sg-step.done .sg-tag { background: #dcfce7; color: #166534; }
+  .sg-step.todo .sg-tag { background: #fef2f2; color: #be123c; }
+  .sg-why { margin: 0; font-size: 13px; color: #475569; line-height: 1.55; }
+  .sg-ok { margin: 6px 0 0; font-size: 12.5px; color: #166534; }
+  .sg-miss { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sg-miss a { display: block; padding: 6px 10px; border-radius: 8px; background: #f8fafc; font-size: 12.5px; color: #475569; text-decoration: none; border-left: 3px solid #cbd5e1; }
+  .sg-miss a:hover { background: #eef1f5; }
+  .sg-miss a b { font-weight: 600; color: #0f172a; }
+  .sg-miss li.need a { border-left-color: #be123c; }
+  .sg-go { flex: 0 0 auto; margin-top: 2px; white-space: nowrap; text-decoration: none; }
+  .sg-go i { font-size: 10px; }
+  @media (max-width: 639px) {
+    .sg-step { flex-wrap: wrap; }
+    .sg-body { flex-basis: calc(100% - 46px); }
+    .sg-go { margin-left: 46px; }
+    .sg-bar { flex-basis: 100%; }
+  }
+  html.dark .dash-setup-all { color: #93c5fd; }
+  html.dark .sg-sum { background: #3b1219; border-color: #7f1d1d; }
+  html.dark .sg-sum.ready { background: #0f2a1c; border-color: #166534; }
+  html.dark .sg-sum-tx b, html.dark .sg-body h2, html.dark .sg-miss a b { color: #f1f5f9; }
+  html.dark .sg-sum-tx span, html.dark .sg-why, html.dark .sg-miss a { color: #cbd5e1; }
+  html.dark .sg-bar { background: #334155; }
+  html.dark .sg-bar i { background: #3b6ea5; }
+  html.dark .sg-sum.ready .sg-bar i { background: #22c55e; }
+  html.dark .sg-step { background: #1e293b; border-color: #334155; }
+  html.dark .sg-step.cur { border-color: #3b6ea5; box-shadow: 0 0 0 1px #3b6ea5; }
+  html.dark .sg-num { background: #0f172a; border-color: #475569; color: #cbd5e1; }
+  html.dark .sg-step.cur .sg-num { background: #3b6ea5; border-color: #3b6ea5; color: #ffffff; }
+  html.dark .sg-tag { background: #0f172a; color: #cbd5e1; }
+  html.dark .sg-step.done .sg-tag { background: #14532d; color: #bbf7d0; }
+  html.dark .sg-step.todo .sg-tag { background: #450a0a; color: #fca5a5; }
+  html.dark .sg-ok { color: #86efac; }
+  html.dark .sg-miss a { background: #0f172a; border-left-color: #475569; }
+  html.dark .sg-miss a:hover { background: #273449; }
+  html.dark .sg-miss li.need a { border-left-color: #fca5a5; }
 </style>

@@ -1292,6 +1292,24 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.app.systemSettings.showTab('bookingsettings');true"); await sleep(1000);
     eq(await ev("JSON.stringify([!!document.getElementById('reserveStartInput'),!!document.getElementById('webhookUrlInput'),/ล้างแคช/.test(document.getElementById('ssTabContent').textContent)])"), '[true,false,false]');
   });
+  await T('setup guide: eight ordered steps, the first unfinished required step is highlighted, staff count comes from the server, Admin only', async () => {
+    await ev("window.location.hash='#setupguide';true"); await sleep(1600);
+    const read = "JSON.stringify([...document.querySelectorAll('.sg-step')].map(e=>e.getAttribute('data-step')+':'+['done','todo','rec','manual'].find(c=>e.classList.contains(c))+(e.classList.contains('cur')?'*':'')))";
+    const a = JSON.parse(await ev(read));
+    eq(a.map(x => x.split(':')[0]), ['channels', 'branches', 'members', 'products', 'promos', 'window', 'shop', 'try']);
+    ok(a[0] === 'channels:done' && a[1] === 'branches:done' && a[7] === 'try:manual', 'seeded states: ' + a.join(' '));
+    ok(/^members:(done|rec)$/.test(a[2]), 'members step must be resolved from GET_TABLE: ' + a[2]);
+    await shot('admin-setup-guide');
+    // no branches + no booking window -> branches is the current step (first required one), window is required too, summary says not ready
+    const b = JSON.parse(await ev("(()=>{const g=window.app.globalData,bk={b:g.branches,s:g.settings};g.branches=[];g.settings=Object.assign({},g.settings,{ReserveStart:'',ReserveEnd:''});window.app.setupGuide.render();const out={steps:JSON.parse(" + read + "),ready:document.getElementById('sgSummary').classList.contains('ready'),btn:document.querySelector('.sg-step.cur .sg-go').className,links:[...document.querySelectorAll('.sg-step[data-step=branches] .sg-miss a')].map(x=>x.getAttribute('href'))};g.branches=bk.b;g.settings=bk.s;window.app.setupGuide.render();return JSON.stringify(out)})()"));
+    ok(b.steps[1] === 'branches:todo*' && b.steps[5] === 'window:todo', 'states without branches/window: ' + b.steps.join(' '));
+    eq(b.steps.filter(x => /\*$/.test(x)).length, 1, 'exactly one current step'); eq(b.ready, false);
+    ok(/cms-btn-green/.test(b.btn), 'current step carries the primary button'); ok(b.links.length >= 1 && b.links.every(h => h === '#branches'), 'missing items link to the page: ' + b.links.join('|'));
+    // a non-Admin never gets the page, even with the * menu permission
+    const acc = await ev("(()=>{const u=window.app.user,bk={r:u.Role,m:u['Accessible Menus']};const a=window.app.checkMenuAccess('setupguide',['Admin']);u.Role='Manager';u['Accessible Menus']='*';const m=window.app.checkMenuAccess('setupguide',['Admin']);u.Role=bk.r;u['Accessible Menus']=bk.m;return a+'|'+m})()");
+    eq(acc, 'true|false');
+    ok(await ev("!!document.getElementById('nav-desk-setupguide')"), 'menu item missing');
+  });
   await T('forms: add forms open, fit the screen, close with the X button', async () => {
     await ev("window.location.hash='#channels';true"); await sleep(1400);
     await ev("window.app.grid.handleAddClick();true"); await sleep(600);

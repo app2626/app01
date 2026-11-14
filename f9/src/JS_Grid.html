@@ -488,7 +488,7 @@ window.app.grid = {
                     if(m.isParent) {
                         if (m.id) opts.push({id: m.id, label: `[กลุ่ม] ${m.label}`});
                         m.children.forEach(child => { if (!child.isCategory && child.id && child.id !== 'systemsettings') opts.push({id: child.id, label: `--- ${child.label}`}); });
-                    } else if (!m.isCategory && m.id) {
+                    } else if (!m.isCategory && m.id && m.id !== 'setupguide') {
                         opts.push({id: m.id, label: m.label});
                     }
                 });

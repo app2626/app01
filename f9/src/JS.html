@@ -23,6 +23,7 @@ window.app = {
       { id: 'branchbookingsummary', icon: 'fa-store-alt', label: 'สรุปยอดจองตามสาขา', sub: 'Branch Bookings', roles: ['Admin', 'Manager'] },
       { id: 'allbookingsummary', icon: 'fa-boxes-stacked', label: 'สรุปข้อมูลจองทั้งหมด', sub: 'All Bookings', roles: ['Admin', 'Manager'] },
       { label: 'หลังร้าน', sub: 'Back Office', isCategory: true, roles: ['Admin', 'Manager'] },
+      { id: 'setupguide', icon: 'fa-list-check', label: 'เริ่มต้นใช้งาน', sub: 'Setup Guide', roles: ['Admin'] },
       {
         // กลุ่มย่อยเรียงตามงาน: สินค้า / ร้านและสาขา / โปรโมชั่น / เนื้อหาและระบบ — id ของทุกเมนูคงเดิม (สิทธิ์ Accessible Menus และ route ผูกกับ id)
         id: 'admin_settings', icon: 'fa-cogs', label: 'จัดการร้าน', sub: 'Store Admin', roles: ['Admin', 'Manager'],
@@ -1623,6 +1624,8 @@ window.app = {
       const uRole = window.app.user.Role;
       if (uRole === 'Admin') return true; 
       
+      // หน้าเริ่มต้นใช้งานเป็นของ Admin เท่านั้น (ทุกลิงก์ในหน้าพาไปหน้าที่ Admin แก้ได้คนเดียว) — สิทธิ์เมนู * ของบทบาทอื่นไม่นับ
+      if (menuId === 'setupguide') return false;
       const allowed = window.app.user['Accessible Menus'];
       if (allowed && allowed.trim() !== '') {
           if (allowed.trim() === '*' || allowed.trim().toUpperCase() === 'ALL') return true;
@@ -1799,6 +1802,9 @@ window.app = {
           break;
         case 'systemsettings':
           window.app.systemSettings.init();
+          break;
+        case 'setupguide':
+          window.app.setupGuide.init();
           break;
         case 'banners': case 'news': case 'newscats':
           window.app.cms.open(hash);

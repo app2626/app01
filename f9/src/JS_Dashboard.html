@@ -237,7 +237,7 @@ window.app.dashboard = {
       let hidden = ''; try { hidden = localStorage.getItem('f9_setup_hidden') || ''; } catch (e) {}
       if (hidden === sig) return;
       el.innerHTML = '<div class="dash-setup-head"><h2 class="dash-todo-h">ตั้งค่าระบบให้พร้อมใช้งาน</h2><span class="dash-setup-n">เสร็จแล้ว ' + (items.length - todo.length) + ' จาก ' + items.length + ' ข้อ</span>'
-        + '<button type="button" class="dash-setup-hide" onclick="window.app.dashboard.hideSetup()">ซ่อน</button></div><ul class="dash-setup-list">'
+        + '<a class="dash-setup-all" href="#setupguide">ดูขั้นตอนทั้งหมด</a><button type="button" class="dash-setup-hide" onclick="window.app.dashboard.hideSetup()">ซ่อน</button></div><ul class="dash-setup-list">'
         + todo.map(i => '<li><a class="dash-setup-row' + (i.need ? ' need' : '') + '" href="' + esc(i.href) + '" data-setup="' + esc(i.id) + '">'
           + '<i class="fas ' + (i.need ? 'fa-circle-exclamation' : 'fa-circle') + ' dash-setup-ic" aria-hidden="true"></i>'
           + '<span class="dash-setup-tx"><b>' + esc(i.title) + '</b><small>' + esc(i.detail) + '</small></span>'

@@ -1,0 +1,88 @@
+<script>
+// หน้า "เริ่มต้นใช้งาน" (#setupguide, Admin เท่านั้น) — เรียงขั้นตอนตั้งค่าตามลำดับที่ต้องทำจริง:
+// ช่องทางขาย -> สาขา -> ผู้ใช้งาน -> สินค้า -> ของแถม/โปรโมชั่น -> ช่วงเวลารับจอง -> หน้าตาร้าน -> ทดลองจอง
+// สถานะแต่ละขั้นมาจาก dashboard.setupItems() (รายการตรวจเดียวกับการ์ดบนแดชบอร์ด) + channelNames() — ไม่มีกติกาซ้ำที่นี่
+// ขั้น "ผู้ใช้งาน" ต้องถาม server (GET_TABLE Members) เพราะ GET_ALL_DATA ไม่ส่งรายชื่อสมาชิกมา
+// ข้อความที่มาจากชีต (ชื่อช่องทาง, รายละเอียดของรายการตรวจ) ผ่าน esc() ทุกจุด; ลิงก์เป็น #id ธรรมดา (ตัวดักคลิกใน init พาไปเอง)
+window.app.setupGuide = {
+  staff: null,   // จำนวนผู้ใช้งานที่ไม่ใช่ Admin; null = ยังไม่รู้
+  seq: 0,
+
+  init: function() {
+    this.staff = null;
+    this.render();
+    this.loadStaff();
+  },
+
+  loadStaff: async function() {
+    const my = ++this.seq;
+    try {
+      const res = await window.app.api('GET_TABLE', { tableName: 'Members' });
+      if (my !== this.seq || window.app.currentRoute !== 'setupguide') return;
+      if (res && res.status === 'success' && Array.isArray(res.data)) {
+        this.staff = res.data.filter(m => String(m.Role || '').trim() !== 'Admin').length;
+        this.render();
+      }
+    } catch (e) { /* นับไม่ได้ก็ปล่อยขั้นนี้เป็น "ตรวจเอง" */ }
+  },
+
+  // state: done = ครบ, todo = มีข้อจำเป็นค้าง, rec = เหลือแต่ข้อแนะนำ, manual = ระบบตรวจให้ไม่ได้
+  steps: function() {
+    const it = {};
+    window.app.dashboard.setupItems().forEach(i => { it[i.id] = i; });
+    const pick = ids => ids.map(id => it[id]).filter(Boolean);
+    const ch = window.app.channelNames();
+    const defs = [
+      { id: 'channels', title: 'กำหนดช่องทางขาย', why: 'ช่องทางคือกลุ่มของสาขา เช่น หน้าร้าน ออนไลน์ ใช้กำหนดว่าสินค้า ของแถม และโปรโมชั่นใดใช้กับสาขากลุ่มไหน', href: '#channels', btn: 'ช่องทางขาย',
+        checks: [{ id: 'channelList', need: true, ok: ch.length > 0, title: 'เพิ่มช่องทางขาย', detail: 'ยังไม่มีช่องทางขาย เพิ่มอย่างน้อยหนึ่งช่องทางก่อนสร้างสาขา', href: '#channels' }],
+        doneText: ch.length ? 'มี ' + ch.length + ' ช่องทาง: ' + ch.slice(0, 4).join(', ') + (ch.length > 4 ? ' ...' : '') : '' },
+      { id: 'branches', title: 'เพิ่มสาขา', why: 'ลูกค้าและพนักงานเลือกสาขาตอนจอง แต่ละสาขาต้องระบุช่องทางขาย', href: '#branches', btn: 'สาขา', checks: pick(['branches', 'branchChannel']) },
+      { id: 'members', title: 'เพิ่มผู้ใช้งานของพนักงาน', why: 'พนักงานขายล็อกอินด้วยบัญชีของตัวเองและเห็นเฉพาะสาขาที่กำหนด', href: '#members', btn: 'ผู้ใช้งาน',
+        checks: this.staff === null ? [] : [{ id: 'staff', need: false, ok: this.staff > 0, title: 'เพิ่มบัญชีพนักงาน', detail: 'ตอนนี้มีแต่บัญชีผู้ดูแลระบบ', href: '#members' }],
+        manual: this.staff === null, doneText: this.staff ? 'มีบัญชีพนักงาน ' + this.staff + ' บัญชี' : '' },
+      { id: 'products', title: 'เพิ่มสินค้า ราคา และรูป', why: 'สินค้าที่สถานะ เปิด และมีราคาเท่านั้นที่ขึ้นหน้าร้าน เพิ่มทีละรุ่นหรือนำเข้าจากไฟล์ CSV ได้', href: '#products', btn: 'สินค้า', checks: pick(['products', 'price', 'image']) },
+      { id: 'promos', title: 'ตั้งของแถมและโปรโมชั่น', why: 'กำหนดว่ารุ่นใดได้ของแถมอะไรในช่องทางไหน ข้ามได้ถ้ายังไม่มีของแถม', href: '#giftmappings', btn: 'ชุดของแถม', checks: pick(['gifts', 'orphanChannel']) },
+      { id: 'window', title: 'กำหนดช่วงเวลารับจอง', why: 'หน้าร้านรับจองเฉพาะช่วงวันเวลาที่ตั้งไว้ นอกช่วงนี้ปุ่มจองถูกปิด', href: '#bookingsettings', btn: 'ตั้งค่าการจอง', checks: pick(['window', 'windowEnded']) },
+      { id: 'shop', title: 'ใส่โลโก้ ช่องทางติดต่อ และแบนเนอร์', why: 'ทำให้หน้าร้านดูเป็นร้านของคุณและลูกค้าติดต่อได้', href: '#ss_shop', btn: 'ตั้งค่าร้านค้า', checks: pick(['logo', 'contact', 'banner']) },
+      { id: 'try', title: 'ทดลองจองหนึ่งรายการ', why: 'เปิดหน้าร้าน เลือกสินค้า แล้วจองจนได้เลขใบจอง เพื่อดูว่าของแถม ราคา และใบจองออกถูกต้อง ลบใบจองทดสอบได้ที่หน้ารายการใบจอง', href: '#pos', btn: 'เปิดหน้าร้าน', checks: [], manual: true }
+    ];
+    return defs.map(s => {
+      const miss = s.checks.filter(c => !c.ok);
+      s.miss = miss;
+      s.state = s.manual ? 'manual' : (miss.some(c => c.need) ? 'todo' : (miss.length ? 'rec' : 'done'));
+      return s;
+    });
+  },
+
+  render: function() {
+    const content = document.getElementById('page-content'); if (!content) return;
+    const esc = window.app.esc, steps = this.steps();
+    const counted = steps.filter(s => s.state !== 'manual');
+    const done = counted.filter(s => s.state === 'done').length;
+    const cur = steps.find(s => s.state === 'todo');
+    const recLeft = steps.filter(s => s.state === 'rec').length;
+    const pct = counted.length ? Math.round(done * 100 / counted.length) : 0;
+    const TAG = { done: 'เสร็จแล้ว', todo: 'ต้องทำ', rec: 'แนะนำ', manual: 'ตรวจเอง' };
+    const sumTitle = cur ? 'ยังเปิดรับจองไม่ได้ เหลือขั้นที่จำเป็นอีก ' + steps.filter(s => s.state === 'todo').length + ' ขั้น'
+      : (recLeft ? 'ระบบพร้อมรับจองแล้ว เหลือข้อแนะนำอีก ' + recLeft + ' ขั้น' : 'ระบบพร้อมรับจองแล้ว');
+    let h = '<div class="cms-page sg-page"><div class="cms-head"><h1>เริ่มต้นใช้งาน</h1><span class="cms-crumb">หลังร้าน &gt; เริ่มต้นใช้งาน</span></div>'
+      + '<div class="sg-sum' + (cur ? '' : ' ready') + '" id="sgSummary"><div class="sg-sum-tx"><b>' + esc(sumTitle) + '</b><span>เสร็จแล้ว ' + done + ' จาก ' + counted.length + ' ขั้นตอน ทำตามลำดับจากบนลงล่าง</span></div>'
+      + '<div class="sg-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div></div><ol class="sg-list">';
+    steps.forEach((s, i) => {
+      const isCur = cur && cur.id === s.id;
+      h += '<li class="sg-step ' + s.state + (isCur ? ' cur' : '') + '" data-step="' + esc(s.id) + '">'
+        + '<span class="sg-num" aria-hidden="true">' + (s.state === 'done' ? '<i class="fas fa-check"></i>' : (i + 1)) + '</span>'
+        + '<div class="sg-body"><h2>' + esc(s.title) + ' <span class="sg-tag">' + TAG[s.state] + '</span></h2>'
+        + '<p class="sg-why">' + esc(s.why) + '</p>';
+      if (s.miss.length) {
+        h += '<ul class="sg-miss">' + s.miss.map(c => '<li class="' + (c.need ? 'need' : '') + '"><a href="' + esc(c.href) + '"><b>' + esc(c.title) + '</b> ' + esc(c.detail) + '</a></li>').join('') + '</ul>';
+      } else if (s.state === 'done' && s.doneText) {
+        h += '<p class="sg-ok">' + esc(s.doneText) + '</p>';
+      }
+      h += '</div><a class="cms-btn ' + (isCur ? 'cms-btn-green' : 'cms-btn-line') + ' sg-go" href="' + esc(s.href) + '">' + esc(s.btn) + ' <i class="fas fa-chevron-right" aria-hidden="true"></i></a></li>';
+    });
+    h += '</ol></div>';
+    content.innerHTML = h;
+  }
+};
+</script>
