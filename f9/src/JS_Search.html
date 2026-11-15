@@ -60,7 +60,7 @@ window.app.search = {
       const hay = (model + ' ' + (p['Marketing Model'] || '') + ' ' + (p.SKU || '') + ' ' + (p['Product Group'] || '')).toLowerCase();
       if (hay.indexOf(q) === -1) return;
       seen[model] = true;
-      out.push({ kind: 'product', icon: 'fa-mobile-screen', title: model, sub: (p.Category || '') + (p['Product Group'] && p['Product Group'] !== '-' ? ' · ' + p['Product Group'] : ''), model: model });
+      out.push({ kind: 'product', icon: 'fa-mobile-screen', title: window.app.titleCaseName(model), sub: (p.Category || '') + (p['Product Group'] && p['Product Group'] !== '-' ? ' · ' + window.app.titleCaseName(p['Product Group']) : ''), model: model });
     });
     return out.slice(0, 6);
   },

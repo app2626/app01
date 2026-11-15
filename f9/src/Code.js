@@ -150,6 +150,8 @@ function setupDatabase(userToken) {
       sheet.appendRow(tables[sheetName]);
       sheet.getRange(1, 1, 1, tables[sheetName].length).setFontWeight("bold").setBackground("#4F46E5").setFontColor("white");
       sheet.setFrozenRows(1);
+      const skuCol = tables[sheetName].indexOf('SKU');
+      if (skuCol > -1) sheet.getRange(2, skuCol + 1, Math.max(1, sheet.getMaxRows() - 1), 1).setNumberFormat('@');
       isNewSheet = true;
     }
     
@@ -846,11 +848,19 @@ function importLaunchDate_(raw) {
   return bannerDateValid_(s) ? s : null;
 }
 function todayThai_() { return Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd"); }
+// SKU ต้องเป็นเซลล์ข้อความเสมอ (owner 2026-11-15) — ไม่งั้น Sheets แปลง SKU ตัวเลขล้วนเป็นตัวเลข (ตัด 0 นำหน้า, 1.23E+12) แล้วจับคู่ไม่ตรง
+// เรียกก่อน setValues: ตั้ง format '@' ที่คอลัมน์ SKU ของช่วงที่จะเขียน และแปลงค่าในแถวเป็น string; colIdx = index (0-based) ของคอลัมน์ SKU ใน rows
+function skuAsText_(sheet, rows, startRow, colIdx) {
+  if (!sheet || !rows || !rows.length || colIdx === undefined || colIdx === null || colIdx < 0) return;
+  rows.forEach(row => { if (row && row[colIdx] !== '' && row[colIdx] !== null && row[colIdx] !== undefined) row[colIdx] = String(row[colIdx]); });
+  sheet.getRange(startRow, colIdx + 1, rows.length, 1).setNumberFormat('@');
+}
 // เขียนแถวสินค้าใหม่ต่อท้ายชีต Products — บังคับคอลัมน์ Launch Date เป็นข้อความก่อน (กัน Sheets แปลงเป็น Date)
 function writeProductRows_(sheet, headers, newRows) {
   const startRow = sheet.getLastRow() + 1;
   const ldIdx = headers.indexOf(PRODUCT_LAUNCH_COL_);
   if (ldIdx !== -1) sheet.getRange(startRow, ldIdx + 1, newRows.length, 1).setNumberFormat('@');
+  skuAsText_(sheet, newRows, startRow, headers.indexOf('SKU'));
   sheet.getRange(startRow, 1, newRows.length, headers.length).setValues(newRows);
 }
 function bannerDateValid_(s) {
@@ -1099,6 +1109,7 @@ function ensureProductSpecColumns_(ss) {
       }
 
       if (rowsUpdated) {
+        skuAsText_(sheet, allData, 2, headers.indexOf('SKU'));
         sheet.getRange(2, 1, allData.length, lastCol).setValues(allData);
       }
       if (schemaChanged || rowsUpdated) {
@@ -1681,7 +1692,7 @@ function processCheckout(payload, secureUser, ss) {
       CacheService.getScriptCache().remove("TABLE_Products");
     }
     if (invRows.length > 0) {
-      invSheet.getRange(invSheet.getLastRow() + 1, 1, invRows.length, invRows[0].length).setValues(invRows);
+      { const invStart = invSheet.getLastRow() + 1; skuAsText_(invSheet, invRows, invStart, 2); invSheet.getRange(invStart, 1, invRows.length, invRows[0].length).setValues(invRows); }
     }
     if (orderRows.length > 0) {
       const orderStartRow = orderSheet.getLastRow() + 1;
@@ -1690,6 +1701,7 @@ function processCheckout(payload, secureUser, ss) {
         const ci = orderHeaders.indexOf(col);
         if (ci > -1) orderSheet.getRange(orderStartRow, ci + 1, orderRows.length, 1).setNumberFormat('@');
       });
+      skuAsText_(orderSheet, orderRows, orderStartRow, orderHeaders.indexOf('SKU'));
       orderSheet.getRange(orderStartRow, 1, orderRows.length, orderRows[0].length).setValues(orderRows);
     }
     
@@ -2066,6 +2078,7 @@ function importProducts(payload, secureUser, ss) {
       const startRow = sheet.getLastRow() + 1;
       // SKU/Model เป็นข้อความเสมอ — ไม่ให้ Sheets ตีความรหัสตัวเลขยาวเป็นตัวเลข (ปัดเป็น 8.65E+13 / เสียความแม่นยำเกิน 15 หลัก)
       [skuIdx, modelIdx, headers.indexOf(PRODUCT_LAUNCH_COL_)].forEach(ci => { if (ci !== -1) sheet.getRange(startRow, ci + 1, outRows.length, 1).setNumberFormat('@'); });
+      skuAsText_(sheet, outRows, startRow, headers.indexOf('SKU'));
       sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
       CacheService.getScriptCache().remove("TABLE_Products");
       logAudit(secureUser.Username, "IMPORT_PRODUCTS", "Imported " + outRows.length + " SKU(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
@@ -2227,6 +2240,7 @@ function importRecords(payload, secureUser, ss) {
     if (!dryRun && outRows.length > 0) {
       const startRow = sheet.getLastRow() + 1;
       spec.textCols.forEach(c => { const ci = headers.indexOf(c); if (ci > -1) sheet.getRange(startRow, ci + 1, outRows.length, 1).setNumberFormat('@'); });
+      skuAsText_(sheet, outRows, startRow, headers.indexOf('SKU'));
       sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
       CacheService.getScriptCache().remove(spec.cache);
       logAudit(secureUser.Username, "IMPORT_" + table.toUpperCase(), "Imported " + outRows.length + " " + table + " row(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
@@ -2303,7 +2317,9 @@ function bulkUpdateProducts(payload, secureUser, ss) {
     }
 
     if (updatedCount > 0) {
-      sheet.getRange(2, 1, data.length - 1, headers.length).setValues(data.slice(1));
+      const outData = data.slice(1);
+      skuAsText_(sheet, outData, 2, headers.indexOf('SKU'));
+      sheet.getRange(2, 1, outData.length, headers.length).setValues(outData);
       CacheService.getScriptCache().remove("TABLE_Products");
       logAudit(secureUser.Username, "BULK_UPDATE_PRODUCTS", "Updated " + updatedCount + " SKU(s)");
     }
@@ -2575,12 +2591,13 @@ function updateFullOrder(dataObj, secureUser, ss) {
       CacheService.getScriptCache().remove("TABLE_Products");
     }
     if (invRows.length > 0) {
-      invSheet.getRange(invSheet.getLastRow() + 1, 1, invRows.length, invRows[0].length).setValues(invRows);
+      { const invStart = invSheet.getLastRow() + 1; skuAsText_(invSheet, invRows, invStart, 2); invSheet.getRange(invStart, 1, invRows.length, invRows[0].length).setValues(invRows); }
     }
     // (7.1) PII เป็น plain text — บังคับ format '@' ที่ 2 คอลัมน์นี้ก่อนเขียน กันเลข 0 นำหน้าเบอร์/เลขบัตรหาย
     const piiColIdx = ["Contact Number", "ID Card_Passport"].map(h => oHeaders.indexOf(h)).filter(i => i > -1);
     orderUpdates.forEach(update => {
       piiColIdx.forEach(ci => orderSheet.getRange(update.row, ci + 1).setNumberFormat('@'));
+      skuAsText_(orderSheet, [update.data], update.row, oHeaders.indexOf('SKU'));
       orderSheet.getRange(update.row, 1, 1, update.data.length).setValues([update.data]);
     });
     
@@ -2686,6 +2703,8 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     };
     const freeTextCols = SAVE_RECORD_FREE_TEXT_COLS_[tableName] || [];
     let rowData = headers.map(h => dataObj[h] !== undefined ? (freeTextCols.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]) : "");
+    const skuCi = headers.indexOf('SKU');
+    if (skuCi > -1) skuAsText_(sheet, [rowData], rowIndex > -1 ? rowIndex : sheet.getLastRow() + 1, skuCi);
     if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); }
     // วันที่ของคูปองต้องเป็นเซลล์ข้อความ — ไม่งั้น Sheets แปลงเป็น Date แล้วอ่านกลับเป็นรูปแบบตามภาษาของชีต (แบบเดียวกับ writeBannerDates_)
     if (couponDateCols.length) {
@@ -3133,7 +3152,7 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
             CacheService.getScriptCache().remove("TABLE_Products");
           }
           if (invRows.length > 0) {
-            invSheet.getRange(invSheet.getLastRow() + 1, 1, invRows.length, invRows[0].length).setValues(invRows);
+            { const invStart = invSheet.getLastRow() + 1; skuAsText_(invSheet, invRows, invStart, 2); invSheet.getRange(invStart, 1, invRows.length, invRows[0].length).setValues(invRows); }
           }
           logAudit(secureUser.Username, "DELETE_ORDER", "Deleted Order ID: " + idValue + " (" + deletedCount + " rows)");
           return { status: 'success' };

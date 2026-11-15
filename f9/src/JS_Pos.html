@@ -1176,7 +1176,7 @@ window.app.pos = {
       resolved.forEach(item => {
         const caps = [...new Set(item.variants.map(v => v.Capacity).filter(c => c && c !== '-'))];
         html += '<td class="p-3 border-l border-slate-200/80">'
-          + (caps.length ? caps.map(c => '<span class="inline-block px-2 py-0.5 mr-1 mb-1 rounded-md bg-slate-100 border border-slate-200 font-bold text-[10px] text-slate-700">' + esc(c) + '</span>').join('') : '<span class="text-slate-400">-</span>')
+          + (caps.length ? caps.map(c => '<span class="inline-block px-2 py-0.5 mr-1 mb-1 rounded-md bg-slate-100 border border-slate-200 font-bold text-[10px] text-slate-700">' + window.app.pn(c) + '</span>').join('') : '<span class="text-slate-400">-</span>')
           + '</td>';
       });
       html += '</tr>';
@@ -1186,7 +1186,7 @@ window.app.pos = {
       resolved.forEach(item => {
         const cols = [...new Set(item.variants.map(v => v.Color).filter(c => c && c !== '-'))];
         html += '<td class="p-3 border-l border-slate-200/80">'
-          + (cols.length ? cols.map(c => '<span class="inline-flex items-center gap-1 px-2 py-0.5 mr-1 mb-1 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-semibold text-slate-700"><span class="w-2.5 h-2.5 rounded-full border border-slate-300" style="background:' + esc(this.colorHex(c)) + '"></span>' + esc(c) + '</span>').join('') : '<span class="text-slate-400">-</span>')
+          + (cols.length ? cols.map(c => '<span class="inline-flex items-center gap-1 px-2 py-0.5 mr-1 mb-1 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-semibold text-slate-700"><span class="w-2.5 h-2.5 rounded-full border border-slate-300" style="background:' + esc(this.colorHex(c)) + '"></span>' + window.app.pn(c) + '</span>').join('') : '<span class="text-slate-400">-</span>')
           + '</td>';
       });
       html += '</tr>';
@@ -1227,7 +1227,7 @@ window.app.pos = {
         const sp = this.getDeviceSpecs(item);
         const pr = parseFloat(String(v.Price || '0').replace(/[^\d.\-]/g, '')) || 0;
         const gInfo = this.countEligibleGifts(v, currentChannel);
-        lines.push((i + 1) + ') ' + item.dispName + ' (' + (v.Capacity || '-') + ')');
+        lines.push((i + 1) + ') ' + window.app.titleCaseName(item.dispName) + ' (' + window.app.titleCaseName(v.Capacity || '-') + ')');
         lines.push('   💰 ราคาพิเศษ: ฿' + pr.toLocaleString() + (pr >= 3000 ? ' (ผ่อน 0% 10 เดือน เพียง ฿' + Math.ceil(pr / 10).toLocaleString() + '/ด.)' : ''));
         lines.push('   🎁 ของแถม: ฟรี ' + gInfo.total + ' รายการ');
         lines.push('   📱 หน้าจอ: ' + sp.display);
@@ -1466,7 +1466,7 @@ window.app.pos = {
       const side = document.getElementById('storeSidebar');
       if (!bar) return;
       this.openPopover = null;
-      const esc = window.app.esc, escJs = window.app.escAttrJs;
+      const esc = window.app.esc, escJs = window.app.escAttrJs, tc = window.app.titleCaseName;
       const f = this.storeFilters;
       const prods = (window.app.globalData.products || []).filter(p => ['เปิด','open','active','on','true'].includes((p.Status || '').toString().trim().toLowerCase()));
       const cats = this.storeCategories(prods);
@@ -1500,7 +1500,7 @@ window.app.pos = {
       sh += grp('หมวดสินค้า', opt(f.category === '', 'สินค้าทั้งหมด', "window.app.pos.setStoreCategory('')")
         + cats.filter(c => !c.includes('ของแถม') || f.category === c).map(c => opt(f.category === c, c, "window.app.pos.setStoreCategory('" + escJs(c) + "')")).join(''));
       if (groups.length > 0) {
-        sh += grp('ซีรีส์ / รุ่น', groups.map(g => opt(f.groups.includes(g), g, "window.app.pos.setStoreGroup('" + escJs(g) + "')")).join(''));
+        sh += grp('ซีรีส์ / รุ่น', groups.map(g => opt(f.groups.includes(g), tc(g), "window.app.pos.setStoreGroup('" + escJs(g) + "')")).join(''));
       }
       const minV = f.priceMin === '' ? '' : f.priceMin, maxV = f.priceMax === '' ? '' : f.priceMax;
       sh += grp('ช่วงราคา',
@@ -1509,10 +1509,10 @@ window.app.pos = {
         + '<button type="button" class="sf-price-go" onclick="window.app.pos.applyPriceInputs()">ตกลง</button></div>'
         + priceOpts.map(o => opt(f.priceRange === o.val && f.priceMin === '' && f.priceMax === '', o.label, "window.app.pos.setStoreFilter('priceRange','" + o.val + "')")).join(''));
       if (caps.length > 0) {
-        sh += grp('ความจุ', caps.map(c => opt(f.capacities.includes(c), c, "window.app.pos.setStoreFilter('capacity','" + escJs(c) + "')")).join(''));
+        sh += grp('ความจุ', caps.map(c => opt(f.capacities.includes(c), tc(c), "window.app.pos.setStoreFilter('capacity','" + escJs(c) + "')")).join(''));
       }
       if (colors.length > 0) {
-        sh += grp('สี', colors.map(c => opt(f.colors.includes(c), c, "window.app.pos.setStoreFilter('color','" + escJs(c) + "')", '<span class="sf-swatch" style="background:' + esc(this.colorHex(c)) + '"></span>')).join(''));
+        sh += grp('สี', colors.map(c => opt(f.colors.includes(c), tc(c), "window.app.pos.setStoreFilter('color','" + escJs(c) + "')", '<span class="sf-swatch" style="background:' + esc(this.colorHex(c)) + '"></span>')).join(''));
       }
       sh += '<button type="button" class="sf-clear" onclick="window.app.pos.clearStoreFilters(false)"' + (this.storeFiltersActive() ? '' : ' disabled') + '>ลบการกรองสินค้าที่เลือก</button>';
       sh += '</div>';
@@ -1525,13 +1525,13 @@ window.app.pos = {
       }
 
       // --- ส่วนหัวรายการ: breadcrumb + ชื่อหมวด + จำนวน + แถบเรียงตาม ---
-      const title = f.groups.length === 1 ? f.groups[0] : (f.category || 'สินค้าทั้งหมด');
+      const title = f.groups.length === 1 ? tc(f.groups[0]) : (f.category || 'สินค้าทั้งหมด');
       // ไทล์ไอคอนหมวด (ยังเป็นปุ่ม .sf-chip เดิม ข้อความในปุ่ม = ชื่อหมวดล้วน — ไอคอนเป็น <i> ไม่มีข้อความ); หมวดของแถมไม่ขึ้นเป็นไทล์เพราะไม่มีการ์ดขายให้กดดู (ยังเลือกได้ที่แถบตัวกรองด้านข้างเหมือนเดิม)
       const catChip = (val, label) => '<button type="button" class="sf-chip sf-tile' + (f.category === val ? ' on' : '') + '" onclick="window.app.pos.setStoreCategory(\'' + escJs(val) + '\')" aria-pressed="' + (f.category === val ? 'true' : 'false') + '"><i class="fas ' + this.catIcon(val) + ' sf-tile-ic" aria-hidden="true"></i><span class="sf-tile-lb">' + esc(label) + '</span></button>';
       let html = '<div class="sf-catchips sf-cattiles" aria-label="หมวดสินค้า">' + catChip('', 'ทั้งหมด') + cats.filter(c => !c.includes('ของแถม')).map(c => catChip(c, c)).join('') + '</div>';
       html += '<nav class="sf-crumb" aria-label="breadcrumb"><span>หน้าหลัก</span><i class="fas fa-chevron-right"></i><span' + (f.category ? '' : ' class="cur"') + '>สินค้าทั้งหมด</span>'
         + (f.category ? '<i class="fas fa-chevron-right"></i><span' + (f.groups.length ? '' : ' class="cur"') + '>' + esc(f.category) + '</span>' : '')
-        + (f.groups.length ? '<i class="fas fa-chevron-right"></i><span class="cur">' + esc(f.groups.join(', ')) + '</span>' : '') + '</nav>';
+        + (f.groups.length ? '<i class="fas fa-chevron-right"></i><span class="cur">' + esc(f.groups.map(tc).join(', ')) + '</span>' : '') + '</nav>';
       html += '<div class="sf-head"><h2 class="sf-h1">' + esc(title) + '</h2><span id="storeResultCount" class="sf-count"></span></div>';
       html += '<div class="sf-sortbar">'
         + '<button type="button" class="sf-filter-btn lg:hidden" onclick="window.app.pos.toggleStoreSidebar()"><i class="fas fa-sliders"></i> ตัวกรอง' + (this.storeFiltersActive() ? ' <span class="sf-dot"></span>' : '') + '</button>'
@@ -1544,14 +1544,14 @@ window.app.pos = {
     },
     // ป้ายตัวกรองที่เลือกอยู่ (ใต้แถบเรียงตาม) — กดที่ป้าย = เอาตัวกรองนั้นออก; ไม่รวมการเรียงลำดับและคำค้น
     activeChipsHtml: function() {
-      const f = this.storeFilters, esc = window.app.esc, escJs = window.app.escAttrJs, chips = [];
+      const f = this.storeFilters, esc = window.app.esc, escJs = window.app.escAttrJs, tc = window.app.titleCaseName, chips = [];
       const add = (label, onclick) => chips.push('<button type="button" class="sf-achip" onclick="' + onclick + '" aria-label="' + esc('เอาออก ' + label) + '"><span>' + esc(label) + '</span><i class="fas fa-xmark" aria-hidden="true"></i></button>');
       const baht = (n) => '฿' + Number(n).toLocaleString('en-US');
       if (f.category) add(f.category, "window.app.pos.setStoreCategory('')");
       if (f.brand) add(f.brand, "window.app.pos.setStoreFilter('brand','')");
-      f.groups.forEach(g => add(g, "window.app.pos.setStoreGroup('" + escJs(g) + "')"));
-      f.capacities.forEach(c => add(c, "window.app.pos.setStoreFilter('capacity','" + escJs(c) + "')"));
-      f.colors.forEach(c => add(c, "window.app.pos.setStoreFilter('color','" + escJs(c) + "')"));
+      f.groups.forEach(g => add(tc(g), "window.app.pos.setStoreGroup('" + escJs(g) + "')"));
+      f.capacities.forEach(c => add(tc(c), "window.app.pos.setStoreFilter('capacity','" + escJs(c) + "')"));
+      f.colors.forEach(c => add(tc(c), "window.app.pos.setStoreFilter('color','" + escJs(c) + "')"));
       const pr = { lt10: 'ต่ำกว่า ' + baht(10000), '10-30': baht(10000) + ' - ' + baht(30000), '30-50': baht(30000) + ' - ' + baht(50000), gt50: 'มากกว่า ' + baht(50000) }[f.priceRange];
       if (pr) add(pr, "window.app.pos.setStoreFilter('priceRange','')");
       else if (f.priceMin !== '' || f.priceMax !== '') add(f.priceMin !== '' && f.priceMax !== '' ? baht(f.priceMin) + ' - ' + baht(f.priceMax) : (f.priceMin !== '' ? 'ตั้งแต่ ' + baht(f.priceMin) : 'ไม่เกิน ' + baht(f.priceMax)), "window.app.pos.setStoreFilter('priceRange','')");
@@ -2172,7 +2172,7 @@ window.app.pos = {
           const sel = col === st.color;
           // tooltip บอกจำนวนคงเหลือของสีนั้น (ความจุที่เลือกอยู่ ถ้าไม่มีความจุนั้นใช้ยอดรวมทุกความจุ)
           const comboV = vars.find(v => v.Color === col && v.Capacity === st.cap);
-          const colTip = col + ' · ' + ((comboV ? stockOf(comboV) : colStock) > 0 ? 'เหลือ ' + (comboV ? stockOf(comboV) : colStock) + ' ชิ้น' : 'หมด');
+          const colTip = window.app.titleCaseName(col) + ' · ' + ((comboV ? stockOf(comboV) : colStock) > 0 ? 'เหลือ ' + (comboV ? stockOf(comboV) : colStock) + ' ชิ้น' : 'หมด');
           dotsHtml += '<button type="button" class="color-dot' + (colStock <= 0 ? ' oos' : '') + (sel ? ' ring-2 ring-[#141416] ring-offset-1 scale-110' : '')
             + ' w-[18px] h-[18px] rounded-full border border-slate-300 shrink-0 transition-all" style="background:' + esc(this.colorHex(col))
             + '" title="' + esc(colTip) + '" aria-label="สี ' + esc(colTip) + '" onclick="window.app.pos.selectCardVariant(\'' + escJs(p.Model) + '\',\'\',\'' + escJs(col) + '\')"></button>';
@@ -2188,7 +2188,7 @@ window.app.pos = {
           chipsHtml += '<button type="button" class="pm-chip'
             + (sel ? ' on' : '')
             + (existsInColor ? '' : ' opacity-40')
-            + '" onclick="window.app.pos.selectCardVariant(\'' + escJs(p.Model) + '\',\'' + escJs(cap) + '\',\'\')">' + esc(cap) + '</button>';
+            + '" onclick="window.app.pos.selectCardVariant(\'' + escJs(p.Model) + '\',\'' + escJs(cap) + '\',\'\')">' + window.app.pn(cap) + '</button>';
         });
       }
 
@@ -2487,7 +2487,7 @@ window.app.pos = {
         capacities.forEach(cap => {
             let isSelected = cap === selectedCapacity;
             let btnClass = isSelected ? 'pd-on bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600';
-            capHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" onclick="window.app.pos.selectVariant('${window.app.escAttrJs(cap)}', '${window.app.escAttrJs(selectedColor)}')">${window.app.esc(cap)}</button>`;
+            capHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" onclick="window.app.pos.selectVariant('${window.app.escAttrJs(cap)}', '${window.app.escAttrJs(selectedColor)}')">${window.app.pn(cap)}</button>`;
         });
         const capOptEl = document.getElementById('modalCapacityOptions');
         if (capOptEl) capOptEl.innerHTML = capHtml || '<span class="text-[9px] md:text-[10px] text-slate-400">ไม่มีตัวเลือกความจุ</span>';
@@ -2508,10 +2508,10 @@ window.app.pos = {
             let btnClass = '';
             if (outOfStock) {
                 btnClass = 'bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed';
-                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" disabled>${dot}${window.app.esc(col)}</button>`;
+                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" disabled>${dot}${window.app.pn(col)}</button>`;
             } else {
                 btnClass = isSelected ? 'pd-on bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600';
-                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" onclick="window.app.pos.selectVariant('${window.app.escAttrJs(selectedCapacity)}', '${window.app.escAttrJs(col)}')">${dot}${window.app.esc(col)}</button>`;
+                colHtml += `<button type="button" class="px-2 md:px-2.5 py-1 md:py-1.5 border rounded-lg text-[9px] md:text-[10px] font-bold transition-all ${btnClass}" onclick="window.app.pos.selectVariant('${window.app.escAttrJs(selectedCapacity)}', '${window.app.escAttrJs(col)}')">${dot}${window.app.pn(col)}</button>`;
             }
         });
         const colOptEl = document.getElementById('modalColorOptions');
@@ -2574,7 +2574,7 @@ window.app.pos = {
         const nm = (p.Model && p.Model !== '-') ? p.Model : (p['Product Name'] || '');
         html += '<button type="button" class="pd-rel-card" onclick="window.app.pos.openRelated(\'' + escJs(p.SKU) + '\')">'
           + '<span class="pd-rel-img"><img src="' + esc(window.app.formatImageUrl(p['Image URL'])) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;"></span>'
-          + '<span class="pd-rel-name">' + esc(nm) + '</span>'
+          + '<span class="pd-rel-name">' + window.app.pn(nm) + '</span>'
           + '<span class="pd-rel-price tabular-nums">฿' + priceOf(p).toLocaleString() + '</span></button>';
       });
       el.innerHTML = html + '</div>';
@@ -3976,7 +3976,7 @@ window.app.pos = {
              <div class="flex-1 min-w-0">
                 <div class="text-xs font-black text-slate-900 line-clamp-1">${window.app.pn(p['Product Name'])}</div>
                 <div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-2">
-                   <span>${esc(p.Capacity || '-')}</span> • <span>${esc(p.Color || '-')}</span>
+                   <span>${window.app.pn(p.Capacity || '-')}</span> • <span>${window.app.pn(p.Color || '-')}</span>
                 </div>
                 <div class="flex items-baseline gap-1.5 mt-1">
                    <span class="text-xs font-black text-[#E11D48] tabular-nums">฿${price.toLocaleString()}</span>

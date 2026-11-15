@@ -11,10 +11,12 @@ class Range {
   getValue() { return this.sh._get(this.r, this.c); }
   setValue(v) { this.sh._set(this.r, this.c, v); return this; }
   setValues(vs) { vs.forEach((row, i) => row.forEach((v, j) => this.sh._set(this.r + i, this.c + j, v))); return this; }
-  setNumberFormat() { return this; } setFontWeight() { return this; } setBackground() { return this; } setFontColor() { return this; }
+  setNumberFormat(f) { for (let i = 0; i < Math.min(this.nr, 2000); i++) for (let j = 0; j < this.nc; j++) this.sh.fmt[(this.r + i) + ':' + (this.c + j)] = f; return this; }
+  getNumberFormat() { return this.sh.fmt[this.r + ':' + this.c] || ''; }
+  setFontWeight() { return this; } setBackground() { return this; } setFontColor() { return this; }
 }
 class Sheet {
-  constructor(name) { this.name = name; this.rows = []; }
+  constructor(name) { this.name = name; this.rows = []; this.fmt = {}; }
   _get(r, c) { const row = this.rows[r - 1]; const v = row ? row[c - 1] : undefined; return v === undefined ? '' : v; }
   _set(r, c, v) { while (this.rows.length < r) this.rows.push([]); const row = this.rows[r - 1]; while (row.length < c) row.push(''); row[c - 1] = v; }
   getName() { return this.name; } getId() { return 1; }

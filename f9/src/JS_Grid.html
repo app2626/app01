@@ -217,7 +217,7 @@ window.app.grid = {
         this.columns.forEach(c => {
           if(c.type==='hidden') return; let val = window.app.esc(row[c.key] || '');
           // ชื่อสินค้าแสดงเป็นตัวใหญ่เฉพาะตัวแรกของคำ (เฉพาะที่แสดง — ฟอร์มแก้ไขและการบันทึกใช้ค่าเดิมจากแถว) ; Model/SKU เป็นค่าที่ใช้จับคู่ จึงแสดงตามที่เก็บ
-          if (window.app.grid.NAME_KEYS.indexOf(c.key) !== -1) val = window.app.pn(row[c.key] || '');
+          if (window.app.grid.DISPLAY_KEYS.indexOf(c.key) !== -1) val = window.app.pn(row[c.key] || '');
           if(c.key==='Password') val = '********';
           else if(c.key==='Contact Number' || c.key==='เบอร์โทรศัพท์' || c.key==='Phone') {
               if (String(val).length === 10) val = String(val).substring(0,3) + '-' + String(val).substring(3,6) + '-' + String(val).substring(6,10);
@@ -792,6 +792,8 @@ window.app.grid = {
     },
     // คอลัมน์ชื่อสินค้าที่แปลงเป็นตัวใหญ่เฉพาะตัวแรกของคำ ตอนแสดงในตารางและตอนส่งออก CSV (Model / SKU ไม่แปลง — เป็นค่าที่ใช้จับคู่และนำเข้ากลับ)
     NAME_KEYS: ['Product Name', 'Marketing Model'],
+    // ช่องที่แสดงแบบ Title Case ในเซลล์ตาราง (owner 2026-11-15) — CSV แปลงแค่ NAME_KEYS: Model/Product Group/Capacity/Color เป็นค่าที่ใช้จับคู่ ต้อง export ตามชีตเพื่อ import กลับได้
+    DISPLAY_KEYS: ['Product Name', 'Marketing Model', 'Model', 'Product Group', 'Capacity', 'Color'],
     exportCSV: function() {
       if (this.filteredDataList.length === 0) return Swal.fire('ไม่มีข้อมูล', 'ไม่มีรายการให้ export ตามตัวกรองปัจจุบัน', 'warning');
       const cols = this.columns.filter(c => c.type !== 'hidden').map(c => c.key);
