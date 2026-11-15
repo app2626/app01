@@ -711,7 +711,7 @@ window.app.pos = {
         html += '<button type="button" onclick="window.app.pos.openAddToCartModal(\'' + escJs(p.SKU) + '\')" class="pm-recent-item shrink-0 flex items-center gap-2 text-left max-w-[210px]">'
           + '<img src="' + esc(img) + '" alt="" onerror="this.remove()" class="w-6 h-6 object-contain shrink-0">'
           + '<div class="min-w-0">'
-          + '  <div class="text-[10px] font-extrabold text-slate-800 truncate">' + esc(p['Product Name']) + '</div>'
+          + '  <div class="text-[10px] font-extrabold text-slate-800 truncate">' + window.app.pn(p['Product Name']) + '</div>'
           + '  <div class="pm-recent-pr tabular-nums">฿' + pr + '</div>'
           + '</div>'
           + '</button>';
@@ -1018,7 +1018,7 @@ window.app.pos = {
         html += '<div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shrink-0 max-w-[180px]">'
           + '<img src="' + esc(img) + '" alt="" onerror="this.remove()" class="w-7 h-7 object-contain bg-white rounded-md p-0.5 shrink-0">'
           + '<div class="min-w-0 flex-1">'
-          + '  <div class="text-[10px] font-bold text-slate-800 truncate">' + esc(item.dispName) + '</div>'
+          + '  <div class="text-[10px] font-bold text-slate-800 truncate">' + window.app.pn(item.dispName) + '</div>'
           + '  <div class="text-[9px] font-black text-[#E05300]">฿' + pr + '</div>'
           + '</div>'
           + '<button type="button" onclick="window.app.pos.toggleCompare(\'' + escJs(item.cardKey) + '\', event)" class="text-slate-400 hover:text-rose-400 text-xs px-1" aria-label="นำออก"><i class="fas fa-times"></i></button>'
@@ -1092,8 +1092,8 @@ window.app.pos = {
           + '<button type="button" onclick="window.app.pos.toggleCompare(\'' + escJs(item.cardKey) + '\', event); window.app.pos.openCompareModal();" class="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 text-[10px] flex items-center justify-center transition-colors" title="เอาออก"><i class="fas fa-times"></i></button>'
           + '<div class="h-28 flex items-center justify-center bg-white rounded-xl p-2 mb-2 border border-slate-100"><img src="' + esc(img) + '" alt="" class="max-h-full max-w-full object-contain"></div>'
           + '<div>' + recBadge + '<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[9px] font-extrabold mb-1">' + esc(v.Category || 'สินค้า') + '</span></div>'
-          + '<div class="text-xs md:text-sm font-black text-slate-900 leading-snug">' + esc(item.dispName) + '</div>'
-          + '<div class="text-[10px] font-semibold text-slate-500 mt-0.5">' + esc(v['Product Name']) + '</div>'
+          + '<div class="text-xs md:text-sm font-black text-slate-900 leading-snug">' + window.app.pn(item.dispName) + '</div>'
+          + '<div class="text-[10px] font-semibold text-slate-500 mt-0.5">' + window.app.pn(v['Product Name']) + '</div>'
           + '</th>';
       });
       html += '</tr></thead><tbody class="divide-y divide-slate-200 text-xs">';
@@ -1386,10 +1386,10 @@ window.app.pos = {
       let html = '<div class="pm-sec-head"><h2 class="pm-sec-title">ยอดนิยมตอนนี้</h2><span class="pm-sec-sub">รุ่นที่ถูกจองมากสุด</span></div>';
       html += '<div class="sf-pop-row custom-scrollbar">';
       items.forEach(it => {
-        html += '<button type="button" class="sf-pop-card" onclick="window.app.pos.openAddToCartModal(\'' + escJs(it.sku) + '\')" aria-label="' + esc(it.name) + ' อันดับ ' + it.rank + '">'
+        html += '<button type="button" class="sf-pop-card" onclick="window.app.pos.openAddToCartModal(\'' + escJs(it.sku) + '\')" aria-label="' + window.app.pn(it.name) + ' อันดับ ' + it.rank + '">'
           + '<span class="sf-pop-rank' + (it.rank <= 3 ? ' top' : '') + '">' + it.rank + '</span>'
           + '<img src="' + esc(window.app.formatImageUrl(it.img)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
-          + '<span class="sf-pop-name">' + esc(it.name) + '</span>'
+          + '<span class="sf-pop-name">' + window.app.pn(it.name) + '</span>'
           + '<span class="sf-pop-price">฿' + it.price.toLocaleString() + '</span></button>';
       });
       html += '</div>';
@@ -1683,10 +1683,10 @@ window.app.pos = {
       const esc = window.app.esc, escJs = window.app.escAttrJs;
       let html = '<div class="pm-sec-head"><h2 class="pm-sec-title">สินค้าใหม่</h2><span class="pm-sec-sub">เปิดตัวล่าสุด จองได้เลย</span></div><div class="sf-pop-row custom-scrollbar">';
       items.forEach(it => {
-        html += '<button type="button" class="sf-pop-card sf-new-card" onclick="window.app.pos.openAddToCartModal(\'' + escJs(it.sku) + '\')" aria-label="' + esc(it.name) + ' สินค้าใหม่">'
+        html += '<button type="button" class="sf-pop-card sf-new-card" onclick="window.app.pos.openAddToCartModal(\'' + escJs(it.sku) + '\')" aria-label="' + window.app.pn(it.name) + ' สินค้าใหม่">'
           + '<span class="sf-new-tag">NEW</span>'
           + '<img src="' + esc(window.app.formatImageUrl(it.img)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
-          + '<span class="sf-pop-name">' + esc(it.name) + '</span>'
+          + '<span class="sf-pop-name">' + window.app.pn(it.name) + '</span>'
           + '<span class="sf-pop-price">฿' + it.price.toLocaleString() + '</span></button>';
       });
       html += '</div>';
@@ -2161,9 +2161,9 @@ window.app.pos = {
         });
       }
 
-      const pName = esc(variant['Product Name']); // สำหรับ attribute (title/alt) — ห้ามมี <mark>
+      const pName = window.app.pn(variant['Product Name']); // สำหรับ attribute (title/alt) — ห้ามมี <mark>
       const dispName = p.isGroup ? p.Model : p['Product Name'];
-      const dispNameHtml = window.app.highlightEsc(dispName, searchTerm || '');
+      const dispNameHtml = window.app.highlightEsc(window.app.titleCaseName(dispName), searchTerm || '');
       const catLabel = esc((variant.Category || 'สินค้า').toString().trim());
       // แบรนด์: คำแรกของชื่อรุ่นถ้าเป็นตัวอักษรละติน (เช่น Samsung) ไม่งั้นใช้หมวด
       const firstWord = String(dispName || '').trim().split(/\s+/)[0] || '';
@@ -2288,7 +2288,7 @@ window.app.pos = {
       card += '    <div class="pm-body flex flex-col flex-1 gap-1.5">';
       card += '      <div class="sf-brand">' + brandLabel + '</div>';
       const nameOpenAttr = openable ? ' role="link" tabindex="0" onkeydown="if(event.key===\'Enter\'){window.app.pos.openCardDetail(event,\'' + escJs(variant.SKU) + '\')}"' : '';
-      card += '      <div class="pm-name line-clamp-2' + (openable ? ' cursor-pointer' : '') + '"' + nameOpenAttr + ' title="' + esc(dispName) + '">' + dispNameHtml + '</div>';
+      card += '      <div class="pm-name line-clamp-2' + (openable ? ' cursor-pointer' : '') + '"' + nameOpenAttr + ' title="' + window.app.pn(dispName) + '">' + dispNameHtml + '</div>';
       // การ์ดแบบเรียบ: ชื่อ → ตัวเลือก (สี+ความจุ แถวเดียว) → ราคา → โปร 1 บรรทัด → สต๊อก → ปุ่ม (ชื่อเต็ม/ป้ายย่อยอยู่ในหน้ารายละเอียด)
       if (dotsHtml || chipsHtml) card += '<div class="pm-vars">' + dotsHtml + chipsHtml + '</div>';
       card += '      <div class="pm-foot mt-auto">';
@@ -2558,7 +2558,7 @@ window.app.pos = {
       this.pushRecentlyViewed(prod.SKU);
       const priceNum = prod.Price ? (parseFloat(prod.Price.toString().replace(/[^\d.\-]/g,'')) || 0) : 0;
       document.getElementById('modalProdSKU').value = prod.SKU; 
-      document.getElementById('modalProdName').innerText = prod['Product Name']; 
+      document.getElementById('modalProdName').innerText = window.app.titleCaseName(prod['Product Name']); 
       document.getElementById('modalProdPrice').innerText = '฿' + priceNum.toLocaleString();
       document.getElementById('modalProdStock').innerText = '(มีสินค้า: ' + prod.Stock + ')'; 
       document.getElementById('modalProdQty').value = 1; 
@@ -2574,7 +2574,7 @@ window.app.pos = {
         const sepIco = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
         setHtml('pdCrumb', '<button type="button" onclick="window.app.hideModal(\'addToCartModal\')">หน้าร้าน</button>' + sepIco
           + (cat ? '<button type="button" onclick="window.app.hideModal(\'addToCartModal\');window.app.pos.setStoreCategory(\'' + escJs(cat) + '\')">' + esc(cat) + '</button>' + sepIco : '')
-          + '<span>' + esc(modelName) + '</span>');
+          + '<span>' + window.app.pn(modelName) + '</span>');
         const bKey = this.brandOf(prod);
         setHtml('pdBrand', bKey ? esc(this.brandLabel_(bKey)) : esc(cat));
         const origNum = parseFloat(String(prod['Original Price'] || '0').replace(/[^\d.\-]/g, '')) || 0;
@@ -2604,7 +2604,7 @@ window.app.pos = {
         this.renderRelated(prod);
 
         // แถบล่างติดขอบจอ
-        const barName = document.getElementById('pdBarName'); if (barName) barName.textContent = prod['Product Name'] || '';
+        const barName = document.getElementById('pdBarName'); if (barName) barName.textContent = window.app.titleCaseName(prod['Product Name'] || '');
         const barPrice = document.getElementById('pdBarPrice'); if (barPrice) barPrice.textContent = '฿' + priceNum.toLocaleString();
         const barImg = document.getElementById('pdBarImg'); if (barImg) { barImg.style.visibility = ''; barImg.src = window.app.formatImageUrl(prod['Image URL']); }
       }
@@ -2688,10 +2688,10 @@ window.app.pos = {
           const gImg = window.app.formatImageUrl(p['Image URL']);
           
           if(p.Category==='ของแถมแบรนด์' && hasMapping && allowedBrandGifts.some(g => g === '*' || pNameLower.includes(g))) {
-            bGiftsHTML += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-emerald-400 hover:bg-emerald-50/20 transition-all"><input class="w-4 h-4 text-emerald-500 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="bgift${idx}" onchange="document.getElementById('bgiftQty${idx}').disabled = !this.checked"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="bgift${idx}">${window.app.esc(p['Product Name'])} <span class="inline-block text-[9px] text-emerald-600 font-extrabold ml-1 bg-emerald-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="bgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
+            bGiftsHTML += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-emerald-400 hover:bg-emerald-50/20 transition-all"><input class="w-4 h-4 text-emerald-500 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="bgift${idx}" onchange="document.getElementById('bgiftQty${idx}').disabled = !this.checked"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="bgift${idx}">${window.app.pn(p['Product Name'])} <span class="inline-block text-[9px] text-emerald-600 font-extrabold ml-1 bg-emerald-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="bgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
           } 
           else if(p.Category==='ของแถมช่องทาง' && hasMapping && allowedChannelGifts.some(g => g === '*' || pNameLower.includes(g))) {
-            allowedSets.forEach((names, si) => { if (names.some(g => g === '*' || pNameLower.includes(g))) setHtml[si] += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all"><input class="w-4 h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${si}_${idx}" data-set="${si + 1}" onchange="window.app.pos.onChannelGiftToggle(this)"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="cgift${si}_${idx}">${window.app.esc(p['Product Name'])} <span class="inline-block text-[9px] text-indigo-600 font-extrabold ml-1 bg-indigo-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="cgiftQty${si}_${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`; });
+            allowedSets.forEach((names, si) => { if (names.some(g => g === '*' || pNameLower.includes(g))) setHtml[si] += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all"><input class="w-4 h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${si}_${idx}" data-set="${si + 1}" onchange="window.app.pos.onChannelGiftToggle(this)"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="cgift${si}_${idx}">${window.app.pn(p['Product Name'])} <span class="inline-block text-[9px] text-indigo-600 font-extrabold ml-1 bg-indigo-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="cgiftQty${si}_${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`; });
           }
         } 
       });
@@ -2869,11 +2869,11 @@ window.app.pos = {
       return '<div class="sf-comp flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-white text-left" data-sku="' + esc(p.SKU) + '">'
         + '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.visibility=\'hidden\'" class="w-12 h-12 object-contain rounded-lg bg-slate-50 shrink-0">'
         + '<div class="min-w-0 flex-1">'
-        + '<div class="text-xs font-bold text-slate-900 leading-snug line-clamp-2">' + esc(p['Product Name']) + '</div>'
+        + '<div class="text-xs font-bold text-slate-900 leading-snug line-clamp-2">' + window.app.pn(p['Product Name']) + '</div>'
         + '<div class="flex items-baseline gap-1.5 flex-wrap mt-0.5"><span class="text-sm font-black text-slate-900 tabular-nums">฿' + after.toLocaleString() + '</span>'
         + (s.pct > 0 ? '<span class="text-[10px] text-slate-400 line-through tabular-nums">฿' + s.price.toLocaleString() + '</span><span class="text-[10px] font-extrabold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1">ลด ' + esc(s.pct) + '% เมื่อซื้อคู่</span>' : '')
         + '</div></div>'
-        + '<button type="button" class="sf-comp-add shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#FF6B00] text-[#E05300] text-[11px] font-black hover:bg-orange-50 transition" onclick="window.app.pos.addCompanion(\'' + escJs(p.SKU) + '\',' + (viaPrompt ? 'true' : 'false') + ')" aria-label="เพิ่ม ' + esc(p['Product Name']) + ' ลงตะกร้า"><i class="fas fa-plus mr-1"></i>เพิ่ม</button>'
+        + '<button type="button" class="sf-comp-add shrink-0 px-3 py-1.5 rounded-lg bg-white border border-[#FF6B00] text-[#E05300] text-[11px] font-black hover:bg-orange-50 transition" onclick="window.app.pos.addCompanion(\'' + escJs(p.SKU) + '\',' + (viaPrompt ? 'true' : 'false') + ')" aria-label="เพิ่ม ' + window.app.pn(p['Product Name']) + ' ลงตะกร้า"><i class="fas fa-plus mr-1"></i>เพิ่ม</button>'
         + '</div>';
     },
     renderCompanions: function() {
@@ -2897,7 +2897,7 @@ window.app.pos = {
       const esc = window.app.esc;
       Swal.fire({
         title: 'เพิ่มลงตะกร้าแล้ว — ซื้อคู่ไหม?',
-        html: '<div class="text-xs text-slate-500 mb-3">สินค้าที่เข้ากับ <b>' + esc(mainProd['Product Name']) + '</b></div><div id="companionPromptList" class="flex flex-col gap-2">' + list.map(s => this.companionRowHtml_(s, true)).join('') + '</div>',
+        html: '<div class="text-xs text-slate-500 mb-3">สินค้าที่เข้ากับ <b>' + window.app.pn(mainProd['Product Name']) + '</b></div><div id="companionPromptList" class="flex flex-col gap-2">' + list.map(s => this.companionRowHtml_(s, true)).join('') + '</div>',
         showCloseButton: true, showConfirmButton: true, confirmButtonText: 'ไปต่อ', confirmButtonColor: '#141416', width: 520
       });
       return true;
@@ -3055,12 +3055,12 @@ window.app.pos = {
         c+=i.qty; let gHtml=''; 
         if(i.channelGifts && i.channelGifts.length > 0) {
             gHtml += '<div class="mt-2.5 p-2 bg-amber-50/70 border border-amber-200/60 rounded-lg"><div class="text-[0.65rem] font-extrabold text-amber-800 uppercase tracking-wider mb-1"><i class="fas fa-gift mr-1"></i>ของแถมช่องทาง</div>';
-            i.channelGifts.forEach(g => gHtml+=`<div class="text-[11px] font-medium text-slate-700 mb-0.5"><i class="fas fa-check text-amber-600 mr-1 text-[0.6rem]"></i> ` + window.app.esc(g.name) + (g.qty > 1 ? ` <span class="font-bold text-amber-800">(x${g.qty})</span>` : '') + `</div>`);
+            i.channelGifts.forEach(g => gHtml+=`<div class="text-[11px] font-medium text-slate-700 mb-0.5"><i class="fas fa-check text-amber-600 mr-1 text-[0.6rem]"></i> ` + window.app.pn(g.name) + (g.qty > 1 ? ` <span class="font-bold text-amber-800">(x${g.qty})</span>` : '') + `</div>`);
             gHtml += '</div>';
         }
         if(i.brandGifts && i.brandGifts.length > 0) {
             gHtml += '<div class="mt-2 p-2 bg-emerald-50/60 border border-emerald-200/60 rounded-lg"><div class="text-[0.65rem] font-extrabold text-emerald-700 uppercase tracking-wider mb-1"><i class="fas fa-gem mr-1"></i>ของแถมแบรนด์</div>';
-            i.brandGifts.forEach(g => gHtml+=`<div class="text-[11px] font-medium text-slate-700 mb-0.5"><i class="fas fa-check text-emerald-500 mr-1 text-[0.6rem]"></i> ` + window.app.esc(g.name) + (g.qty > 1 ? ` <span class="font-bold text-emerald-700">(x${g.qty})</span>` : '') + `</div>`);
+            i.brandGifts.forEach(g => gHtml+=`<div class="text-[11px] font-medium text-slate-700 mb-0.5"><i class="fas fa-check text-emerald-500 mr-1 text-[0.6rem]"></i> ` + window.app.pn(g.name) + (g.qty > 1 ? ` <span class="font-bold text-emerald-700">(x${g.qty})</span>` : '') + `</div>`);
             gHtml += '</div>';
         }
         let pPrice = i.Price ? (parseFloat(i.Price.toString().replace(/[^\d.\-]/g,'')) || 0).toLocaleString() : '0';
@@ -3070,7 +3070,7 @@ window.app.pos = {
         const unitNum = i.Price ? (parseFloat(i.Price.toString().replace(/[^\d.\-]/g,'')) || 0) : 0;
         html+='  <div class="pr-7 flex gap-3 items-start">';
         html+='    <div class="w-14 h-14 shrink-0 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden"><img src="' + window.app.esc(window.app.formatImageUrl(i['Image URL'] || '', 'w200')) + '" loading="lazy" alt="" onerror="this.onerror=null;this.src=window.app.NO_IMG;" class="max-w-full max-h-full object-contain"></div>';
-        html+='    <div class="min-w-0"><span class="inline-block px-1.5 py-0.5 rounded bg-orange-50 text-[#E05300] border border-orange-200 text-[9px] font-black mb-1">ราคา Pre Booking</span><h6 class="text-xs md:text-sm font-extrabold text-slate-900 leading-snug mb-0.5">' + window.app.esc(i['Product Name']) + '</h6>' + (variantTxt ? '<div class="text-[11px] text-slate-500 font-semibold">' + window.app.esc(variantTxt) + '</div>' : '') + '</div>';
+        html+='    <div class="min-w-0"><span class="inline-block px-1.5 py-0.5 rounded bg-orange-50 text-[#E05300] border border-orange-200 text-[9px] font-black mb-1">ราคา Pre Booking</span><h6 class="text-xs md:text-sm font-extrabold text-slate-900 leading-snug mb-0.5">' + window.app.pn(i['Product Name']) + '</h6>' + (variantTxt ? '<div class="text-[11px] text-slate-500 font-semibold">' + window.app.esc(variantTxt) + '</div>' : '') + '</div>';
         html+='  </div>';
         html+=   gHtml;
         html+='  <button type="button" class="pos-cart-gift-edit" onclick="window.app.pos.editCartGifts(' + idx + ')"><i class="fas fa-gift" aria-hidden="true"></i> ' + (gHtml ? 'แก้ไขของแถม' : 'เลือกของแถม') + '</button>';
@@ -3199,9 +3199,9 @@ window.app.pos = {
       this.cartData.forEach(i => {
         const unit = num(i.Price); sub += unit * i.qty;
         const variantTxt = [i.Color, i.Capacity].map(v => (v === null || v === undefined) ? '' : String(v).trim()).filter(v => v && v !== '-').join(' · ');
-        const gifts = [].concat(i.brandGifts || [], i.channelGifts || []).map(g => esc(g.name) + (g.qty > 1 ? ' x' + g.qty : ''));
+        const gifts = [].concat(i.brandGifts || [], i.channelGifts || []).map(g => window.app.pn(g.name) + (g.qty > 1 ? ' x' + g.qty : ''));
         html += '<li><img src="' + esc(window.app.formatImageUrl(i['Image URL'] || '', 'w200')) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
-          + '<div class="co-it"><div class="co-it-n">' + esc(i['Product Name']) + '</div>'
+          + '<div class="co-it"><div class="co-it-n">' + window.app.pn(i['Product Name']) + '</div>'
           + (variantTxt ? '<div class="co-it-v">' + esc(variantTxt) + '</div>' : '')
           + '<div class="co-it-v tabular-nums">' + i.qty + ' x ฿' + unit.toLocaleString() + '</div>'
           + (gifts.length ? '<div class="co-it-g"><i class="fas fa-gift" aria-hidden="true"></i> ' + gifts.join(', ') + '</div>' : '')
@@ -3417,7 +3417,7 @@ window.app.pos = {
               <select id="tiNewProductSelect" onchange="window.app.pos.recalcTradeInModal()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-slate-900">
                 ${allDevices.map(p => {
                   const pr = parseFloat(String(p.Price || 0).replace(/[^\d.\-]/g, '')) || 0;
-                  return `<option value="${esc(p.SKU)}" data-price="${pr}" data-name="${esc(p['Product Name'])}" ${p.SKU === selectedNewSku ? 'selected' : ''}>${esc(p['Product Name'])} (฿${pr.toLocaleString()})</option>`;
+                  return `<option value="${esc(p.SKU)}" data-price="${pr}" data-name="${esc(p['Product Name'])}" ${p.SKU === selectedNewSku ? 'selected' : ''}>${window.app.pn(p['Product Name'])} (฿${pr.toLocaleString()})</option>`;
                 }).join('')}
               </select>
             </div>
@@ -3663,13 +3663,13 @@ window.app.pos = {
                   <div class="py-3 first:pt-0 last:pb-0 flex gap-3.5 items-start">
                     <img src="${esc(it.img)}" alt="" onerror="this.style.display='none'" class="w-16 h-16 object-contain rounded-xl border border-slate-200 p-1 bg-white shrink-0">
                     <div class="flex-1 min-w-0">
-                      <div class="text-sm font-black text-slate-900">${esc(it.name)} <span class="text-xs font-bold text-slate-500">x${it.qty}</span></div>
+                      <div class="text-sm font-black text-slate-900">${window.app.pn(it.name)} <span class="text-xs font-bold text-slate-500">x${it.qty}</span></div>
                       <div class="text-[11px] text-slate-500 font-mono">SKU: ${esc(it.sku)}</div>
                       ${allGifts.length > 0 ? `
                         <div class="mt-2 p-2 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
                           <div class="text-[10px] font-extrabold text-emerald-800 mb-1"><i class="fas fa-gifts text-[#E11D48] mr-1"></i>รับฟรีของแถม ${allGifts.length} รายการ:</div>
                           <div class="flex flex-wrap gap-1">
-                            ${allGifts.map(g => `<span class="px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-[10px] font-bold text-slate-700">• ${esc(g.name)}${g.qty > 1 ? ' (x' + g.qty + ')' : ''}</span>`).join('')}
+                            ${allGifts.map(g => `<span class="px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-[10px] font-bold text-slate-700">• ${window.app.pn(g.name)}${g.qty > 1 ? ' (x' + g.qty + ')' : ''}</span>`).join('')}
                           </div>
                         </div>
                       ` : ''}
@@ -3804,9 +3804,9 @@ window.app.pos = {
                   <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1 text-xs">
                     <div class="text-[11px] text-slate-500 font-bold">สาขารับเครื่อง: <strong class="text-slate-800">${esc(o.branch)} (${esc(o.channel)})</strong> • วันที่จอง: ${esc(o.timestamp)}</div>
                     <div class="pt-1 font-bold text-slate-800">
-                      ${o.items.map(it => `<div>📱 ${esc(it.name)} x${it.qty} <span class="text-[#E11D48]">(฿${it.net.toLocaleString()})</span></div>`).join('')}
+                      ${o.items.map(it => `<div>📱 ${window.app.pn(it.name)} x${it.qty} <span class="text-[#E11D48]">(฿${it.net.toLocaleString()})</span></div>`).join('')}
                     </div>
-                    ${o.gifts.length > 0 ? `<div class="text-[11px] text-emerald-700 font-semibold">🎁 ของแถม: ${o.gifts.map(g => esc(g.name) + (g.qty > 1 ? ' x' + g.qty : '')).join(', ')}</div>` : ''}
+                    ${o.gifts.length > 0 ? `<div class="text-[11px] text-emerald-700 font-semibold">🎁 ของแถม: ${o.gifts.map(g => window.app.pn(g.name) + (g.qty > 1 ? ' x' + g.qty : '')).join(', ')}</div>` : ''}
                     <div class="pt-1.5 border-t border-slate-200 flex justify-between items-center">
                       <span class="text-[11px] font-bold text-slate-500">เงินมัดจำแล้ว: <strong class="text-emerald-600">฿${(o.deposit || 0).toLocaleString()}</strong></span>
                       <span class="text-sm font-black text-[#E11D48]">ยอดสุทธิ: ฿${(o.netTotal || 0).toLocaleString()}</span>
@@ -3941,9 +3941,9 @@ window.app.pos = {
 
         return `
           <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex gap-3 items-center group transition-all hover:border-slate-300">
-             <img src="${esc(img)}" alt="${esc(p['Product Name'])}" onerror="this.src=window.app.NO_IMG" class="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1 shrink-0 ${outOfStock ? 'grayscale opacity-50' : ''}">
+             <img src="${esc(img)}" alt="${window.app.pn(p['Product Name'])}" onerror="this.src=window.app.NO_IMG" class="w-16 h-16 object-contain rounded-xl border border-slate-100 p-1 shrink-0 ${outOfStock ? 'grayscale opacity-50' : ''}">
              <div class="flex-1 min-w-0">
-                <div class="text-xs font-black text-slate-900 line-clamp-1">${esc(p['Product Name'])}</div>
+                <div class="text-xs font-black text-slate-900 line-clamp-1">${window.app.pn(p['Product Name'])}</div>
                 <div class="text-[10px] text-slate-400 font-bold mt-0.5 flex items-center gap-2">
                    <span>${esc(p.Capacity || '-')}</span> • <span>${esc(p.Color || '-')}</span>
                 </div>

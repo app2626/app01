@@ -67,6 +67,25 @@ window.app = {
       function(m, close, tag, cls) { tag = tag.toLowerCase(); return close ? '</' + tag + '>' : '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>'; });
   },
 
+  // ชื่อสินค้าในชีตมักพิมพ์ตัวใหญ่ทั้งหมด (SAMSUNG GALAXY Z FOLD 8 12/512GB GRAPHITE) — หน้าร้านแสดงเป็นตัวใหญ่เฉพาะตัวแรกของคำ
+  // แปลงเฉพาะตอนแสดงผล: ห้ามใช้กับค่าที่ส่งกลับ server หรือใช้จับคู่ (value ของของแถม, data-name, SKU, Model ใน onclick) เพราะกติกาของแถม/ค้นหาเทียบกับค่าในชีต
+  // หน่วยหลังตัวเลข (512GB, 5G, 25W, 10000mAh) และคำใน KEEP / SPECIAL คงรูปที่ถูกต้อง ; ข้อความไทยไม่ถูกแตะ
+  titleCaseName: function(text) {
+    var UNITS = { gb: 'GB', tb: 'TB', mb: 'MB', g: 'G', w: 'W', mah: 'mAh', hz: 'Hz', mp: 'MP', mm: 'mm' };
+    var KEEP = ['LTE', 'FE', 'SE', 'TV', 'USB', 'NFC', 'UHD', 'LED', 'OLED', 'QLED', 'AI', 'TG', 'II', 'III'];
+    var SPECIAL = { iphone: 'iPhone', ipad: 'iPad', airpods: 'AirPods', macbook: 'MacBook' };
+    return String(text === undefined || text === null ? '' : text)
+      .toLowerCase()
+      .replace(/(^|[^a-z0-9])([a-z])/g, function(m, before, ch) { return before + ch.toUpperCase(); })
+      .replace(/(\d)(gb|tb|mb|mah|hz|mp|mm|g|w)(?![a-z0-9])/gi, function(m, digit, unit) { return digit + UNITS[unit.toLowerCase()]; })
+      .replace(/[A-Za-z]+/g, function(word) {
+        if (SPECIAL[word.toLowerCase()]) return SPECIAL[word.toLowerCase()];
+        return KEEP.indexOf(word.toUpperCase()) !== -1 ? word.toUpperCase() : word;
+      });
+  },
+  // ชื่อสินค้าสำหรับแทรกลง HTML ของหน้าร้าน = titleCaseName แล้ว escape
+  pn: function(v) { return window.app.esc(window.app.titleCaseName(v)); },
+
   escAttrJs: function(v) {
     return window.app.esc(String(v === null || v === undefined ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
   },

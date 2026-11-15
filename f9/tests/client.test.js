@@ -1320,6 +1320,9 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     eq(await ev("document.getElementById('formModalTitle').textContent"), 'เพิ่มช่องทางขาย', 'form title names the table');
     ok(await ev("[...document.querySelectorAll('#dynamicForm label')].every(l=>/[ก-๙]/.test(l.textContent))"), 'all field labels are Thai');
     await shot('form-generic');
+    const tc = JSON.parse(await ev("JSON.stringify(['SAMSUNG GALAXY Z FOLD 8 12/512GB GRAPHITE','IPHONE 17 PRO MAX 1TB','GALAXY S25 FE 5G (NAVY)','POWERBANK 10000MAH','หูฟัง BUDS3 PRO',null].map(window.app.titleCaseName))"));
+    eq(tc.join('|'), 'Samsung Galaxy Z Fold 8 12/512GB Graphite|iPhone 17 Pro Max 1TB|Galaxy S25 FE 5G (Navy)|Powerbank 10000mAh|หูฟัง Buds3 Pro|', 'titleCaseName');
+    eq(await ev("window.app.pn('<B>A&B')"), '&lt;B&gt;A&amp;B', 'pn must escape after converting');
     await ev("document.querySelector('#formModal [aria-label=\"ปิดฟอร์ม\"]').click();true"); await sleep(300);
     ok(await ev("document.getElementById('formModal').classList.contains('hidden')"), 'generic form did not close');
     await ev("window.location.hash='#products';true"); await sleep(1500);
