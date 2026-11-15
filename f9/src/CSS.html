@@ -3272,4 +3272,86 @@
   html.dark .sg-miss a { background: #0f172a; border-left-color: #475569; }
   html.dark .sg-miss a:hover { background: #273449; }
   html.dark .sg-miss li.need a { border-left-color: #fca5a5; }
+  /* ===================================================
+     ADMIN FORMS (หน้าตั้งค่าระบบ #ssTabContent + ฟอร์มเพิ่ม/แก้ไข #formModal / #productGroupModal)
+     - ตั้งค่าระบบ: การ์ดทุกใบ = .ss-card > .ss-head (ชื่อ+คำอธิบาย) + .ss-body (ช่องกรอก+ปุ่ม) ; จอ >= 1024px หัวการ์ดอยู่คอลัมน์ซ้าย 280px ช่องกรอกอยู่ขวา
+       กว้างเท่าแถบแท็บ ; ช่องกรอกสูง 40px ปุ่มสูง 40px เท่ากันทุกใบ ; การ์ดที่ซ่อน (.hidden) ต้องยังซ่อน จึงกำหนด display ผ่าน :not(.hidden)
+     - ฟอร์ม: หัว/เนื้อหา/ท้ายใช้ระยะขอบเดียวกัน 24px มุม 12px ; ช่องกรอก 40px ; กล่องติ๊กเลือก (.fm-checks) สูงเท่ากัน
+     สีมาจากคลาส Tailwind เดิม (โหมดมืดใช้กฎเดิม) — บล็อกนี้คุมรูปทรง ขนาด และระยะเท่านั้น ยกเว้นเส้นแบ่งที่มีกฎ html.dark คู่กัน
+     =================================================== */
+  #ssTabContent .ss-card { margin-bottom: 16px; }
+  #ssTabContent .ss-card:last-child { margin-bottom: 0; }
+  #ssTabContent .ss-head { padding: 20px; background: transparent !important; border-bottom: 1px solid #eef1f5; }
+  #ssTabContent .ss-head h3,
+  #ssTabContent summary.ss-head > span:first-child { font-size: 15px; font-weight: 700; line-height: 1.4; }
+  #ssTabContent .ss-head h3 i,
+  #ssTabContent summary.ss-head i { width: 18px; margin-right: 6px; font-size: 13px; text-align: center; opacity: 0.75; }
+  #ssTabContent .ss-head p,
+  #ssTabContent summary.ss-head > span.block { margin-top: 4px; font-size: 12.5px; line-height: 1.6; }
+  #ssTabContent .ss-body { padding: 20px; }
+  #ssTabContent .ss-body label { font-size: 13px; font-weight: 600; }
+  #ssTabContent .ss-body label > i { display: none; }
+  #ssTabContent .ss-body .space-y-2 > * + * { margin-top: 6px; }
+  #ssTabContent .ss-body input[type="text"],
+  #ssTabContent .ss-body input[type="url"],
+  #ssTabContent .ss-body input[type="number"],
+  #ssTabContent .ss-body input[type="datetime-local"],
+  #ssTabContent .ss-body textarea { min-height: 40px; padding: 8px 12px; font-family: inherit; font-size: 14px; font-weight: 500; line-height: 1.5; box-shadow: none; }
+  #ssTabContent .ss-body p.text-\[11px\] { font-size: 12px; line-height: 1.55; }
+  #ssTabContent .ss-body button.rounded-xl,
+  #ssTabContent .ss-body .cms-btn { height: 40px; padding: 0 16px; font-size: 13.5px; font-weight: 600; box-shadow: none !important; white-space: nowrap; }
+  #ssTabContent .ss-body .grid { gap: 16px; }
+  #ssTabContent details.ss-card > summary { list-style-position: inside; }
+  @media (min-width: 1024px) {
+    #ssTabContent div.ss-card:not(.hidden) { display: grid; grid-template-columns: 280px minmax(0, 1fr); }
+    #ssTabContent div.ss-card > .ss-head { border-bottom: 0; border-right: 1px solid #eef1f5; padding: 24px; }
+    #ssTabContent div.ss-card > .ss-body { padding: 24px; }
+    #ssTabContent details.ss-card > .ss-head,
+    #ssTabContent details.ss-card > .ss-body { padding: 20px 24px; }
+  }
+  html.dark #ssTabContent .ss-head { border-color: #334155; }
+
+  #formModal .rounded-3xl,
+  #productGroupModal .rounded-3xl { border-radius: 12px; }
+  #formModal .rounded-b-3xl,
+  #productGroupModal .rounded-b-3xl { border-radius: 0 0 12px 12px; }
+  #formModal .px-8.py-5,
+  #productGroupModal .px-8.py-5 { padding: 14px 24px; }
+  #formModal h3,
+  #productGroupModal h3 { font-size: 16px; font-weight: 700; }
+  #formModal .overflow-y-auto.flex-1,
+  #productGroupModal .overflow-y-auto.flex-1 { padding: 20px 24px; }
+  #formModal .px-8.py-5 button.rounded-xl,
+  #productGroupModal .px-8.py-5 button.rounded-xl { height: 40px; padding: 0 16px; border-radius: 8px; font-size: 13.5px; font-weight: 600; box-shadow: none; }
+  #dynamicForm { gap: 16px; align-items: start; }
+  #dynamicForm .fm-field { min-width: 0; }
+  #dynamicForm label.block,
+  #productGroupModal label.block { margin-bottom: 6px; font-size: 13px; font-weight: 600; line-height: 1.4; }
+  #dynamicForm input[type="text"],
+  #dynamicForm input[type="number"],
+  #dynamicForm input[type="password"],
+  #dynamicForm input[type="date"],
+  #dynamicForm input[type="email"],
+  #dynamicForm select,
+  #productGroupModal .pg-input { min-height: 40px; border-radius: 8px; box-shadow: none; }
+  #dynamicForm .fm-note,
+  #dynamicForm .fm-field > p { font-size: 12px; line-height: 1.5; }
+  #dynamicForm .fm-checks { height: 176px; max-height: none; margin-top: 0; padding: 6px; border-radius: 8px; box-shadow: none; }
+  #dynamicForm .fm-checks > label { margin-top: 0 !important; padding: 6px 8px; border-radius: 6px; box-shadow: none; }
+  #dynamicForm .fm-checks > label:first-child { margin-bottom: 4px; }
+  #dynamicForm .fm-checks input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 auto; }
+  #dynamicForm .fm-checks span { font-size: 13px; line-height: 1.4; }
+  #productGroupModal h4 { font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+  #productGroupModal .rounded-2xl { border-radius: 12px; }
+  #productGroupModal button.rounded-xl { border-radius: 8px; }
+  #productGroupModal .flex.gap-2 > button.rounded-xl,
+  #dynamicForm .flex.gap-2 > button.rounded-xl { height: 40px; border-radius: 8px; box-shadow: none; }
+  #productGroupModal .grid p.text-[11px] { font-size: 12px; line-height: 1.5; }
+  @media (max-width: 639px) {
+    #formModal .px-8.py-5,
+    #productGroupModal .px-8.py-5,
+    #formModal .overflow-y-auto.flex-1,
+    #productGroupModal .overflow-y-auto.flex-1 { padding-left: 16px; padding-right: 16px; }
+    #dynamicForm .fm-checks { height: auto; max-height: 176px; }
+  }
 </style>

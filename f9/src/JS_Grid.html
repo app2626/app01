@@ -497,7 +497,7 @@ window.app.grid = {
                 opts = window.app.globalData.products.filter(p => p.Category === targetCat && p.Status === 'เปิด').map(p => ({id: p['Product Name'], label: p['Product Name']}));
             }
             
-            inp = `<div class="max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 mt-1 shadow-inner">`;
+            inp = `<div class="fm-checks max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 mt-1 shadow-inner">`;
             
             inp += `<label class="flex items-center space-x-3 cursor-pointer p-2 bg-white rounded-lg border border-slate-100 hover:bg-indigo-50 transition-colors shadow-sm">
                        <input type="checkbox" class="chk-group-${safeKey} w-5 h-5 text-indigo-600 bg-slate-100 border-slate-300 rounded focus:ring-indigo-500" value="${allVal}" onchange="if(this.checked) document.querySelectorAll('.chk-group-${safeKey}').forEach(cb=>{if(cb!==this)cb.checked=false})" ${isAll?'checked':''}> 
@@ -593,7 +593,10 @@ window.app.grid = {
         }
         else inp='<input type="' + c.type + '" class="'+inputClass+'" id="field_' + c.key + '" value="' + escVal + '" ' + dis + '>';
         
-        fHtml += '<div><label class="block text-xs font-bold text-slate-600 mb-1.5">' + c.label + '</label>' + inp + (c.hint ? '<p class="text-[11px] mt-1 text-slate-500">' + window.app.esc(c.hint) + '</p>' : '') + '</div>';
+        // ป้ายชื่อช่องที่ลงท้ายด้วยวงเล็บ (คำอธิบาย) — แยกคำอธิบายลงไปเป็นบรรทัดช่วยใต้ช่อง ป้ายจึงสั้นบรรทัดเดียวและช่องในแถวเดียวกันเรียงตรงกัน
+        const lbParts = String(c.label || '').match(/^(.*\S)\s*\(([^()]*)\)\s*$/);
+        const lbMain = lbParts ? lbParts[1] : c.label, lbNote = lbParts ? '<p class="fm-note text-[11px] mt-1 text-slate-500">' + lbParts[2] + '</p>' : '';
+        fHtml += '<div class="fm-field' + (c.type.startsWith('multi_select_') ? ' fm-wide' : '') + '"><label class="block text-xs font-bold text-slate-600 mb-1.5">' + lbMain + '</label>' + inp + lbNote + (c.hint ? '<p class="text-[11px] mt-1 text-slate-500">' + window.app.esc(c.hint) + '</p>' : '') + '</div>';
       });
       f.innerHTML = fHtml;
       if (this.tableName === 'GiftMappings') this.targetHint(data ? data['Target Mobile (SKU or Group)'] : '');

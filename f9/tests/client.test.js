@@ -1289,6 +1289,9 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const a = JSON.parse(await ev("(()=>{const vis=id=>{const e=document.getElementById(id);return !!e&&e.offsetParent!==null};const d=document.querySelector('#ssTabContent [data-sec=setup]');return JSON.stringify({hook:vis('webhookUrlInput'),cache:!!document.querySelector('#ssTabContent [data-sec=cache]:not(.hidden) button'),tag:d.tagName,open:d.open})})()"));
     ok(a.hook && a.cache, 'webhook + cache cards: ' + JSON.stringify(a)); eq(a.tag + '|' + a.open, 'DETAILS|false', 'Auto Setup must start collapsed');
     await shot('admin-settings-system');
+    for (const t of ['bookingsettings', 'ss_docs', 'loginbg']) { await ev("window.app.systemSettings.showTab('" + t + "');true"); await sleep(1000); await shot('admin-settings-' + t); }
+    const g = JSON.parse(await ev("(()=>{const c=document.querySelector('#ssTabContent .ss-card:not(.hidden)');const h=c.querySelector('.ss-head').getBoundingClientRect(),b=c.querySelector('.ss-body').getBoundingClientRect();return JSON.stringify({side:b.left>=h.right-1,top:Math.abs(b.top-h.top)<2,hid:[...document.querySelectorAll('#ssTabContent .ss-card.hidden')].every(e=>getComputedStyle(e).display==='none')})})()"));
+    ok(g.side && g.top, 'settings card: title column left, fields right ' + JSON.stringify(g)); ok(g.hid, 'hidden settings cards must stay hidden');
     await ev("window.app.systemSettings.showTab('bookingsettings');true"); await sleep(1000);
     eq(await ev("JSON.stringify([!!document.getElementById('reserveStartInput'),!!document.getElementById('webhookUrlInput'),/ล้างแคช/.test(document.getElementById('ssTabContent').textContent)])"), '[true,false,false]');
   });
