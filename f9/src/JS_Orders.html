@@ -196,7 +196,7 @@ window.app.orders = {
       body.innerHTML = pageRows.map(o => {
         const firstItem = o.items[0] || o.gifts[0] || null;
         const more = o.items.length + o.gifts.length - 1;
-        const itemTxt = firstItem ? esc(firstItem.name || firstItem.sku) : '-';
+        const itemTxt = firstItem ? window.app.pn(firstItem.name || firstItem.sku) : '-';
         const stOpts = (opts.indexOf(o.status) === -1 ? [o.status] : []).concat(opts);
         const stCell = edit
           ? '<select class="od-st" style="--od-c:' + esc(this.statusColor(o.status)) + '" aria-label="สถานะของ ' + esc(o.id) + '" onclick="event.stopPropagation()" onchange="window.app.orders.changeStatus(\'' + escJs(o.id) + '\', this.value, this)">'
@@ -337,8 +337,8 @@ window.app.orders = {
       + row('ประเภท', o.res) + row('เลขที่ใบเสร็จมัดจำ', o.receipt) + (o.deposit ? row('เงินมัดจำ', this.baht(o.deposit)) : '') + row('รอบรับเครื่อง', o.pickup)
       + row('พนักงาน', o.staff) + row('เบอร์พนักงาน', o.bookingPhone) + row('ความสนใจ', o.interests) + row('หมายเหตุ', o.remark) + '</dl></section>';
     h += '<section class="od-sec"><h3>รายการ</h3><ul class="od-items">'
-      + o.items.map(i => '<li><div><b>' + esc(i.name || i.sku) + '</b><span>' + esc(i.sku) + ' · ' + i.qty + ' x ' + esc(this.baht(i.price)) + (i.promo ? ' · ' + esc(i.promo) : '') + '</span></div><em>' + esc(this.baht(i.net)) + '</em></li>').join('')
-      + o.gifts.map(g => '<li><div><b><i class="fas fa-gift" aria-hidden="true"></i> ' + esc(g.name || g.sku) + '</b><span>ของแถม · ' + g.qty + ' ชิ้น' + (g.remark ? ' · ' + esc(g.remark) : '') + '</span></div><em>-</em></li>').join('')
+      + o.items.map(i => '<li><div><b>' + window.app.pn(i.name || i.sku) + '</b><span>' + esc(i.sku) + ' · ' + i.qty + ' x ' + esc(this.baht(i.price)) + (i.promo ? ' · ' + esc(i.promo) : '') + '</span></div><em>' + esc(this.baht(i.net)) + '</em></li>').join('')
+      + o.gifts.map(g => '<li><div><b><i class="fas fa-gift" aria-hidden="true"></i> ' + window.app.pn(g.name || g.sku) + '</b><span>ของแถม · ' + g.qty + ' ชิ้น' + (g.remark ? ' · ' + esc(g.remark) : '') + '</span></div><em>-</em></li>').join('')
       + o.discounts.map(d => '<li class="od-disc"><div><b>' + esc(d.name) + '</b></div><em>-' + esc(this.baht(d.amount)) + '</em></li>').join('')
       + '</ul><div class="od-sum"><span>ยอดสุทธิ</span><b>' + esc(this.baht(o.total)) + '</b></div></section>';
     h += '<section class="od-sec"><h3>ประวัติสถานะ</h3><div id="odHistory" class="od-hist"><span class="od-sub">กำลังโหลด...</span></div></section>';

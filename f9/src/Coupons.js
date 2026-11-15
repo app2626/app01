@@ -2,9 +2,9 @@
 // ระบบโค้ดคูปอง (Coupon Codes) + ล้างแคช
 // ชีต "Coupons" สร้างอัตโนมัติเมื่อ Admin เปิดหน้า Coupons ครั้งแรก
 // คอลัมน์: Code | Description | Discount Type (Fixed/Percent) | Value | Min Spend | Max Uses (0/ว่าง = ไม่จำกัด)
-//          | Used Count | Start Date | Expiry Date | Status (เปิด/ปิด)
+//          | Used Count | Start Date | Expiry Date | Status (เปิด/ปิด) | Show On Store (เปิด = แสดงโค้ดในหน้า "โปรโมชั่นทั้งหมด" ของหน้าร้าน)
 // ============================================================================
-var COUPON_HEADERS_ = ["Code", "Description", "Discount Type", "Value", "Min Spend", "Max Uses", "Used Count", "Start Date", "Expiry Date", "Status"];
+var COUPON_HEADERS_ = ["Code", "Description", "Discount Type", "Value", "Min Spend", "Max Uses", "Used Count", "Start Date", "Expiry Date", "Status", "Show On Store"];
 
 function ensureCouponsSheet_(ss) {
   let sheet = ss.getSheetByName("Coupons");
@@ -13,9 +13,36 @@ function ensureCouponsSheet_(ss) {
     sheet.appendRow(COUPON_HEADERS_);
     sheet.getRange(1, 1, 1, COUPON_HEADERS_.length).setFontWeight("bold").setBackground("#4F46E5").setFontColor("white");
     sheet.setFrozenRows(1);
-    sheet.appendRow(["WELCOME500", "ส่วนลดต้อนรับ 500 บาท (ตัวอย่าง)", "Fixed", 500, 5000, 100, 0, "", "", "ปิด"]);
+    sheet.appendRow(["WELCOME500", "ส่วนลดต้อนรับ 500 บาท (ตัวอย่าง)", "Fixed", 500, 5000, 100, 0, "", "", "ปิด", "ปิด"]);
+  } else {
+    // ชีตเก่ายังไม่มีคอลัมน์ "Show On Store" — เติมต่อท้าย (ทำซ้ำได้ ; ชีต Coupons อ่าน/เขียนตามชื่อหัวคอลัมน์ จึงไม่กระทบข้อมูลเดิม)
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+    const heads = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => (h === null || h === undefined ? '' : h).toString().trim());
+    if (heads.indexOf("Show On Store") === -1) sheet.getRange(1, lastCol + 1).setValue("Show On Store").setFontWeight("bold").setBackground("#4F46E5").setFontColor("white");
   }
   return sheet;
+}
+
+// โค้ดคูปองที่เจ้าของร้านเลือกให้แสดงหน้าร้าน (Show On Store = เปิด) — ส่งไปกับ GET_ALL_DATA
+// โค้ดอื่นยังเป็นความลับเหมือนเดิม: ส่งเฉพาะแถวที่ เปิดใช้งาน + เลือกแสดง + อยู่ในช่วงวันที่ + ยังไม่ครบสิทธิ์ และส่งเฉพาะฟิลด์ที่ลูกค้าต้องเห็น
+// ไม่สร้างชีต (ระบบที่ยังไม่มีชีต Coupons ได้รายการว่าง)
+function getPublicCoupons_(ss) {
+  const sheet = ss.getSheetByName("Coupons");
+  if (!sheet) return [];
+  const on = (v) => ['เปิด', 'open', 'active', 'on', 'true'].indexOf((v === null || v === undefined ? '' : v).toString().trim().toLowerCase()) > -1;
+  const now = new Date(), out = [];
+  getTableDataAsJson(sheet, true).forEach(c => {
+    const code = (c.Code || '').toString().trim();
+    if (!code || !on(c.Status) || !on(c['Show On Store'])) return;
+    const start = parseCouponDate_(c['Start Date'], false), end = parseCouponDate_(c['Expiry Date'], true);
+    if ((start && now < start) || (end && now > end)) return;
+    const maxUses = parseInt(normalizeCouponNumber_(c['Max Uses']), 10) || 0, used = parseInt(normalizeCouponNumber_(c['Used Count']), 10) || 0;
+    if (maxUses > 0 && used >= maxUses) return;
+    const value = normalizeCouponNumber_(c.Value);
+    if (!(value > 0)) return;
+    out.push({ code: code, description: (c.Description || '').toString(), type: /percent|%/i.test((c['Discount Type'] || '').toString()) ? 'Percent' : 'Fixed', value: value, minSpend: normalizeCouponNumber_(c['Min Spend']), expiry: end ? Utilities.formatDate(end, Session.getScriptTimeZone(), 'yyyy-MM-dd') : '' });
+  });
+  return out.slice(0, 20);
 }
 
 // รองรับ yyyy-mm-dd, yyyy/mm/dd, dd/mm/yyyy (และปี พ.ศ.) — คืน null ถ้าว่าง/อ่านไม่ได้

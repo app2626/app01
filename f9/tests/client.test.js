@@ -934,6 +934,12 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(r.c, 'cart empty state missing'); eq(r.cb, 1); ok(!/จองด่วน/.test(r.ct), 'stale button name in empty cart text'); ok(r.w, 'wishlist empty state missing');
     await ev("window.app.toast('ทดสอบ','success');true"); await sleep(250);
     ok(await ev("!!document.querySelector('.swal2-container.swal2-top-end .swal2-toast')"), 'storefront toast is not top-end'); await shot('pos-toast');
+    {
+      const hub = JSON.parse(await P("(async()=>{const g=window.app.globalData,pos=window.app.pos;const bak=g.publicCoupons,bc=pos.cartData,ba=pos.appliedCoupons;g.publicCoupons=[{code:'WELCOME500',description:'<i>ต้อนรับ</i>',type:'Fixed',value:500,minSpend:5000,expiry:''}];pos.cartData=[];pos.appliedCoupons=[];pos.openPromoHub();const sec=document.getElementById('promoHubCodes');const out={sec:!!sec,code:sec?sec.querySelector('.pm-v-code').textContent:'',raw:sec?!!sec.querySelector('.pm-v-name i'):true,val:sec?sec.querySelector('.pm-v-val').textContent:''};await pos.usePublicCoupon(0);out.emptyCart=pos.appliedCoupons.length;g.publicCoupons=[];pos.openPromoHub();out.gone=!document.getElementById('promoHubCodes');g.publicCoupons=bak;pos.cartData=bc;pos.appliedCoupons=ba;window.app.hideModal('promoHubModal');if(window.Swal)Swal.close();return JSON.stringify(out)})()"));
+      ok(hub.sec, 'coupon code section missing from the promotions page'); eq(hub.code, 'WELCOME500'); eq(hub.val, 'ลด ฿500'); ok(!hub.raw, 'coupon description must be escaped'); eq(hub.emptyCart, 0, 'empty cart must not apply a code'); ok(hub.gone, 'no public coupons = no section');
+      const nm = JSON.parse(await ev("JSON.stringify({keys:window.app.grid.NAME_KEYS.join(','),csv:typeof window.app.grid.exportCSV})"));
+      eq(nm.keys, 'Product Name,Marketing Model');
+    }
     await ev("Swal.close();true"); await sleep(200);
   });
   await T('orders page: one row per order, status tabs with counts, search, detail drawer with items and history', async () => {
@@ -1323,6 +1329,8 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const tc = JSON.parse(await ev("JSON.stringify(['SAMSUNG GALAXY Z FOLD 8 12/512GB GRAPHITE','IPHONE 17 PRO MAX 1TB','GALAXY S25 FE 5G (NAVY)','POWERBANK 10000MAH','หูฟัง BUDS3 PRO',null].map(window.app.titleCaseName))"));
     eq(tc.join('|'), 'Samsung Galaxy Z Fold 8 12/512GB Graphite|iPhone 17 Pro Max 1TB|Galaxy S25 FE 5G (Navy)|Powerbank 10000mAh|หูฟัง Buds3 Pro|', 'titleCaseName');
     eq(await ev("window.app.pn('<B>A&B')"), '&lt;B&gt;A&amp;B', 'pn must escape after converting');
+    const rm = JSON.parse(await ev("(()=>{const bak=localStorage.getItem('tg_pos_remember');const box=document.createElement('div');box.innerHTML='<input id=\"loginUsername\"><input id=\"loginPassword\" type=\"password\"><input id=\"loginRemember\" type=\"checkbox\">';document.body.appendChild(box);const q=id=>box.querySelector('#'+id);localStorage.setItem('tg_pos_remember',JSON.stringify({u:'somchai',p:'pw-1234'}));window.app.loadRememberedLogin();const out={u:q('loginUsername').value,p:q('loginPassword').value,c:q('loginRemember').checked,kept:JSON.parse(localStorage.getItem('tg_pos_remember')).p};q('loginUsername').value='';q('loginPassword').value='';localStorage.setItem('tg_pos_remember',JSON.stringify({u:'old'}));window.app.loadRememberedLogin();out.oldU=q('loginUsername').value;out.oldP=q('loginPassword').value;box.remove();if(bak===null)localStorage.removeItem('tg_pos_remember');else localStorage.setItem('tg_pos_remember',bak);return JSON.stringify(out)})()"));
+    eq(rm.u + '|' + rm.p + '|' + rm.c + '|' + rm.kept, 'somchai|pw-1234|true|pw-1234', 'remembered login fills username + password'); eq(rm.oldU + '|' + rm.oldP, 'old|', 'an old username-only entry still loads');
     await ev("document.querySelector('#formModal [aria-label=\"ปิดฟอร์ม\"]').click();true"); await sleep(300);
     ok(await ev("document.getElementById('formModal').classList.contains('hidden')"), 'generic form did not close');
     await ev("window.location.hash='#products';true"); await sleep(1500);

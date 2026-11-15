@@ -214,6 +214,8 @@ window.app.grid = {
         }
         this.columns.forEach(c => {
           if(c.type==='hidden') return; let val = window.app.esc(row[c.key] || '');
+          // ชื่อสินค้าแสดงเป็นตัวใหญ่เฉพาะตัวแรกของคำ (เฉพาะที่แสดง — ฟอร์มแก้ไขและการบันทึกใช้ค่าเดิมจากแถว) ; Model/SKU เป็นค่าที่ใช้จับคู่ จึงแสดงตามที่เก็บ
+          if (window.app.grid.NAME_KEYS.indexOf(c.key) !== -1) val = window.app.pn(row[c.key] || '');
           if(c.key==='Password') val = '********';
           else if(c.key==='Contact Number' || c.key==='เบอร์โทรศัพท์' || c.key==='Phone') {
               if (String(val).length === 10) val = String(val).substring(0,3) + '-' + String(val).substring(3,6) + '-' + String(val).substring(6,10);
@@ -784,12 +786,14 @@ window.app.grid = {
       if (this.tableName === 'Products') return window.app.productGroup.openImport();
       return window.app.importer.open(this.tableName);
     },
+    // คอลัมน์ชื่อสินค้าที่แปลงเป็นตัวใหญ่เฉพาะตัวแรกของคำ ตอนแสดงในตารางและตอนส่งออก CSV (Model / SKU ไม่แปลง — เป็นค่าที่ใช้จับคู่และนำเข้ากลับ)
+    NAME_KEYS: ['Product Name', 'Marketing Model'],
     exportCSV: function() {
       if (this.filteredDataList.length === 0) return Swal.fire('ไม่มีข้อมูล', 'ไม่มีรายการให้ export ตามตัวกรองปัจจุบัน', 'warning');
       const cols = this.columns.filter(c => c.type !== 'hidden').map(c => c.key);
       const escCell = (v) => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
       let csv = "\uFEFF" + cols.map(escCell).join(',') + '\r\n'; // BOM นำหน้าให้ Excel เปิดภาษาไทยถูก (escape ไว้ ไม่ฝังตัวอักษรล่องหนในซอร์ส)
-      this.filteredDataList.forEach(row => { csv += cols.map(k => escCell(row[k])).join(',') + '\r\n'; });
+      this.filteredDataList.forEach(row => { csv += cols.map(k => escCell(this.NAME_KEYS.indexOf(k) !== -1 ? window.app.titleCaseName(row[k]) : row[k])).join(',') + '\r\n'; });
       // ชื่อไฟล์ใช้วันที่ local — ห้าม toISOString (UTC ทำให้วันเลื่อนถอยหลังในโซน +7)
       const d = new Date();
       const fname = this.tableName.toLowerCase() + '_' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '.csv';

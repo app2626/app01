@@ -1227,6 +1227,8 @@ function getAllInitialData(ss, isAdmin) {
     popupBanners: popupBanners,
     popularModels: getPopularModels_(ss),
     news: getLiveNews_(ss),
+    // โค้ดคูปองที่ตั้ง Show On Store = เปิด (แสดงในหน้า "โปรโมชั่นทั้งหมด") — โค้ดอื่นไม่ถูกส่งออก
+    publicCoupons: (function() { try { return getPublicCoupons_(ss); } catch (e) { return []; } })(),
     // เฉพาะคีย์ที่ไม่ใช่ความลับ (Webhook URL / Drive Folder ID ไม่ส่งให้หน้าเว็บของ role ใดเลย — Admin อ่านผ่าน GET_SETTINGS_LIST)
     settings: publicSettings_(getKeyValueSettings(ss))
   };

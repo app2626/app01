@@ -826,6 +826,19 @@ t('Coupons: unreadable date and start-after-end rejected', () => {
   ok(/ไม่หลัง/.test(cpn({ Code: 'RULE4', 'Start Date': '2026-12-31', 'Expiry Date': '2026-12-01' }).message));
   ok(!tbl('Coupons').some(x => x.Code === 'RULE3' || x.Code === 'RULE4'));
 });
+t('Coupons: only codes with Show On Store = เปิด reach the storefront, with no usage or limit fields', () => {
+  eq(cpn({ Code: 'SHOWME', Value: 500, 'Min Spend': 5000, 'Show On Store': 'เปิด' }).status, 'success');
+  eq(cpn({ Code: 'SECRET1', 'Show On Store': 'ปิด' }).status, 'success');
+  eq(cpn({ Code: 'OFFSHOW', Status: 'ปิด', 'Show On Store': 'เปิด' }).status, 'success');
+  eq(cpn({ Code: 'OLDSHOW', 'Expiry Date': '2020-01-01', 'Show On Store': 'เปิด' }).status, 'success');
+  eq(cpn({ Code: 'FULLSHOW', 'Max Uses': 1, 'Used Count': 1, 'Show On Store': 'เปิด' }).status, 'success');
+  [sales, admin].forEach(u => {
+    const pc = unwrap(api('GET_ALL_DATA', {}, u)).publicCoupons;
+    eq(pc.map(c => c.code).join(','), 'SHOWME', JSON.stringify(pc));
+    eq(Object.keys(pc[0]).sort().join(','), 'code,description,expiry,minSpend,type,value'); eq(pc[0].value, 500); eq(pc[0].minSpend, 5000); eq(pc[0].type, 'Fixed');
+  });
+  ok(!JSON.stringify(api('GET_ALL_DATA', {}, sales)).includes('SECRET1'), 'a hidden code leaked to the storefront payload');
+});
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
 
 console.log('\n==== ' + pass + ' passed, ' + fail + ' failed');

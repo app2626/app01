@@ -291,10 +291,10 @@ window.app.pos = {
     getPromoDiscounts: function() {
       return this.getSelectPromoDiscounts().concat(this.getCouponDiscounts());
     },
-    applyCouponCode: async function() {
+    // presetCode = โค้ดที่กดจากหน้า "โปรโมชั่นทั้งหมด" (ไม่ต้องพิมพ์ในช่อง) ; คืน true เมื่อใช้โค้ดสำเร็จ
+    applyCouponCode: async function(presetCode) {
       const inp = document.getElementById('cartCouponInput');
-      if (!inp) return;
-      const code = inp.value.trim().toUpperCase();
+      const code = String(typeof presetCode === 'string' ? presetCode : (inp ? inp.value : '')).trim().toUpperCase();
       if (!code) return;
       if ((this.appliedCoupons || []).some(c => c.code.toUpperCase() === code)) {
         return Swal.fire('แจ้งเตือน', 'ใช้โค้ดนี้ในตะกร้าแล้ว', 'info');
@@ -307,10 +307,11 @@ window.app.pos = {
           return Swal.fire('ใช้โค้ดไม่ได้', (res && res.message) ? res.message : 'ตรวจสอบโค้ดไม่สำเร็จ', 'warning');
         }
         this.appliedCoupons.push({ code: res.coupon.code, type: res.coupon.type, value: res.coupon.value, minSpend: res.coupon.minSpend || 0 });
-        inp.value = '';
+        if (inp) inp.value = '';
         this.renderCouponChips();
         this.updateTotal();
         window.app.toast('ใช้โค้ด ' + res.coupon.code + ' ลด ฿' + Number(res.coupon.discount).toLocaleString(), 'success');
+        return true;
       } catch (e) {
         Swal.fire('ระบบขัดข้อง', 'ตรวจสอบโค้ดไม่สำเร็จ กรุณาลองใหม่', 'error');
       }
@@ -1746,6 +1747,22 @@ window.app.pos = {
         });
         html += '</div></section>';
       }
+      // 2.1) โค้ดส่วนลดที่ร้านเลือกให้แสดง (Coupons: Show On Store = เปิด → globalData.publicCoupons) — กดเพื่อใช้กับตะกร้า ; ตะกร้าว่าง = คัดลอกโค้ดไว้ใส่ทีหลัง
+      const pubCoupons = (g.publicCoupons || []).filter(c => c && c.code);
+      if (pubCoupons.length) {
+        const usedCodes = (this.appliedCoupons || []).map(c => String(c.code).toUpperCase());
+        html += '<section id="promoHubCodes"><div class="pm-sec-head"><h3 class="pm-sec-title">โค้ดส่วนลด</h3><span class="pm-sec-sub">กดเพื่อใช้กับตะกร้า หรือกรอกโค้ดในตะกร้า</span></div><div class="sf-promo-grid sf-promo-grid-sm">';
+        pubCoupons.forEach((c, ci) => {
+          const on = usedCodes.indexOf(String(c.code).toUpperCase()) !== -1;
+          const dVal = Number(c.value) || 0, minSp = Number(c.minSpend) || 0;
+          const note = [minSp > 0 ? 'ขั้นต่ำ ฿' + minSp.toLocaleString() : '', c.expiry ? 'ถึง ' + c.expiry : ''].filter(Boolean).join(' · ') || 'ใช้ได้กับทุกยอดซื้อ';
+          html += '<div class="bnn-voucher-card sf-promo-coupon sf-promo-code' + (on ? ' applied' : '') + '" role="button" tabindex="0" onclick="window.app.pos.usePublicCoupon(' + ci + ')" onkeydown="if(event.key===\'Enter\'){window.app.pos.usePublicCoupon(' + ci + ')}">'
+            + '<div class="min-w-0"><div class="pm-v-val truncate">' + esc(c.type === 'Percent' ? 'ลด ' + dVal + '%' : 'ลด ฿' + dVal.toLocaleString()) + '</div><div class="pm-v-code">' + esc(c.code) + '</div>'
+            + (c.description ? '<div class="pm-v-name">' + esc(c.description) + '</div>' : '') + '<div class="pm-v-note">' + esc(note) + '</div></div>'
+            + '<span class="pm-v-btn shrink-0' + (on ? ' on' : '') + '">' + (on ? '<i class="fas fa-check mr-0.5"></i>ใช้อยู่' : 'ใช้โค้ด') + '</span></div>';
+        });
+        html += '</div></section>';
+      }
       // 3) ซื้อคู่ลดพิเศษ (AutoPromotions) — ไม่มีกติกาในชีต = ใช้ค่าเริ่มต้นเดียวกับแถบคูปอง
       let rules = (g.autoPromotions || []).filter(r => window.app.statusOn(r.Status));
       if (!rules.length) rules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10 }];
@@ -1761,6 +1778,20 @@ window.app.pos = {
       html += '</div></section>';
       body.innerHTML = html;
       window.app.showModal('promoHubModal');
+    },
+    // กดการ์ดโค้ดส่วนลดในหน้าโปรโมชั่นทั้งหมด — index ชี้ไปที่ globalData.publicCoupons (ไม่ฝังข้อความจากชีตใน onclick)
+    usePublicCoupon: async function(i) {
+      const c = ((window.app.globalData || {}).publicCoupons || []).filter(x => x && x.code)[i];
+      if (!c) return;
+      if ((this.appliedCoupons || []).some(x => String(x.code).toUpperCase() === String(c.code).toUpperCase())) { window.app.toast('ใช้โค้ด ' + c.code + ' ในตะกร้าอยู่แล้ว', 'info'); return; }
+      if (this.getCartSubtotal() <= 0) {
+        let copied = false;
+        try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(c.code); copied = true; } } catch (e) {}
+        window.app.toast((copied ? 'คัดลอกโค้ด ' + c.code + ' แล้ว' : 'โค้ด ' + c.code) + ' — เลือกสินค้าลงตะกร้าแล้วกรอกโค้ดนี้ได้เลย', 'info');
+        return;
+      }
+      const done = await this.applyCouponCode(c.code);
+      if (done && !document.getElementById('promoHubModal').classList.contains('hidden')) this.openPromoHub();
     },
     openPromoCampaign: function(i) {
       const c = (this._promoCamps || [])[i];

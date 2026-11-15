@@ -550,7 +550,7 @@ window.app = {
         itemsHtml += `
           <tr style="border-bottom: 1px dashed #cbd5e1;">
             <td style="padding: 10px 0; text-align: left;">
-              <div style="font-weight: bold; font-size: 14px;">${esc(item['Product Name'])}${isFreeLine ? ' <span style="font-size:11px;color:#059669;font-weight:normal;">(ของแถม)</span>' : ''}</div>
+              <div style="font-weight: bold; font-size: 14px;">${window.app.pn(item['Product Name'])}${isFreeLine ? ' <span style="font-size:11px;color:#059669;font-weight:normal;">(ของแถม)</span>' : ''}</div>
               <div style="font-size: 12px; color: #64748b;">SKU: ${esc(item.SKU)}</div>
             </td>
             <td style="padding: 10px 0; text-align: center;">${item.qty}</td>
@@ -565,7 +565,7 @@ window.app = {
            const gQty = parseInt(g.qty, 10) || 1;
            itemsHtml += `
           <tr style="border-bottom: 1px dashed #e2e8f0;">
-            <td colspan="2" style="padding: 4px 0 4px 14px; text-align: left; font-size: 12px; color: #64748b;">— ของแถม: ${esc(g.name)} x${gQty}</td>
+            <td colspan="2" style="padding: 4px 0 4px 14px; text-align: left; font-size: 12px; color: #64748b;">— ของแถม: ${window.app.pn(g.name)} x${gQty}</td>
             <td style="padding: 4px 0; text-align: right; font-size: 12px; color: #64748b;"></td>
             <td style="padding: 4px 0; text-align: right; font-size: 12px; color: #64748b; font-weight: bold;">ฟรี</td>
           </tr>
@@ -1900,7 +1900,7 @@ window.app = {
             { key: 'Accessible Menus', label: 'เมนูที่เข้าได้ (ไม่ติ๊กเลย = ตามบทบาท)', type: 'multi_select_menu' }
         ]); break;
         case 'promotions': window.app.grid.init('Promotions', 'Promo ID', [{ key: 'Promo ID', label: 'รหัสโปรโมชัน (สร้างอัตโนมัติ เช่น P-001)', type: 'text' }, { key: 'Promo Name', label: 'ชื่อโปรโมชัน', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: [{ value: 'Fixed', label: 'ลดเป็นบาท' }, { value: 'Percent', label: 'ลดเป็นเปอร์เซ็นต์ (%)' }] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
-        case 'coupons': window.app.grid.init('Coupons', 'Code', [{ key: 'Code', label: 'โค้ดคูปอง (เช่น NEWYEAR500)', type: 'text' }, { key: 'Description', label: 'รายละเอียด', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: [{ value: 'Fixed', label: 'ลดเป็นบาท' }, { value: 'Percent', label: 'ลดเป็นเปอร์เซ็นต์ (%)' }] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Min Spend', label: 'ยอดซื้อขั้นต่ำ', type: 'number' }, { key: 'Max Uses', label: 'ใช้ได้สูงสุด (0 = ไม่จำกัด)', type: 'number' }, { key: 'Used Count', label: 'ใช้ไปแล้ว', type: 'number' }, { key: 'Start Date', label: 'วันเริ่มใช้ (เว้นว่าง = ใช้ได้ทันที)', type: 'date' }, { key: 'Expiry Date', label: 'วันหมดอายุ (เว้นว่าง = ไม่หมดอายุ)', type: 'date' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
+        case 'coupons': window.app.grid.init('Coupons', 'Code', [{ key: 'Code', label: 'โค้ดคูปอง (เช่น NEWYEAR500)', type: 'text' }, { key: 'Description', label: 'รายละเอียด', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: [{ value: 'Fixed', label: 'ลดเป็นบาท' }, { value: 'Percent', label: 'ลดเป็นเปอร์เซ็นต์ (%)' }] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Min Spend', label: 'ยอดซื้อขั้นต่ำ', type: 'number' }, { key: 'Max Uses', label: 'ใช้ได้สูงสุด (0 = ไม่จำกัด)', type: 'number' }, { key: 'Used Count', label: 'ใช้ไปแล้ว', type: 'number' }, { key: 'Start Date', label: 'วันเริ่มใช้ (เว้นว่าง = ใช้ได้ทันที)', type: 'date' }, { key: 'Expiry Date', label: 'วันหมดอายุ (เว้นว่าง = ไม่หมดอายุ)', type: 'date' }, { key: 'Show On Store', label: 'แสดงโค้ดหน้าร้าน (หน้าโปรโมชั่นทั้งหมด)', type: 'select', options: ['ปิด', 'เปิด'] }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
         case 'inventorylog': window.app.grid.init('InventoryLog', 'Log ID', [{ key: 'Log ID', label: 'รหัสบันทึก', type: 'readonly' }, { key: 'Timestamp', label: 'วันเวลา', type: 'readonly' }, { key: 'SKU', label: 'SKU', type: 'readonly' }, { key: 'Action', label: 'การทำรายการ', type: 'readonly' }, { key: 'Qty', label: 'จำนวน', type: 'readonly' }, { key: 'Branch', label: 'สาขา', type: 'readonly' }, { key: 'User', label: 'ผู้ใช้', type: 'readonly' }], true); break;
         case 'auditlog': window.app.grid.init('AuditLog', 'Log ID', [{ key: 'Log ID', label: 'รหัสบันทึก', type: 'readonly' }, { key: 'Timestamp', label: 'วันเวลา', type: 'readonly' }, { key: 'User', label: 'ผู้ใช้', type: 'readonly' }, { key: 'Action', label: 'การทำรายการ', type: 'readonly' }, { key: 'Details', label: 'รายละเอียด', type: 'readonly' }], true); break;
         case 'invoice': 
@@ -1971,17 +1971,19 @@ window.app = {
     return Promise.race([call, timeout]);
   },
 
-  // จำเฉพาะ Username ไว้ auto-fill ฟอร์ม login ครั้งถัดไป — ไม่เก็บรหัสผ่านอีกต่อไป (เซสชันอยู่ใน token 30 วันของ tg_pos_user อยู่แล้ว)
-  // ข้อมูลเก่าที่เคยเก็บ {u,p} จะถูกลบ p ทิ้งทันทีที่เปิดหน้า login
+  // จำ Username และรหัสผ่านไว้เติมฟอร์ม login ครั้งถัดไป (เจ้าของร้านเลือกเอง 2026-11-15 — ก่อนหน้านี้จำแค่ Username)
+  // เก็บใน localStorage ของเบราว์เซอร์เครื่องนั้นแบบอ่านได้ และเฉพาะเมื่อติ๊กช่อง "จดจำ" ; ไม่ติ๊กตอน login = ลบทิ้งทั้งคู่
+  // ห้ามส่งค่านี้ไปที่อื่น ห้าม log และห้ามใส่ลงใน globalData
   loadRememberedLogin: function() {
     try {
       const raw = localStorage.getItem('tg_pos_remember');
       if (!raw) return;
       const saved = JSON.parse(raw);
-      if (saved && saved.p !== undefined) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: saved.u || '' }));
       const uEl = document.getElementById('loginUsername');
       const cEl = document.getElementById('loginRemember');
       if (uEl && saved.u) uEl.value = saved.u;
+      const pEl = document.getElementById('loginPassword');
+      if (pEl && typeof saved.p === 'string' && saved.p) pEl.value = saved.p;
       if (cEl) cEl.checked = true;
     } catch (e) { /* localStorage บล็อก/ข้อมูลเสีย — ปล่อยฟอร์มว่างเฉยๆ ไม่ต้อง throw */ }
   },
@@ -1995,9 +1997,9 @@ window.app = {
       const pVal = document.getElementById('loginPassword').value;
       const res = await this.api('LOGIN', { username: uVal, password: pVal });
       if(res && res.status === 'success') {
-        // บันทึก/ลบ Username ที่จำไว้เฉพาะตอน login สำเร็จเท่านั้น
+        // บันทึก/ลบ Username + รหัสผ่านที่จำไว้เฉพาะตอน login สำเร็จเท่านั้น (รหัสที่ผิดจึงไม่ถูกจำ)
         const remember = document.getElementById('loginRemember');
-        if (remember && remember.checked) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: uVal }));
+        if (remember && remember.checked) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: uVal, p: pVal }));
         else localStorage.removeItem('tg_pos_remember');
         window.app.user = res.user; localStorage.setItem('tg_pos_user', JSON.stringify(window.app.user));
         Swal.fire({icon: 'success', title: 'Welcome', text: res.user.Name, timer: 1500, showConfirmButton: false});
