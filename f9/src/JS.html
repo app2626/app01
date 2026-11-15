@@ -1565,12 +1565,28 @@ window.app = {
             const bgEl = document.getElementById('loginBg');
             if(bgEl && cfg && cfg.loginBg) {
                 bgEl.style.backgroundImage = `url('${window.app.formatImageUrl(cfg.loginBg)}')`;
-                bgEl.classList.remove('opacity-30');
-                bgEl.classList.add('opacity-100');
+                bgEl.classList.add('has-img');
             }
             window.app.applyLogo('loginLogoBox', 'loginLogoIcon', cfg && cfg.logoUrl);
         }).getPublicConfig();
     }
+  },
+
+  // หน้า Login: ปุ่มตาแสดง/ซ่อนรหัสผ่าน + เตือน Caps Lock (event null = ซ่อนคำเตือน)
+  toggleLoginPw: function() {
+    const inp = document.getElementById('loginPassword'), btn = document.getElementById('loginPwToggle');
+    if (!inp || !btn) return;
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    btn.setAttribute('aria-label', show ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน');
+    btn.innerHTML = '<i class="fas ' + (show ? 'fa-eye-slash' : 'fa-eye') + '"></i>';
+    inp.focus();
+  },
+  loginCapsHint: function(e) {
+    const el = document.getElementById('loginCaps'); if (!el) return;
+    const on = !!(e && e.getModifierState && e.getModifierState('CapsLock'));
+    el.classList.toggle('hidden', !on);
   },
 
   renderLayout: async function() {
@@ -2006,7 +2022,8 @@ window.app = {
   handleLogin: async function(e) {
     e.preventDefault();
     const btn = document.getElementById('btnLogin');
-    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Wait...';
+    if (!btn.dataset.label) btn.dataset.label = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>กำลังเข้าสู่ระบบ...</span>';
     try {
       const uVal = document.getElementById('loginUsername').value;
       const pVal = document.getElementById('loginPassword').value;
@@ -2021,11 +2038,11 @@ window.app = {
         window.app.renderLayout();
       } else {
         Swal.fire('Error', res ? res.message : 'Unknown Error', 'error');
-        btn.disabled = false; btn.innerHTML = 'เข้าสู่ระบบ';
+        btn.disabled = false; btn.innerHTML = btn.dataset.label || 'เข้าสู่ระบบ';
       }
     } catch (err) {
       Swal.fire('Error', err && err.message ? err.message : 'เชื่อมต่อระบบไม่สำเร็จ', 'error');
-      btn.disabled = false; btn.innerHTML = 'เข้าสู่ระบบ';
+      btn.disabled = false; btn.innerHTML = btn.dataset.label || 'เข้าสู่ระบบ';
     }
   },
 
