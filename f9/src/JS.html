@@ -69,18 +69,30 @@ window.app = {
 
   // ชื่อสินค้าในชีตมักพิมพ์ตัวใหญ่ทั้งหมด (SAMSUNG GALAXY Z FOLD 8 12/512GB GRAPHITE) — หน้าร้านแสดงเป็นตัวใหญ่เฉพาะตัวแรกของคำ
   // แปลงเฉพาะตอนแสดงผล: ห้ามใช้กับค่าที่ส่งกลับ server หรือใช้จับคู่ (value ของของแถม, data-name, SKU, Model ใน onclick) เพราะกติกาของแถม/ค้นหาเทียบกับค่าในชีต
-  // หน่วยหลังตัวเลข (512GB, 5G, 25W, 10000mAh) และคำใน KEEP / SPECIAL คงรูปที่ถูกต้อง ; ข้อความไทยไม่ถูกแตะ
+  // กติกา (owner 2026-11-15): ตัวแรกของทุกคำใหญ่ ที่เหลือเล็ก ยกเว้น
+  //   KEEP = คำย่อ/หน่วยที่ต้องใหญ่ทั้งคำ (GB, TB, 5G, 4G, LTE, AI, NFC, USB-C, AMOLED, OLED, OIS, IP68, SE, FE, GT, RAM, ROM, SSD, 4K, W ...)
+  //   SPECIAL = คำที่มีรูปตัวพิมพ์เฉพาะ (Wi-Fi, eSIM, mAh, iOS, iPadOS, macOS, tg, iPhone ...) — key เป็นตัวเล็กทั้งคำ
+  //   หน่วยติดตัวเลข (512GB, 25W, 10000mAh, 120Hz) ใช้ UNITS ; ตัวเลข+G/K (5G, 4K) และ IP+ตัวเลข (IP68) ใหญ่ทั้งคำ
+  // เพิ่มคำย่อ/รูปเฉพาะใหม่ที่ KEEP / SPECIAL ; ข้อความไทยไม่ถูกแตะ
   titleCaseName: function(text) {
-    var UNITS = { gb: 'GB', tb: 'TB', mb: 'MB', g: 'G', w: 'W', mah: 'mAh', hz: 'Hz', mp: 'MP', mm: 'mm' };
-    var KEEP = ['LTE', 'FE', 'SE', 'TV', 'USB', 'NFC', 'UHD', 'LED', 'OLED', 'QLED', 'AI', 'TG', 'II', 'III'];
-    var SPECIAL = { iphone: 'iPhone', ipad: 'iPad', airpods: 'AirPods', macbook: 'MacBook' };
+    var UNITS = { gb: 'GB', tb: 'TB', mb: 'MB', g: 'G', k: 'K', w: 'W', mah: 'mAh', hz: 'Hz', mp: 'MP', mm: 'mm' };
+    var KEEP = ['GB', 'TB', 'MB', 'LTE', 'AI', 'NFC', 'USB', 'AMOLED', 'OLED', 'QLED', 'LED', 'OIS', 'SE', 'FE', 'GT', 'RAM', 'ROM', 'SSD', 'W',
+                'TV', 'UHD', 'II', 'III'];
+    var SPECIAL = { 'wi-fi': 'Wi-Fi', 'usb-c': 'USB-C', esim: 'eSIM', mah: 'mAh', ios: 'iOS', ipados: 'iPadOS', macos: 'macOS', tg: 'tg',
+                    iphone: 'iPhone', ipad: 'iPad', airpods: 'AirPods', macbook: 'MacBook' };
     return String(text === undefined || text === null ? '' : text)
       .toLowerCase()
       .replace(/(^|[^a-z0-9])([a-z])/g, function(m, before, ch) { return before + ch.toUpperCase(); })
-      .replace(/(\d)(gb|tb|mb|mah|hz|mp|mm|g|w)(?![a-z0-9])/gi, function(m, digit, unit) { return digit + UNITS[unit.toLowerCase()]; })
-      .replace(/[A-Za-z]+/g, function(word) {
+      .replace(/(\d)(gb|tb|mb|mah|hz|mp|mm|g|k|w)(?![a-z0-9])/gi, function(m, digit, unit) { return digit + UNITS[unit.toLowerCase()]; })
+      // คำ (ตัวอักษร/ตัวเลข ต่อด้วยขีดได้ เช่น Wi-Fi, USB-C) — รูปเฉพาะทั้งคำก่อน แล้วค่อยดูทีละส่วนรอบขีด
+      .replace(/[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/g, function(word) {
         if (SPECIAL[word.toLowerCase()]) return SPECIAL[word.toLowerCase()];
-        return KEEP.indexOf(word.toUpperCase()) !== -1 ? word.toUpperCase() : word;
+        return word.split('-').map(function(part) {
+          var low = part.toLowerCase(), up = part.toUpperCase();
+          if (SPECIAL[low]) return SPECIAL[low];
+          if (KEEP.indexOf(up) !== -1 || /^\d+[gk]$/i.test(part) || /^ip\d{2}$/i.test(part)) return up;
+          return part;
+        }).join('-');
       });
   },
   // ชื่อสินค้าสำหรับแทรกลง HTML ของหน้าร้าน = titleCaseName แล้ว escape
