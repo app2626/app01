@@ -1048,7 +1048,7 @@ window.app.pos = {
         if (!seenKeys.has(k)) {
           seenKeys.add(k);
           const pr = (parseFloat(String(p.Price || '0').replace(/[^\d.\-]/g, '')) || 0).toLocaleString();
-          candidateKeys.push({ key: k, label: ((p.Model && p.Model !== '-') ? p.Model : p['Product Name']) + ' (฿' + pr + ')' });
+          candidateKeys.push({ key: k, label: window.app.titleCaseName((p.Model && p.Model !== '-') ? p.Model : p['Product Name']) + ' (฿' + pr + ')' });
         }
       });
 
@@ -1138,7 +1138,7 @@ window.app.pos = {
         html += '<td class="p-3 border-l border-slate-200/80">'
           + (gInfo.total > 0
               ? '<div class="font-black text-emerald-700 mb-1"><i class="fas fa-gift mr-1"></i>แถมฟรี ' + gInfo.total + ' รายการ</div>'
-                + '<div class="text-[10px] text-slate-600 space-y-0.5">' + gInfo.giftNames.slice(0, 4).map(n => '<div>• ' + esc(n) + '</div>').join('') + (gInfo.giftNames.length > 4 ? '<div class="text-slate-400">+ อีก ' + (gInfo.giftNames.length - 4) + ' รายการ</div>' : '') + '</div>'
+                + '<div class="text-[10px] text-slate-600 space-y-0.5">' + gInfo.giftNames.slice(0, 4).map(n => '<div>• ' + window.app.pn(n) + '</div>').join('') + (gInfo.giftNames.length > 4 ? '<div class="text-slate-400">+ อีก ' + (gInfo.giftNames.length - 4) + ' รายการ</div>' : '') + '</div>'
               : '<span class="text-slate-400">ไม่มีของแถมผูกไว้</span>')
           + '</td>';
       });
@@ -2285,7 +2285,7 @@ window.app.pos = {
         if (outOfStock) stockBarHtml = '<div class="sf-stock out">สินค้าหมด</div>';
         else {
           // แสดงจำนวนคงเหลือของตัวเลือกที่เลือกอยู่ (สี/ความจุ) เสมอ — กดจุดสีแล้วเห็นของสีนั้นทันที ไม่ใช่เห็นเฉพาะเมื่อเหลือน้อย
-          const colorLbl = (p.isGroup && variant.Color && variant.Color !== '-') ? 'สี' + variant.Color + ' · ' : '';
+          const colorLbl = (p.isGroup && variant.Color && variant.Color !== '-') ? 'สี' + window.app.titleCaseName(variant.Color) + ' · ' : '';
           // หลอดสเกลความขาดแคลน: เต็มเมื่อเหลือ >= 30 ชิ้น (ชีตไม่มีสต๊อกเริ่มต้น จึงคิด % ที่ขายไปแล้วไม่ได้) ขั้นต่ำ 8% ให้เห็นหลอดเสมอ
           const stockPct = Math.max(8, Math.min(100, Math.round(stockNum / 30 * 100)));
           const stockMeter = '<span class="sf-stock-bar" aria-hidden="true"><span style="width:' + stockPct + '%"></span></span>';
@@ -3097,7 +3097,7 @@ window.app.pos = {
         let pPrice = i.Price ? (parseFloat(i.Price.toString().replace(/[^\d.\-]/g,'')) || 0).toLocaleString() : '0';
         
         html+='<div class="bg-white border border-slate-200/90 p-3.5 rounded-2xl shadow-sm mb-3 relative group hover:border-amber-400 transition-all">';
-        const variantTxt = [i.Color, i.Capacity].map(v => (v === null || v === undefined) ? '' : String(v).trim()).filter(v => v && v !== '-').join(' · ');
+        const variantTxt = [i.Color, i.Capacity].map(v => (v === null || v === undefined) ? '' : String(v).trim()).filter(v => v && v !== '-').map(window.app.titleCaseName).join(' · ');
         const unitNum = i.Price ? (parseFloat(i.Price.toString().replace(/[^\d.\-]/g,'')) || 0) : 0;
         html+='  <div class="pr-7 flex gap-3 items-start">';
         html+='    <div class="w-14 h-14 shrink-0 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center overflow-hidden"><img src="' + window.app.esc(window.app.formatImageUrl(i['Image URL'] || '', 'w200')) + '" loading="lazy" alt="" onerror="this.onerror=null;this.src=window.app.NO_IMG;" class="max-w-full max-h-full object-contain"></div>';
@@ -3229,7 +3229,7 @@ window.app.pos = {
       let sub = 0, html = '<ul class="co-items">';
       this.cartData.forEach(i => {
         const unit = num(i.Price); sub += unit * i.qty;
-        const variantTxt = [i.Color, i.Capacity].map(v => (v === null || v === undefined) ? '' : String(v).trim()).filter(v => v && v !== '-').join(' · ');
+        const variantTxt = [i.Color, i.Capacity].map(v => (v === null || v === undefined) ? '' : String(v).trim()).filter(v => v && v !== '-').map(window.app.titleCaseName).join(' · ');
         const gifts = [].concat(i.brandGifts || [], i.channelGifts || []).map(g => window.app.pn(g.name) + (g.qty > 1 ? ' x' + g.qty : ''));
         html += '<li><img src="' + esc(window.app.formatImageUrl(i['Image URL'] || '', 'w200')) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=window.app.NO_IMG;">'
           + '<div class="co-it"><div class="co-it-n">' + window.app.pn(i['Product Name']) + '</div>'

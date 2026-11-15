@@ -78,7 +78,7 @@ window.app = {
     var UNITS = { gb: 'GB', tb: 'TB', mb: 'MB', g: 'G', k: 'K', w: 'W', mah: 'mAh', hz: 'Hz', mp: 'MP', mm: 'mm' };
     var KEEP = ['GB', 'TB', 'MB', 'LTE', 'AI', 'NFC', 'USB', 'AMOLED', 'OLED', 'QLED', 'LED', 'OIS', 'SE', 'FE', 'GT', 'RAM', 'ROM', 'SSD', 'W',
                 'TV', 'UHD', 'II', 'III'];
-    var SPECIAL = { 'wi-fi': 'Wi-Fi', 'usb-c': 'USB-C', esim: 'eSIM', mah: 'mAh', ios: 'iOS', ipados: 'iPadOS', macos: 'macOS', tg: 'tg',
+    var SPECIAL = { 'wi-fi': 'Wi-Fi', 'usb-c': 'USB-C', esim: 'eSIM', mah: 'mAh', ios: 'iOS', ipados: 'iPadOS', macos: 'macOS', tg: 'tg', '16e': '16e',
                     iphone: 'iPhone', ipad: 'iPad', airpods: 'AirPods', macbook: 'MacBook' };
     return String(text === undefined || text === null ? '' : text)
       .toLowerCase()
@@ -91,6 +91,8 @@ window.app = {
           var low = part.toLowerCase(), up = part.toUpperCase();
           if (SPECIAL[low]) return SPECIAL[low];
           if (KEEP.indexOf(up) !== -1 || /^\d+[gk]$/i.test(part) || /^ip\d{2}$/i.test(part)) return up;
+          // รหัสรุ่นที่ลงท้ายด้วยตัวอักษรหลังตัวเลข: S24U, X200T, A56FE, 15T, 13C — ใหญ่ทั้งคำ (รูปเฉพาะอย่าง 16e อยู่ใน SPECIAL)
+          if (/^[a-z]{0,3}\d+[a-z]{1,2}$/i.test(part) && !/^\d+(hz|mm)$/i.test(part)) return up;
           return part;
         }).join('-');
       });
