@@ -295,20 +295,19 @@
       </div>
 
       <div id="popupBannerModal" class="fixed inset-0 z-[100] hidden" role="dialog" aria-modal="true" aria-label="แบนเนอร์ประชาสัมพันธ์">
-        <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity" onclick="window.app.closePopupBanner()"></div>
-        <div class="fixed inset-0 z-10 overflow-y-auto">
-          <div class="flex min-h-full items-center justify-center p-4 text-center">
-            <div class="relative transform overflow-hidden rounded-3xl bg-transparent text-left shadow-xl transition-all w-full max-w-3xl flex flex-col items-center animate-fade-in-up">
-              <div class="w-full flex justify-end mb-3">
-                 <button type="button" aria-label="ปิดแบนเนอร์" class="w-10 h-10 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full text-white flex items-center justify-center transition-all shadow-md focus:outline-none" onclick="window.app.closePopupBanner()">
-                   <i class="fas fa-times text-xl"></i>
-                 </button>
-              </div>
-              <div class="popup-carousel w-full">
+        <div class="pp-backdrop"></div>
+        <div class="pp-stage" onclick="if (event.target === this) window.app.closePopupBanner()">
+          <div class="pp-shell">
+            <div class="popup-carousel">
+              <div class="pp-frame">
                 <div id="popupBannerContent" class="popup-track"></div>
-                <button type="button" id="popupPrev" class="popup-nav popup-nav-prev" aria-label="ก่อนหน้า" onclick="window.app.popupSlide(-1)"><i class="fas fa-chevron-left"></i></button>
-                <button type="button" id="popupNext" class="popup-nav popup-nav-next" aria-label="ถัดไป" onclick="window.app.popupSlide(1)"><i class="fas fa-chevron-right"></i></button>
+                <button type="button" class="pp-close" aria-label="ปิดแบนเนอร์" onclick="window.app.closePopupBanner()"><i class="fas fa-times"></i></button>
+              </div>
+              <button type="button" id="popupPrev" class="popup-nav popup-nav-prev" aria-label="ก่อนหน้า" onclick="window.app.popupSlide(-1)"><i class="fas fa-chevron-left"></i></button>
+              <button type="button" id="popupNext" class="popup-nav popup-nav-next" aria-label="ถัดไป" onclick="window.app.popupSlide(1)"><i class="fas fa-chevron-right"></i></button>
+              <div class="pp-foot">
                 <div id="popupBannerDots" class="popup-dots"></div>
+                <span id="popupCount" class="pp-count" aria-live="polite"></span>
               </div>
             </div>
           </div>

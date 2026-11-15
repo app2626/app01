@@ -1207,23 +1207,24 @@ window.app = {
             if (!hasCard) {
                 // ไม่มีหัวข้อ/คำอธิบาย/ปุ่ม CTA เลย — พฤติกรรมเดิม 100% (รูปเปล่าคลิกได้) กันแบนเนอร์ที่เคยตั้งค่าไว้ก่อนหน้าเปลี่ยนหน้าตาไปโดยไม่ได้ตั้งใจ
                 let img = this.esc(this.formatImageUrl(item.url));
-                let linkTag = item.link ? `<a href="${this.esc(item.link)}" target="_blank" class="block w-full h-full cursor-pointer">` : '';
+                let linkTag = item.link ? `<a href="${this.esc(item.link)}" target="_blank" class="pp-link">` : '';
                 let endLinkTag = item.link ? `</a>` : '';
-                html += `<div class="popup-slide">${linkTag}<img src="${img}" class="w-full h-auto object-contain rounded-2xl shadow-lg border border-white/10">${endLinkTag}</div>`;
+                html += `<div class="popup-slide">${linkTag}<img src="${img}" alt="" class="pp-img">${endLinkTag}</div>`;
                 return;
             }
-            // มีหัวข้อ/คำอธิบาย/ปุ่ม CTA อย่างน้อย 1 อย่าง — แสดงเป็นการ์ด (พอร์ตแนวคิดจาก pbzf8's PromoPopupModal.jsx, 2026-09-19)
+            // มีหัวข้อ/คำอธิบาย/ปุ่ม CTA อย่างน้อย 1 อย่าง — แสดงเป็นการ์ด (จอกว้าง: รูปเต็มไม่ครอป ข้อความซ้าย ปุ่มขวา; มือถือ: เรียงลงมา) หน้าตาอยู่ที่บล็อก POPUP v2 ใน CSS.html
             const img = this.esc(this.formatImageUrl(item.url));
             const ctaHtml = (item.buttonText && item.link)
-                ? `<a href="${this.esc(item.link)}" target="_blank" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl transition-colors">${this.esc(item.buttonText)}</a>`
-                : `<button type="button" onclick="window.app.closePopupBanner()" class="text-sm text-slate-400 hover:text-slate-600 font-medium">ปิดหน้าต่างนี้</button>`;
+                ? `<a href="${this.esc(item.link)}" target="_blank" class="pp-cta">${this.esc(item.buttonText)}<i class="fas fa-arrow-right"></i></a>`
+                : `<button type="button" onclick="window.app.closePopupBanner()" class="pp-dismiss">ปิดหน้าต่างนี้</button>`;
             html += `
-              <div class="popup-slide"><div class="w-full bg-white rounded-2xl shadow-lg overflow-hidden">
-                <img src="${img}" class="w-full aspect-video object-cover">
-                <div class="p-6 text-center">
-                  ${item.title ? `<h2 class="text-xl font-bold text-slate-800 mb-2">${this.esc(item.title)}</h2>` : ''}
-                  ${item.details ? `<p class="text-sm text-slate-500 leading-relaxed mb-5 whitespace-pre-wrap">${this.esc(item.details)}</p>` : ''}
-                  ${ctaHtml}
+              <div class="popup-slide"><div class="pp-card">
+                <img src="${img}" alt="" class="pp-card-img">
+                <div class="pp-body">
+                  <div class="pp-copy"><span class="pp-rule"></span>
+                  ${item.title ? `<h2 class="pp-title">${this.esc(item.title)}</h2>` : ''}
+                  ${item.details ? `<p class="pp-text">${this.esc(item.details)}</p>` : ''}</div>
+                  <div class="pp-actions">${ctaHtml}</div>
                 </div>
               </div></div>
             `;
@@ -1257,20 +1258,32 @@ window.app = {
         if (Math.abs(dx) > 40) window.app.popupSlide(dx < 0 ? 1 : -1);
         window.app.popupAuto_();
       }, {passive: true});
-      const car = track.parentNode;
+      const car = track.closest('.popup-carousel') || track.parentNode;
       car.addEventListener('mouseenter', () => window.app.popupStop_());
       car.addEventListener('mouseleave', () => window.app.popupAuto_());
     }
     this.popupAuto_();
   },
-  popupStop_: function() { if (this.popupTimer) { clearInterval(this.popupTimer); this.popupTimer = null; } },
+  // .popup-running บน modal = แถบของหน้าปัจจุบันวิ่งเต็มใน 5 วิ (ตรงกับ timer); หยุด timer = แถบเต็มค้างไว้
+  popupStop_: function() {
+    if (this.popupTimer) { clearInterval(this.popupTimer); this.popupTimer = null; }
+    const modal = document.getElementById('popupBannerModal');
+    if (modal) modal.classList.remove('popup-running');
+  },
   popupAuto_: function() {
     this.popupStop_();
     const track = document.getElementById('popupBannerContent');
-    if (track && track.children.length > 1) this.popupTimer = setInterval(() => this.popupSlide(1), 5000);
+    if (track && track.children.length > 1) {
+      this.popupTimer = setInterval(() => this.popupSlide(1), 5000);
+      const modal = document.getElementById('popupBannerModal');
+      if (modal) { void modal.offsetWidth; modal.classList.add('popup-running'); }
+    }
   },
   popupSync_: function() {
-    document.querySelectorAll('#popupBannerDots .popup-dot').forEach((d, k) => d.classList.toggle('active', k === this.popupIdx));
+    const dots = document.querySelectorAll('#popupBannerDots .popup-dot');
+    dots.forEach((d, k) => { d.classList.toggle('active', k === this.popupIdx); d.classList.toggle('done', k < this.popupIdx); });
+    const count = document.getElementById('popupCount');
+    if (count) count.textContent = dots.length > 1 ? ((this.popupIdx || 0) + 1) + ' / ' + dots.length : '';
   },
   popupGo: function(i) {
     const track = document.getElementById('popupBannerContent');
@@ -1280,6 +1293,8 @@ window.app = {
     this.popupIdx = ((i % n) + n) % n;
     track.style.transform = 'translateX(-' + (this.popupIdx * 100) + '%)';
     this.popupSync_();
+    // กดเปลี่ยนหน้าเองระหว่างที่ timer เดินอยู่ = เริ่มนับ 5 วิใหม่ ให้แถบกับ timer ตรงกันเสมอ
+    if (this.popupTimer) this.popupAuto_();
   },
   popupSlide: function(dir) { this.popupGo((this.popupIdx || 0) + dir); },
 

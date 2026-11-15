@@ -1537,20 +1537,88 @@
   .cms-grid .cms-pg:disabled { opacity: 0.6; }
   html.dark .cms-grid .cms-btn-line { color: #93c5fd; background: transparent; border-color: #334155; }
 
-  /* Popup banner carousel: หลายหน้า = สไลด์แนวนอน (scroll-snap) */
+  /* POPUP v2 — แบนเนอร์ป๊อปอัป: ฉากหลังเบลอ, กรอบขอบบาง, แถบความคืบหน้าแบบ story, ปุ่มกระจก
+     คง class .popup-* / id เดิมไว้ (JS + tests ใช้) — สีพื้นเรียบ ไม่มี gradient ตามกติกาหน้าร้าน */
+  .pp-backdrop { position: fixed; inset: 0; background: rgba(6, 12, 24, .66); -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%); animation: ppFade .32s ease-out both; }
+  .pp-stage { position: fixed; inset: 0; z-index: 10; overflow-y: auto; display: flex; padding: 20px 16px; }
+  .pp-shell { width: 100%; max-width: 760px; margin: auto; animation: ppIn .52s cubic-bezier(.16, 1, .3, 1) both; }
   .popup-carousel { position: relative; }
-  .popup-carousel { overflow: hidden; border-radius: 1rem; }
-  .popup-track { display: flex; transition: transform .5s ease-out; }
-  .popup-slide { flex: 0 0 100%; min-width: 0; max-height: 80vh; overflow-y: auto; box-sizing: border-box; }
-  .popup-nav { display: none; position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 9999px; border: 0; background: rgba(255,255,255,0.9); color: #0f172a; box-shadow: 0 2px 10px rgba(0,0,0,0.3); align-items: center; justify-content: center; cursor: pointer; z-index: 2; }
-    .popup-nav-prev { left: 8px; }
-  .popup-nav-next { right: 8px; }
-  .popup-dots { display: none; justify-content: center; gap: 8px; margin-top: 12px; }
-  .popup-dot { width: 8px; height: 8px; border-radius: 9999px; border: 0; padding: 0; background: rgba(255,255,255,0.45); cursor: pointer; transition: all .2s; }
-  .popup-dot.active { width: 22px; background: #fff; }
+  .pp-frame { position: relative; overflow: hidden; border-radius: 16px; background: #0b1424; box-shadow: 0 0 0 1px rgba(255, 255, 255, .14), 0 36px 90px -24px rgba(0, 0, 0, .7); }
+  .popup-track { display: flex; transition: transform .6s cubic-bezier(.22, 1, .36, 1); }
+  .popup-slide { flex: 0 0 100%; min-width: 0; max-height: 82vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; }
+  .popup-slide > * { margin-top: auto; margin-bottom: auto; }
+  .pp-img { display: block; width: 100%; height: auto; }
+  .pp-link { display: block; width: 100%; }
+  .pp-card { display: flex; flex-direction: column; width: 100%; background: #fff; flex: 1 0 auto; }
+  .pp-card-img { width: 100%; height: auto; display: block; }
+  .pp-body { padding: 22px 22px 24px; text-align: left; display: flex; flex-direction: column; gap: 18px; min-width: 0; flex: 1 0 auto; }
+  .pp-copy { min-width: 0; flex: 1 1 auto; }
+  .pp-copy > :last-child { margin-bottom: 0; }
+  .pp-rule { display: block; width: 28px; height: 3px; border-radius: 2px; background: #FF6B00; margin-bottom: 14px; }
+  .pp-title { font-size: 22px; line-height: 1.3; font-weight: 700; letter-spacing: -.01em; color: #0f2a43; margin: 0 0 10px; overflow-wrap: anywhere; }
+  .pp-text { font-size: 14.5px; line-height: 1.7; color: var(--ink-2, #111827); margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pp-actions { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+  #popupBannerModal .pp-cta { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 20px; border-radius: 8px; background: #FF6B00; color: #fff; font-size: 14.5px; font-weight: 700; text-decoration: none; transition: background .2s, transform .2s; }
+  #popupBannerModal .pp-cta:hover { background: #E05300; }
+  #popupBannerModal .pp-cta:active { transform: scale(.98); }
+  .pp-cta i { font-size: 12px; transition: transform .25s cubic-bezier(.22, 1, .36, 1); }
+  .pp-cta:hover i { transform: translateX(4px); }
+  .pp-dismiss { height: 44px; padding: 0 4px; border: 0; background: transparent; font-size: 13.5px; font-weight: 600; color: #64748b; cursor: pointer; }
+  .pp-dismiss:hover { color: #0f2a43; text-decoration: underline; }
+  .pp-copy > *, .pp-actions { animation: ppRise .5s cubic-bezier(.16, 1, .3, 1) both; }
+  .pp-copy > :nth-child(1) { animation-delay: .14s; }
+  .pp-copy > :nth-child(2) { animation-delay: .2s; }
+  .pp-copy > :nth-child(3) { animation-delay: .26s; }
+  .pp-actions { animation-delay: .32s; }
+  .pp-close { position: absolute; top: 12px; right: 12px; z-index: 3; width: 36px; height: 36px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, .28); background: rgba(8, 15, 30, .55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer; transition: background .2s, transform .3s cubic-bezier(.22, 1, .36, 1); }
+  .pp-close:hover { background: rgba(8, 15, 30, .85); transform: rotate(90deg); }
+  .popup-nav { display: none; position: absolute; top: calc(50% - 17px); transform: translateY(-50%); width: 40px; height: 40px; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, .28); background: rgba(8, 15, 30, .55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; font-size: 14px; align-items: center; justify-content: center; cursor: pointer; z-index: 2; transition: background .2s, border-color .2s; }
+  .popup-nav:hover { background: rgba(8, 15, 30, .9); border-color: rgba(255, 255, 255, .6); }
+  .popup-nav-prev { left: 10px; }
+  .popup-nav-next { right: 10px; }
+  .pp-close:focus-visible, .popup-nav:focus-visible, .popup-dot:focus-visible, #popupBannerModal .pp-cta:focus-visible, .pp-dismiss:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .pp-dismiss:focus-visible, #popupBannerModal .pp-cta:focus-visible { outline-color: #0f2a43; }
+  .pp-foot { display: none; align-items: center; justify-content: center; gap: 14px; height: 34px; }
+  .popup-dots { display: flex; align-items: center; gap: 6px; }
+  .popup-dot { position: relative; width: 26px; height: 16px; border: 0; padding: 0; background: transparent; cursor: pointer; transition: width .35s cubic-bezier(.22, 1, .36, 1); }
+  .popup-dot::before, .popup-dot::after { content: ""; position: absolute; left: 0; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 2px; }
+  .popup-dot::before { width: 100%; background: rgba(255, 255, 255, .3); }
+  .popup-dot::after { width: 0; background: #fff; }
+  .popup-dot.done::after { width: 100%; background: rgba(255, 255, 255, .7); }
+  .popup-dot.active { width: 46px; }
+  .popup-dot.active::after { width: 100%; }
+  .popup-running .popup-dot.active::after { animation: ppFill 5s linear both; }
+  .pp-count { min-width: 44px; font-size: 12px; font-weight: 600; letter-spacing: .08em; color: rgba(255, 255, 255, .75); font-variant-numeric: tabular-nums; }
   .popup-multi .popup-nav { display: flex; }
-  .popup-multi .popup-dots { display: flex; }
-  @media (prefers-reduced-motion: reduce) { .popup-track { transition: none; } }
+  .popup-multi .pp-foot { display: flex; }
+  @media (min-width: 768px) {
+    .pp-body { flex-direction: row; align-items: center; gap: 32px; padding: 26px 32px 28px; }
+    .pp-title { font-size: 24px; }
+  }
+  @media (max-width: 919px) {
+    .pp-foot { height: 52px; }
+    .popup-nav { top: auto; bottom: 8px; transform: none; width: 36px; height: 36px; }
+    .popup-nav-prev { left: 0; }
+    .popup-nav-next { right: 0; }
+  }
+  @media (min-width: 920px) {
+    .popup-nav-prev { left: -58px; }
+    .popup-nav-next { right: -58px; }
+  }
+  html.dark .pp-card { background: #0f172a; }
+  html.dark .pp-title { color: #f1f5f9; }
+  html.dark .pp-text { color: #cbd5e1; }
+  html.dark .pp-dismiss { color: #94a3b8; }
+  html.dark .pp-dismiss:hover { color: #f1f5f9; }
+  @keyframes ppFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes ppIn { from { opacity: 0; transform: translateY(18px) scale(.95); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
+  @keyframes ppRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes ppFill { from { width: 0; } to { width: 100%; } }
+  @media (prefers-reduced-motion: reduce) {
+    .popup-track { transition: none; }
+    .pp-backdrop, .pp-shell, .pp-copy > *, .pp-actions, .popup-running .popup-dot.active::after { animation: none; }
+    .pp-close:hover { transform: none; }
+  }
 
   /* ===== หน้าร้านแบบเว็บไซต์มาตรฐาน — html.sf-site (route() ใส่ให้เฉพาะ #pos) =====
      ซ่อน sidebar/แถบบนของระบบหลังร้าน, เนื้อหาอยู่ในคอนเทนเนอร์กลางจอ (กว้างเกือบเต็มจอ: เว้นขอบรวม 4in, ไม่แคบกว่า 1320px),
