@@ -380,7 +380,7 @@ window.app.dashboard = {
         }
       });
       const sortedDayKeys = Object.keys(trendData).sort();
-      this.createChart('chartSalesTrend', 'line', sortedDayKeys.map(k => trendData[k].label), sortedDayKeys.map(k => trendData[k].qty), 'จำนวนเครื่อง', '#254d71');
+      this.createChart('chartSalesTrend', 'line', sortedDayKeys.map(k => trendData[k].label), sortedDayKeys.map(k => trendData[k].qty), 'จำนวนเครื่อง', '#0f2a43');
 
       // กลุ่มรุ่นสินค้า (ตัดข้อมูลก่อนความจุ) — owner request 2026-07-24, แทนที่ตำแหน่งกราฟ "โมบาย" เดิมที่ย้ายไปอยู่คู่กับกราฟ "สมาร์ทวอทช์ & หูฟัง" แล้ว
       // ใช้หลักการเดียวกับ bookingSummary.stripCapacity (JS.html บรรทัด ~2899): ตัดข้อความ Model ที่ตำแหน่งซึ่งพบค่า Capacity ของแถวนั้นๆ เพื่อรวมทุกความจุของรุ่นเดียวกันเข้าเป็นกลุ่มเดียว
@@ -400,7 +400,7 @@ window.app.dashboard = {
         groupData[g] = (groupData[g] || 0) + qty;
       });
       let sortedGroups = Object.keys(groupData).sort((a,b) => groupData[b] - groupData[a]);
-      this.createChart('chartModelGroupStripped', 'bar', sortedGroups, sortedGroups.map(g => groupData[g]), 'จำนวนเครื่อง', '#7c3aed');
+      this.createChart('chartModelGroupStripped', 'bar', sortedGroups, sortedGroups.map(g => groupData[g]), 'จำนวนเครื่อง', '#2f6fa3');
 
       // การวิเคราะห์โมเดลสินค้ายอดนิยม — แยกเป็น 2 กราฟตามหมวดหมู่ (owner request 2026-07-24, แทนที่กราฟ "เปรียบเทียบยอดจองรายสัปดาห์" ที่ไม่ได้ใช้แล้ว):
       // โมบาย แยกกราฟเดี่ยว, ส่วนสมาร์ทวอทช์+หูฟังรวมกันอยู่อีกกราฟหนึ่ง (ไม่รวม "อุปกรณ์เสริม" ทั่วไป)
@@ -423,7 +423,7 @@ window.app.dashboard = {
         if(ctxModel) {
           this.charts[canvasId] = new Chart(ctxModel.getContext('2d'), {
               type: 'bar',
-              data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#254d71', borderRadius: 6 }] },
+              data: { labels: sortedModels, datasets: [{ label: 'จำนวนเครื่อง', data: sortedModels.map(m => modelsData[m]), backgroundColor: '#0f2a43', borderRadius: 6, maxBarThickness: 40 }] },
               options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: window.app.chartTheme().grid }, grace: '15%' }, x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { footer: (tooltipItems) => { let mName = tooltipItems[0].label; let part = modelsData[mName] || 0; let percent = grandTotalQty > 0 ? ((part / grandTotalQty) * 100).toFixed(1) : 0; return 'คิดเป็นสัดส่วน: ' + percent + '% ของยอดจองทั้งหมด'; } } } } }
           });
           window.app.chartExportButtons(canvasId);
@@ -446,18 +446,18 @@ window.app.dashboard = {
           this.createChart(canvasId, 'bar', labels, data, 'จำนวนเครื่อง', colorHex);
       };
       
-      buildCountChart('Mall', 'chartMall', '#17a2b8'); buildCountChart('Region', 'chartRegion', '#10b981');
-      buildCountChart('Province', 'chartProvince', '#f59e0b'); buildCountChart('Type Name', 'chartType', '#8b5cf6');
+      buildCountChart('Mall', 'chartMall', '#0f2a43'); buildCountChart('Region', 'chartRegion', '#2f6fa3');
+      buildCountChart('Province', 'chartProvince', '#14b8a6'); buildCountChart('Type Name', 'chartType', '#FF6B00');
 
       const branchCounts = {};
       this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o)) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); branchCounts[o['Branch Code']] = (branchCounts[o['Branch Code']] || 0) + (isNaN(qty) ? 0 : qty); } });
       let sortedBranches = Object.keys(branchCounts).sort((a,b)=>branchCounts[b]-branchCounts[a]).slice(0, 10);
-      this.createChart('chartTopBranches', 'bar', sortedBranches, sortedBranches.map(b=>branchCounts[b]), 'จำนวนเครื่องรวม', '#254d71');
+      this.createChart('chartTopBranches', 'bar', sortedBranches, sortedBranches.map(b=>branchCounts[b]), 'จำนวนเครื่องรวม', '#0f2a43');
 
       const salesCounts = {};
       this.filteredOrders.forEach(o => { if(!window.app.isOrderCancelled(o) && isDevice(o) && o['Staff']) { let qty = parseInt(String(o.Qty || 0).replace(/,/g,''), 10); salesCounts[o['Staff']] = (salesCounts[o['Staff']] || 0) + (isNaN(qty) ? 0 : qty); } });
       let sortedSales = Object.keys(salesCounts).sort((a,b)=>salesCounts[b]-salesCounts[a]).slice(0, 10);
-      this.createChart('chartSalesRank', 'bar', sortedSales, sortedSales.map(s=>salesCounts[s]), 'จำนวนเครื่อง', '#2563eb', true);
+      this.createChart('chartSalesRank', 'bar', sortedSales, sortedSales.map(s=>salesCounts[s]), 'จำนวนเครื่อง', '#2f6fa3', true);
 
       // Gifts summary is rendered as a table via renderGiftsTable()
 
@@ -491,7 +491,7 @@ window.app.dashboard = {
       const renderStackedChart = (canvasId, dataMap, channelsSet) => {
           let topModels = Object.keys(dataMap).sort((a,b) => dataMap[b].total - dataMap[a].total).slice(0, 15);
           let datasets = [];
-          let colorsChannel = ['#254d71', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#14b8a6', '#f43f5e', '#64748b'];
+          let colorsChannel = ['#0f2a43', '#FF6B00', '#14b8a6', '#2f6fa3', '#f59e0b', '#94a3b8', '#7dd3fc', '#e11d48', '#64748b'];
           let chIdx = 0;
           
           Array.from(channelsSet).forEach(ch => {
@@ -725,23 +725,25 @@ window.app.dashboard = {
         label: lblName,
         data: data,
         borderWidth: type === 'line' ? 2.5 : 0,
-        borderRadius: type === 'bar' ? (isHoriz ? [0, 8, 8, 0] : [8, 8, 0, 0]) : 0
+        borderRadius: type === 'bar' ? (isHoriz ? [0, 6, 6, 0] : [6, 6, 0, 0]) : 0,
+        maxBarThickness: 40
       };
       
       if (type === 'line') {
         const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, hexToRgba(themeColor, 0.18));
+        gradient.addColorStop(0, hexToRgba(themeColor, 0.16));
         gradient.addColorStop(1, hexToRgba(themeColor, 0.0));
         
         datasetConfig.borderColor = themeColor;
         datasetConfig.backgroundColor = gradient;
         datasetConfig.fill = true;
-        datasetConfig.tension = 0.4;
-        datasetConfig.pointBackgroundColor = '#ffffff';
-        datasetConfig.pointBorderColor = themeColor;
+        datasetConfig.tension = 0.35;
+        datasetConfig.pointBackgroundColor = themeColor;
+        datasetConfig.pointBorderColor = '#ffffff';
         datasetConfig.pointBorderWidth = 2;
-        datasetConfig.pointRadius = 4;
+        datasetConfig.pointRadius = 0;
         datasetConfig.pointHoverRadius = 6;
+        datasetConfig.pointHitRadius = 14;
       } else {
         datasetConfig.backgroundColor = themeColor;
       }
@@ -763,6 +765,7 @@ window.app.dashboard = {
           responsive: true,
           maintainAspectRatio: false,
           indexAxis: isHoriz ? 'y' : 'x',
+          interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -770,7 +773,7 @@ window.app.dashboard = {
               titleFont: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', size: 12, weight: '700' },
               bodyFont: { family: 'Roboto, Helvetica Neue, Helvetica, Tahoma, Arial, sans-serif', size: 11, weight: '400' },
               padding: 10,
-              cornerRadius: 10,
+              cornerRadius: 8,
               displayColors: false,
               titleColor: '#ffffff',
               bodyColor: '#e2e8f0'
