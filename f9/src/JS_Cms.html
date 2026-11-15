@@ -417,7 +417,7 @@
         await cfg.save.call(this, r.value, row);
         window.app.hideLoading();
         await this.reload();
-        Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลสำเร็จ', showConfirmButton: false, timer: 1200 });
+        Swal.fire({ icon: 'success', title: (row ? 'บันทึกการแก้ไข' : 'เพิ่ม') + String(cfg.title || '').replace(/^จัดการ/, '') + 'แล้ว', showConfirmButton: false, timer: 1400 });
       } catch (e) {
         window.app.hideLoading();
         Swal.fire('บันทึกไม่สำเร็จ', this.esc(e.message || e), 'error');
@@ -436,7 +436,7 @@
         window.app.hideLoading();
         rows.forEach(function(r) { delete st.selected[r.key]; });
         await this.reload();
-        Swal.fire({ icon: 'success', title: 'ลบแล้ว ' + n + ' รายการ', showConfirmButton: false, timer: 1200 });
+        Swal.fire({ icon: 'success', title: 'ลบ' + String(cfg.title || '').replace(/^จัดการ/, '') + 'แล้ว ' + n + ' รายการ', showConfirmButton: false, timer: 1400 });
       } catch (e) {
         window.app.hideLoading();
         await this.reload();
@@ -455,7 +455,8 @@
         if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'บันทึกลำดับไม่สำเร็จ');
         row.seq = v;
         await window.app.refreshGlobalData();
-        this.reload();
+        await this.reload();
+        window.app.toast('บันทึกลำดับการแสดงเป็น ' + v + ' แล้ว', 'success');
       } catch (e) {
         input.value = row.seq; input.disabled = false;
         Swal.fire('บันทึกลำดับไม่สำเร็จ', this.esc(e.message || e), 'error');

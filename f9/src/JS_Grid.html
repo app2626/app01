@@ -2,6 +2,8 @@
 // Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
 window.app.grid = {
     TITLES: { Products: 'จัดการสินค้า', Branches: 'จัดการสาขา', Channels: 'จัดการช่องทางขาย', Members: 'จัดการผู้ใช้งาน', GiftMappings: 'จัดการชุดของแถม', AutoPromotions: 'จัดการส่วนลดซื้อคู่อัตโนมัติ', Promotions: 'จัดการส่วนลดตอนจอง', Interests: 'จัดการตัวเลือกความสนใจลูกค้า', Coupons: 'จัดการโค้ดส่วนลด', Orders: 'รายการจอง', InventoryLog: 'ประวัติสต๊อก', AuditLog: 'ประวัติการใช้งาน' },
+    // ชื่อสิ่งที่หน้านี้จัดการ (สาขา / โค้ดส่วนลด / รายการจอง ...) — ใช้ในข้อความแจ้งผลบันทึก/ลบ ให้บอกว่าบันทึกอะไร ไม่ใช่แค่ "สำเร็จ"
+    subject: function() { return (this.TITLES[this.tableName] || '').replace(/^จัดการ/, '') || 'ข้อมูล'; },
     setPageSize: function(v) { const n = parseInt(v, 10); if (n > 0) { this.pageSize = n; this.renderPage(1); } },
     STATUS_TABLES: ['Products', 'GiftMappings', 'AutoPromotions', 'Promotions'],
     canBulkStatus: function() { return this.canBulk() && this.STATUS_TABLES.indexOf(this.tableName) > -1; },
@@ -311,11 +313,11 @@ window.app.grid = {
         if (res && res.status === 'success') {
           this.selected = {};
           await window.app.refreshGlobalData();
-          let msg = 'เปลี่ยนเป็น ' + res.newStatus + ' แล้ว ' + res.updated + ' รายการ';
+          let msg = 'เปลี่ยนสถานะ' + this.subject() + 'เป็น ' + res.newStatus + ' แล้ว ' + res.updated + ' รายการ';
           if (res.unchanged) msg += ' · เป็นสถานะนี้อยู่แล้ว ' + res.unchanged;
           if (res.notFound && res.notFound.length) msg += ' · ไม่พบ ' + res.notFound.length;
+          await this.loadData();
           Swal.fire({ icon: 'success', title: msg, showConfirmButton: false, timer: 1800 });
-          this.loadData();
         } else Swal.fire('Error', res ? res.message : 'Error', 'error');
       } catch (e) { window.app.hideLoading(); Swal.fire('Error', e.message || 'Error', 'error'); }
     },
@@ -332,11 +334,11 @@ window.app.grid = {
         if (res && res.status === 'success') {
           this.selected = {};
           await window.app.refreshGlobalData();
-          let msg = 'ลบแล้ว ' + res.deleted + ' รายการ';
+          let msg = 'ลบ' + this.subject() + 'แล้ว ' + res.deleted + ' รายการ';
           if (res.protectedIds && res.protectedIds.length) msg += ' (ข้ามบัญชีของตัวเอง)';
           if (res.notFound && res.notFound.length) msg += ' · ไม่พบ ' + res.notFound.length + ' รายการ';
+          await this.loadData();
           Swal.fire({ icon: 'success', title: msg, showConfirmButton: false, timer: 1800 });
-          this.loadData();
         } else Swal.fire('Error', res ? res.message : 'Error', 'error');
       } catch (e) { window.app.hideLoading(); Swal.fire('Error', e.message || 'Error', 'error'); }
     },
@@ -759,13 +761,15 @@ window.app.grid = {
            else res = await window.app.api('SAVE_RECORD', { tableName: this.tableName, idField: this.idField, data: pay });
            if(res && res.status==='success'){
              await window.app.refreshGlobalData();
+             // โหลดตารางใหม่ให้เสร็จก่อนแล้วค่อยแจ้งผล — loadData เปิด/ปิดแถบ "กำลังโหลด" ด้วย Swal ซึ่งจะทับ/ปิดข้อความแจ้งผลที่ขึ้นก่อนหน้า
+             await this.loadData();
              if (res.generatedPassword) {
                // สมาชิกใหม่เว้นรหัสผ่านว่าง — server สุ่มรหัสผ่านให้ ต้องโชว์ครั้งเดียวตอนนี้เพราะจะไม่ถูกส่งกลับมาอีก (rule 5)
                Swal.fire({ icon: 'success', title: 'สร้างสมาชิกสำเร็จ', html: 'รหัสผ่านที่สุ่มให้: <b>' + window.app.esc(res.generatedPassword) + '</b><br><span class="text-xs text-slate-500">กรุณาบันทึกไว้และแจ้งพนักงาน — จะไม่แสดงซ้ำอีก</span>' });
              } else {
-               Swal.fire({ icon: 'success', title: 'อัปเดตข้อมูลเสร็จสิ้น', showConfirmButton: false, timer: 1500 });
+               const savedId = String(pay[this.idField] === undefined || pay[this.idField] === null ? '' : pay[this.idField]).trim();
+               Swal.fire({ icon: 'success', title: (this.editingData ? 'บันทึกการแก้ไข' : 'เพิ่ม') + this.subject() + 'แล้ว', text: savedId, showConfirmButton: false, timer: 1600 });
              }
-             this.loadData();
            } else Swal.fire('ผิดพลาด',res ? res.message : 'Error', 'error');
          } catch(e) { Swal.fire('ผิดพลาด', e.message || 'Error', 'error'); }
          finally { restoreBtn(); }
@@ -776,7 +780,7 @@ window.app.grid = {
         window.app.showLoading('กำลังลบข้อมูล...');
         try {
           const res = await window.app.api('DELETE_RECORD', { tableName:this.tableName, idField:this.idField, idValue:id });
-          if(res && res.status==='success') { await window.app.refreshGlobalData(); Swal.fire({ icon: 'success', title: 'ลบข้อมูลสำเร็จแล้ว', showConfirmButton: false, timer: 1200 }); this.loadData(); } else Swal.fire('Error',res ? res.message : 'Error','error');
+          if(res && res.status==='success') { await window.app.refreshGlobalData(); await this.loadData(); Swal.fire({ icon: 'success', title: 'ลบ' + this.subject() + 'แล้ว', text: String(id === undefined || id === null ? '' : id), showConfirmButton: false, timer: 1400 }); } else Swal.fire('Error',res ? res.message : 'Error','error');
         } catch(e) { Swal.fire('Error', e.message || 'Error', 'error'); }
       }
     },

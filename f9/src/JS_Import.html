@@ -169,7 +169,7 @@
         window.app.hideLoading();
         if (!fin || fin.status !== 'success') throw new Error(fin && fin.message ? fin.message : 'นำเข้าไม่สำเร็จ');
         await window.app.refreshGlobalData();
-        if (window.app.grid && window.app.grid.tableName === table) window.app.grid.loadData();
+        if (window.app.grid && window.app.grid.tableName === table) await window.app.grid.loadData();
         await this.showDone(table, fin);
       } catch (e) {
         window.app.hideLoading();

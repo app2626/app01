@@ -455,8 +455,9 @@ window.app.settingsManager = {
         const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: 'loginbg', url: url });
         if(res && res.status==='success') {
           await window.app.refreshGlobalData();
+          // โหลดตารางใหม่ให้เสร็จก่อนแล้วค่อยแจ้งผล — init เปิด/ปิดแถบ "กำลังโหลด" ด้วย Swal ซึ่งจะทับ/ปิดข้อความแจ้งผลที่ขึ้นก่อนหน้า
+          await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกภาพพื้นหลังสำเร็จ', showConfirmButton: false, timer: 1500 });
-          this.init(this.currentType);
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }
@@ -509,8 +510,8 @@ window.app.settingsManager = {
         });
         if(res && res.status==='success') {
           await window.app.refreshGlobalData();
-          Swal.fire({ icon: 'success', title: 'บันทึกเวลาการจองสำเร็จ', showConfirmButton: false, timer: 1500 });
-          this.init(this.currentType);
+          await this.init(this.currentType);
+          Swal.fire({ icon: 'success', title: 'บันทึกการตั้งค่าการจองแล้ว', showConfirmButton: false, timer: 1500 });
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }
@@ -533,8 +534,8 @@ window.app.settingsManager = {
       try {
         const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { WebhookUrl: url } });
         if (res && res.status === 'success') {
+          await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกการแจ้งเตือนแล้ว', timer: 1500, showConfirmButton: false });
-          this.init(this.currentType);
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }
@@ -557,8 +558,8 @@ window.app.settingsManager = {
         if (res && res.status === 'success') {
           await window.app.refreshGlobalData();
           window.app.renderFooterContact();
+          await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลติดต่อแล้ว', timer: 1500, showConfirmButton: false });
-          this.init(this.currentType);
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }
@@ -577,8 +578,8 @@ window.app.settingsManager = {
         const res = await window.app.api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { PolicyBooking: booking, PolicyPrivacy: privacy, HelpHowTo: val('helpHowToInput'), HelpFaq: val('helpFaqInput') } });
         if (res && res.status === 'success') {
           await window.app.refreshGlobalData();
+          await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกเงื่อนไขและนโยบายแล้ว', timer: 1500, showConfirmButton: false });
-          this.init(this.currentType);
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }
@@ -606,8 +607,8 @@ window.app.settingsManager = {
         if(res && res.status==='success') {
           await window.app.refreshGlobalData();
           // ชื่อในแท็บ/หน้า login ฝัง server-side ตอน doGet — ต้องโหลดหน้าใหม่ทั้งหน้าถึงจะเห็นผลจริง ไม่ใช่แค่ refreshGlobalData
+          await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกชื่อเว็บแอปสำเร็จ', text: 'รีเฟรชหน้าเว็บเพื่อให้ชื่อใหม่แสดงผลทุกจุด', showConfirmButton: false, timer: 2000 });
-          this.init(this.currentType);
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }
@@ -632,8 +633,8 @@ window.app.settingsManager = {
         });
         if(res && res.status==='success') {
           await window.app.refreshGlobalData();
+          await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกโฟลเดอร์สำเร็จ', showConfirmButton: false, timer: 1500 });
-          this.init(this.currentType);
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }
@@ -666,8 +667,8 @@ window.app.settingsManager = {
         });
         if(res && res.status==='success') {
           await window.app.refreshGlobalData();
+          await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลบริษัทสำเร็จ', showConfirmButton: false, timer: 1500 });
-          this.init(this.currentType);
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
         }

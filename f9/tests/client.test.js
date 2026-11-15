@@ -1326,6 +1326,14 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     eq(await ev("document.getElementById('formModalTitle').textContent"), 'เพิ่มช่องทางขาย', 'form title names the table');
     ok(await ev("[...document.querySelectorAll('#dynamicForm label')].every(l=>/[ก-๙]/.test(l.textContent))"), 'all field labels are Thai');
     await shot('form-generic');
+    eq(await ev("window.app.grid.subject()"), 'ช่องทางขาย', 'save messages name the page subject');
+    {
+      const sv = JSON.parse(await P("(async()=>{const g=window.app.grid;document.getElementById('field_Channel Name').value='ทดสอบแจ้งผล';const seen=async(re)=>{for(let i=0;i<80;i++){const t=document.querySelector('.swal2-title');if(t&&re.test(t.textContent)){const x=document.querySelector('.swal2-html-container');return {title:t.textContent,text:x?x.textContent:''};}await new Promise(r=>setTimeout(r,100));}const lt=document.querySelector('.swal2-title'),lx=document.querySelector('.swal2-html-container');return {title:'(last) '+(lt?lt.textContent:'none'),text:lx?lx.textContent:''};};g.saveForm();const out=await seen(/แล้ว$/);Swal.close();await new Promise(r=>setTimeout(r,800));return JSON.stringify(out)})()"));
+      eq(sv.title, 'เพิ่มช่องทางขายแล้ว', 'add message: ' + JSON.stringify(sv)); ok(/^CH-\d+$/.test(sv.text), 'message shows the saved id: ' + sv.text);
+      const dl = JSON.parse(await P("(async()=>{const g=window.app.grid;const row=g.dataList.find(r=>r['Channel Name']==='ทดสอบแจ้งผล');if(!row)return JSON.stringify({title:'row missing'});const seen=async(re)=>{for(let i=0;i<80;i++){const t=document.querySelector('.swal2-title');if(t&&re.test(t.textContent)){const x=document.querySelector('.swal2-html-container');return {title:t.textContent,text:x?x.textContent:''};}await new Promise(r=>setTimeout(r,100));}const lt=document.querySelector('.swal2-title'),lx=document.querySelector('.swal2-html-container');return {title:'(last) '+(lt?lt.textContent:'none'),text:lx?lx.textContent:''};};g.deleteRecord(row['Channel ID']);await new Promise(r=>setTimeout(r,400));Swal.clickConfirm();const out=await seen(/^ลบ.*แล้ว$/);Swal.close();await new Promise(r=>setTimeout(r,800));return JSON.stringify(out)})()"));
+      eq(dl.title, 'ลบช่องทางขายแล้ว', 'delete message');
+      await ev("window.app.grid.openForm();true"); await sleep(300);
+    }
     const tc = JSON.parse(await ev("JSON.stringify(['SAMSUNG GALAXY Z FOLD 8 12/512GB GRAPHITE','IPHONE 17 PRO MAX 1TB','GALAXY S25 FE 5G (NAVY)','POWERBANK 10000MAH','หูฟัง BUDS3 PRO',null].map(window.app.titleCaseName))"));
     eq(tc.join('|'), 'Samsung Galaxy Z Fold 8 12/512GB Graphite|iPhone 17 Pro Max 1TB|Galaxy S25 FE 5G (Navy)|Powerbank 10000mAh|หูฟัง Buds3 Pro|', 'titleCaseName');
     eq(await ev("window.app.pn('<B>A&B')"), '&lt;B&gt;A&amp;B', 'pn must escape after converting');

@@ -369,13 +369,13 @@ window.app.productGroup = {
         window.app.hideLoading();
         if (res && res.status === 'success') {
           window.app.hideModal('productGroupModal');
+          await window.app.refreshGlobalData();
+          await window.app.grid.loadData();
           window.app.toast(isEditing
             ? 'บันทึกการแก้ไขสินค้า "' + shared['Model'] + '" สำเร็จ (' + res.skuCount + ' SKU)'
             : (res.appended
               ? 'เพิ่ม SKU ใหม่ ' + res.skuCount + ' รายการเข้าสินค้า "' + shared['Model'] + '" สำเร็จ'
               : 'เพิ่มสินค้า "' + shared['Model'] + '" (' + res.skuCount + ' SKU) สำเร็จ'));
-          await window.app.refreshGlobalData();
-          window.app.grid.loadData();
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ', 'error');
         }
@@ -499,11 +499,11 @@ window.app.productGroup = {
         window.app.hideLoading();
         if (res && res.status === 'success') {
           window.app.hideModal('bulkQuickEditModal');
-          if (res.updatedCount > 0) window.app.toast('อัปเดตราคาและสต๊อกสำเร็จ ' + res.updatedCount + ' SKU'); else window.app.toast('ไม่มีรายการที่ถูกอัปเดต (ไม่พบ SKU ในระบบ)', 'warning');
           await window.app.refreshGlobalData();
           if (window.app.grid && window.app.grid.tableName === 'Products') {
-            window.app.grid.loadData();
+            await window.app.grid.loadData();
           }
+          if (res.updatedCount > 0) window.app.toast('อัปเดตราคาและสต๊อกสำเร็จ ' + res.updatedCount + ' SKU'); else window.app.toast('ไม่มีรายการที่ถูกอัปเดต (ไม่พบ SKU ในระบบ)', 'warning');
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ', 'error');
         }
