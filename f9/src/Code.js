@@ -305,6 +305,18 @@ function looksLikePasswordHash_(value) {
 // (ล้างหลังด้วย กันผู้อ่านที่ยิงเข้ามาระหว่างเขียนแล้วเขียนค่าเก่ากลับลงแคช) — เพิ่ม action อ่านใหม่ต้องมาเพิ่มที่นี่ ไม่งั้นแค่ล้างแคชเกินจำเป็น (ปลอดภัย)
 var DASH_READ_ACTIONS_ = ['LOGIN', 'GET_ADVANCED_DASHBOARD', 'GET_TABLE', 'GET_ALL_DATA', 'GET_SETTINGS_LIST', 'NEWS_LIST', 'GET_CUSTOMER_BY_PHONE', 'GET_INVOICES', 'TRACK_ORDER', 'PUBLIC_TRACK_ORDER', 'VALIDATE_COUPON'];
 
+// GET_TABLE อ่านได้เฉพาะชีตในรายชื่อนี้ ตาม role ที่ระบุ (ตรวจฝั่ง server เสมอ) — เพิ่มชีตใหม่ที่หน้าเว็บต้องอ่านทาง GET_TABLE ต้องมาเพิ่มที่นี่
+// Orders / InventoryLog: Sales ได้เฉพาะสาขาตัวเอง, Invoices: role อื่นนอกจาก Admin/Manager ได้เฉพาะของตัวเอง (กรองใน case GET_TABLE)
+var ROLES_ALL_ = ['Admin', 'Manager', 'Sales'];
+var GET_TABLE_ROLES_ = {
+  Products: ROLES_ALL_, Branches: ROLES_ALL_, Channels: ROLES_ALL_, Promotions: ROLES_ALL_, Interests: ROLES_ALL_,
+  GiftMappings: ROLES_ALL_, AutoPromotions: ROLES_ALL_, OrderStatus: ROLES_ALL_,
+  Orders: ROLES_ALL_, InventoryLog: ROLES_ALL_, Invoices: ROLES_ALL_,
+  Target: ['Admin', 'Manager'],
+  Members: ['Admin'], Settings: ['Admin'], AuditLog: ['Admin'], OrderStatusLog: ['Admin'], Coupons: ['Admin'],
+  UI_Banners: ['Admin'], News: ['Admin'], NewsCategories: ['Admin']
+};
+
 function apiHandler(action, payload, userToken) {
   const isWrite = DASH_READ_ACTIONS_.indexOf(action) === -1;
   if (isWrite) invalidateDashboardCache_();
@@ -343,13 +355,11 @@ function apiHandlerInner_(action, payload, userToken) {
       case 'LOGIN': return doLogin_(payload.username, payload.password, ss);
       case 'GET_ADVANCED_DASHBOARD': return getAdvancedDashboard_(secureUser, ss, payload);
       case 'GET_TABLE':
-        // ตารางอ่อนไหว (ข้อมูลสมาชิก/ตั้งค่า/ประวัติระบบ) อ่านได้เฉพาะ Admin — บังคับสิทธิ์ฝั่ง server เสมอ
-        if (['Members', 'Settings', 'AuditLog', 'OrderStatusLog'].includes(payload.tableName) && secureUser.Role !== 'Admin') {
-          throw new Error("Permission Denied: Admin only");
-        }
-        // Target: หน้า Target/Analytics เปิดให้เฉพาะ Admin/Manager ใน menuConfig — ต้องบังคับฝั่ง server ด้วย ไม่งั้น Sales เรียก action นี้ตรงๆ ผ่าน console ได้
-        if (payload.tableName === 'Target' && !['Admin', 'Manager'].includes(secureUser.Role)) {
-          throw new Error("Permission Denied: Admin/Manager only");
+        // รายชื่ออนุญาตต่อ role (GET_TABLE_ROLES_) — ชีตที่ไม่อยู่ในรายชื่อ (เช่น ชีตสำรองที่สร้างด้วยมือ) อ่านทางนี้ไม่ได้เลย แม้เป็น Admin
+        {
+          const allowedRoles = Object.prototype.hasOwnProperty.call(GET_TABLE_ROLES_, payload.tableName) ? GET_TABLE_ROLES_[payload.tableName] : null;
+          if (!allowedRoles) throw new Error("Permission Denied: table not available");
+          if (allowedRoles.indexOf(secureUser.Role) === -1) throw new Error("Permission Denied: " + allowedRoles.join('/') + " only");
         }
         // Coupons: โค้ดส่วนลดเป็นความลับ — อ่านได้เฉพาะ Admin (ฝั่ง POS ตรวจโค้ดผ่าน VALIDATE_COUPON เท่านั้น)
         // AutoPromotions: Admin เปิดหน้านี้ครั้งแรกหลังอัปเดต → แปลง Active/Inactive เดิมเป็น เปิด/ปิด (idempotent)
@@ -386,7 +396,7 @@ function apiHandlerInner_(action, payload, userToken) {
           });
         }
         return { status: 'success', data: tableData };
-      case 'GET_ALL_DATA': return getAllInitialData_(ss, secureUser.Role === 'Admin');
+      case 'GET_ALL_DATA': return getAllInitialData_(ss, secureUser.Role === 'Admin', secureUser);
       case 'SAVE_RECORD': return saveRecord_(payload.tableName, payload.data, payload.idField, secureUser, ss);
       case 'DELETE_RECORDS': return deleteRecords_(payload, secureUser, ss);
       case 'BULK_SET_STATUS': return bulkSetStatus_(payload, secureUser, ss);
@@ -1004,7 +1014,19 @@ function getPopularModels_(ss, now) {
   return result;
 }
 
-function getAllInitialData_(ss, isAdmin) {
+// รายชื่อสมาชิกที่ส่งออกหน้าเว็บ (GET_ALL_DATA / Dashboard): เฉพาะ 4 ฟิลด์ที่หน้า Dashboard (ตัวเลือกพนักงาน) และ Target (ชื่อที่แสดง) ใช้จริง
+// ไม่มี Password, Accessible Menus หรือคอลัมน์อื่น — รายชื่อเต็มอ่านได้ทาง GET_TABLE Members (Admin เท่านั้น)
+var MEMBER_PUBLIC_FIELDS_ = ['Name', 'Username', 'Role', 'Branch Code'];
+function memberDirectory_(ss) {
+  return getTableDataAsJson_(ss.getSheetByName("Members")).map(m => { const o = {}; MEMBER_PUBLIC_FIELDS_.forEach(k => { o[k] = (m[k] === undefined || m[k] === null) ? '' : m[k]; }); return o; });
+}
+// Sales เห็นเฉพาะสมาชิกสาขาเดียวกับตัวเอง (เหมือนใบจอง) — ต้องกรองหลังอ่านแคชเสมอ ห้ามกรองก่อนลงแคช
+function membersForRole_(list, secureUser) {
+  if (!secureUser || secureUser.Role !== 'Sales') return list;
+  return list.filter(m => String(m['Branch Code']) === String(secureUser['Branch Code']));
+}
+
+function getAllInitialData_(ss, isAdmin, secureUser) {
   initAutoPromotionsSheet_(ss);
   ensureProductSpecColumns_(ss);
   CacheService.getScriptCache().remove("TABLE_AutoPromotions");
@@ -1061,7 +1083,7 @@ function getAllInitialData_(ss, isAdmin) {
     interests: getTableDataAsJson_(ss.getSheetByName("Interests"), isAdmin),
     giftMappings: getTableDataAsJson_(ss.getSheetByName("GiftMappings"), isAdmin),
     autoPromotions: getTableDataAsJson_(ss.getSheetByName("AutoPromotions"), isAdmin),
-    members: getTableDataAsJson_(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
+    members: membersForRole_(memberDirectory_(ss), secureUser),
     // ใช้วาด order status timeline (5A.3) — ชีตอาจไม่มีในระบบเก่า จึงต้องกัน null
     orderStatuses: ss.getSheetByName("OrderStatus") ? getTableDataAsJson_(ss.getSheetByName("OrderStatus")) : [],
     heroBanners: heroBanners,
@@ -1122,7 +1144,7 @@ function getAdvancedDashboard_(secureUser, ss, payload) {
       // Admin เห็นข้อมูลสินค้าสดเสมอ (ข้ามแคชตาราง) ตอนสร้างชุดข้อมูลใหม่
       products: getTableDataAsJson_(ss.getSheetByName("Products"), isAdmin || forceRefresh),
       // Dashboard เปิดได้ทุก role — ห้ามส่ง Password hash ออกไปหน้าบ้านเด็ดขาด (ตัดก่อนลงแคชด้วย)
-      members: getTableDataAsJson_(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
+      members: memberDirectory_(ss),
       builtAt: new Date().getTime()
     };
     try { dashCachePut_(JSON.stringify(base)); } catch (e) {}
@@ -1139,7 +1161,7 @@ function getAdvancedDashboard_(secureUser, ss, payload) {
   if (secureUser.Role === 'Sales') {
     orders = orders.filter(o => o['Branch Code'] === secureUser['Branch Code']);
   }
-  return { status: 'success', data: { orders: orders, products: base.products, members: base.members, builtAt: base.builtAt } };
+  return { status: 'success', data: { orders: orders, products: base.products, members: membersForRole_(base.members || [], secureUser), builtAt: base.builtAt } };
 }
 
 

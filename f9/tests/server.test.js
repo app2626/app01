@@ -919,6 +919,30 @@ t('Coupons: only codes with Show On Store = เปิด reach the storefront, w
 });
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
 
+console.log('== TABLE ALLOWLIST + MEMBER DIRECTORY');
+t('GET_TABLE: a sheet outside the allowlist (hand-made backup copy) cannot be read by any role, Admin included', () => {
+  const bk = ss.insertSheet('Members_backup'); bk.rows = sheets.Members.rows.map(r => r.slice());
+  try {
+    [admin, sales].forEach(u => { const r = api('GET_TABLE', { tableName: 'Members_backup' }, u); ok(r.status === 'error' && /Permission Denied/.test(r.message), JSON.stringify(r).slice(0, 160)); });
+    ['constructor', '__proto__', 'toString', '', undefined].forEach(n => eq(api('GET_TABLE', { tableName: n }, admin).status, 'error', String(n)));
+  } finally { delete sheets.Members_backup; }
+});
+t('GET_TABLE: Sales is refused the Admin tables and Target; still reads Products and its own Orders', () => {
+  ['Members', 'Settings', 'AuditLog', 'OrderStatusLog', 'Coupons', 'UI_Banners', 'News', 'NewsCategories', 'Target'].forEach(n => { const r = api('GET_TABLE', { tableName: n }, sales); ok(r.status === 'error' && /Permission Denied/.test(r.message), n + ' ' + JSON.stringify(r).slice(0, 120)); });
+  ok(tbl('Products', sales).length > 0); ok(tbl('Orders', sales).every(o => o['Branch Code'] === sales['Branch Code']));
+});
+t('member directory: GET_ALL_DATA and the dashboard send only Name/Username/Role/Branch Code; Sales gets own branch only, Admin gets everyone', () => {
+  const FIELDS = ['Branch Code', 'Name', 'Role', 'Username'];
+  const total = sheets.Members.rows.length - 1; ok(total >= 3, 'members=' + total);
+  const check = (list, who) => { ok(list.length > 0, who + ' empty'); list.forEach(m => eq(Object.keys(m).sort(), FIELDS, who)); };
+  const aAll = unwrap(api('GET_ALL_DATA', {}, admin)).members, aDash = api('GET_ADVANCED_DASHBOARD', { refresh: true }, admin).data.members;
+  check(aAll, 'admin all'); check(aDash, 'admin dash'); eq(aAll.length, total); eq(aDash.length, total);
+  const sAll = unwrap(api('GET_ALL_DATA', {}, sales)).members, sDash = api('GET_ADVANCED_DASHBOARD', {}, sales).data.members; // 2nd dashboard read = from the cache the admin built
+  check(sAll, 'sales all'); check(sDash, 'sales dash');
+  ok(sAll.length < total && sAll.every(m => m['Branch Code'] === sales['Branch Code']), 'sales sees other branches: ' + JSON.stringify(sAll.map(m => m['Branch Code'])));
+  eq(sDash.length, sAll.length); ok(sAll.some(m => m.Username === sales.Username));
+});
+
 console.log('== PUBLIC SURFACE');
 // GAS: every top-level function whose name does not end in "_" can be called by anyone with google.script.run (the app is ANYONE_ANONYMOUS).
 const PUBLIC_FUNCTIONS = ['apiHandler', 'doGet', 'getPublicConfig', 'include', 'resetMemberPasswordFromProperties', 'setupDatabase'];
