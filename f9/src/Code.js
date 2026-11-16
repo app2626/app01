@@ -2666,6 +2666,12 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
         }
       }
     }
+    // GiftMappings: เงื่อนไขที่เปิดใช้ต้องมีสินค้าเป้าหมาย + ของแถมอย่างน้อยหนึ่งช่อง (กฎเดียวกับ CSV import) — แถวที่ปิดอยู่บันทึกได้ตามเดิม
+    if (tableName === "GiftMappings" && (dataObj.Status || '').toString().trim() !== 'ปิด') {
+      const gmVal = k => (dataObj[k] === undefined || dataObj[k] === null ? '' : dataObj[k]).toString().trim();
+      if (!gmVal('Target Mobile (SKU or Group)')) throw new Error("กรุณาระบุสินค้าที่จะได้ของแถม (รุ่น / กลุ่มสินค้า / SKU หรือ * = ทุกรุ่น)");
+      if (!gmVal('Brand Gifts') && !GIFT_SET_COLS_.some(c => gmVal(c))) throw new Error("กรุณาเลือกของแถมแบรนด์ หรือของแถมช่องทางอย่างน้อยหนึ่งรายการ");
+    }
     // Members: สาขาต้องมีจริงในชีต Branches (หรือ ALL) และ Manager/Sales ห้ามว่าง — เดิมเป็นช่องพิมพ์อิสระ พิมพ์ผิดแล้วพนักงานล็อกอินได้แต่ไม่เห็นสาขา
     // ค่าที่ไม่ได้เปลี่ยนจากที่เก็บอยู่ไม่ตรวจซ้ำ (แถวเก่าที่รหัสสาขาถูกลบไปแล้วยังแก้ชื่อ/รหัสผ่านได้)
     if (tableName === "Members") {

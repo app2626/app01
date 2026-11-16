@@ -649,7 +649,7 @@ window.app.pos = {
         if (m.Status !== 'เปิด') return false;
         const mCh = (m.Channel || '').trim().toLowerCase();
         const mChTokens = mCh.split(',').map(v => v.trim()).filter(Boolean);
-        const chMatch = (mCh === 'all' || mCh === '' || !chLower || mChTokens.includes(chLower));
+        const chMatch = (mCh === 'all' || mCh === '*' || mCh === '' || !chLower || mChTokens.includes(chLower));
         if (!chMatch) return false;
 
         const target = (m['Target Mobile (SKU or Group)'] || '').trim();
@@ -2689,7 +2689,7 @@ window.app.pos = {
           // ไม่งั้น mapping ที่เลือกหลายช่องทางจะโชว์ให้เลือกได้ที่นี่ แต่ server ปฏิเสธตอน checkout (ไม่ตรงกัน)
           const mCh = (m.Channel || '').trim().toLowerCase();
           const mChTokens = mCh.split(',').map(v => v.trim()).filter(Boolean);
-          const chMatch = (mCh === 'all' || mCh === '' || mChTokens.includes(currentChannel.toLowerCase()));
+          const chMatch = (mCh === 'all' || mCh === '*' || mCh === '' || mChTokens.includes(currentChannel.toLowerCase())); // '*' = ทุกช่องทาง เหมือน server
           if(!chMatch) return false;
 
           const target = (m['Target Mobile (SKU or Group)'] || '').trim();

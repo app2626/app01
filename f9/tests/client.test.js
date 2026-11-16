@@ -1302,6 +1302,11 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     eq(new Set(r.bOpts.map(v => v.toLowerCase())).size, r.bOpts.length, 'no duplicate options: ' + r.bOpts.join('|'));
     eq(r.cOn, ['Bag']);
     await closeForm();
+    const c = JSON.parse(await ev("(()=>{const G=window.app.grid;G.openForm({'Mapping ID':'GM-T2','Target Mobile (SKU or Group)':'*',Channel:'Retail, Gone Channel','Brand Gifts':'zz-nothing','Channel Gifts':'','Channel Gifts 2':'','Channel Gifts 3':'',Status:'เปิด'});const lab=k=>[...document.querySelectorAll('.chk-group-'+k)].map(x=>x.value+'='+x.closest('label').textContent.trim().replace(/\s+/g,' '));const on=k=>[...document.querySelectorAll('.chk-group-'+k+':checked')].map(x=>x.value);return JSON.stringify({chOn:on('Channel'),bLab:lab('BrandGifts')})})()"));
+    eq(c.chOn.slice().sort(), ['Gone Channel', 'Retail'], 'a stored channel that no branch uses must stay ticked (dropping it = every channel)');
+    ok(c.bLab.some(x => /^zz-nothing=.*ไม่ตรงกับของแถมใดเลย/.test(x)), 'dead gift value is flagged: ' + c.bLab.join(' | '));
+    ok(c.bLab.some(x => /\(\d+ รายการ\)$/.test(x)), 'group options show how many gifts they cover: ' + c.bLab.join(' | '));
+    await closeForm();
   });
   await T('system tab holds the technical cards (webhook, cache, drive, collapsed Auto Setup); booking tab keeps only booking fields', async () => {
     await ev("window.location.hash='#systemsettings';true"); await sleep(1500);

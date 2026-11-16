@@ -160,6 +160,15 @@ t('CHECKOUT gift lists can name a gift Product Group (exact, case-insensitive), 
     eq(run().status, 'error', 'unrelated group must not allow the gift');
   } finally { prow[gi] = oldG; row[bi] = oldB; cache.remove('TABLE_GiftMappings'); cache.remove('TABLE_Products'); }
 });
+t('GiftMappings save: an open rule needs a target and at least one gift; a closed rule can still be saved', () => {
+  const n = sheets.GiftMappings.rows.length;
+  const save = (d) => api('SAVE_RECORD', { tableName: 'GiftMappings', idField: 'Mapping ID', data: Object.assign({ 'Mapping ID': 'GM-VAL', Channel: '', 'Brand Gifts': '', 'Channel Gifts': '', 'Channel Gifts 2': '', 'Channel Gifts 3': '', Status: 'เปิด' }, d) }, admin);
+  eq(save({ 'Target Mobile (SKU or Group)': '', 'Brand Gifts': 'Adapter' }).status, 'error', 'no target');
+  eq(save({ 'Target Mobile (SKU or Group)': '*' }).status, 'error', 'no gift');
+  eq(sheets.GiftMappings.rows.length, n, 'nothing written');
+  ok(save({ 'Target Mobile (SKU or Group)': '', Status: 'ปิด' }).status !== 'error', 'closed rule allowed');
+  const i = sheets.GiftMappings.rows.findIndex(r => r[0] === 'GM-VAL'); ok(i > 0, 'closed rule saved'); sheets.GiftMappings.rows.splice(i, 1); cache.remove('TABLE_GiftMappings');
+});
 t('GiftMappings: set 2/3 columns are moved/inserted right after Channel Gifts, data follows, system still works', () => {
   const gm = sheets.GiftMappings, keep = gm.rows.map(r => r.slice());
   const col = n => gm.rows[0].indexOf(n);

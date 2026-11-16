@@ -484,6 +484,8 @@ window.app.grid = {
             let opts = [];
             if(c.type === 'multi_select_channel') {
                 opts = window.app.channelNames().map(n => ({id: n, label: n}));
+                // ช่องทางที่บันทึกไว้แต่ไม่มีในรายการแล้ว (สะกดต่าง / ช่องทางถูกลบ) ต้องยังติ๊กอยู่ — ถ้าหายไปเฉยๆ บันทึกแล้วช่องนี้ว่าง = ใช้กับทุกช่องทาง
+                currentVals.filter(v => v && v !== allVal && v !== '*' && !opts.some(o => o.id.toLowerCase() === v.toLowerCase())).forEach(v => opts.unshift({id: v, label: v + ' (ค่าเดิม - ไม่มีสาขาใช้ช่องทางนี้)'}));
             } else if (c.type === 'multi_select_menu') {
                 // ข้ามแถวหัวข้อ (isCategory) ที่ไม่มี id — ถ้าหลุดเข้า opts จะทำ opt.id.toLowerCase() พังทั้งฟอร์ม (ปุ่มแก้ไข Members เงียบ)
                 // ข้าม 'systemsettings' เสมอ — saveSettingsItem/deleteSettingsItem/uploadImage ล็อก Admin-only ทุกจุดไม่มีข้อยกเว้น
@@ -502,12 +504,15 @@ window.app.grid = {
                 // เคยเทียบแบบ substring กับ Product Name แล้วบันทึกกลับเป็นชื่อสินค้าทุกตัวที่ตรง — ค่า Product Group ที่ตั้งไว้กลายเป็น Product Name หลังกดแก้ไข
                 let targetCat = c.type === 'multi_select_brand_gifts' ? 'ของแถมแบรนด์' : 'ของแถมช่องทาง';
                 const seenG = {};
-                window.app.globalData.products.filter(p => p.Category === targetCat && p.Status === 'เปิด').forEach(p => {
+                const giftProds = window.app.globalData.products.filter(p => p.Category === targetCat && p.Status === 'เปิด');
+                // ป้ายบอกจำนวนของแถมที่ค่านั้นครอบคลุม (กฎเดียวกับหน้าร้าน pos.giftMatch) — ค่าเดิมที่ตรงกับ 0 รายการ = ไม่มีผลแล้ว ควรเอาออก
+                const giftCount = v => giftProds.filter(p => window.app.pos.giftMatch([String(v).trim().toLowerCase()], p)).length;
+                giftProds.forEach(p => {
                     const g = String(p['Product Group'] || '').trim() || String(p['Product Name'] || '').trim();
-                    if (g && !seenG[g.toLowerCase()]) { seenG[g.toLowerCase()] = true; opts.push({id: g, label: window.app.titleCaseName(g)}); }
+                    if (g && !seenG[g.toLowerCase()]) { seenG[g.toLowerCase()] = true; opts.push({id: g, label: window.app.titleCaseName(g) + ' (' + giftCount(g) + ' รายการ)'}); }
                 });
                 opts.sort((a, b) => a.label.localeCompare(b.label, 'th'));
-                currentVals.filter(v => v && v !== allVal && !seenG[v.toLowerCase()]).forEach(v => { seenG[v.toLowerCase()] = true; opts.unshift({id: v, label: v + ' (ค่าเดิม)'}); });
+                currentVals.filter(v => v && v !== allVal && !seenG[v.toLowerCase()]).forEach(v => { seenG[v.toLowerCase()] = true; const n = giftCount(v); opts.unshift({id: v, label: v + (n ? ' (ค่าเดิม - ตรงกับ ' + n + ' รายการ)' : ' (ค่าเดิม - ไม่ตรงกับของแถมใดเลย)')}); });
             }
             
             inp = `<div class="fm-checks max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 mt-1 shadow-inner">`;
@@ -729,6 +734,17 @@ window.app.grid = {
       // ส่ง _rowIndex ของแถวเดิมไปด้วยตอนแก้ไข (ไม่ใช่ Orders — มี field '_rowIndex' hidden ของตัวเองอยู่แล้วในคอลัมน์ config) ให้ saveRecord (Code.js)
       // ใช้ชี้แถวที่จะอัปเดตตรงๆ แทนการไล่เทียบค่า ID เฉยๆ — กันกรณี ID ที่พิมพ์แก้ไขบังเอิญไปชนกับแถวอื่น
       if (this.editingData && this.tableName !== 'Orders') pay._rowIndex = this.editingData._rowIndex;
+
+      // เงื่อนไขของแถมที่เปิดใช้ต้องมีสินค้าเป้าหมายและของแถมอย่างน้อยหนึ่งช่อง — ไม่งั้นบันทึกได้แต่ไม่มีผลอะไรเลย (server ตรวจซ้ำใน saveRecord)
+      if (this.tableName === 'GiftMappings' && pay.Status !== 'ปิด') {
+        const noTarget = !String(pay['Target Mobile (SKU or Group)'] || '').trim();
+        const noGift = !['Brand Gifts', 'Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3'].some(k => String(pay[k] || '').trim());
+        if (noTarget || noGift) {
+          restoreBtn();
+          Swal.fire(noTarget ? 'ยังไม่ได้ระบุสินค้า' : 'ยังไม่ได้เลือกของแถม', noTarget ? 'ใส่รุ่น กลุ่มสินค้า หรือ SKU ที่จะได้ของแถม (หรือ * = ทุกรุ่น)' : 'เลือกของแถมแบรนด์ หรือของแถมช่องทางอย่างน้อยหนึ่งรายการ', 'warning');
+          return;
+        }
+      }
 
       // ผู้ใช้งานที่ไม่ใช่ Admin ต้องมีสาขา (หรือ ALL) — ตรวจก่อนปิดฟอร์ม ไม่งั้นข้อความ error จาก server มาหลังฟอร์มปิดและค่าที่กรอกหาย (server ตรวจซ้ำใน saveRecord)
       if (this.tableName === 'Members' && pay.Role !== 'Admin' && !String(pay['Branch Code'] || '').trim()) {
