@@ -206,6 +206,37 @@ t('TRACK_ORDER shows deposit for จอง T order', () => { const tRow = sheets
 t('PUBLIC_TRACK_ORDER correct phone', () => { const r = api('PUBLIC_TRACK_ORDER', { orderId: oid, phone: '0812345678' }, null); eq(r.status, 'success', JSON.stringify(r).slice(0, 200)); });
 t('PUBLIC_TRACK_ORDER wrong phone => no data/PII', () => { const r = api('PUBLIC_TRACK_ORDER', { orderId: oid, phone: '0000000000' }, null); ok(r.status === 'error' && !/1234567890123|ลูกค้าทดสอบ/.test(JSON.stringify(r)), JSON.stringify(r).slice(0, 200)); });
 t('PUBLIC_TRACK_ORDER masks PII on success', () => { const r = api('PUBLIC_TRACK_ORDER', { orderId: oid, phone: '0812345678' }, null); ok(!/1234567890123/.test(JSON.stringify(r)) && !/0812345678/.test(JSON.stringify(r)), 'unmasked PII in ' + JSON.stringify(r).slice(0, 300)); });
+const pubTrack = (o, p) => api('PUBLIC_TRACK_ORDER', { orderId: o, phone: p }, null);
+const clearTrackLimits = () => { cache.remove('TRACK_FAIL_ALL'); cache.remove('TRACK_FAIL_' + String(oid).toUpperCase()); };
+t('PUBLIC_TRACK_ORDER: no phone or fewer than 4 digits always asks for the phone, for a real and an unknown order alike', () => {
+  ['', '8', '678', 'ab-1'].forEach(p => { eq(pubTrack(oid, p).status, 'require_phone', 'real/' + p); eq(pubTrack('ORD-000000-999', p).status, 'require_phone', 'unknown/' + p); });
+  ok(!/items|customerName/.test(JSON.stringify(pubTrack(oid, '8'))));
+});
+t('PUBLIC_TRACK_ORDER: last 4 digits open it; result has no remark; unknown order and wrong phone answer the same message', () => {
+  clearTrackLimits();
+  const r = pubTrack(oid, '5678'); eq(r.status, 'success', JSON.stringify(r).slice(0, 200)); ok(!('remark' in r.order), 'remark leaked'); ok(r.order.items.length >= 1);
+  const a = pubTrack(oid, '0000'), b = pubTrack('ORD-000000-999', '5678'); eq(a.status, 'error'); eq(a.message, b.message);
+  eq(pubTrack('ORD-1"><x', '5678').status, 'error');
+  clearTrackLimits();
+});
+t('PUBLIC_TRACK_ORDER: 5 wrong phones lock that order (even the right phone), a correct answer before that resets the count', () => {
+  clearTrackLimits();
+  for (let i = 0; i < 4; i++) eq(pubTrack(oid, '000' + i).status, 'error');
+  eq(pubTrack(oid, '5678').status, 'success', 'right phone after 4 fails'); eq(cache.get('TRACK_FAIL_' + String(oid).toUpperCase()), null);
+  for (let i = 0; i < 5; i++) pubTrack(oid, '111' + i);
+  const locked = pubTrack(oid, '5678'); ok(locked.status === 'error' && /15 นาที/.test(locked.message), JSON.stringify(locked));
+  clearTrackLimits(); eq(pubTrack(oid, '5678').status, 'success');
+});
+t('PUBLIC_TRACK_ORDER: too many failures overall closes public tracking for a while', () => {
+  clearTrackLimits(); cache.put('TRACK_FAIL_ALL', String(ctx.PUBLIC_TRACK_GLOBAL_MAX_));
+  const r = pubTrack(oid, '5678'); ok(r.status === 'error' && /ปิดชั่วคราว/.test(r.message), JSON.stringify(r));
+  clearTrackLimits(); eq(pubTrack(oid, '5678').status, 'success');
+});
+t('PUBLIC_TRACK_ORDER: an order saved without a phone cannot be opened from the public page', () => {
+  const h = ctx.ORDERS_HEADERS_, row = sheets.Orders.rows.find((r, i) => i > 0 && r[0] === oid), keep = row[h.indexOf('Contact Number')];
+  try { row[h.indexOf('Contact Number')] = ''; eq(pubTrack(oid, '5678').status, 'error'); eq(pubTrack(oid, '').status, 'require_phone'); }
+  finally { row[h.indexOf('Contact Number')] = keep; clearTrackLimits(); }
+});
 t('GET_CUSTOMER_BY_PHONE', () => { const r = api('GET_CUSTOMER_BY_PHONE', { phone: '0812345678' }, sales); ok(r && r.status !== 'error', JSON.stringify(r).slice(0, 200)); });
 t('UPDATE_FULL_ORDER (admin) sets status', () => { const r = api('UPDATE_FULL_ORDER', { data: { _rowIndex: 2, 'Order Status': 'Confirmed' } }, admin); ok(r && r.status !== 'error', JSON.stringify(r).slice(0, 200)); });
 t('UPDATE_FULL_ORDER by Sales blocked', () => eq(api('UPDATE_FULL_ORDER', { data: { _rowIndex: 2, 'Order Status': 'Confirmed' } }, sales).status, 'error'));

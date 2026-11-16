@@ -1708,10 +1708,35 @@ function trackOrderLookup_(payload, secureUser, ss) {
 
 // 4.1 ระบบติดตามสถานะคำสั่งจอง & บัตรรับเครื่องดิจิทัลสำหรับลูกค้า (Public Booking Tracking & Digital Pass)
 // ปลอดภัยตามมาตรฐาน PDPA: ค้นหาด้วย Order ID + ตรวจสอบเบอร์โทร 4 ตัวท้าย (หรือเบอร์เต็ม) และ Mask ข้อมูลส่วนตัว
+// กันเดา (2026-11-17): ต้องส่งเบอร์โทรอย่างน้อย 4 หลักท้ายเสมอ (ใบจองที่ไม่มีเบอร์ = เปิดดูทางนี้ไม่ได้), ผิดเกิน PUBLIC_TRACK_MAX_FAILS_ ครั้ง
+// ต่อเลขใบจองใน 15 นาที = ล็อกเลขนั้นชั่วคราว, ผิดรวมทั้งระบบเกิน PUBLIC_TRACK_GLOBAL_MAX_ ใน 10 นาที = ปิดช่องนี้ชั่วคราว (GAS ไม่เห็น IP ผู้เรียก
+// จึงนับต่อผู้เรียกไม่ได้), "ไม่พบใบจอง" กับ "เบอร์ไม่ตรง" ตอบข้อความเดียวกัน และไม่ส่ง Remark ออกไป
+var PUBLIC_TRACK_MAX_FAILS_ = 5;
+var PUBLIC_TRACK_FAIL_TTL_ = 900;
+var PUBLIC_TRACK_GLOBAL_MAX_ = 100;
+var PUBLIC_TRACK_GLOBAL_TTL_ = 600;
+var PUBLIC_TRACK_NOT_FOUND_MSG_ = "ไม่พบใบจอง หรือเบอร์โทรศัพท์ไม่ตรงกับใบจองนี้ กรุณาตรวจสอบเลขที่ใบจองและเบอร์ 4 ตัวท้าย";
 function publicTrackOrderLookup_(payload, ss) {
   const orderId = ((payload && payload.orderId) ? payload.orderId : '').toString().trim();
   const phone = ((payload && payload.phone) ? payload.phone : '').toString().trim();
   if (!orderId) throw new Error("กรุณาระบุเลขที่ใบจอง (Order ID)");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(orderId)) return { status: 'error', message: PUBLIC_TRACK_NOT_FOUND_MSG_ };
+  // ยังไม่ส่งเบอร์ (หรือสั้นกว่า 4 หลัก) = ขอเบอร์ก่อนเสมอ โดยไม่อ่านชีต — จึงไม่บอกว่าเลขใบจองนี้มีอยู่จริงหรือไม่
+  if (phone.replace(/\D/g, '').length < 4) {
+    return { status: 'require_phone', orderId: orderId, message: "เพื่อความปลอดภัยของข้อมูล กรุณาระบุเบอร์โทรศัพท์ 4 ตัวท้ายที่ใช้สั่งจอง" };
+  }
+  const rlCache = CacheService.getScriptCache();
+  const rlKey = 'TRACK_FAIL_' + orderId.toUpperCase();
+  const rlGlobalKey = 'TRACK_FAIL_ALL';
+  const failCount = parseInt(rlCache.get(rlKey) || '0', 10);
+  const globalFails = parseInt(rlCache.get(rlGlobalKey) || '0', 10);
+  if (failCount >= PUBLIC_TRACK_MAX_FAILS_) return { status: 'error', message: "ตรวจสอบใบจองนี้ผิดเกินกำหนด กรุณารอ 15 นาทีแล้วลองใหม่ หรือติดต่อสาขาที่ทำการจอง" };
+  if (globalFails >= PUBLIC_TRACK_GLOBAL_MAX_) return { status: 'error', message: "ระบบติดตามใบจองปิดชั่วคราว กรุณาลองใหม่ในอีก 10 นาที หรือติดต่อสาขาที่ทำการจอง" };
+  const trackFail = () => {
+    rlCache.put(rlKey, String(failCount + 1), PUBLIC_TRACK_FAIL_TTL_);
+    rlCache.put(rlGlobalKey, String(globalFails + 1), PUBLIC_TRACK_GLOBAL_TTL_);
+    return { status: 'error', message: PUBLIC_TRACK_NOT_FOUND_MSG_ };
+  };
 
   const sheet = ss.getSheetByName("Orders");
   if (!sheet) return { status: 'error', message: "ไม่พบข้อมูลใบจองในระบบ" };
@@ -1723,7 +1748,7 @@ function publicTrackOrderLookup_(payload, ss) {
   const oIdIdx = idx("OrderID"), tsIdx = idx("Timestamp"), chIdx = idx("Channel"), brIdx = idx("Branch Code");
   const cNameIdx = idx("Customer Name"), phoneIdx = idx("Contact Number"), skuIdx = idx("SKU");
   const prodIdx = idx("Product Name"), qtyIdx = idx("Qty"), priceIdx = idx("Unit Price");
-  const netIdx = idx("Row Total"), stIdx = idx("Order Status"), remIdx = idx("Remark");
+  const netIdx = idx("Row Total"), stIdx = idx("Order Status");
   const depIdx = idx("Deposit"), pickDateIdx = idx("Pickup Date");
 
   const qOrderUpper = orderId.toUpperCase();
@@ -1731,23 +1756,19 @@ function publicTrackOrderLookup_(payload, ss) {
 
   let matched = false;
   let orderData = null;
+  // เบอร์โทรอยู่เฉพาะแถวแรกของใบจอง — ใช้ค่าแรกที่ไม่ว่าง แล้วตรวจให้ผ่านก่อนสร้างผลลัพธ์ใดๆ
+  const orderRowsIdx = [];
   let storedPhoneDigits = '';
-
   for (let i = 1; i < data.length; i++) {
-    const row = data[i];
+    if ((data[i][oIdIdx] || '').toString().trim().toUpperCase() !== qOrderUpper) continue;
+    orderRowsIdx.push(i);
+    if (!storedPhoneDigits && phoneIdx > -1) storedPhoneDigits = deobfuscate_((data[i][phoneIdx] || '').toString().trim()).replace(/\D/g, '');
+  }
+  if (!orderRowsIdx.length || storedPhoneDigits.length < 4 || !storedPhoneDigits.endsWith(phoneDigits)) return trackFail();
+
+  for (let k = 0; k < orderRowsIdx.length; k++) {
+    const row = data[orderRowsIdx[k]];
     const oid = (row[oIdIdx] || '').toString().trim();
-    if (oid.toUpperCase() !== qOrderUpper) continue;
-
-    const rawPhone = phoneIdx > -1 ? deobfuscate_((row[phoneIdx] || '').toString().trim()) : '';
-    storedPhoneDigits = rawPhone.replace(/\D/g, '');
-
-    // หากมีการระบุเบอร์โทรมาด้วย ต้องตรงกันอย่างน้อย 4 ตัวท้าย
-    if (phoneDigits) {
-      const matchPhone = storedPhoneDigits.endsWith(phoneDigits) || storedPhoneDigits === phoneDigits;
-      if (!matchPhone) {
-        return { status: 'error', message: "เบอร์โทรศัพท์ไม่ตรงกับข้อมูลใบจองนี้ กรุณาตรวจสอบเบอร์ 4 ตัวท้าย" };
-      }
-    }
 
     if (!orderData) {
       matched = true;
@@ -1775,7 +1796,6 @@ function publicTrackOrderLookup_(payload, ss) {
         maskedPhone: maskedPhone,
         status: stIdx > -1 ? (row[stIdx] || 'Pending') : 'Pending',
         deposit: depIdx > -1 ? (parseFloat(String(row[depIdx] || '0').replace(/,/g, '')) || 0) : 0,
-        remark: remIdx > -1 ? row[remIdx] : '',
         netTotal: 0,
         items: [],
         gifts: [],
@@ -1798,18 +1818,8 @@ function publicTrackOrderLookup_(payload, ss) {
     }
   }
 
-  if (!matched || !orderData) {
-    return { status: 'error', message: "ไม่พบข้อมูลใบจองตามเลขที่ \"" + orderId + "\" กรุณาตรวจสอบความถูกต้อง" };
-  }
-
-  // หากไม่ได้ระบุเบอร์โทรมา และในออเดอร์มีเบอร์โทร ให้แจ้งเตือนให้ระบุเบอร์ 4 ตัวท้ายเพื่อความปลอดภัย
-  if (!phoneDigits && storedPhoneDigits && storedPhoneDigits.length >= 4) {
-    return { 
-      status: 'require_phone', 
-      orderId: orderData.orderId, 
-      message: "เพื่อความปลอดภัยของข้อมูล กรุณาระบุเบอร์โทรศัพท์ 4 ตัวท้ายที่ใช้สั่งจอง" 
-    };
-  }
+  if (!matched || !orderData) return trackFail();
+  rlCache.remove(rlKey); // ยืนยันถูก — ล้างตัวนับของใบจองนี้
 
   // คำนวณยอดคงเหลือชำระหน้าร้าน
   orderData.balanceDue = Math.max(0, orderData.netTotal - orderData.deposit);
