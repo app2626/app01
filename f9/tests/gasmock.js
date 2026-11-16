@@ -55,6 +55,7 @@ const ctx = {
     computeDigest: (a, s) => Array.from(crypto.createHash('sha256').update(s, 'utf8').digest()).map(b => (b > 127 ? b - 256 : b)),
     computeHmacSha256Signature: (v, k) => Array.from(crypto.createHmac('sha256', Array.isArray(k) ? Buffer.from(k.map(b => b & 255)) : k).update(Array.isArray(v) ? Buffer.from(v.map(b => b & 255)) : v).digest()).map(b => (b > 127 ? b - 256 : b)),
     base64EncodeWebSafe: x => (Array.isArray(x) ? Buffer.from(x.map(b => (b < 0 ? b + 256 : b))) : Buffer.from(String(x))).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
+    base64Decode: s => Array.from(Buffer.from(String(s), 'base64')).map(b => (b > 127 ? b - 256 : b)),
     base64DecodeWebSafe: s => toBytes(Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('binary')).map(b => b),
     newBlob: s => ({ getBytes: () => toBytes(s), getDataAsString: () => Buffer.from(s.map ? s.map(b => (b < 0 ? b + 256 : b)) : s).toString('utf8') }),
     getUuid: () => crypto.randomUUID(),

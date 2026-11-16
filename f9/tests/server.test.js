@@ -920,6 +920,44 @@ t('Coupons: only codes with Show On Store = เปิด reach the storefront, w
 });
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
 
+console.log('== CHECKOUT WRITE ORDER / UPLOAD TYPE / AUDIT TEXT / CACHE');
+// makes every setValues on that sheet throw while fn runs (a write that fails half-way through checkout)
+const failWrites = (sheetName, fn) => { const sh = sheets[sheetName], orig = sh.getRange; sh.getRange = function () { const rg = orig.apply(sh, arguments); rg.setValues = () => { throw new Error('simulated write failure: ' + sheetName); }; return rg; }; try { return fn(); } finally { delete sh.getRange; } };
+t('CHECKOUT: when the Orders write fails the stock goes back to what it was and nothing else is written', () => {
+  const stock = stockOf('SKU-S24U'), nOrders = sheets.Orders.rows.length, nInv = sheets.InventoryLog.rows.length;
+  const r = failWrites('Orders', () => api('CHECKOUT', co(), sales));
+  ok(r.status === 'error' && /simulated write failure/.test(r.message), JSON.stringify(r).slice(0, 200));
+  eq(stockOf('SKU-S24U'), stock, 'stock restored'); eq(sheets.Orders.rows.length, nOrders, 'no order rows'); eq(sheets.InventoryLog.rows.length, nInv, 'no inventory rows');
+  const again = api('CHECKOUT', co(), sales); eq(again.status, 'success', JSON.stringify(again)); eq(stockOf('SKU-S24U'), stock - 1, 'a later checkout works normally');
+});
+t('CHECKOUT: an InventoryLog write failure does not fail the saved order; it is recorded in AuditLog', () => {
+  const stock = stockOf('SKU-S24U'), nOrders = sheets.Orders.rows.length;
+  const r = failWrites('InventoryLog', () => api('CHECKOUT', co(), sales));
+  eq(r.status, 'success', JSON.stringify(r).slice(0, 200)); eq(stockOf('SKU-S24U'), stock - 1); ok(sheets.Orders.rows.length > nOrders);
+  ok(sheets.AuditLog.rows.some(a => a[3] === 'CHECKOUT_WARN' && String(a[4]).includes(r.orderId)), 'no CHECKOUT_WARN row');
+});
+t('UPLOAD_IMAGE: only jpg/png/webp/gif, and the bytes must really be that type (svg and renamed files refused before Drive is touched)', () => {
+  const b64 = a => Buffer.from(a).toString('base64');
+  const pngHead = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 73, 72, 68, 82];
+  const up = (mime, bytes, u) => api('UPLOAD_IMAGE', { fileName: 'a.png', mimeType: mime, base64Data: b64(bytes) }, u || admin);
+  ok(/Admin only/.test(up('image/png', pngHead, sales).message));
+  ['image/svg+xml', 'text/html', 'image/x-icon', 'application/pdf', ''].forEach(m => { const r = up(m, pngHead); ok(r.status === 'error' && /jpg, png, webp/.test(r.message), m + ' ' + JSON.stringify(r)); });
+  const fake = up('image/png', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>')); ok(fake.status === 'error' && /เนื้อไฟล์ไม่ใช่รูปภาพ/.test(fake.message), JSON.stringify(fake));
+  ok(/เนื้อไฟล์ไม่ใช่รูปภาพ/.test(up('image/jpeg', pngHead).message), 'png bytes sent as jpeg');
+  ok(ctx.imageBytesMatch_(pngHead.map(b => (b > 127 ? b - 256 : b)), 'image/png') && ctx.imageBytesMatch_([0xFF, 0xD8, 0xFF, 0xE0, 0, 16, 74, 70, 73, 70, 0, 1], 'image/jpeg') && ctx.imageBytesMatch_(Array.from(Buffer.from('GIF89a------')), 'image/gif') && ctx.imageBytesMatch_(Array.from(Buffer.from('RIFF1234WEBPVP8 ')), 'image/webp'));
+  ok(!ctx.imageBytesMatch_(Array.from(Buffer.from('RIFF1234WAVEfmt ')), 'image/webp') && !ctx.imageBytesMatch_([0xFF, 0xD8], 'image/jpeg'));
+});
+t('AuditLog: text that starts with = + - @ is stored as text, not as a formula', () => {
+  ctx.logAudit_('=HYPERLINK("x")', '+ACT', '@details -1'); const row = sheets.AuditLog.rows[sheets.AuditLog.rows.length - 1];
+  eq(row.slice(2, 5), ["'=HYPERLINK(\"x\")", "'+ACT", "'@details -1"]);
+});
+t('GET_ALL_DATA no longer clears the Branches / AutoPromotions table cache on every call', () => {
+  unwrap(api('GET_ALL_DATA', {}, sales)); cache.put('TABLE_Branches', cache.get('TABLE_Branches') || '[]'); cache.put('TABLE_AutoPromotions', cache.get('TABLE_AutoPromotions') || '[]');
+  unwrap(api('GET_ALL_DATA', {}, sales)); unwrap(api('GET_ALL_DATA', {}, admin));
+  ok(cache.get('TABLE_Branches') !== null && cache.get('TABLE_AutoPromotions') !== null, 'cache was cleared');
+  cache.remove('TABLE_Branches'); cache.remove('TABLE_AutoPromotions');
+});
+
 console.log('== PASSWORD STORAGE');
 t('pbkdf2Hex_ equals Node crypto.pbkdf2Sync (ASCII and Thai passwords)', () => {
   [['Pass1234!', '00112233445566778899aabbccddeeff', 1], ['Pass1234!', 'a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5', 7], ['รหัสผ่านไทย 99', 'ffffffffffffffffffffffffffffffff', 300]].forEach(c => eq(ctx.pbkdf2Hex_(c[0], c[1], c[2]), crypto.pbkdf2Sync(c[0], c[1], c[2], 32, 'sha256').toString('hex'), c.join('|')));

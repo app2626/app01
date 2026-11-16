@@ -310,7 +310,8 @@ function sanitizeSheetText_(value) {
 function logAudit_(user, action, details) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("AuditLog");
-  if(sheet) sheet.appendRow([generateId_('LOG'), new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}), user, action, details]);
+  // user/action/details อาจมีข้อความจากผู้ใช้ (username ที่พิมพ์ตอน login, ชื่อ/ID ที่บันทึก) — กันขึ้นต้นด้วย = + - @ กลายเป็นสูตร
+  if(sheet) sheet.appendRow([generateId_('LOG'), new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}), sanitizeSheetText_(user), sanitizeSheetText_(action), sanitizeSheetText_(details)]);
 }
 
 // คืนค่า config สาธารณะที่หน้า login ต้องใช้ (เรียกได้โดยไม่ต้อง login) — ต้องไม่มีข้อมูลอ่อนไหวปนมาเด็ดขาด
@@ -1082,9 +1083,14 @@ function membersForRole_(list, secureUser) {
 
 function getAllInitialData_(ss, isAdmin, secureUser) {
   initAutoPromotionsSheet_(ss);
-  ensureProductSpecColumns_(ss);
-  CacheService.getScriptCache().remove("TABLE_AutoPromotions");
-  CacheService.getScriptCache().remove("TABLE_Branches");
+  // เติมคอลัมน์สเปคที่ขาดของชีต Products: ทำเฉพาะตอน Admin โหลด และอยู่ใน lock (เดิมทำทุกครั้งทุก role โดยไม่มี lock — เขียนชีตชนกับการจองได้)
+  // ได้ lock ไม่ทัน = ข้ามไปก่อน รอบหน้าค่อยเติม; และไม่ล้างแคช AutoPromotions/Branches ทุกครั้งอีกแล้ว (ทุกจุดที่เขียนสองตารางนี้ล้างแคชเองอยู่แล้ว)
+  if (isAdmin) {
+    const specLock = LockService.getScriptLock();
+    let gotSpecLock = false;
+    try { gotSpecLock = specLock.tryLock(3000); } catch (e) { gotSpecLock = false; }
+    if (gotSpecLock) { try { ensureProductSpecColumns_(ss); } finally { specLock.releaseLock(); } }
+  }
 
   let heroBanners = [];
   let gridBanners = [];
@@ -1368,7 +1374,7 @@ function processCheckout_(payload, secureUser, ss) {
       let itemCat = '';
       let foundMain = false;
       for(let i=1; i<prodData.length; i++) {
-        if(prodData[i][skuIdx] == item.SKU) {
+        if(String(prodData[i][skuIdx]) === String(item.SKU)) {
           let currentStock = parseInt(prodData[i][stockIdx] || 0);
           if (!Number.isInteger(currentStock) || currentStock < 0) throw new Error("Invalid stock value for SKU: " + item.SKU);
           if(currentStock < qty) throw new Error("สินค้า " + prodData[i][nameIdx] + " สต๊อกไม่พอ (เหลือ " + currentStock + ")");
@@ -1383,7 +1389,7 @@ function processCheckout_(payload, secureUser, ss) {
       if(!foundMain) throw new Error("ไม่พบสินค้า SKU: " + item.SKU);
 
       const allowedGifts = { brand: [], channel: [], channelSets: GIFT_SET_COLS_.map(() => []) };
-      const mainProductRow = prodData.find(r => r[skuIdx] == item.SKU) || [];
+      const mainProductRow = prodData.find(r => String(r[skuIdx]) === String(item.SKU)) || [];
       const groupIdx = headers.indexOf("Product Group");
       const addGiftNames = (value, target) => (value || '').toString().split(',').map(v => v.trim().toLowerCase()).filter(Boolean).forEach(v => target.push(v));
       giftMappings.forEach(mapping => {
@@ -1607,14 +1613,18 @@ function processCheckout_(payload, secureUser, ss) {
     for (let i = 1; i < prodData.length; i++) {
        newStocks.push([prodData[i][stockIdx]]);
     }
+    // ลำดับการเขียน (2026-11-17): ตัดสต๊อก → เขียนใบจอง → เขียน InventoryLog
+    // ถ้าเขียนใบจองไม่สำเร็จ คืนสต๊อกเป็นค่าก่อนตัดทันที (เดิม: สต๊อกถูกตัดไปแล้วแต่ไม่มีใบจอง)
+    // InventoryLog เขียนหลังสุดและพังได้โดยไม่ทำให้การจองล้ม (ใบจองบันทึกแล้ว — ถ้าตอบ error ผู้ใช้จะกดจองซ้ำ)
+    let stockBackup = null;
     if (newStocks.length > 0) {
-      prodSheet.getRange(2, stockIdx + 1, newStocks.length, 1).setValues(newStocks);
+      const stockRange = prodSheet.getRange(2, stockIdx + 1, newStocks.length, 1);
+      stockBackup = stockRange.getValues();
+      stockRange.setValues(newStocks);
       // สต๊อกเปลี่ยนแล้วต้องเคลียร์ cache — ไม่งั้น POS เห็นสต๊อกเก่าได้ถึง 6 ชม. แล้วขายเกิน
       CacheService.getScriptCache().remove("TABLE_Products");
     }
-    if (invRows.length > 0) {
-      { const invStart = invSheet.getLastRow() + 1; skuAsText_(invSheet, invRows, invStart, 2); invSheet.getRange(invStart, 1, invRows.length, invRows[0].length).setValues(invRows); }
-    }
+    try {
     if (orderRows.length > 0) {
       const orderStartRow = orderSheet.getLastRow() + 1;
       // PII เป็น plain text แล้ว — บังคับ format '@' กัน Sheets ตีความเบอร์/เลขบัตรเป็นตัวเลข (เลข 0 นำหน้าหาย)
@@ -1625,10 +1635,31 @@ function processCheckout_(payload, secureUser, ss) {
       skuAsText_(orderSheet, orderRows, orderStartRow, orderHeaders.indexOf('SKU'));
       orderSheet.getRange(orderStartRow, 1, orderRows.length, orderRows[0].length).setValues(orderRows);
     }
-    
+    } catch (orderWriteErr) {
+      if (stockBackup) {
+        try {
+          prodSheet.getRange(2, stockIdx + 1, stockBackup.length, 1).setValues(stockBackup);
+          CacheService.getScriptCache().remove("TABLE_Products");
+        } catch (restoreErr) {
+          try { logAudit_(secureUser.Username, "CHECKOUT_ERROR", "Order " + orderId + " was not saved AND stock could not be restored - check Products stock by hand: " + restoreErr); } catch (e3) {}
+        }
+      }
+      throw orderWriteErr;
+    }
+    if (invRows.length > 0) {
+      try {
+        const invStart = invSheet.getLastRow() + 1; skuAsText_(invSheet, invRows, invStart, 2); invSheet.getRange(invStart, 1, invRows.length, invRows[0].length).setValues(invRows);
+      } catch (invErr) {
+        try { logAudit_(secureUser.Username, "CHECKOUT_WARN", "Order " + orderId + " saved but InventoryLog was not written: " + invErr); } catch (e3) {}
+      }
+    }
+
     logAudit_(secureUser.Username, "CHECKOUT", "Created Order: " + orderId);
     if (orderRows.length > 0) logOrderStatus_(ss, orderId, '', 'Pending', secureUser.Username);
-    try { bumpCouponUsage_(ss, couponCodesUsed || []); } catch (cuErr) {}
+    // นับจำนวนใช้คูปองพลาด = คูปองจำกัดสิทธิ์อาจถูกใช้เกิน — ไม่ทำให้การจองล้ม แต่ต้องมีร่องรอยใน AuditLog (ไม่บันทึกตัวโค้ด)
+    try { bumpCouponUsage_(ss, couponCodesUsed || []); } catch (cuErr) {
+      try { logAudit_(secureUser.Username, "COUPON_USAGE_ERROR", "Order " + orderId + ": coupon usage count was not updated (" + (couponCodesUsed || []).length + " code) - " + cuErr); } catch (e3) {}
+    }
     try {
       sendCheckoutWebhookNotification_(ss, orderId, actualChannel, actualBranch, payload, orderRows, prodData, skuIdx, nameIdx, stockIdx);
     } catch (whErr) {}
@@ -1661,7 +1692,7 @@ function sendCheckoutWebhookNotification_(ss, orderId, channel, branch, payload,
     if (sku && sku !== 'DISCOUNT' && net > 0) {
       mainItems.push(pName + ' x' + qty);
       for (let i = 1; i < prodData.length; i++) {
-        if (prodData[i][skuIdx] == sku) {
+        if (String(prodData[i][skuIdx]) === String(sku)) {
           const rem = parseInt(prodData[i][stockIdx] || 0, 10);
           if (rem <= lowThreshold) {
             lowStockItems.push(prodData[i][nameIdx] + ' (เหลือ ' + rem + ' ชิ้น)');
@@ -3444,11 +3475,25 @@ function ensureLinkViewable_(file) {
   }
 }
 
+// ชนิดรูปที่อัปโหลดได้ (ไม่มี svg — svg ใส่สคริปต์ได้) และนามสกุลที่จะใช้ตั้งชื่อไฟล์
+var UPLOAD_IMAGE_TYPES_ = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' };
+function imageBytesMatch_(bytes, mimeType) {
+  if (!bytes || bytes.length < 12) return false;
+  const b = i => (bytes[i] < 0 ? bytes[i] + 256 : bytes[i]);
+  const is = (at, arr) => arr.every((v, k) => b(at + k) === v);
+  if (mimeType === 'image/jpeg') return is(0, [0xFF, 0xD8, 0xFF]);
+  if (mimeType === 'image/png') return is(0, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  if (mimeType === 'image/gif') return is(0, [0x47, 0x49, 0x46, 0x38]);
+  if (mimeType === 'image/webp') return is(0, [0x52, 0x49, 0x46, 0x46]) && is(8, [0x57, 0x45, 0x42, 0x50]);
+  return false;
+}
+
 function uploadImage_(payload, secureUser, ss) {
   if (secureUser.Role !== 'Admin') throw new Error("ไม่มีสิทธิ์อัปโหลดรูป (Admin only)");
 
-  const mimeType = (payload.mimeType || '').toString();
-  if (mimeType.indexOf('image/') !== 0) throw new Error("ไฟล์ต้องเป็นรูปภาพเท่านั้น (jpg, png, webp, gif)");
+  let mimeType = (payload.mimeType || '').toString().trim().toLowerCase();
+  if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
+  if (!Object.prototype.hasOwnProperty.call(UPLOAD_IMAGE_TYPES_, mimeType)) throw new Error("ไฟล์ต้องเป็นรูปภาพ jpg, png, webp หรือ gif เท่านั้น");
 
   const base64Data = (payload.base64Data || '').toString();
   if (!base64Data) throw new Error("ไม่พบข้อมูลไฟล์รูป");
@@ -3458,8 +3503,12 @@ function uploadImage_(payload, secureUser, ss) {
   const rawName = (payload.fileName || 'image').toString();
   const dotIdx = rawName.lastIndexOf('.');
   const baseName = (dotIdx > 0 ? rawName.slice(0, dotIdx) : rawName).replace(/[^a-zA-Z0-9._-]/g, '_');
-  const ext = (dotIdx > 0 ? rawName.slice(dotIdx) : '').replace(/[^a-zA-Z0-9.]/g, '');
-  const fileName = baseName + '_' + new Date().getTime() + ext;
+  // นามสกุลไฟล์มาจากชนิดที่ตรวจแล้ว ไม่ใช่จากชื่อที่หน้าเว็บส่งมา (กันชื่อ .svg / .html)
+  const fileName = (baseName || 'image').slice(0, 80) + '_' + new Date().getTime() + UPLOAD_IMAGE_TYPES_[mimeType];
+  // เนื้อไฟล์ต้องเป็นรูปชนิดนั้นจริง (ดูไบต์ต้นไฟล์) — ตรวจก่อนแตะ Drive
+  let imageBytes;
+  try { imageBytes = Utilities.base64Decode(base64Data); } catch (decErr) { throw new Error("ข้อมูลไฟล์รูปไม่ถูกต้อง"); }
+  if (!imageBytesMatch_(imageBytes, mimeType)) throw new Error("เนื้อไฟล์ไม่ใช่รูปภาพชนิด " + UPLOAD_IMAGE_TYPES_[mimeType].slice(1) + " (ไฟล์เสียหาย หรือชนิดไฟล์ไม่ตรง)");
 
   const settings = getKeyValueSettings_(ss);
   const driveFolderId = (settings.DriveFolderId || '').toString().trim();
@@ -3475,7 +3524,7 @@ function uploadImage_(payload, secureUser, ss) {
     folder = folders.hasNext() ? folders.next() : DriveApp.createFolder("MPOS Product Images");
   }
 
-  const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+  const blob = Utilities.newBlob(imageBytes, mimeType, fileName);
   const file = folder.createFile(blob);
 
   // Drive มีดีเลย์สั้น ๆ หลังสร้างไฟล์ก่อนที่การเปลี่ยนสิทธิ์แชร์จะสำเร็จ (eventual consistency) — ลองซ้ำ 1 ครั้งกันพลาด
