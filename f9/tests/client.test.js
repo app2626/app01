@@ -611,7 +611,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(!JSON.stringify(await P("JSON.stringify(window.app.globalData)")).includes(shown), 'password must not be kept in globalData');
     await P("Swal.clickConfirm();true"); await sleep(500); await P("window.__im");
     const mh = sheets.Members.rows[0], row = sheets.Members.rows.find(r => r.includes('ui.imp.user'));
-    ok(row && /^[a-f0-9]{64}$/.test(row[mh.indexOf('Password')]) && row[mh.indexOf('Password')] !== shown, 'stored as hash only');
+    ok(row && ctx.PW_V2_RE_.test(row[mh.indexOf('Password')]) && row[mh.indexOf('Password')] !== shown, 'stored as hash only');
     const mi = sheets.Members.rows.findIndex(r => r.includes('ui.imp.user')); if (mi > 0) sheets.Members.rows.splice(mi, 1);
     ctx.CacheService.getScriptCache().remove('TABLE_Members'); await ev("window.app.refreshGlobalData().then(()=>true)");
   });
@@ -1468,6 +1468,14 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     try { await waitFor("document.querySelectorAll('#productGrid .pos-card').length>0", 6000); }
     catch (e) { throw new Error('no cards; user=' + (await ev('JSON.stringify(window.app.user && {r: window.app.user.Role, b: window.app.user["Branch Code"], c: window.app.user.Channel})')) + ' hash=' + (await ev('location.hash')) + ' grid=' + (await ev("(document.getElementById('productGrid')||{innerText:'(none)'}).innerText.slice(0,150)"))); } ok(await ev("document.getElementById('posBranchSelect').disabled===true")); ok((await cnt()) > 0, 'no cards'); });
   await T('restricted user (menus=pos) cannot open #products', async () => { await ev("window.app.user['Accessible Menus']='pos';window.location.hash='#products';true"); await sleep(800); const d = await ev("JSON.stringify({hash:location.hash,role:window.app.user.Role,swal:(window.Swal&&Swal.isVisible&&Swal.isVisible())?document.querySelector('.swal2-title').textContent:null,menu:(window.app.menuConfig.flatMap(x=>x.children||[x]).find(x=>x.id==='products')||{}).roles})"); const o = JSON.parse(d); ok(o.hash !== '#products' || /ปฏิเสธ/.test(o.swal || ''), d); await ev("window.Swal&&Swal.close();true"); });
+  // keep this one last: it ends the session
+  await T('a token the server no longer accepts sends the user back to the login page with a message', async () => {
+    await ev("window.app.user=Object.assign({},window.app.user,{Token:'bad.token'});window.app.api('GET_TABLE',{tableName:'Products'}).catch(function(){});true");
+    await waitFor("!!document.getElementById('loginUsername') && window.app.user===null", 6000); await sleep(700);
+    const o = JSON.parse(await ev("JSON.stringify({swal:(window.Swal&&Swal.isVisible&&Swal.isVisible())?document.querySelector('.swal2-title').textContent:null,stored:localStorage.getItem('tg_pos_user')})"));
+    ok(/เข้าสู่ระบบใหม่/.test(o.swal || ''), JSON.stringify(o)); ok(o.stored === null, 'stored session not cleared');
+    await ev("window.Swal&&Swal.close();true");
+  });
 
   console.log('\n==== client: ' + pass + ' passed, ' + fail + ' failed');
   const real = pageErrors.filter(e => !/favicon|ERR_|Failed to load resource|tailwind|manifest/i.test(e.text));

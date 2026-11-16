@@ -59,6 +59,7 @@ function setupDatabase(userToken) {
     if (!tokenPayload) throw new Error("Unauthorized: กรุณาเข้าสู่ระบบก่อนใช้งาน Auto Setup");
     const membersList = getTableDataAsJson_(membersSheetCheck);
     const caller = membersList.find(u => u.Username === tokenPayload.Username);
+    if (caller && !tokenMatchesUser_(tokenPayload, caller)) throw new Error("Unauthorized: กรุณาเข้าสู่ระบบใหม่ก่อนใช้งาน Auto Setup");
     if (!caller || caller.Role !== 'Admin') throw new Error("Permission Denied: เฉพาะ Admin เท่านั้น");
   }
   const tables = {
@@ -164,18 +165,71 @@ function setupDatabase(userToken) {
   return { status: 'success', message: 'Database Ready', initialAdmin: { username: 'admin', password: initialAdminPassword } };
 }
 
-function hashPassword_(password) {
-  const salt = "Mpos2026!@#";
-  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password + salt);
-  let hexString = '';
-  for (let i = 0; i < digest.length; i++) {
-    let hashVal = digest[i];
-    if (hashVal < 0) hashVal += 256;
-    let hexStr = hashVal.toString(16);
-    if (hexStr.length == 1) hexStr = '0' + hexStr;
-    hexString += hexStr;
+// ===== รหัสผ่าน (2026-11-17) =====
+// รูปแบบที่เก็บในชีต Members: v2$<จำนวนรอบ>$<salt สุ่มต่อผู้ใช้ 32 hex>$<PBKDF2-HMAC-SHA256 64 hex>
+// รูปแบบเก่ายังตรวจได้ (SHA-256 + salt คงที่, SHA-256 ไม่มี salt, plain text) และถูกแปลงเป็น v2 อัตโนมัติตอน login สำเร็จ (doLogin_)
+// จำนวนรอบเก็บอยู่ในค่าที่บันทึก จึงปรับ PW_V2_ROUNDS_ ได้โดยรหัสเดิมยังใช้ได้ — GAS ไม่มี PBKDF2 ในตัว ต้องวน HMAC เอง
+// ทุกรอบคือการเรียก Utilities 1 ครั้ง (ช้ากว่าโค้ดปกติมาก) จึงตั้งรอบไว้ไม่สูง; เปลี่ยนค่านี้แล้วต้องจับเวลา login บนเว็บจริง
+var PW_V2_ROUNDS_ = 2000;
+var PW_V2_MAX_ROUNDS_ = 200000;
+var PW_MIN_LENGTH_ = 8;
+var PW_V2_RE_ = /^v2\$([0-9]{1,6})\$([a-f0-9]{32})\$([a-f0-9]{64})$/;
+
+function bytesToHex_(bytes) {
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) { const v = bytes[i] < 0 ? bytes[i] + 256 : bytes[i]; hex += (v < 16 ? '0' : '') + v.toString(16); }
+  return hex;
+}
+function sha256Hex_(text) { return bytesToHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text)); }
+// รูปแบบเก่า — ใช้ตรวจรหัสที่ยังไม่ถูกแปลงเท่านั้น ห้ามใช้สร้างรหัสใหม่
+function legacyHashPassword_(password) { return sha256Hex_(password + "Mpos2026!@#"); }
+
+// PBKDF2-HMAC-SHA256 บล็อกเดียว (32 ไบต์) — ผลตรงกับ crypto.pbkdf2Sync(password, salt, rounds, 32, 'sha256') (มีเทสต์เทียบ)
+function pbkdf2Hex_(password, salt, rounds) {
+  const key = Array.prototype.slice.call(Utilities.newBlob(String(password)).getBytes());
+  const first = Array.prototype.slice.call(Utilities.newBlob(String(salt)).getBytes()).concat([0, 0, 0, 1]);
+  let u = Utilities.computeHmacSha256Signature(first, key);
+  const out = Array.prototype.slice.call(u);
+  for (let i = 1; i < rounds; i++) {
+    u = Utilities.computeHmacSha256Signature(u, key);
+    for (let j = 0; j < out.length; j++) out[j] ^= u[j];
   }
-  return hexString;
+  return bytesToHex_(out);
+}
+
+function hashPassword_(password) {
+  const salt = Utilities.getUuid().replace(/-/g, '').toLowerCase();
+  return 'v2$' + PW_V2_ROUNDS_ + '$' + salt + '$' + pbkdf2Hex_(password, salt, PW_V2_ROUNDS_);
+}
+
+// ตรวจรหัสผ่านกับค่าที่เก็บไว้ทุกรูปแบบ — คืน { ok, legacy } (legacy = ผ่านด้วยรูปแบบเก่า ควรแปลงเป็น v2)
+// ค่าที่เก็บซึ่งหน้าตาเป็น hash จะไม่ถูกเทียบแบบ plain text เด็ดขาด (ไม่งั้นคนที่ได้ hash ไปจะใช้ hash นั้นเป็นรหัสผ่านได้เลย)
+function checkPassword_(password, stored) {
+  const pw = (password === null || password === undefined) ? '' : String(password);
+  const st = (stored === null || stored === undefined) ? '' : String(stored);
+  if (!pw || !st) return { ok: false, legacy: false };
+  const m = PW_V2_RE_.exec(st);
+  if (m) {
+    const rounds = parseInt(m[1], 10);
+    if (rounds < 1 || rounds > PW_V2_MAX_ROUNDS_) return { ok: false, legacy: false };
+    return { ok: timingSafeEqual_(pbkdf2Hex_(pw, m[2], rounds), m[3]), legacy: false };
+  }
+  if (/^[a-f0-9]{64}$/i.test(st)) {
+    const low = st.toLowerCase();
+    const a = timingSafeEqual_(legacyHashPassword_(pw), low), b = timingSafeEqual_(sha256Hex_(pw), low);
+    return { ok: a || b, legacy: true };
+  }
+  return { ok: timingSafeEqual_(pw, st), legacy: true };
+}
+
+// ลายนิ้วมือของรหัสผ่านปัจจุบัน (HMAC ด้วยคีย์ลับ — ไม่เปิดเผยอะไรเกี่ยวกับ hash) ฝังใน token เป็น pv
+// เปลี่ยน/รีเซ็ตรหัสผ่านเมื่อไร ค่านี้เปลี่ยน token เดิมทุกใบของผู้ใช้นั้นใช้ไม่ได้ทันที (tokenMatchesUser_)
+function passwordStamp_(stored) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature('pw:' + String(stored === null || stored === undefined ? '' : stored), getSecretKey_())).slice(0, 16);
+}
+function tokenMatchesUser_(tokenPayload, member) {
+  if (!tokenPayload || !member || !tokenPayload.pv) return false;
+  return timingSafeEqual_(tokenPayload.pv, passwordStamp_(member.Password));
 }
 
 // คีย์ลับสำหรับเซ็น token — สร้างอัตโนมัติครั้งแรกและเก็บใน Script Properties (MPOS_SECRET_KEY)
@@ -190,9 +244,10 @@ function getSecretKey_() {
   return key;
 }
 
-function generateToken_(username) {
+// storedPassword = ค่าในคอลัมน์ Password ของผู้ใช้ ณ ตอนออก token (ใช้ทำ pv — ดู passwordStamp_)
+function generateToken_(username, storedPassword) {
   // อายุ token 30 วัน (เดิม 24 ชม. — เจ้าของระบบขอให้อยู่ในระบบนานขึ้น ไม่ต้อง login ทุกวัน, 2026-07-10)
-  const payloadStr = JSON.stringify({ Username: username, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 });
+  const payloadStr = JSON.stringify({ Username: username, exp: Date.now() + 1000 * 60 * 60 * 24 * 30, pv: passwordStamp_(storedPassword) });
   const payloadB64 = Utilities.base64EncodeWebSafe(Utilities.newBlob(payloadStr).getBytes());
   const signature = Utilities.computeHmacSha256Signature(payloadB64, getSecretKey_());
   const signatureB64 = Utilities.base64EncodeWebSafe(signature);
@@ -298,7 +353,8 @@ function getPublicConfig() {
 }
 
 function looksLikePasswordHash_(value) {
-  return /^[a-f0-9]{64}$/i.test((value || '').toString().trim());
+  const v = (value || '').toString().trim();
+  return /^[a-f0-9]{64}$/i.test(v) || PW_V2_RE_.test(v);
 }
 
 // action ที่ "อ่านอย่างเดียว" — ไม่ต้องล้างแคช Dashboard; action อื่นทั้งหมด (บันทึก/ลบ/จอง/แก้/อัปโหลด/เคลียร์แคช) ล้างแคชก่อนและหลังทำงาน
@@ -339,7 +395,9 @@ function apiHandlerInner_(action, payload, userToken) {
       const members = getTableDataAsJson_(ss.getSheetByName("Members"));
       secureUser = members.find(u => u.Username === payloadObj.Username);
       if (!secureUser) throw new Error("Invalid User Session");
-      
+      // token ผูกกับรหัสผ่านที่ใช้ตอน login — เปลี่ยน/รีเซ็ตรหัสผ่านแล้ว token เดิมใช้ไม่ได้ (token ที่ออกก่อน 2026-11-17 ไม่มี pv = ต้อง login ใหม่)
+      if (!tokenMatchesUser_(payloadObj, secureUser)) throw new Error("Invalid or Expired Token. Please login again.");
+
       if (secureUser['Branch Code'] !== 'ALL') {
         const branches = getTableDataAsJson_(ss.getSheetByName("Branches"));
         const bInfo = branches.find(b => b['Branch Code'] === secureUser['Branch Code']);
@@ -453,42 +511,41 @@ function doLogin_(username, password, ss) {
   }
 
   const data = getTableDataAsJson_(sheet);
-  const hashedPw = hashPassword_(password);
-  
-  // Backward compatibility for un-salted passwords
-  const oldHashedPw = (() => {
-    const d = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password);
-    let h = '';
-    for (let i=0; i<d.length; i++) {
-      let v = d[i]; if(v<0) v+=256;
-      let s = v.toString(16); if(s.length==1) s='0'+s;
-      h+=s;
-    }
-    return h;
-  })();
+  let user = null, legacyFormat = false;
+  const candidates = data.filter(u => u.Username === username);
+  for (let i = 0; i < candidates.length && !user; i++) {
+    const c = checkPassword_(password, candidates[i].Password);
+    if (c.ok) { user = candidates[i]; legacyFormat = c.legacy; }
+  }
+  // ไม่มี username นี้ — ยังคำนวณ 1 รอบเต็ม เพื่อไม่ให้เวลาตอบบอกว่า username มีอยู่จริงหรือไม่
+  if (!candidates.length && password) pbkdf2Hex_(String(password), '00000000000000000000000000000000', PW_V2_ROUNDS_);
 
-  let user = data.find(u => u.Username === username && (u.Password === hashedPw || u.Password === oldHashedPw));
-
-  // Auto-migrate plain text password: hash it and save back to sheet
-  if (!user) {
-    const plainUser = data.find(u => u.Username === username && u.Password === password);
-    if (plainUser) {
-      const sheetData = sheet.getDataRange().getValues();
-      const headers = sheetData[0];
-      const pwCol = headers.indexOf('Password');
-      const userCol = headers.indexOf('Username');
-      for (let i = 1; i < sheetData.length; i++) {
-        if (sheetData[i][userCol] === username) {
-          sheet.getRange(i + 1, pwCol + 1).setValue(hashedPw);
-          break;
+  // รหัสที่ยังเก็บแบบเก่า (SHA-256 รอบเดียว / plain text) → แปลงเป็น v2 ทันทีที่ login ผ่าน (พลาด lock = ข้ามไปก่อน รอบหน้าค่อยแปลง)
+  if (user && legacyFormat) {
+    const upLock = LockService.getScriptLock();
+    let locked = false;
+    try { locked = upLock.tryLock(5000); } catch (e) { locked = false; }
+    if (locked) {
+      try {
+        const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].map(h => h.toString().trim());
+        const pwCol = headers.indexOf('Password'), userCol = headers.indexOf('Username');
+        const rowNo = user._rowIndex;
+        // ยืนยันว่าแถวยังเป็นของผู้ใช้คนเดิมและค่าเดิม (กันแถวเลื่อนระหว่างอ่านกับเขียน)
+        if (pwCol > -1 && userCol > -1 && rowNo >= 2 && rowNo <= sheet.getLastRow()) {
+          const cur = sheet.getRange(rowNo, 1, 1, headers.length).getDisplayValues()[0];
+          if (cur[userCol] === username && cur[pwCol] === user.Password) {
+            const upgraded = hashPassword_(String(password));
+            sheet.getRange(rowNo, pwCol + 1).setNumberFormat('@').setValue(upgraded);
+            user.Password = upgraded;
+          }
         }
-      }
-      user = plainUser;
+      } finally { upLock.releaseLock(); }
     }
   }
 
   if (user) {
     rlCache.remove(rlKey); // login สำเร็จ — ล้างตัวนับ
+    const storedPassword = user.Password;
     delete user.Password;
     if (user['Branch Code'] !== 'ALL') {
       const branches = getTableDataAsJson_(ss.getSheetByName("Branches"));
@@ -499,7 +556,7 @@ function doLogin_(username, password, ss) {
       user.Channel = 'ALL';
       user['Branch Name'] = 'ALL Branches';
     }
-    user.Token = generateToken_(user.Username);
+    user.Token = generateToken_(user.Username, storedPassword);
     logAudit_(user.Username, "LOGIN", "System Login");
     return { status: 'success', user: user };
   }
@@ -514,7 +571,8 @@ function changePassword_(payload, secureUser, ss) {
     const oldPassword = (payload.oldPassword || '').toString();
     const newPassword = (payload.newPassword || '').toString();
     if (!oldPassword || !newPassword) throw new Error("กรุณากรอกรหัสผ่านให้ครบถ้วน");
-    if (newPassword.length < 4) throw new Error("รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร");
+    if (newPassword.length < PW_MIN_LENGTH_) throw new Error("รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย " + PW_MIN_LENGTH_ + " ตัวอักษร");
+    if (newPassword.length > 100) throw new Error("รหัสผ่านใหม่ยาวเกินไป (ไม่เกิน 100 ตัวอักษร)");
 
     const sheet = ss.getSheetByName("Members");
     const data = sheet.getDataRange().getValues();
@@ -528,20 +586,16 @@ function changePassword_(payload, secureUser, ss) {
     if (rowIndex === -1) throw new Error("ไม่พบบัญชีผู้ใช้");
 
     const storedHash = data[rowIndex - 1][pwCol];
-    const hashedOld = hashPassword_(oldPassword);
-    // รองรับรหัสผ่านเก่าที่ยังไม่ได้ salt (legacy) / plain text — เหมือน logic ใน doLogin_
-    const oldHashedLegacy = (() => {
-      const d = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, oldPassword);
-      let h = ''; for (let i = 0; i < d.length; i++) { let v = d[i]; if (v < 0) v += 256; let s = v.toString(16); if (s.length == 1) s = '0' + s; h += s; }
-      return h;
-    })();
-    if (storedHash !== hashedOld && storedHash !== oldHashedLegacy && storedHash !== oldPassword) {
+    // ตรวจรหัสเดิมได้ทุกรูปแบบที่เก็บไว้ (v2 / แบบเก่า) — กติกาเดียวกับ doLogin_
+    if (!checkPassword_(oldPassword, storedHash).ok) {
       throw new Error("รหัสผ่านเดิมไม่ถูกต้อง");
     }
 
-    sheet.getRange(rowIndex, pwCol + 1).setValue(hashPassword_(newPassword));
+    const newHash = hashPassword_(newPassword);
+    sheet.getRange(rowIndex, pwCol + 1).setNumberFormat('@').setValue(newHash);
     logAudit_(secureUser.Username, "CHANGE_PASSWORD", "Changed own password");
-    return { status: 'success' };
+    // token เดิมทุกใบของผู้ใช้นี้หมดสภาพแล้ว — ส่ง token ใหม่ให้หน้าที่กำลังใช้อยู่ทำงานต่อได้ (เครื่องอื่นต้อง login ใหม่)
+    return { status: 'success', token: generateToken_(secureUser.Username, newHash) };
   } catch (e) {
     return { status: 'error', message: e.toString() };
   } finally {
@@ -2099,8 +2153,8 @@ function importRecords_(payload, secureUser, ss) {
           if (!dryRun) { const g = Utilities.getUuid().replace(/-/g, '').slice(0, 16); generated.push({ username: id, password: g }); obj['Password'] = hashPassword_(g); }
         } else if (looksLikePasswordHash_(pw)) {
           obj['Password'] = pw;
-        } else if (pw.length < 4) {
-          return fail('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร (หรือเว้นว่างให้ระบบสุ่มให้)');
+        } else if (pw.length < PW_MIN_LENGTH_) {
+          return fail('รหัสผ่านต้องมีอย่างน้อย ' + PW_MIN_LENGTH_ + ' ตัวอักษร (หรือเว้นว่างให้ระบบสุ่มให้)');
         } else {
           obj['Password'] = dryRun ? '' : hashPassword_(pw);
         }
@@ -2584,6 +2638,8 @@ function saveRecord_(tableName, dataObj, idField, secureUser, ss) {
           dataObj.Password = hashPassword_(generatedPassword);
         }
       } else if (!looksLikePasswordHash_(dataObj.Password)) {
+        if (dataObj.Password.length < PW_MIN_LENGTH_) throw new Error("รหัสผ่านต้องมีอย่างน้อย " + PW_MIN_LENGTH_ + " ตัวอักษร");
+        if (dataObj.Password.length > 100) throw new Error("รหัสผ่านยาวเกินไป (ไม่เกิน 100 ตัวอักษร)");
         dataObj.Password = hashPassword_(dataObj.Password);
       }
     }

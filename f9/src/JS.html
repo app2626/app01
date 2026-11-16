@@ -1940,7 +1940,7 @@ window.app = {
         case 'channels': window.app.grid.init('Channels', 'Channel ID', [{ key: 'Channel ID', label: 'รหัสช่องทาง (สร้างอัตโนมัติ เช่น CH-01)', type: 'text' }, { key: 'Channel Name', label: 'ชื่อช่องทาง', type: 'text' }, { key: 'Description', label: 'คำอธิบาย', type: 'text' }]); break;
         case 'members': window.app.grid.init('Members', 'Username', [
             { key: 'Username', label: 'ชื่อผู้ใช้ (Username)', type: 'text' }, 
-            { key: 'Password', label: 'รหัสผ่าน (เว้นว่างถ้าไม่เปลี่ยน)', type: 'password' }, 
+            { key: 'Password', label: 'รหัสผ่าน (เว้นว่างถ้าไม่เปลี่ยน · ตั้งใหม่อย่างน้อย 8 ตัวอักษร)', type: 'password' }, 
             { key: 'Role', label: 'บทบาท', type: 'select', options: [{ value: 'Sales', label: 'Sales - พนักงานขาย (เห็นเฉพาะสาขาตัวเอง)' }, { value: 'Manager', label: 'Manager - ผู้จัดการ (เห็นทุกสาขา ดูรายงานได้)' }, { value: 'Admin', label: 'Admin - ผู้ดูแลระบบ (ทำได้ทุกอย่าง)' }] }, 
             { key: 'Name', label: 'ชื่อ-สกุล', type: 'text' }, 
             { key: 'Branch Code', label: 'สาขา', type: 'select', options: window.app.branchOptions() },
@@ -2003,11 +2003,25 @@ window.app = {
           ], isSalesRole);
   },
 
+  // token ใช้ไม่ได้แล้ว (หมดอายุ 30 วัน, เปลี่ยนหรือรีเซ็ตรหัสผ่าน, หมุนคีย์ลับ, บัญชีถูกลบ) = พากลับหน้า login พร้อมบอกเหตุผล
+  // เดิมไม่มีจุดนี้ ผู้ใช้จะเห็นแต่ข้อความ error ทุกหน้าจนกว่าจะกดออกจากระบบเอง — หน้าที่เปิดค้างไว้ (saved route) ยังจำไว้ให้หลัง login ใหม่
+  SESSION_ERR_RE: /Invalid or Expired Token|Invalid User Session|Unauthorized Access: No Token/,
+  checkSession_: function(action, res, sentUser) {
+    if (!res || res.status !== 'error' || action === 'LOGIN' || action === 'PUBLIC_TRACK_ORDER') return;
+    if (!window.app.SESSION_ERR_RE.test(String(res.message || ''))) return;
+    if (!sentUser || window.app.user !== sentUser) return; // ออกจากระบบไปแล้ว หรือ login ใหม่แล้วระหว่างรอคำตอบ
+    window.app.user = null;
+    try { localStorage.removeItem('tg_pos_user'); sessionStorage.removeItem('tg_pos_user'); } catch (e) {}
+    window.app.renderLogin();
+    setTimeout(() => { Swal.fire({ icon: 'info', title: 'กรุณาเข้าสู่ระบบใหม่', text: 'การเข้าสู่ระบบครั้งก่อนใช้ไม่ได้แล้ว (หมดอายุ หรือมีการเปลี่ยนรหัสผ่าน)', confirmButtonText: 'ตกลง' }); }, 300);
+  },
+
   api: function(action, payload) {
     // google.script.run ไม่มี timeout ในตัว — ถ้า handler ไม่ถูกเรียกกลับ Promise จะค้างตลอดกาล
+    const sentUser = window.app.user;
     const call = new Promise((resolve, reject) => {
-      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).apiHandler(action, payload, window.app.user);
-    });
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).apiHandler(action, payload, sentUser);
+    }).then(res => { window.app.checkSession_(action, res, sentUser); return res; });
     const timeout = new Promise((_, reject) => {
       setTimeout(() => {
         const err = new Error('การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่');
@@ -2085,7 +2099,7 @@ window.app = {
           </div>
           <div>
             <label class="block text-sm font-bold text-slate-700 mb-1">รหัสผ่านใหม่</label>
-            <input type="password" id="cp-new" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="อย่างน้อย 4 ตัวอักษร">
+            <input type="password" id="cp-new" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="อย่างน้อย 8 ตัวอักษร">
           </div>
           <div>
             <label class="block text-sm font-bold text-slate-700 mb-1">ยืนยันรหัสผ่านใหม่</label>
@@ -2105,8 +2119,8 @@ window.app = {
           Swal.showValidationMessage('กรุณากรอกข้อมูลให้ครบทุกช่อง');
           return false;
         }
-        if (newPassword.length < 4) {
-          Swal.showValidationMessage('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+        if (newPassword.length < 8) {
+          Swal.showValidationMessage('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
           return false;
         }
         if (newPassword !== confirmPassword) {
@@ -2122,6 +2136,16 @@ window.app = {
         const res = await window.app.api('CHANGE_PASSWORD', { oldPassword: result.value.oldPassword, newPassword: result.value.newPassword });
         Swal.close();
         if (res && res.status === 'success') {
+          // token เดิมหมดสภาพทันทีที่เปลี่ยนรหัส — server ส่งใบใหม่มาให้หน้านี้ใช้ต่อ (เครื่องอื่นของผู้ใช้นี้ต้อง login ใหม่)
+          if (res.token && window.app.user) {
+            window.app.user = Object.assign({}, window.app.user, { Token: res.token });
+            try { localStorage.setItem('tg_pos_user', JSON.stringify(window.app.user)); } catch (e) {}
+            // รหัสที่ "จำไว้" ในเครื่องนี้ต้องตามรหัสใหม่ ไม่งั้นครั้งหน้าช่องรหัสผ่านจะเติมรหัสเก่า
+            try {
+              const rem = JSON.parse(localStorage.getItem('tg_pos_remember') || 'null');
+              if (rem && rem.u === window.app.user.Username) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: rem.u, p: result.value.newPassword }));
+            } catch (e) {}
+          }
           Swal.fire({ icon: 'success', title: 'เปลี่ยนรหัสผ่านสำเร็จ', showConfirmButton: false, timer: 1500 });
         } else {
           Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');

@@ -70,7 +70,7 @@ console.log('== USERS / ROLES');
 let sales;
 t('create Sales member', () => eq(api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: { Username: 'sale1', Password: 'Pass1234!', Role: 'Sales', Name: 'พนักงาน', 'Branch Code': 'B01', 'Accessible Menus': '*' } }, admin).status, 'success'));
 t('Sales login', () => { const r = api('LOGIN', { username: 'sale1', password: 'Pass1234!' }); sales = r.Token ? r : r.user; ok(sales && sales.Token, JSON.stringify(r).slice(0, 200)); });
-t('Members password stored hashed, not plaintext', () => { const row = sheets.Members.rows.find(r => r[0] === 'sale1'); ok(/^[a-f0-9]{64}$/i.test(row[1]), 'stored=' + row[1]); });
+t('Members password stored hashed, not plaintext', () => { const row = sheets.Members.rows.find(r => r[0] === 'sale1'); ok(ctx.PW_V2_RE_.test(row[1]), 'stored=' + row[1]); });
 t('GET_TABLE Members hides Password', () => ok(tbl('Members').every(m => !('Password' in m))));
 t('Sales cannot read Members/Settings/AuditLog', () => ['Members', 'Settings', 'AuditLog'].forEach(n => eq(api('GET_TABLE', { tableName: n }, sales).status, 'error', n)));
 t('Sales cannot read Target', () => eq(api('GET_TABLE', { tableName: 'Target' }, sales).status, 'error'));
@@ -85,7 +85,7 @@ t('Sales cannot SAVE_RECORD Members', () => eq(api('SAVE_RECORD', { tableName: '
 t('Sales cannot DELETE_RECORD', () => eq(api('DELETE_RECORD', { tableName: 'Products', idField: 'SKU', idValue: 'SKU-S24U' }, sales).status, 'error'));
 t('Sales cannot BULK_UPDATE/CLEAR_CACHE/SAVE_PRODUCT_GROUP', () => { eq(api('BULK_UPDATE_PRODUCTS', { updates: [] }, sales).status, 'error'); eq(api('CLEAR_CACHE', {}, sales).status, 'error'); eq(api('SAVE_PRODUCT_GROUP', { shared: { Model: 'X' }, variants: [{ sku: 'X1', stock: 1 }] }, sales).status, 'error'); });
 t('role claim in client token object ignored', () => eq(api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: { Username: 'evil2', Password: 'x' } }, Object.assign({}, sales, { Role: 'Admin' })).status, 'error'));
-t('CHANGE_PASSWORD + relogin', () => { const r = api('CHANGE_PASSWORD', { oldPassword: 'Pass1234!', newPassword: 'NewPass5678!' }, sales); ok(r.status !== 'error', JSON.stringify(r)); const l = api('LOGIN', { username: 'sale1', password: 'NewPass5678!' }); ok(l.Token || l.user, JSON.stringify(l).slice(0, 120)); sales = l.Token ? l : l.user; });
+t('CHANGE_PASSWORD + relogin', () => { const oldTok = sales; eq(api('CHANGE_PASSWORD', { oldPassword: 'Pass1234!', newPassword: 'short7!' }, sales).status, 'error', 'under 8 chars'); const r = api('CHANGE_PASSWORD', { oldPassword: 'Pass1234!', newPassword: 'NewPass5678!' }, sales); ok(r.status !== 'error', JSON.stringify(r)); ok(/Invalid or Expired Token/.test(api('GET_ALL_DATA', {}, oldTok).message), 'old token must stop working'); ok(unwrap(api('GET_ALL_DATA', {}, { Token: r.token })).products, 'token returned by CHANGE_PASSWORD works'); eq(api('LOGIN', { username: 'sale1', password: 'Pass1234!' }).status, 'error', 'old password'); const l = api('LOGIN', { username: 'sale1', password: 'NewPass5678!' }); ok(l.Token || l.user, JSON.stringify(l).slice(0, 120)); sales = l.Token ? l : l.user; });
 t('CHANGE_PASSWORD wrong old pw rejected', () => eq(api('CHANGE_PASSWORD', { oldPassword: 'bad', newPassword: 'Another1234!' }, sales).status, 'error'));
 console.log('== PRODUCTS');
 const flipShared = { Model: 'Galaxy Z Flip8', 'Marketing Model': 'Samsung Galaxy Z Flip8', 'Product Group': 'Z-Series', Capacity: '256GB', Price: 35900, 'Original Price': 39900, Category: 'โมบาย', Status: 'เปิด', Channel: 'ALL', Unit: 'เครื่อง', 'Image URL': '' };
@@ -601,14 +601,15 @@ t('emergency password reset: needs MPOS_RESET_ENABLE, validates input, hashes, c
   cache.put('LOGIN_FAIL_admin', '5');
   const res = attempt('admin', 'Brand#New2026');
   ok(res.ok && !/Brand#New2026/.test(res.ok), JSON.stringify(res));
-  ok(/^[a-f0-9]{64}$/.test(row()[pc]) && row()[pc] !== before, 'stored as salted hash');
+  ok(ctx.PW_V2_RE_.test(row()[pc]) && row()[pc] !== before, 'stored as salted hash');
+  eq(api('GET_ALL_DATA', {}, admin).status, 'error', 'token issued before the reset no longer works');
   eq(cache.get('LOGIN_FAIL_admin'), null, 'rate-limit lock cleared');
   ['MPOS_RESET_ENABLE', 'MPOS_RESET_USERNAME', 'MPOS_RESET_PASSWORD'].forEach(k => eq(props.getProperty(k), null, k + ' cleared after success'));
   const login = api('LOGIN', { username: 'admin', password: 'Brand#New2026' }); ok(login && (login.Token || (login.user && login.user.Token)), 'can log in with the new password');
   eq(api('LOGIN', { username: 'admin', password: adminPw }).status, 'error', 'old password no longer works');
   // restore the original password so later tests keep working
   props.setProperty('MPOS_RESET_ENABLE', 'true'); props.setProperty('MPOS_RESET_USERNAME', 'admin'); props.setProperty('MPOS_RESET_PASSWORD', adminPw); run();
-  const again = api('LOGIN', { username: 'admin', password: adminPw }); ok(again && (again.Token || (again.user && again.user.Token)), 'original password restored');
+  const again = api('LOGIN', { username: 'admin', password: adminPw }); ok(again && (again.Token || (again.user && again.user.Token)), 'original password restored'); admin = again.Token ? again : again.user;
 });
 t('import channels: blank ID auto-numbers after the highest CH-nn; explicit IDs kept; dup ID skipped; duplicate name warned', () => {
   const restore = importSnap(['Channels']); const ch = sheets.Channels.rows[0], before = sheets.Channels.rows.length;
@@ -661,7 +662,7 @@ t('import members: roles/branches validated; passwords hashed (login works); bla
     const s1 = row('imp.sales'), m1 = row('imp.mgr'), a1 = row('imp.admin');
     eq([s1.Role, s1['Accessible Menus'], s1['Branch Code']], ['Sales', 'pos,orders', branch]);
     eq([m1.Role, a1['Branch Code'], a1.Password], ['Manager', 'ALL', knownHash], 'blank branch => ALL for Admin; given hash kept');
-    ok(/^[a-f0-9]{64}$/.test(s1.Password) && s1.Password !== 'Secret-123', 'plain password stored hashed');
+    ok(ctx.PW_V2_RE_.test(s1.Password) && s1.Password !== 'Secret-123', 'plain password stored hashed');
     ok(api('LOGIN', { username: 'imp.sales', password: 'Secret-123' }).status !== 'error', 'imported password logs in');
     ok(api('LOGIN', { username: 'imp.mgr', password: real.generatedPasswords[0].password }).status !== 'error', 'generated password logs in');
     ok(api('LOGIN', { username: 'imp.admin', password: 'Known-Pass-1' }).status !== 'error', 'hash-imported password logs in');
@@ -918,6 +919,49 @@ t('Coupons: only codes with Show On Store = เปิด reach the storefront, w
   ok(!JSON.stringify(api('GET_ALL_DATA', {}, sales)).includes('SECRET1'), 'a hidden code leaked to the storefront payload');
 });
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
+
+console.log('== PASSWORD STORAGE');
+t('pbkdf2Hex_ equals Node crypto.pbkdf2Sync (ASCII and Thai passwords)', () => {
+  [['Pass1234!', '00112233445566778899aabbccddeeff', 1], ['Pass1234!', 'a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5', 7], ['รหัสผ่านไทย 99', 'ffffffffffffffffffffffffffffffff', 300]].forEach(c => eq(ctx.pbkdf2Hex_(c[0], c[1], c[2]), crypto.pbkdf2Sync(c[0], c[1], c[2], 32, 'sha256').toString('hex'), c.join('|')));
+});
+t('hashPassword_: v2 format, a fresh salt every time, verifies only the right password', () => {
+  const a = ctx.hashPassword_('Same-Pass-1'), b = ctx.hashPassword_('Same-Pass-1');
+  ok(ctx.PW_V2_RE_.test(a) && ctx.PW_V2_RE_.test(b) && a !== b, a);
+  eq(ctx.checkPassword_('Same-Pass-1', a), { ok: true, legacy: false }); eq(ctx.checkPassword_('Same-Pass-2', a).ok, false); eq(ctx.checkPassword_('', a).ok, false);
+  eq(ctx.checkPassword_('x', 'v2$999999$' + '0'.repeat(32) + '$' + '0'.repeat(64)).ok, false, 'absurd round count is refused, not computed');
+  ok(ctx.looksLikePasswordHash_(a) && ctx.looksLikePasswordHash_('a'.repeat(64)) && !ctx.looksLikePasswordHash_('Same-Pass-1'));
+});
+t('legacy passwords (salted SHA-256, unsalted SHA-256, plain text) still log in once and are rewritten as v2; a stored hash is never accepted as the password itself', () => {
+  const h = sheets.Members.rows[0], uc = h.indexOf('Username'), pc = h.indexOf('Password');
+  const sha = s => crypto.createHash('sha256').update(s, 'utf8').digest('hex');
+  const cases = [['leg.salted', sha('Old-Salted-1' + 'Mpos2026!@#'), 'Old-Salted-1'], ['leg.plainsha', sha('Old-Unsalted-1'), 'Old-Unsalted-1'], ['leg.plain', 'plain77', 'plain77']];
+  cases.forEach(c => { const row = h.map(() => ''); row[uc] = c[0]; row[pc] = c[1]; row[h.indexOf('Role')] = 'Sales'; row[h.indexOf('Name')] = c[0]; row[h.indexOf('Branch Code')] = sales['Branch Code']; sheets.Members.rows.push(row); });
+  try {
+    const stored = u => sheets.Members.rows.find(r => r[uc] === u)[pc];
+    eq(api('LOGIN', { username: 'leg.salted', password: cases[0][1] }).status, 'error', 'pass-the-hash'); eq(stored('leg.salted'), cases[0][1], 'failed login must not rewrite');
+    cases.forEach(c => {
+      eq(api('LOGIN', { username: c[0], password: 'wrong-' + c[2] }).status, 'error', c[0] + ' wrong pw');
+      const r = api('LOGIN', { username: c[0], password: c[2] }); eq(r.status, 'success', c[0] + ' ' + JSON.stringify(r).slice(0, 120));
+      ok(ctx.PW_V2_RE_.test(stored(c[0])), c[0] + ' not upgraded: ' + stored(c[0])); ok(!('Password' in r.user));
+      ok(unwrap(api('GET_ALL_DATA', {}, r.user)).products, c[0] + ' token issued at the upgrading login works');
+      eq(api('LOGIN', { username: c[0], password: c[2] }).status, 'success', c[0] + ' second login (v2)');
+    });
+  } finally { cases.forEach(c => { const i = sheets.Members.rows.findIndex(r => r[uc] === c[0]); if (i > 0) sheets.Members.rows.splice(i, 1); cache.remove('LOGIN_FAIL_' + c[0]); }); }
+});
+t('tokens: one without pv (issued before this change) is rejected; Admin editing a member password ends that member session; short password refused', () => {
+  const key = ctx.getSecretKey_(), b64 = b => b.toString('base64').split('+').join('-').split('/').join('_');
+  const p = b64(Buffer.from(JSON.stringify({ Username: 'admin', exp: Date.now() + 60000 }))), sig = b64(crypto.createHmac('sha256', key).update(p).digest());
+  ok(ctx.verifyToken_(p + '.' + sig), 'signature itself is valid'); ok(/Invalid or Expired Token/.test(api('GET_ALL_DATA', {}, { Token: p + '.' + sig }).message));
+  const mk = pw => api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: { Username: 'tok.user', Password: pw, Role: 'Sales', Name: 'Tok', 'Branch Code': sales['Branch Code'], 'Accessible Menus': 'pos' } }, admin);
+  eq(mk('short7!').status, 'error', 'under 8 chars'); eq(mk('First-Pass-1').status, 'success');
+  const l = api('LOGIN', { username: 'tok.user', password: 'First-Pass-1' }); eq(l.status, 'success'); ok(unwrap(api('GET_ALL_DATA', {}, l.user)).products);
+  const row = tbl('Members').find(m => m.Username === 'tok.user');
+  eq(api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: { _rowIndex: row._rowIndex, Username: 'tok.user', Password: '', Role: 'Sales', Name: 'Tok 2', 'Branch Code': sales['Branch Code'], 'Accessible Menus': 'pos' } }, admin).status, 'success');
+  ok(unwrap(api('GET_ALL_DATA', {}, l.user)).products, 'editing other fields (blank password) keeps the session');
+  eq(api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: { _rowIndex: row._rowIndex, Username: 'tok.user', Password: 'Second-Pass-2', Role: 'Sales', Name: 'Tok 2', 'Branch Code': sales['Branch Code'], 'Accessible Menus': 'pos' } }, admin).status, 'success');
+  ok(/Invalid or Expired Token/.test(api('GET_ALL_DATA', {}, l.user).message), 'old session must end'); eq(api('LOGIN', { username: 'tok.user', password: 'Second-Pass-2' }).status, 'success');
+  api('DELETE_RECORD', { tableName: 'Members', idField: 'Username', idValue: 'tok.user' }, admin);
+});
 
 console.log('== TABLE ALLOWLIST + MEMBER DIRECTORY');
 t('GET_TABLE: a sheet outside the allowlist (hand-made backup copy) cannot be read by any role, Admin included', () => {
