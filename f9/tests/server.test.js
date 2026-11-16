@@ -21,7 +21,7 @@ t('login wrong password rejected', () => { const r = api('LOGIN', { username: 'a
 t('login ok returns token', () => { const r = api('LOGIN', { username: 'admin', password: adminPw }); ok(r && (r.Token || (r.user && r.user.Token)), JSON.stringify(r).slice(0, 200)); admin = r.Token ? r : r.user; });
 t('no token => Unauthorized', () => { const r = api('GET_ALL_DATA', {}, null); ok(r && r.status === 'error' && /Unauthorized/.test(r.message), JSON.stringify(r)); });
 t('forged token rejected', () => { const r = api('GET_ALL_DATA', {}, { Token: admin.Token.slice(0, -3) + 'abc' }); ok(r.status === 'error', JSON.stringify(r)); });
-t('verifyToken(valid) username', () => eq(ctx.verifyToken(admin.Token).Username, 'admin'));
+t('verifyToken_(valid) username', () => eq(ctx.verifyToken_(admin.Token).Username, 'admin'));
 t('login rate-limit after 5 fails', () => { for (let i = 0; i < 6; i++) api('LOGIN', { username: 'ghost', password: 'x' }); const r = api('LOGIN', { username: 'ghost', password: 'x' }); ok(/พยายาม|หลาย|ล็อก|lock|many/i.test(JSON.stringify(r)), JSON.stringify(r)); });
 
 console.log('== READ');
@@ -219,7 +219,7 @@ t('status log: OrderStatusLog table readable by Admin only', () => { eq(api('GET
 
 console.log('== SETTINGS / COUPON / INVOICE / CACHE');
 console.log('== SETTINGS HARDENING (A: secrets never leave Admin, B: server-side validation)');
-const ksv = () => ctx.getKeyValueSettings(ctx.SpreadsheetApp.getActiveSpreadsheet());
+const ksv = () => ctx.getKeyValueSettings_(ctx.SpreadsheetApp.getActiveSpreadsheet());
 const saveSet = (settings, u) => api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings }, u || admin);
 const origWindow = { ReserveStart: ksv().ReserveStart, ReserveEnd: ksv().ReserveEnd };
 t('SAVE_SETTINGS_ITEM bookingsettings valid', () => { const r = saveSet({ SystemName: 'ทดสอบระบบ' }); eq(r.status, 'success', JSON.stringify(r)); eq(ksv().SystemName, 'ทดสอบระบบ'); });
@@ -602,7 +602,7 @@ t('import channels: blank ID auto-numbers after the highest CH-nn; explicit IDs 
 t('import members: roles/branches validated; passwords hashed (login works); blank => random shown once only on real run; hashes pass through; never logged', () => {
   const restore = importSnap(['Members']); const mh = sheets.Members.rows[0], before = sheets.Members.rows.length;
   const branch = sheets.Branches.rows[1][sheets.Branches.rows[0].indexOf('Branch Code')];
-  const knownHash = ctx.hashPassword('Known-Pass-1');
+  const knownHash = ctx.hashPassword_('Known-Pass-1');
   const rows = [
     { Username: 'imp.sales', Password: 'Secret-123', Role: 'sales', Name: 'Imp Sales', 'Branch Code': branch, 'Accessible Menus': 'pos, orders' },
     { Username: 'imp.mgr', Password: '', Role: 'Manager', Name: 'Imp Mgr', 'Branch Code': 'ALL' },
@@ -887,6 +887,21 @@ t('Coupons: only codes with Show On Store = เปิด reach the storefront, w
   ok(!JSON.stringify(api('GET_ALL_DATA', {}, sales)).includes('SECRET1'), 'a hidden code leaked to the storefront payload');
 });
 t('unknown action rejected', () => eq(api('NOPE', {}, admin).status, 'error'));
+
+console.log('== PUBLIC SURFACE');
+// GAS: every top-level function whose name does not end in "_" can be called by anyone with google.script.run (the app is ANYONE_ANONYMOUS).
+const PUBLIC_FUNCTIONS = ['apiHandler', 'doGet', 'getPublicConfig', 'include', 'resetMemberPasswordFromProperties', 'setupDatabase'];
+t('only the allowed functions are callable from the page (every other top-level function ends with _)', () => {
+  const found = [];
+  fs.readdirSync(SRC).filter(f => /\.(js|gs)$/.test(f)).forEach(f => {
+    const src = fs.readFileSync(SRC + f, 'utf8'); let m;
+    const fnRe = /^(?:async\s+)?function\s*\*?\s*([A-Za-z0-9_$]+)\s*\(/gm; while ((m = fnRe.exec(src))) found.push(m[1]);
+    const varRe = /^(?:var|let|const)\s+([A-Za-z0-9_$]+)\s*=\s*(?:async\s+)?(?:function\b|\(|[A-Za-z0-9_$]+\s*=>)/gm; while ((m = varRe.exec(src))) found.push(m[1]);
+  });
+  ok(found.length > 100, 'scan found too few functions: ' + found.length);
+  eq(found.filter(n => !/_$/.test(n)).sort(), PUBLIC_FUNCTIONS);
+});
+t('token / secret / dashboard helpers are not reachable under their old public names', () => ['generateToken', 'getSecretKey', 'verifyToken', 'hashPassword', 'getAdvancedDashboard', 'logAudit', 'saveRecord', 'processCheckout', 'healthCheck', 'migrateDeobfuscatePII'].forEach(n => eq(typeof ctx[n], 'undefined', n)));
 
 console.log('\n==== ' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log('\nFAILURES:'); fails.forEach(f => console.log(' - ' + f)); }

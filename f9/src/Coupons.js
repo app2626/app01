@@ -31,7 +31,7 @@ function getPublicCoupons_(ss) {
   if (!sheet) return [];
   const on = (v) => ['เปิด', 'open', 'active', 'on', 'true'].indexOf((v === null || v === undefined ? '' : v).toString().trim().toLowerCase()) > -1;
   const now = new Date(), out = [];
-  getTableDataAsJson(sheet, true).forEach(c => {
+  getTableDataAsJson_(sheet, true).forEach(c => {
     const code = (c.Code || '').toString().trim();
     if (!code || !on(c.Status) || !on(c['Show On Store'])) return;
     const start = parseCouponDate_(c['Start Date'], false), end = parseCouponDate_(c['Expiry Date'], true);
@@ -75,7 +75,7 @@ function normalizeCouponNumber_(v) {
   return parseFloat((v === null || v === undefined ? '' : v).toString().replace(/[^\d.\-]/g, '')) || 0;
 }
 
-// ตรวจโค้ดกับรายการคูปอง (rows จาก getTableDataAsJson) — คืน {ok, message, code, type, value, minSpend, discount}
+// ตรวจโค้ดกับรายการคูปอง (rows จาก getTableDataAsJson_) — คืน {ok, message, code, type, value, minSpend, discount}
 function evaluateCoupon_(rows, code, goodsTotal) {
   const key = (code || '').toString().trim().toUpperCase();
   if (!key) return { ok: false, message: 'กรุณากรอกโค้ดคูปอง' };
@@ -110,13 +110,13 @@ function evaluateCoupon_(rows, code, goodsTotal) {
 
 // API: ตรวจโค้ดคูปองสำหรับตะกร้าปัจจุบัน (ทุก role ที่ login) — ส่งเฉพาะข้อมูลที่จำเป็นกลับไป ไม่เปิดเผยรายการคูปองทั้งหมด
 function validateCouponApi_(payload, ss) {
-  const rows = getTableDataAsJson(ss.getSheetByName("Coupons"), true);
+  const rows = getTableDataAsJson_(ss.getSheetByName("Coupons"), true);
   const ev = evaluateCoupon_(rows, payload && payload.code, payload && payload.subtotal);
   if (!ev.ok) return { status: 'error', message: ev.message };
   return { status: 'success', coupon: { code: ev.code, type: ev.type, value: ev.value, minSpend: ev.minSpend, discount: ev.discount, description: ev.description } };
 }
 
-// นับการใช้งานคูปอง (+1 ต่อโค้ดต่อออเดอร์) — เรียกภายใน lock ของ processCheckout
+// นับการใช้งานคูปอง (+1 ต่อโค้ดต่อออเดอร์) — เรียกภายใน lock ของ processCheckout_
 function bumpCouponUsage_(ss, codes) {
   if (!codes || codes.length === 0) return;
   const sheet = ss.getSheetByName("Coupons");
@@ -142,6 +142,6 @@ function bumpCouponUsage_(ss, codes) {
 function clearAllCaches_(secureUser) {
   const tables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions", "Members", "Settings", "Coupons"];
   CacheService.getScriptCache().removeAll(tables.map(t => "TABLE_" + t));
-  logAudit(secureUser.Username, "CLEAR_CACHE", "ล้างแคชข้อมูล: " + tables.join(', '));
+  logAudit_(secureUser.Username, "CLEAR_CACHE", "ล้างแคชข้อมูล: " + tables.join(', '));
   return { status: 'success', cleared: tables.length };
 }

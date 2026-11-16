@@ -8,7 +8,7 @@ function doGet(e) {
   // ชื่อเว็บแอปตั้งค่าได้จากเมนู "ตั้งค่าระบบ" (Settings sheet, key SystemName) — เพื่อให้สำเนาโปรเจกต์ไปใช้ที่อื่น
   // เปลี่ยนชื่อได้จากหน้าเว็บล้วนๆ โดยไม่ต้องแก้โค้ด/deploy ใหม่
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const settingsAll = getKeyValueSettings(ss);
+  const settingsAll = getKeyValueSettings_(ss);
   const appName = (settingsAll.SystemName || '').toString().trim() || 'Mobile Pre Booking System';
   const template = HtmlService.createTemplateFromFile('Index');
   template.appName = appName;
@@ -55,9 +55,9 @@ function setupDatabase(userToken) {
     throw new Error("Setup ถูกปิดใช้งานแล้ว กรุณาเปิดใช้งานใหม่จาก Script Properties โดยผู้ดูแลระบบ");
   }
   if (membersSheetCheck && membersSheetCheck.getLastRow() > 1) {
-    const tokenPayload = (userToken && userToken.Token) ? verifyToken(userToken.Token) : null;
+    const tokenPayload = (userToken && userToken.Token) ? verifyToken_(userToken.Token) : null;
     if (!tokenPayload) throw new Error("Unauthorized: กรุณาเข้าสู่ระบบก่อนใช้งาน Auto Setup");
-    const membersList = getTableDataAsJson(membersSheetCheck);
+    const membersList = getTableDataAsJson_(membersSheetCheck);
     const caller = membersList.find(u => u.Username === tokenPayload.Username);
     if (!caller || caller.Role !== 'Admin') throw new Error("Permission Denied: เฉพาะ Admin เท่านั้น");
   }
@@ -138,7 +138,7 @@ function setupDatabase(userToken) {
       ["ดีไซน์สวยงาม / น้ำหนักเบา", "เปิด"]
     ],
     "Members": [
-      ["admin", hashPassword(initialAdminPassword), "Admin", "ผู้ดูแลระบบ", "ALL", "*"]
+      ["admin", hashPassword_(initialAdminPassword), "Admin", "ผู้ดูแลระบบ", "ALL", "*"]
     ]
   };
 
@@ -164,93 +164,7 @@ function setupDatabase(userToken) {
   return { status: 'success', message: 'Database Ready', initialAdmin: { username: 'admin', password: initialAdminPassword } };
 }
 
-// One-time migration (2026-09-19): ย้ายคอลัมน์ Products "Marketing Model" มาติด "Model" และ "Original Price" มาติด "Price"
-// รันด้วยมือครั้งเดียวจาก Apps Script editor (Run) เท่านั้น — ไม่ได้ผูกกับ apiHandler/เว็บแอป เพราะเป็นงานปรับโครงสร้างชีตแบบ one-off
-// ทุกจุดอ่าน/เขียนชีต Products ในโค้ด (saveRecord/processCheckout/getTableDataAsJson ฯลฯ) ใช้ headers.indexOf(...) หา column แบบไดนามิกทั้งหมด
-// ไม่มีจุดไหน hardcode ตำแหน่งคอลัมน์ Products ตายตัว — ย้ายคอลัมน์ทางกายภาพจึงไม่กระทบโค้ดฝั่งแอปเลย
-// กติกาเดียวที่ต้องรักษา: ห้ามมี header ชื่อซ้ำกันสองคอลัมน์พร้อมกัน (obj[h]=row[i] จะอ่านได้แค่ค่าขวาสุด และ headers.map(h=>dataObj[h])
-// จะเขียนค่าเดียวกันทับทุกคอลัมน์ที่ชื่อซ้ำ) — ฟังก์ชันนี้จึงคัดลอกค่าไปคอลัมน์ใหม่แล้ว "เปลี่ยนชื่อ" คอลัมน์เดิมเป็น "(เดิม)"
-// แทนที่จะปล่อยชื่อซ้ำ ข้อมูลคอลัมน์เดิมยังอยู่ครบ ไม่ถูกลบ ไม่ถูกทับ แค่แอปเลิกอ่าน/เขียนคอลัมน์นั้นต่อไป
-function migrateProductColumnLayout_20260919() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Products");
-  if (!sheet) throw new Error("ไม่พบชีต Products");
-  if (sheet.getLastRow() < 1) throw new Error("ชีต Products ไม่มีแม้แต่แถว header");
-
-  function readHeaders() {
-    return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
-  }
-
-  // กันรันซ้ำ — ถ้าเคยรันไปแล้วจะมีคอลัมน์ "(เดิม)" ค้างอยู่ รันซ้ำจะย้ายคอลัมน์ archive ทับกันเองอีกที ห้ามปล่อยผ่าน
-  const existingHeaders = readHeaders();
-  if (existingHeaders.includes("Original Price (เดิม)") || existingHeaders.includes("Marketing Model (เดิม)")) {
-    throw new Error("พบคอลัมน์ '(เดิม)' อยู่แล้วในชีต Products — ดูเหมือนเคยรัน migration นี้ไปแล้ว ยกเลิกเพื่อกันข้อมูลซ้ำซ้อน");
-  }
-
-  // แทรกคอลัมน์ใหม่ถัดจาก anchor -> คัดลอกค่าจากคอลัมน์ sourceHeaderName เดิม -> คอลัมน์เดิมเปลี่ยนชื่อเป็น "(เดิม)"
-  // อ่าน header สดใหม่ทุกครั้งก่อนเริ่ม เพราะการแทรกคอลัมน์รอบก่อนหน้าเลื่อนตำแหน่งคอลัมน์อื่นไปแล้ว
-  function moveColumnNextTo(sourceHeaderName, anchorHeaderName) {
-    const headers = readHeaders();
-    const anchorIdx1b = headers.indexOf(anchorHeaderName) + 1; // 1-based, 0 = not found
-    const sourceIdx1b = headers.indexOf(sourceHeaderName) + 1;
-    if (anchorIdx1b === 0) throw new Error("ไม่พบคอลัมน์ '" + anchorHeaderName + "'");
-    if (sourceIdx1b === 0) throw new Error("ไม่พบคอลัมน์ '" + sourceHeaderName + "'");
-
-    const lastRow = sheet.getLastRow();
-    sheet.insertColumnAfter(anchorIdx1b);
-    const newCol1b = anchorIdx1b + 1;
-    // ถ้าคอลัมน์ต้นทางเดิมอยู่ตำแหน่งหลังจุดที่เพิ่งแทรก มันเลื่อนขวาไป 1 ช่องแล้วจากการ insert บรรทัดบน
-    const shiftedSourceCol1b = sourceIdx1b >= newCol1b ? sourceIdx1b + 1 : sourceIdx1b;
-
-    if (lastRow > 1) {
-      const values = sheet.getRange(2, shiftedSourceCol1b, lastRow - 1, 1).getValues();
-      sheet.getRange(2, newCol1b, lastRow - 1, 1).setValues(values);
-    }
-    sheet.getRange(1, newCol1b).setValue(sourceHeaderName)
-      .setFontWeight("bold").setBackground("#4F46E5").setFontColor("white");
-    sheet.getRange(1, shiftedSourceCol1b).setValue(sourceHeaderName + " (เดิม)");
-  }
-
-  moveColumnNextTo("Marketing Model", "Model");
-  moveColumnNextTo("Original Price", "Price");
-
-  CacheService.getScriptCache().remove("TABLE_Products");
-  logAudit('SYSTEM', "MIGRATE_SCHEMA", "ย้ายคอลัมน์ Products: Marketing Model ไปติด Model, Original Price ไปติด Price (คอลัมน์เดิมเปลี่ยนชื่อเป็น '(เดิม)' เก็บข้อมูลไว้ครบ ไม่ลบ/ไม่ทับ)");
-
-  return "เสร็จสมบูรณ์ — ตรวจสอบแถว header ของชีต Products แล้วทดสอบหน้า Products/Pre Booking/Checkout ก่อนใช้งานจริง";
-}
-
-// One-time cleanup (2026-09-19): ลบคอลัมน์ archive "(เดิม)" ที่ migrateProductColumnLayout_20260919() สร้างไว้
-// รันเฉพาะหลังจากตรวจสอบด้วยตาแล้วว่าคอลัมน์ใหม่ (Marketing Model ติด Model / Original Price ติด Price) มีข้อมูลถูกต้องครบถ้วนจริง
-// คำสั่งนี้ลบข้อมูลถาวร กู้คืนได้ทาง Google Sheets Version History เท่านั้น — รันด้วยมือจาก Apps Script editor เช่นเดียวกับฟังก์ชัน migrate
-function deleteArchivedProductColumns_20260919() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Products");
-  if (!sheet) throw new Error("ไม่พบชีต Products");
-
-  function readHeaders() {
-    return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
-  }
-
-  // กันลบ archive ทิ้งทั้งที่คอลัมน์ใหม่ (ตำแหน่งติด Model/Price) ยังไม่มีอยู่จริง — ป้องกันรันผิดขั้นตอน/ผิดชีต
-  const headers = readHeaders();
-  if (headers.indexOf("Marketing Model") === -1 || headers.indexOf("Original Price") === -1) {
-    throw new Error("ไม่พบคอลัมน์ 'Marketing Model' หรือ 'Original Price' (ตำแหน่งใหม่) ในชีต Products — ห้ามลบ archive ก่อนแน่ใจว่าคอลัมน์ใหม่พร้อมใช้งานแล้ว");
-  }
-
-  ["Marketing Model (เดิม)", "Original Price (เดิม)"].forEach(archiveHeaderName => {
-    const idx1b = readHeaders().indexOf(archiveHeaderName) + 1; // อ่านสดทุกรอบ กันตำแหน่งเพี้ยนหลังลบคอลัมน์ก่อนหน้าในลูปนี้
-    if (idx1b === 0) return; // ไม่มีคอลัมน์นี้แล้ว (อาจเคยลบไปแล้ว) ข้ามไป ไม่ throw
-    sheet.deleteColumn(idx1b);
-  });
-
-  CacheService.getScriptCache().remove("TABLE_Products");
-  logAudit('SYSTEM', "MIGRATE_SCHEMA", "ลบคอลัมน์ archive 'Marketing Model (เดิม)' และ 'Original Price (เดิม)' ออกจาก Products หลังยืนยันคอลัมน์ใหม่ถูกต้องแล้ว");
-
-  return "ลบคอลัมน์ archive เรียบร้อย — ชีต Products เหลือ 15 คอลัมน์ (SKU..Channel เดิม + Marketing Model ติด Model + Original Price ติด Price)";
-}
-
-function hashPassword(password) {
+function hashPassword_(password) {
   const salt = "Mpos2026!@#";
   const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password + salt);
   let hexString = '';
@@ -266,7 +180,7 @@ function hashPassword(password) {
 
 // คีย์ลับสำหรับเซ็น token — สร้างอัตโนมัติครั้งแรกและเก็บใน Script Properties (MPOS_SECRET_KEY)
 // ห้ามใช้ค่าคงที่ในซอร์สโค้ดเป็น fallback มิฉะนั้นผู้อื่นสามารถปลอม token ได้
-function getSecretKey() {
+function getSecretKey_() {
   const props = PropertiesService.getScriptProperties();
   let key = props.getProperty('MPOS_SECRET_KEY');
   if (!key) {
@@ -276,17 +190,17 @@ function getSecretKey() {
   return key;
 }
 
-function generateToken(username) {
+function generateToken_(username) {
   // อายุ token 30 วัน (เดิม 24 ชม. — เจ้าของระบบขอให้อยู่ในระบบนานขึ้น ไม่ต้อง login ทุกวัน, 2026-07-10)
   const payloadStr = JSON.stringify({ Username: username, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 });
   const payloadB64 = Utilities.base64EncodeWebSafe(Utilities.newBlob(payloadStr).getBytes());
-  const signature = Utilities.computeHmacSha256Signature(payloadB64, getSecretKey());
+  const signature = Utilities.computeHmacSha256Signature(payloadB64, getSecretKey_());
   const signatureB64 = Utilities.base64EncodeWebSafe(signature);
   return payloadB64 + "." + signatureB64;
 }
 
 // เทียบ string แบบ constant-time — กัน timing attack เดา signature ทีละตัวอักษร
-function timingSafeEqual(a, b) {
+function timingSafeEqual_(a, b) {
   const aStr = String(a);
   const bStr = String(b);
   if (aStr.length !== bStr.length) return false;
@@ -297,13 +211,13 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-function verifyToken(token) {
+function verifyToken_(token) {
   if (!token) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
-  const expectedSig = Utilities.computeHmacSha256Signature(parts[0], getSecretKey());
+  const expectedSig = Utilities.computeHmacSha256Signature(parts[0], getSecretKey_());
   const expectedSigB64 = Utilities.base64EncodeWebSafe(expectedSig);
-  if (!timingSafeEqual(expectedSigB64, parts[1])) return null;
+  if (!timingSafeEqual_(expectedSigB64, parts[1])) return null;
   
   const payloadStr = Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString();
   const payload = JSON.parse(payloadStr);
@@ -311,12 +225,7 @@ function verifyToken(token) {
   return payload;
 }
 
-function obfuscate(text) {
-  if (!text) return "";
-  return Utilities.base64EncodeWebSafe(Utilities.newBlob(text).getBytes());
-}
-
-function deobfuscate(encoded) {
+function deobfuscate_(encoded) {
   if (!encoded) return "";
   // Check if it's already plain text (e.g. contains only digits/dashes and length <= 15)
   if (/^[\d\-+()\s]+$/.test(encoded)) return encoded;
@@ -327,87 +236,9 @@ function deobfuscate(encoded) {
   }
 }
 
-// 7.1 — Migration ครั้งเดียว: ถอดรหัส PII แถวเก่า (base64) ในชีต Orders ให้เป็น plain text ตามนโยบายใหม่ 2026-07-05
-// ไม่ผูกกับ apiHandler — Admin รันมือจาก GAS editor เท่านั้น (เลือกฟังก์ชันนี้แล้วกด Run)
-function migrateDeobfuscatePII() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Orders");
-  if (!sheet) throw new Error("ไม่พบชีต Orders");
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return "ไม่มีข้อมูลให้ migrate";
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
-    const touched = {}; // แถว (0-based ในช่วงข้อมูล) ที่มีการถอดรหัสอย่างน้อย 1 คอลัมน์
-    ["Contact Number", "ID Card_Passport"].forEach(colName => {
-      const idx = headers.indexOf(colName);
-      if (idx === -1) return;
-      const rng = sheet.getRange(2, idx + 1, lastRow - 1, 1);
-      const vals = rng.getValues();
-      let changed = false;
-      for (let r = 0; r < vals.length; r++) {
-        const v = (vals[r][0] || "").toString();
-        if (!v) continue;
-        if (/^[\d\-+()\s]+$/.test(v)) continue; // ตัวเลขล้วน = plain อยู่แล้ว ข้าม
-        const plain = deobfuscate(v);
-        if (plain !== v) { vals[r][0] = plain; changed = true; touched[r] = true; }
-      }
-      if (changed) {
-        // format '@' ก่อนเขียนกลับ กันเลข 0 นำหน้าหาย — เขียน batch ครั้งเดียวทั้งคอลัมน์
-        rng.setNumberFormat('@');
-        rng.setValues(vals);
-      }
-    });
-    const rowCount = Object.keys(touched).length;
-    logAudit((Session.getActiveUser().getEmail() || "ADMIN_MANUAL"), "MIGRATE_PII", "Deobfuscated PII in Orders: " + rowCount + " rows");
-    return "Migrated " + rowCount + " rows";
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-// 12.1 — Migration ครั้งเดียว: จัดเรียง Channel ID ในชีต Channels ใหม่เป็น CH-01, CH-02, ... ตามลำดับแถว
-// สาเหตุ: บางแถวถูกแก้ตรงในชีตให้เป็นค่าเดียวกับ Branch Code (เช่น B01) ทำให้ตัวสร้างรหัสอัตโนมัติฝั่งแอดมิน
-// (ดู JS.html: autoIdFormats['Channel ID'], regex ^CH-(\d+)$) มองไม่เห็นว่ามี ID ตรงรูปแบบอยู่แล้ว
-// ปลอดภัยที่จะรันได้เสมอ — Channel ID ไม่ถูกใช้ join/อ้างอิงที่ไหนในระบบเลย (Branches/GiftMappings/POS/Checkout
-// เชื่อมกันด้วย Channel Name ทั้งหมด ไม่ใช่ Channel ID) การเขียนทับคอลัมน์นี้จึงไม่กระทบข้อมูลอื่น
-// ไม่ผูกกับ apiHandler — Admin รันมือจาก GAS editor เท่านั้น (เลือกฟังก์ชันนี้แล้วกด Run)
-function migrateResequenceChannelIds() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Channels");
-  if (!sheet) throw new Error("ไม่พบชีต Channels");
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return "ไม่มีข้อมูลให้จัดเรียง";
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
-    const idCol = headers.indexOf("Channel ID");
-    if (idCol === -1) throw new Error("ไม่พบคอลัมน์ Channel ID");
-
-    const rng = sheet.getRange(2, idCol + 1, lastRow - 1, 1);
-    const vals = rng.getValues();
-    let changedCount = 0;
-    for (let i = 0; i < vals.length; i++) {
-      const newId = 'CH-' + String(i + 1).padStart(2, '0');
-      if (String(vals[i][0] || '').trim() !== newId) { vals[i][0] = newId; changedCount++; }
-    }
-    if (changedCount > 0) {
-      rng.setNumberFormat('@'); // กัน Sheets ตีความ ID เป็นชนิดอื่น เผื่ออนาคตมีรูปแบบตัวเลขล้วนปนมา
-      rng.setValues(vals);
-      CacheService.getScriptCache().remove("TABLE_Channels");
-    }
-    logAudit((Session.getActiveUser().getEmail() || "ADMIN_MANUAL"), "MIGRATE_CHANNEL_ID", "Resequenced Channel ID in Channels: " + changedCount + " of " + vals.length + " rows changed");
-    return "จัดเรียง Channel ID เรียบร้อย: แก้ไข " + changedCount + " จาก " + vals.length + " แถว (ผลลัพธ์ CH-01 ถึง CH-" + String(vals.length).padStart(2, '0') + ")";
-  } finally {
-    lock.releaseLock();
-  }
-}
-
 // running number ภายใน execution เดียว — สุ่ม 4 หลักอย่างเดียวเคยเสี่ยง ID ชนกันใน batch (เช่น invRows หลายแถวในออเดอร์เดียว)
 let __genIdSeq = 0;
-function generateId(prefix) {
+function generateId_(prefix) {
   __genIdSeq++;
   return prefix + '-' + Utilities.formatDate(new Date(), "GMT+7", "yyMMdd") + '-' + Date.now() + '-' + __genIdSeq + '-' + Math.floor(100 + Math.random() * 900);
 }
@@ -421,10 +252,10 @@ function sanitizeSheetText_(value) {
   return s;
 }
 
-function logAudit(user, action, details) {
+function logAudit_(user, action, details) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("AuditLog");
-  if(sheet) sheet.appendRow([generateId('LOG'), new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}), user, action, details]);
+  if(sheet) sheet.appendRow([generateId_('LOG'), new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}), user, action, details]);
 }
 
 // คืนค่า config สาธารณะที่หน้า login ต้องใช้ (เรียกได้โดยไม่ต้อง login) — ต้องไม่มีข้อมูลอ่อนไหวปนมาเด็ดขาด
@@ -461,7 +292,7 @@ function getPublicConfig() {
          }
       }
     }
-    const logoUrl = (getKeyValueSettings(ss).LogoUrl || '').toString().trim() || null;
+    const logoUrl = (getKeyValueSettings_(ss).LogoUrl || '').toString().trim() || null;
     return { loginBg: loginBg, logoUrl: logoUrl };
   } catch(e) { return { loginBg: loginBg, logoUrl: null }; }
 }
@@ -490,15 +321,15 @@ function apiHandlerInner_(action, payload, userToken) {
     let secureUser = null;
     if (action !== 'LOGIN' && action !== 'PUBLIC_TRACK_ORDER') {
       if (!userToken || !userToken.Token) throw new Error("Unauthorized Access: No Token");
-      const payloadObj = verifyToken(userToken.Token);
+      const payloadObj = verifyToken_(userToken.Token);
       if (!payloadObj) throw new Error("Invalid or Expired Token. Please login again.");
       
-      const members = getTableDataAsJson(ss.getSheetByName("Members"));
+      const members = getTableDataAsJson_(ss.getSheetByName("Members"));
       secureUser = members.find(u => u.Username === payloadObj.Username);
       if (!secureUser) throw new Error("Invalid User Session");
       
       if (secureUser['Branch Code'] !== 'ALL') {
-        const branches = getTableDataAsJson(ss.getSheetByName("Branches"));
+        const branches = getTableDataAsJson_(ss.getSheetByName("Branches"));
         const bInfo = branches.find(b => b['Branch Code'] === secureUser['Branch Code']);
         secureUser.Channel = bInfo ? bInfo.Channel : 'Unknown';
         secureUser['Branch Name'] = bInfo ? bInfo['Branch Name'] : 'Unknown Branch';
@@ -509,8 +340,8 @@ function apiHandlerInner_(action, payload, userToken) {
     }
 
     switch(action) {
-      case 'LOGIN': return doLogin(payload.username, payload.password, ss);
-      case 'GET_ADVANCED_DASHBOARD': return getAdvancedDashboard(secureUser, ss, payload);
+      case 'LOGIN': return doLogin_(payload.username, payload.password, ss);
+      case 'GET_ADVANCED_DASHBOARD': return getAdvancedDashboard_(secureUser, ss, payload);
       case 'GET_TABLE':
         // ตารางอ่อนไหว (ข้อมูลสมาชิก/ตั้งค่า/ประวัติระบบ) อ่านได้เฉพาะ Admin — บังคับสิทธิ์ฝั่ง server เสมอ
         if (['Members', 'Settings', 'AuditLog', 'OrderStatusLog'].includes(payload.tableName) && secureUser.Role !== 'Admin') {
@@ -536,7 +367,7 @@ function apiHandlerInner_(action, payload, userToken) {
         if (payload.tableName === 'Products') {
           ensureProductSpecColumns_(ss);
         }
-        let tableData = getTableDataAsJson(ss.getSheetByName(payload.tableName), secureUser.Role === 'Admin');
+        let tableData = getTableDataAsJson_(ss.getSheetByName(payload.tableName), secureUser.Role === 'Admin');
         if ((payload.tableName === 'Orders' || payload.tableName === 'InventoryLog') && secureUser.Role === 'Sales') {
           tableData = tableData.filter(row => row['Branch Code'] === secureUser['Branch Code']);
         }
@@ -549,45 +380,45 @@ function apiHandlerInner_(action, payload, userToken) {
         }
         if (payload.tableName === 'Orders') {
           tableData = tableData.map(o => {
-            if (o['Contact Number']) o['Contact Number'] = deobfuscate(o['Contact Number']);
-            if (o['ID Card_Passport']) o['ID Card_Passport'] = deobfuscate(o['ID Card_Passport']);
+            if (o['Contact Number']) o['Contact Number'] = deobfuscate_(o['Contact Number']);
+            if (o['ID Card_Passport']) o['ID Card_Passport'] = deobfuscate_(o['ID Card_Passport']);
             return o;
           });
         }
         return { status: 'success', data: tableData };
-      case 'GET_ALL_DATA': return getAllInitialData(ss, secureUser.Role === 'Admin');
-      case 'SAVE_RECORD': return saveRecord(payload.tableName, payload.data, payload.idField, secureUser, ss);
-      case 'DELETE_RECORDS': return deleteRecords(payload, secureUser, ss);
-      case 'BULK_SET_STATUS': return bulkSetStatus(payload, secureUser, ss);
-      case 'DELETE_RECORD': return deleteRecord(payload.tableName, payload.idField, payload.idValue, secureUser, ss);
-      case 'SAVE_PRODUCT_GROUP': return saveProductGroup(payload, secureUser, ss);
-      case 'UPDATE_PRODUCT_GROUP': return updateProductGroup(payload, secureUser, ss);
-      case 'CHECKOUT': return processCheckout(payload, secureUser, ss);
-      case 'UPDATE_FULL_ORDER': return updateFullOrder(payload.data, secureUser, ss);
+      case 'GET_ALL_DATA': return getAllInitialData_(ss, secureUser.Role === 'Admin');
+      case 'SAVE_RECORD': return saveRecord_(payload.tableName, payload.data, payload.idField, secureUser, ss);
+      case 'DELETE_RECORDS': return deleteRecords_(payload, secureUser, ss);
+      case 'BULK_SET_STATUS': return bulkSetStatus_(payload, secureUser, ss);
+      case 'DELETE_RECORD': return deleteRecord_(payload.tableName, payload.idField, payload.idValue, secureUser, ss);
+      case 'SAVE_PRODUCT_GROUP': return saveProductGroup_(payload, secureUser, ss);
+      case 'UPDATE_PRODUCT_GROUP': return updateProductGroup_(payload, secureUser, ss);
+      case 'CHECKOUT': return processCheckout_(payload, secureUser, ss);
+      case 'UPDATE_FULL_ORDER': return updateFullOrder_(payload.data, secureUser, ss);
       case 'GET_SETTINGS_LIST':
         if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
-        return getSettingsList(ss);
-      case 'SAVE_SETTINGS_ITEM': return saveSettingsItem(payload, secureUser, ss);
-      case 'DELETE_SETTINGS_ITEM': return deleteSettingsItem(payload, secureUser, ss);
-      case 'NEWS_LIST': return newsList(secureUser, ss);
-      case 'NEWS_SAVE': return saveNews(payload, secureUser, ss);
-      case 'NEWS_DELETE': return deleteNews(payload, secureUser, ss);
-      case 'NEWS_SET_SEQ': return setNewsSeq(payload, secureUser, ss);
-      case 'NEWS_CAT_SAVE': return saveNewsCategory(payload, secureUser, ss);
-      case 'NEWS_CAT_DELETE': return deleteNewsCategories(payload, secureUser, ss);
-      case 'UPLOAD_IMAGE': return uploadImage(payload, secureUser, ss);
-      case 'CHANGE_PASSWORD': return changePassword(payload, secureUser, ss);
-      case 'GET_CUSTOMER_BY_PHONE': return getCustomerByPhone(payload, secureUser, ss); // ทุก role ที่ login แล้ว — คืนเฉพาะฟิลด์เติมฟอร์ม
-      case 'GET_INVOICES': return getInvoices(secureUser, ss);       // Admin/Manager เห็นทั้งหมด, role อื่นเห็นเฉพาะที่ตนสร้าง
-      case 'SAVE_INVOICE': return saveInvoice(payload, secureUser, ss);
-      case 'APPROVE_INVOICE': return approveInvoice(payload, secureUser, ss);
-      case 'DELETE_INVOICE': return deleteInvoice(payload, secureUser, ss);
-      case 'TRACK_ORDER': return trackOrderLookup(payload, secureUser, ss);
-      case 'SET_ORDER_STATUS': return setOrderStatus(payload, secureUser, ss);
-      case 'PUBLIC_TRACK_ORDER': return publicTrackOrderLookup(payload, ss);
-      case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts(payload, secureUser, ss);
-      case 'IMPORT_PRODUCTS': return importProducts(payload, secureUser, ss);
-      case 'IMPORT_RECORDS': return importRecords(payload, secureUser, ss);
+        return getSettingsList_(ss);
+      case 'SAVE_SETTINGS_ITEM': return saveSettingsItem_(payload, secureUser, ss);
+      case 'DELETE_SETTINGS_ITEM': return deleteSettingsItem_(payload, secureUser, ss);
+      case 'NEWS_LIST': return newsList_(secureUser, ss);
+      case 'NEWS_SAVE': return saveNews_(payload, secureUser, ss);
+      case 'NEWS_DELETE': return deleteNews_(payload, secureUser, ss);
+      case 'NEWS_SET_SEQ': return setNewsSeq_(payload, secureUser, ss);
+      case 'NEWS_CAT_SAVE': return saveNewsCategory_(payload, secureUser, ss);
+      case 'NEWS_CAT_DELETE': return deleteNewsCategories_(payload, secureUser, ss);
+      case 'UPLOAD_IMAGE': return uploadImage_(payload, secureUser, ss);
+      case 'CHANGE_PASSWORD': return changePassword_(payload, secureUser, ss);
+      case 'GET_CUSTOMER_BY_PHONE': return getCustomerByPhone_(payload, secureUser, ss); // ทุก role ที่ login แล้ว — คืนเฉพาะฟิลด์เติมฟอร์ม
+      case 'GET_INVOICES': return getInvoices_(secureUser, ss);       // Admin/Manager เห็นทั้งหมด, role อื่นเห็นเฉพาะที่ตนสร้าง
+      case 'SAVE_INVOICE': return saveInvoice_(payload, secureUser, ss);
+      case 'APPROVE_INVOICE': return approveInvoice_(payload, secureUser, ss);
+      case 'DELETE_INVOICE': return deleteInvoice_(payload, secureUser, ss);
+      case 'TRACK_ORDER': return trackOrderLookup_(payload, secureUser, ss);
+      case 'SET_ORDER_STATUS': return setOrderStatus_(payload, secureUser, ss);
+      case 'PUBLIC_TRACK_ORDER': return publicTrackOrderLookup_(payload, ss);
+      case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts_(payload, secureUser, ss);
+      case 'IMPORT_PRODUCTS': return importProducts_(payload, secureUser, ss);
+      case 'IMPORT_RECORDS': return importRecords_(payload, secureUser, ss);
       case 'VALIDATE_COUPON': return validateCouponApi_(payload, ss);
       case 'CLEAR_CACHE':
         if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
@@ -599,7 +430,7 @@ function apiHandlerInner_(action, payload, userToken) {
   }
 }
 
-function doLogin(username, password, ss) {
+function doLogin_(username, password, ss) {
   const sheet = ss.getSheetByName("Members");
   if(!sheet) return { status: 'error', message: 'กรุณากด Auto Setup ก่อน' };
 
@@ -611,8 +442,8 @@ function doLogin(username, password, ss) {
     return { status: 'error', message: 'พยายามเข้าสู่ระบบผิดพลาดเกินกำหนด กรุณารอ 5 นาทีแล้วลองใหม่' };
   }
 
-  const data = getTableDataAsJson(sheet);
-  const hashedPw = hashPassword(password);
+  const data = getTableDataAsJson_(sheet);
+  const hashedPw = hashPassword_(password);
   
   // Backward compatibility for un-salted passwords
   const oldHashedPw = (() => {
@@ -650,7 +481,7 @@ function doLogin(username, password, ss) {
     rlCache.remove(rlKey); // login สำเร็จ — ล้างตัวนับ
     delete user.Password;
     if (user['Branch Code'] !== 'ALL') {
-      const branches = getTableDataAsJson(ss.getSheetByName("Branches"));
+      const branches = getTableDataAsJson_(ss.getSheetByName("Branches"));
       const bInfo = branches.find(b => b['Branch Code'] === user['Branch Code']);
       user.Channel = bInfo ? bInfo.Channel : 'Unknown';
       user['Branch Name'] = bInfo ? bInfo['Branch Name'] : 'Unknown Branch';
@@ -658,15 +489,15 @@ function doLogin(username, password, ss) {
       user.Channel = 'ALL';
       user['Branch Name'] = 'ALL Branches';
     }
-    user.Token = generateToken(user.Username);
-    logAudit(user.Username, "LOGIN", "System Login");
+    user.Token = generateToken_(user.Username);
+    logAudit_(user.Username, "LOGIN", "System Login");
     return { status: 'success', user: user };
   }
   rlCache.put(rlKey, String(failCount + 1), 300); // นับ fail — หมดอายุเอง 5 นาที
   return { status: 'error', message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
 }
 
-function changePassword(payload, secureUser, ss) {
+function changePassword_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -687,8 +518,8 @@ function changePassword(payload, secureUser, ss) {
     if (rowIndex === -1) throw new Error("ไม่พบบัญชีผู้ใช้");
 
     const storedHash = data[rowIndex - 1][pwCol];
-    const hashedOld = hashPassword(oldPassword);
-    // รองรับรหัสผ่านเก่าที่ยังไม่ได้ salt (legacy) / plain text — เหมือน logic ใน doLogin
+    const hashedOld = hashPassword_(oldPassword);
+    // รองรับรหัสผ่านเก่าที่ยังไม่ได้ salt (legacy) / plain text — เหมือน logic ใน doLogin_
     const oldHashedLegacy = (() => {
       const d = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, oldPassword);
       let h = ''; for (let i = 0; i < d.length; i++) { let v = d[i]; if (v < 0) v += 256; let s = v.toString(16); if (s.length == 1) s = '0' + s; h += s; }
@@ -698,8 +529,8 @@ function changePassword(payload, secureUser, ss) {
       throw new Error("รหัสผ่านเดิมไม่ถูกต้อง");
     }
 
-    sheet.getRange(rowIndex, pwCol + 1).setValue(hashPassword(newPassword));
-    logAudit(secureUser.Username, "CHANGE_PASSWORD", "Changed own password");
+    sheet.getRange(rowIndex, pwCol + 1).setValue(hashPassword_(newPassword));
+    logAudit_(secureUser.Username, "CHANGE_PASSWORD", "Changed own password");
     return { status: 'success' };
   } catch (e) {
     return { status: 'error', message: e.toString() };
@@ -711,7 +542,7 @@ function changePassword(payload, secureUser, ss) {
 // skipCache=true (ใช้กับ Admin) ข้ามการ "อ่าน" จาก cache เสมอ อ่านสดจากชีตตรงๆ ทุกครั้ง — กันแอดมินเห็นข้อมูลเก่าค้างได้นานสุด 6 ชม. (21600 วิ ด้านล่าง)
 // หลังจากคนอื่นแก้ไขชีตตรงๆ ใน Google Sheets UI (ไม่ผ่านฟอร์มของแอป จึงไม่มีจุดไหนสั่ง cache.remove() ให้) ยังคง "เขียน" ทับ cache ตามปกติ
 // ไม่ว่า skipCache หรือไม่ — ผลคือพลอยรีเฟรช cache ให้ role อื่นที่ยังใช้ cache อยู่ (Sales/Manager) เห็นข้อมูลใหม่ไปด้วยทันทีที่แอดมินเข้าเปิดหน้าไหนก็ตาม
-function getTableDataAsJson(sheet, skipCache) {
+function getTableDataAsJson_(sheet, skipCache) {
   if (!sheet) return [];
   const tableName = sheet.getName();
   const cache = CacheService.getScriptCache();
@@ -741,7 +572,7 @@ function getTableDataAsJson(sheet, skipCache) {
   return result;
 }
 
-function getKeyValueSettings(ss) {
+function getKeyValueSettings_(ss) {
   const sheet = ss.getSheetByName("Settings");
   if (!sheet) return {};
   const data = sheet.getDataRange().getValues();
@@ -755,7 +586,7 @@ function getKeyValueSettings(ss) {
   return settings;
 }
 
-function initAutoPromotionsSheet(ss) {
+function initAutoPromotionsSheet_(ss) {
   let sheet = ss.getSheetByName("AutoPromotions");
   if (!sheet) {
     try {
@@ -1026,7 +857,7 @@ const GIFT_SET_COLS_ = ["Channel Gifts", "Channel Gifts 2", "Channel Gifts 3"];
 
 // จัดคอลัมน์ชุดที่ 2/3 ของชีต GiftMappings ให้อยู่ถัดจาก "Channel Gifts" (… Channel Gifts, Channel Gifts 2, Channel Gifts 3, Status)
 // ยังไม่มี = แทรกคอลัมน์ใหม่, มีแล้วแต่อยู่ผิดที่ (เช่น ต่อท้ายหลัง Status จากเวอร์ชันก่อน) = ย้ายทั้งคอลัมน์พร้อมข้อมูล — รันซ้ำได้ ไม่ทำอะไรถ้าเรียงถูกแล้ว
-// ชีตนี้อ่าน/เขียนตามชื่อหัวคอลัมน์ทุกจุด (getTableDataAsJson / saveRecord / importRecords / bulkSetStatus / deleteRecords) ตำแหน่งคอลัมน์จึงไม่กระทบระบบ
+// ชีตนี้อ่าน/เขียนตามชื่อหัวคอลัมน์ทุกจุด (getTableDataAsJson_ / saveRecord_ / importRecords_ / bulkSetStatus_ / deleteRecords_) ตำแหน่งคอลัมน์จึงไม่กระทบระบบ
 // ผู้เรียกต้องถือ script lock อยู่แล้ว คืนค่า true เมื่อมีการเปลี่ยนโครงสร้างชีต
 function ensureGiftSetColumns_(ss) {
   let changed = false;
@@ -1139,7 +970,7 @@ function getPopularModels_(ss, now) {
       if (skuI > -1 && tsI > -1) {
         // SKU -> Model เฉพาะสินค้าขายปกติที่เปิดอยู่ (ของแถม/ส่วนลด/รุ่นที่ไม่มี Model ไม่นับ — หน้าร้านไม่แสดงเป็นการ์ดอยู่แล้ว)
         const modelOfSku = {};
-        getTableDataAsJson(ss.getSheetByName("Products")).forEach(p => {
+        getTableDataAsJson_(ss.getSheetByName("Products")).forEach(p => {
           const model = (p.Model || '').toString().trim();
           if (!model || model === '-') return;
           if ((p.Category || '').toString().includes('ของแถม')) return;
@@ -1173,8 +1004,8 @@ function getPopularModels_(ss, now) {
   return result;
 }
 
-function getAllInitialData(ss, isAdmin) {
-  initAutoPromotionsSheet(ss);
+function getAllInitialData_(ss, isAdmin) {
+  initAutoPromotionsSheet_(ss);
   ensureProductSpecColumns_(ss);
   CacheService.getScriptCache().remove("TABLE_AutoPromotions");
   CacheService.getScriptCache().remove("TABLE_Branches");
@@ -1196,7 +1027,7 @@ function getAllInitialData(ss, isAdmin) {
         const details = data[i][5] ? data[i][5].toString().trim() : "";
         const title = data[i][6] ? data[i][6].toString().trim() : "";
         const buttonText = data[i][7] ? data[i][7].toString().trim() : "";
-        // หน้าร้านเห็นเฉพาะแบนเนอร์ที่อยู่ในช่วงเวลา (ว่าง = แสดงตลอด) — หน้าตั้งค่า (getSettingsList) เห็นครบพร้อมสถานะ
+        // หน้าร้านเห็นเฉพาะแบนเนอร์ที่อยู่ในช่วงเวลา (ว่าง = แสดงตลอด) — หน้าตั้งค่า (getSettingsList_) เห็นครบพร้อมสถานะ
         const live = bannerScheduleState_(bannerDateStr_(data[i][8]), bannerDateStr_(data[i][9])) === 'live';
         if (live && status !== 'Deleted' && url && url.toString().trim() !== "") {
           if (type === 'herobanner') heroBanners.push({url: url.toString().trim(), link: targetLink, details: details, title: title});
@@ -1223,16 +1054,16 @@ function getAllInitialData(ss, isAdmin) {
 
   return {
     status: 'success',
-    products: getTableDataAsJson(ss.getSheetByName("Products"), isAdmin),
-    promotions: getTableDataAsJson(ss.getSheetByName("Promotions"), isAdmin),
-    branches: getTableDataAsJson(ss.getSheetByName("Branches"), isAdmin),
-    channels: getTableDataAsJson(ss.getSheetByName("Channels"), isAdmin),
-    interests: getTableDataAsJson(ss.getSheetByName("Interests"), isAdmin),
-    giftMappings: getTableDataAsJson(ss.getSheetByName("GiftMappings"), isAdmin),
-    autoPromotions: getTableDataAsJson(ss.getSheetByName("AutoPromotions"), isAdmin),
-    members: getTableDataAsJson(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
+    products: getTableDataAsJson_(ss.getSheetByName("Products"), isAdmin),
+    promotions: getTableDataAsJson_(ss.getSheetByName("Promotions"), isAdmin),
+    branches: getTableDataAsJson_(ss.getSheetByName("Branches"), isAdmin),
+    channels: getTableDataAsJson_(ss.getSheetByName("Channels"), isAdmin),
+    interests: getTableDataAsJson_(ss.getSheetByName("Interests"), isAdmin),
+    giftMappings: getTableDataAsJson_(ss.getSheetByName("GiftMappings"), isAdmin),
+    autoPromotions: getTableDataAsJson_(ss.getSheetByName("AutoPromotions"), isAdmin),
+    members: getTableDataAsJson_(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
     // ใช้วาด order status timeline (5A.3) — ชีตอาจไม่มีในระบบเก่า จึงต้องกัน null
-    orderStatuses: ss.getSheetByName("OrderStatus") ? getTableDataAsJson(ss.getSheetByName("OrderStatus")) : [],
+    orderStatuses: ss.getSheetByName("OrderStatus") ? getTableDataAsJson_(ss.getSheetByName("OrderStatus")) : [],
     heroBanners: heroBanners,
     gridBanners: gridBanners,
     popupBanners: popupBanners,
@@ -1241,7 +1072,7 @@ function getAllInitialData(ss, isAdmin) {
     // โค้ดคูปองที่ตั้ง Show On Store = เปิด (แสดงในหน้า "โปรโมชั่นทั้งหมด") — โค้ดอื่นไม่ถูกส่งออก
     publicCoupons: (function() { try { return getPublicCoupons_(ss); } catch (e) { return []; } })(),
     // เฉพาะคีย์ที่ไม่ใช่ความลับ (Webhook URL / Drive Folder ID ไม่ส่งให้หน้าเว็บของ role ใดเลย — Admin อ่านผ่าน GET_SETTINGS_LIST)
-    settings: publicSettings_(getKeyValueSettings(ss))
+    settings: publicSettings_(getKeyValueSettings_(ss))
   };
 }
 
@@ -1281,17 +1112,17 @@ function invalidateDashboardCache_() {
   try { CacheService.getScriptCache().remove(DASH_CACHE_KEY_ + '_meta'); } catch (e) {}
 }
 
-function getAdvancedDashboard(secureUser, ss, payload) {
+function getAdvancedDashboard_(secureUser, ss, payload) {
   const isAdmin = secureUser.Role === 'Admin';
   const forceRefresh = !!(payload && payload.refresh === true);
   let base = forceRefresh ? null : dashCacheGet_();
   if (!base) {
     base = {
-      orders: getTableDataAsJson(ss.getSheetByName("Orders")),
+      orders: getTableDataAsJson_(ss.getSheetByName("Orders")),
       // Admin เห็นข้อมูลสินค้าสดเสมอ (ข้ามแคชตาราง) ตอนสร้างชุดข้อมูลใหม่
-      products: getTableDataAsJson(ss.getSheetByName("Products"), isAdmin || forceRefresh),
+      products: getTableDataAsJson_(ss.getSheetByName("Products"), isAdmin || forceRefresh),
       // Dashboard เปิดได้ทุก role — ห้ามส่ง Password hash ออกไปหน้าบ้านเด็ดขาด (ตัดก่อนลงแคชด้วย)
-      members: getTableDataAsJson(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
+      members: getTableDataAsJson_(ss.getSheetByName("Members")).map(m => { const clean = Object.assign({}, m); delete clean.Password; return clean; }),
       builtAt: new Date().getTime()
     };
     try { dashCachePut_(JSON.stringify(base)); } catch (e) {}
@@ -1300,8 +1131,8 @@ function getAdvancedDashboard(secureUser, ss, payload) {
   // Deobfuscate PII for display (ทำกับสำเนา ไม่แก้ base ที่แคชไว้)
   let orders = base.orders.map(o => {
     const c = Object.assign({}, o);
-    if (c['Contact Number']) c['Contact Number'] = deobfuscate(c['Contact Number']);
-    if (c['ID Card_Passport']) c['ID Card_Passport'] = deobfuscate(c['ID Card_Passport']);
+    if (c['Contact Number']) c['Contact Number'] = deobfuscate_(c['Contact Number']);
+    if (c['ID Card_Passport']) c['ID Card_Passport'] = deobfuscate_(c['ID Card_Passport']);
     return c;
   });
 
@@ -1333,7 +1164,7 @@ function normalizeIdCard_(raw) {
   throw new Error("เลข Passport ต้องเป็นตัวอักษรอังกฤษ/ตัวเลข 6-9 ตัว");
 }
 
-function processCheckout(payload, secureUser, ss) {
+function processCheckout_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -1344,7 +1175,7 @@ function processCheckout(payload, secureUser, ss) {
 
     // ==== กติกาการจองต้องบังคับฝั่ง server เสมอ (UI เช็คแล้วแต่เชื่อ client ไม่ได้) ====
     if (!payload.cart || !Array.isArray(payload.cart) || payload.cart.length === 0) throw new Error("ตะกร้าว่างเปล่า");
-    const bookSettings = getKeyValueSettings(ss);
+    const bookSettings = getKeyValueSettings_(ss);
     if (bookSettings.ReserveStart && bookSettings.ReserveEnd) {
       const rStart = new Date(bookSettings.ReserveStart);
       const rEnd = new Date(bookSettings.ReserveEnd);
@@ -1353,7 +1184,7 @@ function processCheckout(payload, secureUser, ss) {
         throw new Error("ไม่อยู่ในช่วงเวลาการจองสินค้า");
       }
     }
-    // whitelist ค่าเดียวกับที่ updateFullOrder เช็ค (rule 25 style) — เดิม processCheckout เช็คแค่ .indexOf('จอง T') แล้วปล่อยสตริงอื่นใดผ่าน sanitizeSheetText_ เขียนตรงๆ
+    // whitelist ค่าเดียวกับที่ updateFullOrder_ เช็ค (rule 25 style) — เดิม processCheckout_ เช็คแค่ .indexOf('จอง T') แล้วปล่อยสตริงอื่นใดผ่าน sanitizeSheetText_ เขียนตรงๆ
     // ทำให้รายงาน/พีวอตที่ key ด้วยสองสตริงนี้แน่นอน (bookingSummary, salesSummary, ฯลฯ) จัดกลุ่มแถวที่มีค่าอื่นไม่ได้เลย
     const validResStatuses = ['', 'จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'];
     if (payload.resStatus && !validResStatuses.includes(payload.resStatus.toString().trim())) {
@@ -1407,13 +1238,13 @@ function processCheckout(payload, secureUser, ss) {
        actualChannel = secureUser.Channel;
     }
 
-    const branches = getTableDataAsJson(ss.getSheetByName("Branches"));
+    const branches = getTableDataAsJson_(ss.getSheetByName("Branches"));
     const branchInfo = branches.find(b => b['Branch Code'] === actualBranch && (b.Channel === actualChannel || actualChannel === 'ALL'));
     if (actualBranch !== 'ALL' && !branchInfo) throw new Error("Invalid branch or channel.");
     // branch === 'ALL' ข้ามการเช็คคู่ branch/channel ด้านบนไปเลย — ต้องเช็ค channel แยกว่ามีอยู่จริงในชีต Channels
     // ไม่งั้น payload ที่ครอบ branch:'ALL' ส่ง channel เป็นสตริงอะไรก็ได้ ผ่านเข้าไปปลดล็อกของแถม/ส่วนลดที่ผูก channel นั้นได้
     if (actualBranch === 'ALL' && actualChannel !== 'ALL') {
-      const channels = getTableDataAsJson(ss.getSheetByName("Channels"));
+      const channels = getTableDataAsJson_(ss.getSheetByName("Channels"));
       const channelExists = channels.some(c => (c['Channel Name'] || '').toString().trim() === (actualChannel || '').toString().trim());
       if (!channelExists) throw new Error("Invalid branch or channel.");
     }
@@ -1449,7 +1280,7 @@ function processCheckout(payload, secureUser, ss) {
     let catTotals = {};   // ยอดเงินต่อหมวด (ราคาจากชีต) — ใช้คำนวณ Auto Bundle ซ้ำฝั่ง server
     let catQtys = {};     // จำนวนชิ้นต่อหมวด
 
-    const giftMappings = getTableDataAsJson(ss.getSheetByName("GiftMappings"));
+    const giftMappings = getTableDataAsJson_(ss.getSheetByName("GiftMappings"));
     payload.cart.forEach(item => {
       // จำนวนต้องเป็นจำนวนเต็ม >= 1 — กันค่าติดลบ/ทศนิยมจาก client ทำสต๊อกเพิ่มเอง
       const qty = Number(item.qty);
@@ -1508,12 +1339,12 @@ function processCheckout(payload, secureUser, ss) {
         if (totalMobileQty > 1) throw new Error("สินค้าประเภท โมบาย จำกัดสิทธิ์จองได้ออเดอร์ละ 1 เครื่อง");
       }
 
-      invRows.push([generateId('INV'), now, item.SKU, "SALE", -qty, actualBranch, secureUser.Username]);
+      invRows.push([generateId_('INV'), now, item.SKU, "SALE", -qty, actualBranch, secureUser.Username]);
       
       // sanitizeSheetText_ กัน formula injection (=,+,-,@ นำหน้า) — ทุกฟิลด์นี้เป็นข้อความที่ user พิมพ์เองล้วนๆ
       let fCustName = isFirstRow ? sanitizeSheetText_(payload.customerName) : "";
       // นโยบายเจ้าของระบบ 2026-07-05 (รอบ 7.1): PII เขียน plain text เพื่ออ่านในชีตตรงๆ ได้
-      // ฝั่งอ่าน (GET_TABLE/Dashboard) ยังผ่าน deobfuscate ซึ่งมี digit-passthrough — อ่านแถวเก่าที่เข้ารหัสไว้ได้ ห้ามลบ
+      // ฝั่งอ่าน (GET_TABLE/Dashboard) ยังผ่าน deobfuscate_ ซึ่งมี digit-passthrough — อ่านแถวเก่าที่เข้ารหัสไว้ได้ ห้ามลบ
       let fContact = isFirstRow ? sanitizeSheetText_(payload.contactPhone) : "";
       let fEmail = isFirstRow ? sanitizeSheetText_(payload.email) : "";
       let fIdCard = isFirstRow ? sanitizeSheetText_(payload.idCard) : "";
@@ -1589,9 +1420,9 @@ function processCheckout(payload, secureUser, ss) {
           // นโยบาย: ของแถมหมดต้องไม่ block การขายมือถือ แต่ InventoryLog ต้องตรงความจริง —
           // ตัดสต๊อกจริงเท่านั้นถึง log ติดลบ ถ้าไม่พอให้ log qty 0 และหมายเหตุที่แถวออเดอร์
           if (giftHasStock) {
-            invRows.push([generateId('INV'), now, giftSku, "GIFT", -gQty, actualBranch, secureUser.Username]);
+            invRows.push([generateId_('INV'), now, giftSku, "GIFT", -gQty, actualBranch, secureUser.Username]);
           } else {
-            invRows.push([generateId('INV'), now, giftSku, "GIFT (NO STOCK)", 0, actualBranch, secureUser.Username]);
+            invRows.push([generateId_('INV'), now, giftSku, "GIFT (NO STOCK)", 0, actualBranch, secureUser.Username]);
           }
 
           orderRows.push([
@@ -1630,8 +1461,8 @@ function processCheckout(payload, secureUser, ss) {
       discountsList = [{ name: payload.promo, value: payload.discount }];
     }
     if (discountsList.length > 0) {
-      const promoList = getTableDataAsJson(ss.getSheetByName("Promotions"));
-      let autoRules = getTableDataAsJson(ss.getSheetByName("AutoPromotions"));
+      const promoList = getTableDataAsJson_(ss.getSheetByName("Promotions"));
+      let autoRules = getTableDataAsJson_(ss.getSheetByName("AutoPromotions"));
       // fallback rule เดียวกับหน้า POS (checkAutoPromotions) กรณีชีต AutoPromotions ว่าง
       if (autoRules.length === 0) {
         autoRules = [{ 'Buy Category': 'โมบาย', 'Get Discount Category': 'อุปกรณ์เสริม', 'Discount Percent': 10, 'Status': 'เปิด' }];
@@ -1657,7 +1488,7 @@ function processCheckout(payload, secureUser, ss) {
       // สะสมยอดใช้ต่อชื่อโปรโมชั่น — กัน client ส่งชื่อโปรเดิมซ้ำหลายแถวแล้วแต่ละแถวผ่านเพดานแยกกันเป็นเอกเทศ (เพดานจริงต้องนับรวมต่อโปรหนึ่งชื่อ)
       const promoUsed = {};
       // โค้ดคูปอง (ชื่อส่วนลดขึ้นต้นด้วย COUPON:) — ตรวจกับชีต Coupons ฝั่ง server ทุกครั้ง และนับการใช้งานหลังบันทึกออเดอร์สำเร็จ
-      const couponRows = getTableDataAsJson(ss.getSheetByName("Coupons"), true);
+      const couponRows = getTableDataAsJson_(ss.getSheetByName("Coupons"), true);
       var couponCodesUsed = [];
       discountsList.forEach(d => {
         let val = parseFloat(d.value || 0);
@@ -1719,7 +1550,7 @@ function processCheckout(payload, secureUser, ss) {
       orderSheet.getRange(orderStartRow, 1, orderRows.length, orderRows[0].length).setValues(orderRows);
     }
     
-    logAudit(secureUser.Username, "CHECKOUT", "Created Order: " + orderId);
+    logAudit_(secureUser.Username, "CHECKOUT", "Created Order: " + orderId);
     if (orderRows.length > 0) logOrderStatus_(ss, orderId, '', 'Pending', secureUser.Username);
     try { bumpCouponUsage_(ss, couponCodesUsed || []); } catch (cuErr) {}
     try {
@@ -1735,7 +1566,7 @@ function processCheckout(payload, secureUser, ss) {
 
 // 5. ระบบส่งแจ้งเตือนออเดอร์ใหม่ + แจ้งเตือนสต๊อกใกล้หมด (Low Stock Alert) ผ่าน Webhook / LINE Messaging / Discord / Google Chat
 function sendCheckoutWebhookNotification_(ss, orderId, channel, branch, payload, orderRows, prodData, skuIdx, nameIdx, stockIdx) {
-  const settings = getKeyValueSettings(ss);
+  const settings = getKeyValueSettings_(ss);
   const webhookUrl = (settings.WebhookUrl || settings.LineWebhookUrl || '').toString().trim();
   if (!webhookUrl || !/^https:\/\//i.test(webhookUrl)) return;
 
@@ -1789,7 +1620,7 @@ function sendCheckoutWebhookNotification_(ss, orderId, channel, branch, payload,
 }
 
 // 4. ระบบค้นหาและติดตามสถานะใบจอง (Order Tracking & Digital Booking Pass)
-function trackOrderLookup(payload, secureUser, ss) {
+function trackOrderLookup_(payload, secureUser, ss) {
   const qRaw = ((payload && payload.query) ? payload.query : '').toString().trim();
   if (!qRaw || qRaw.length < 3) throw new Error("กรุณากรอกเลขที่ใบจอง (เช่น ORD-...) หรือเบอร์โทรศัพท์อย่างน้อย 4 หลัก");
   const sheet = ss.getSheetByName("Orders");
@@ -1815,7 +1646,7 @@ function trackOrderLookup(payload, secureUser, ss) {
     if (!oid) continue;
     if (secureUser.Role === 'Sales' && brIdx > -1 && row[brIdx] !== secureUser['Branch Code']) continue;
 
-    const rawPhone = phoneIdx > -1 ? deobfuscate((row[phoneIdx] || '').toString().trim()) : '';
+    const rawPhone = phoneIdx > -1 ? deobfuscate_((row[phoneIdx] || '').toString().trim()) : '';
     const phoneDigits = rawPhone.replace(/\D/g, '');
     const cName = cNameIdx > -1 ? (row[cNameIdx] || '').toString().trim().toLowerCase() : '';
 
@@ -1835,7 +1666,7 @@ function trackOrderLookup(payload, secureUser, ss) {
     const oid = (row[oIdIdx] || '').toString().trim();
     if (!matchedOrderIds[oid]) continue;
     if (!orderMap[oid]) {
-      const rawPhone = phoneIdx > -1 ? deobfuscate((row[phoneIdx] || '').toString().trim()) : '';
+      const rawPhone = phoneIdx > -1 ? deobfuscate_((row[phoneIdx] || '').toString().trim()) : '';
       const maskedPhone = rawPhone.length >= 7 ? (rawPhone.slice(0, 3) + '-XXX-' + rawPhone.slice(-4)) : rawPhone;
       orderMap[oid] = {
         orderId: oid,
@@ -1877,7 +1708,7 @@ function trackOrderLookup(payload, secureUser, ss) {
 
 // 4.1 ระบบติดตามสถานะคำสั่งจอง & บัตรรับเครื่องดิจิทัลสำหรับลูกค้า (Public Booking Tracking & Digital Pass)
 // ปลอดภัยตามมาตรฐาน PDPA: ค้นหาด้วย Order ID + ตรวจสอบเบอร์โทร 4 ตัวท้าย (หรือเบอร์เต็ม) และ Mask ข้อมูลส่วนตัว
-function publicTrackOrderLookup(payload, ss) {
+function publicTrackOrderLookup_(payload, ss) {
   const orderId = ((payload && payload.orderId) ? payload.orderId : '').toString().trim();
   const phone = ((payload && payload.phone) ? payload.phone : '').toString().trim();
   if (!orderId) throw new Error("กรุณาระบุเลขที่ใบจอง (Order ID)");
@@ -1907,7 +1738,7 @@ function publicTrackOrderLookup(payload, ss) {
     const oid = (row[oIdIdx] || '').toString().trim();
     if (oid.toUpperCase() !== qOrderUpper) continue;
 
-    const rawPhone = phoneIdx > -1 ? deobfuscate((row[phoneIdx] || '').toString().trim()) : '';
+    const rawPhone = phoneIdx > -1 ? deobfuscate_((row[phoneIdx] || '').toString().trim()) : '';
     storedPhoneDigits = rawPhone.replace(/\D/g, '');
 
     // หากมีการระบุเบอร์โทรมาด้วย ต้องตรงกันอย่างน้อย 4 ตัวท้าย
@@ -1991,13 +1822,13 @@ function publicTrackOrderLookup(payload, ss) {
 // ===== นำเข้าสินค้าจาก CSV (Admin) =====
 // payload.rows = แถวที่ client แปลงจาก CSV (คีย์ = ชื่อหัวคอลัมน์ตรงกับปุ่ม Export ของ Products); dryRun=true คืนรายงานโดยไม่เขียนชีต
 // เพิ่ม SKU ใหม่เท่านั้น — SKU ที่มีอยู่แล้ว (ในระบบหรือซ้ำในไฟล์) ถูกข้ามและรายงาน ไม่เขียนทับข้อมูลเดิม; ตรวจทุกแถวฝั่งนี้ซ้ำเสมอ (ไม่เชื่อผล dryRun/client)
-// Product Name สร้างจาก Model+Color เสมอ (กฎเดียวกับ saveProductGroup); รุ่นที่มีอยู่แล้ว/ซ้ำในไฟล์ใช้ฟิลด์ร่วม (ราคา ความจุ ฯลฯ) ของแถวแรก
+// Product Name สร้างจาก Model+Color เสมอ (กฎเดียวกับ saveProductGroup_); รุ่นที่มีอยู่แล้ว/ซ้ำในไฟล์ใช้ฟิลด์ร่วม (ราคา ความจุ ฯลฯ) ของแถวแรก
 // รูปแบบที่ Excel/Sheets ใช้แสดงเลขยาว (เช่น 8.65E+13, 1E+13) — ตัวเลขเดิมสูญหายไปแล้ว ห้ามรับเป็นรหัส
 function isSciNotation_(v) { return /^[0-9]+(\.[0-9]+)?E\+[0-9]+$/i.test((v === null || v === undefined ? '' : v).toString().trim()); }
 var PRODUCT_IMPORT_MAX_ROWS_ = 1000;
 var PRODUCT_IMPORT_REPORT_CAP_ = 200;
 var PRODUCT_IMPORT_SHARED_FIELDS_ = ['Marketing Model', 'Product Group', 'Capacity', 'Price', 'Original Price', 'Unit', 'Category', 'Channel', 'Image URL'].concat(PRODUCT_SPEC_COLS_);
-function importProducts(payload, secureUser, ss) {
+function importProducts_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -2095,7 +1926,7 @@ function importProducts(payload, secureUser, ss) {
       skuAsText_(sheet, outRows, startRow, headers.indexOf('SKU'));
       sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
       CacheService.getScriptCache().remove("TABLE_Products");
-      logAudit(secureUser.Username, "IMPORT_PRODUCTS", "Imported " + outRows.length + " SKU(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
+      logAudit_(secureUser.Username, "IMPORT_PRODUCTS", "Imported " + outRows.length + " SKU(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
     }
     return { status: 'success', dryRun: dryRun, total: rowsIn.length, created: outRows.length, skippedCount: skippedCount, errorCount: errorCount, warningCount: warningCount, skipped: skipped, errors: errors, warnings: warnings };
   } catch (e) {
@@ -2124,7 +1955,7 @@ function importCell_(r, k) {
   return v;
 }
 
-function importRecords(payload, secureUser, ss) {
+function importRecords_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -2233,13 +2064,13 @@ function importRecords(payload, secureUser, ss) {
         if (pw === '') {
           generatedCount++;
           obj['Password'] = '';
-          if (!dryRun) { const g = Utilities.getUuid().replace(/-/g, '').slice(0, 16); generated.push({ username: id, password: g }); obj['Password'] = hashPassword(g); }
+          if (!dryRun) { const g = Utilities.getUuid().replace(/-/g, '').slice(0, 16); generated.push({ username: id, password: g }); obj['Password'] = hashPassword_(g); }
         } else if (looksLikePasswordHash_(pw)) {
           obj['Password'] = pw;
         } else if (pw.length < 4) {
           return fail('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร (หรือเว้นว่างให้ระบบสุ่มให้)');
         } else {
-          obj['Password'] = dryRun ? '' : hashPassword(pw);
+          obj['Password'] = dryRun ? '' : hashPassword_(pw);
         }
       }
       if (needsAutoId) {
@@ -2257,7 +2088,7 @@ function importRecords(payload, secureUser, ss) {
       skuAsText_(sheet, outRows, startRow, headers.indexOf('SKU'));
       sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
       CacheService.getScriptCache().remove(spec.cache);
-      logAudit(secureUser.Username, "IMPORT_" + table.toUpperCase(), "Imported " + outRows.length + " " + table + " row(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
+      logAudit_(secureUser.Username, "IMPORT_" + table.toUpperCase(), "Imported " + outRows.length + " " + table + " row(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
     }
     const res = { status: 'success', table: table, dryRun: dryRun, total: rowsIn.length, created: outRows.length, skippedCount: skippedCount, errorCount: errorCount, warningCount: warningCount, skipped: skipped, errors: errors, warnings: warnings, generatedCount: generatedCount };
     if (!dryRun && generated.length > 0) res.generatedPasswords = generated; // แสดงครั้งเดียวหลังนำเข้า — ไม่เก็บไว้ที่ใด
@@ -2269,7 +2100,7 @@ function importRecords(payload, secureUser, ss) {
   }
 }
 
-function bulkUpdateProducts(payload, secureUser, ss) {
+function bulkUpdateProducts_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -2335,7 +2166,7 @@ function bulkUpdateProducts(payload, secureUser, ss) {
       skuAsText_(sheet, outData, 2, headers.indexOf('SKU'));
       sheet.getRange(2, 1, outData.length, headers.length).setValues(outData);
       CacheService.getScriptCache().remove("TABLE_Products");
-      logAudit(secureUser.Username, "BULK_UPDATE_PRODUCTS", "Updated " + updatedCount + " SKU(s)");
+      logAudit_(secureUser.Username, "BULK_UPDATE_PRODUCTS", "Updated " + updatedCount + " SKU(s)");
     }
     return { status: 'success', updatedCount: updatedCount };
   } catch (e) {
@@ -2346,9 +2177,9 @@ function bulkUpdateProducts(payload, secureUser, ss) {
 }
 
 // 8A.2 — จำลูกค้าเก่าจากเบอร์โทร: สแกน Orders จากแถวล่างสุดขึ้นบน (ออเดอร์ล่าสุดก่อน)
-// Contact Number อยู่เฉพาะแถวแรกของออเดอร์ — แถวเก่าอาจเป็น base64 จึงเทียบหลังผ่าน deobfuscate
+// Contact Number อยู่เฉพาะแถวแรกของออเดอร์ — แถวเก่าอาจเป็น base64 จึงเทียบหลังผ่าน deobfuscate_
 // คืนเฉพาะ 4 ฟิลด์ที่ใช้เติมฟอร์ม checkout — ห้ามคืนทั้งแถว (มีข้อมูลออเดอร์อื่นปน)
-function getCustomerByPhone(payload, secureUser, ss) {
+function getCustomerByPhone_(payload, secureUser, ss) {
   const phone = (payload && payload.phone ? payload.phone : '').toString().replace(/\D/g, '');
   if (!/^\d{9,10}$/.test(phone)) throw new Error("เบอร์โทรศัพท์ไม่ถูกต้อง (ต้องเป็นตัวเลข 9-10 หลัก)");
   const sheet = ss.getSheetByName("Orders");
@@ -2366,13 +2197,13 @@ function getCustomerByPhone(payload, secureUser, ss) {
   for (let i = data.length - 1; i >= 1; i--) {
     const raw = (data[i][phoneIdx] || '').toString().trim();
     if (!raw) continue; // แถวของแถม/ส่วนลด/แถวรอง — ข้าม
-    if (deobfuscate(raw).replace(/\D/g, '') === phone &&
+    if (deobfuscate_(raw).replace(/\D/g, '') === phone &&
         (secureUser.Role !== 'Sales' || branchIdx === -1 || data[i][branchIdx] === secureUser['Branch Code'])) {
       return {
         status: 'success', found: true,
         customerName: nameIdx > -1 ? (data[i][nameIdx] || '') : '',
         email: emailIdx > -1 ? (data[i][emailIdx] || '') : '',
-        idCard: idCardIdx > -1 ? deobfuscate((data[i][idCardIdx] || '').toString()) : '',
+        idCard: idCardIdx > -1 ? deobfuscate_((data[i][idCardIdx] || '').toString()) : '',
         codeHandraiser: codeIdx > -1 ? (data[i][codeIdx] || '') : ''
       };
     }
@@ -2382,14 +2213,14 @@ function getCustomerByPhone(payload, secureUser, ss) {
 
 // เปลี่ยนสถานะใบจองทีละใบหรือหลายใบจากหน้ารายการใบจอง (payload: { orderIds: [...], status })
 // - Admin/Manager เปลี่ยนเป็นสถานะใดก็ได้; Sales (owner 2026-11-16) เปลี่ยนได้เฉพาะ SALES_ORDER_STATUSES_ (ชำระแล้ว/ส่งมอบแล้ว/ยกเลิก),
-//   เฉพาะใบจองของสาขาตัวเอง; ใบที่ยกเลิกแล้วเปลี่ยนต่อได้เฉพาะ Admin (ตรวจใน updateFullOrder ภายใต้ lock)
+//   เฉพาะใบจองของสาขาตัวเอง; ใบที่ยกเลิกแล้วเปลี่ยนต่อได้เฉพาะ Admin (ตรวจใน updateFullOrder_ ภายใต้ lock)
 // - สูงสุด SET_ORDER_STATUS_MAX_ ใบต่อครั้ง
 // - หาแถวจาก OrderID ฝั่ง server เอง (ไม่รับ _rowIndex จาก client — ตำแหน่งแถวที่ client ถืออยู่อาจเก่าถ้ามีคนลบแถวไปแล้ว)
-// - งานจริงทำโดย updateFullOrder ทีละใบ: ตรวจชื่อสถานะกับชีต OrderStatus, คืน/ตัดสต๊อกเมื่อยกเลิกหรือนำกลับมา, เขียน AuditLog + OrderStatusLog
+// - งานจริงทำโดย updateFullOrder_ ทีละใบ: ตรวจชื่อสถานะกับชีต OrderStatus, คืน/ตัดสต๊อกเมื่อยกเลิกหรือนำกลับมา, เขียน AuditLog + OrderStatusLog
 // - ใบที่ไม่ผ่าน (ไม่พบ / สต๊อกไม่พอ ฯลฯ) รายงานใน failed โดยไม่ทำให้ใบอื่นล้ม
 var SET_ORDER_STATUS_MAX_ = 50;
 var SALES_ORDER_STATUSES_ = ['Paid', 'Delivered', 'Cancelled'];
-function setOrderStatus(payload, secureUser, ss) {
+function setOrderStatus_(payload, secureUser, ss) {
   try {
     if (!['Admin', 'Manager', 'Sales'].includes(secureUser.Role)) throw new Error("ไม่มีสิทธิ์เปลี่ยนสถานะใบจอง");
     const isSales = secureUser.Role === 'Sales';
@@ -2421,7 +2252,7 @@ function setOrderStatus(payload, secureUser, ss) {
       if (!rowIdx) { failed.push({ orderId: id, message: "ไม่พบใบจองนี้" }); return; }
       const current = (sheet.getRange(rowIdx, stCol + 1).getValue() || 'Pending').toString().trim();
       if (current === status) { unchanged.push(id); return; }
-      const r = updateFullOrder({ "_rowIndex": rowIdx, "Order Status": status }, secureUser, ss, { statusOnly: true });
+      const r = updateFullOrder_({ "_rowIndex": rowIdx, "Order Status": status }, secureUser, ss, { statusOnly: true });
       if (r && r.status === 'success') updated.push(id);
       else failed.push({ orderId: id, message: ((r && r.message) || 'ไม่สำเร็จ').toString().replace(/^Error:\s*/, '') });
     });
@@ -2431,8 +2262,8 @@ function setOrderStatus(payload, secureUser, ss) {
   }
 }
 
-// opts.statusOnly = เรียกจาก setOrderStatus (เปลี่ยนสถานะอย่างเดียว) — ทางเดียวที่ Sales เข้ามาได้; UPDATE_FULL_ORDER ไม่ส่ง opts
-function updateFullOrder(dataObj, secureUser, ss, opts) {
+// opts.statusOnly = เรียกจาก setOrderStatus_ (เปลี่ยนสถานะอย่างเดียว) — ทางเดียวที่ Sales เข้ามาได้; UPDATE_FULL_ORDER ไม่ส่ง opts
+function updateFullOrder_(dataObj, secureUser, ss, opts) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
     const salesStatusOnly = secureUser.Role === 'Sales' && !!(opts && opts.statusOnly);
@@ -2481,7 +2312,7 @@ function updateFullOrder(dataObj, secureUser, ss, opts) {
         dataObj = { "_rowIndex": dataObj["_rowIndex"], "Order Status": newStatus };
       }
 
-    // นโยบาย 2026-07-05 (รอบ 7.1): PII เขียน plain text — ไม่ obfuscate อีกต่อไป (ฝั่งอ่านคง deobfuscate ไว้เพื่อแถวเก่า)
+    // นโยบาย 2026-07-05 (รอบ 7.1): PII เขียน plain text — ไม่ obfuscate อีกต่อไป (ฝั่งอ่านคง deobfuscate_ ไว้เพื่อแถวเก่า)
 
     const prodData = prodSheet.getDataRange().getValues(); 
     const pHeaders = prodData[0];
@@ -2510,7 +2341,7 @@ function updateFullOrder(dataObj, secureUser, ss, opts) {
         for (let i = 1; i < prodData.length; i++) {
           if (prodData[i][pSkuIdx] == oldSkuVal) {
             prodData[i][pStockIdx] = parseInt(prodData[i][pStockIdx] || 0) + oldQtyVal;
-            invRows.push([generateId('INV'), now, oldSkuVal, "EDIT (REVERT)", oldQtyVal, branchVal, secureUser.Username]);
+            invRows.push([generateId_('INV'), now, oldSkuVal, "EDIT (REVERT)", oldQtyVal, branchVal, secureUser.Username]);
             break;
           }
         }
@@ -2527,7 +2358,7 @@ function updateFullOrder(dataObj, secureUser, ss, opts) {
             let currentStock = parseInt(prodData[i][pStockIdx] || 0);
             if (currentStock < newQtyVal) throw new Error("สินค้า " + prodData[i][pNameIdx] + " สต๊อกไม่พอสำหรับการแก้ไข (เหลือ " + currentStock + ")");
             prodData[i][pStockIdx] = currentStock - newQtyVal;
-            invRows.push([generateId('INV'), now, newSkuVal, "EDIT (APPLY)", -newQtyVal, branchVal, secureUser.Username]);
+            invRows.push([generateId_('INV'), now, newSkuVal, "EDIT (APPLY)", -newQtyVal, branchVal, secureUser.Username]);
             break;
           }
         }
@@ -2585,7 +2416,7 @@ function updateFullOrder(dataObj, secureUser, ss, opts) {
 
         // กัน formula injection บนฟิลด์ข้อความอิสระที่ user พิมพ์เอง — ห้ามครอบคอลัมน์ตัวเลข/ควบคุม (Row Total, Qty, Order Status ฯลฯ)
         // ไม่งั้นค่าตัวเลขจะกลายเป็นสตริงและพังการรวมยอด/สถานะ
-        // Receipt No เป็นข้อความอิสระเหมือนกัน (sanitize แล้วตอนสร้างออเดอร์ใน processCheckout) — เดิมหลุดจากลิสต์นี้ตอนแก้ไขออเดอร์
+        // Receipt No เป็นข้อความอิสระเหมือนกัน (sanitize แล้วตอนสร้างออเดอร์ใน processCheckout_) — เดิมหลุดจากลิสต์นี้ตอนแก้ไขออเดอร์
         const FREE_TEXT_COLS_ = ["Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser", "Promo", "Staff", "Booking Phone", "Customer Interests", "Remark", "Receipt No", "Pre Order No", "Pickup Date"];
         oHeaders.forEach(h => {
           if (dataObj[h] !== undefined && h !== "_rowIndex") {
@@ -2632,7 +2463,7 @@ function updateFullOrder(dataObj, secureUser, ss, opts) {
       orderSheet.getRange(update.row, 1, 1, update.data.length).setValues([update.data]);
     });
     
-    logAudit(secureUser.Username, "EDIT_ORDER", "Edited Order Bill: " + orderId + " (Status: " + newStatus + ")");
+    logAudit_(secureUser.Username, "EDIT_ORDER", "Edited Order Bill: " + orderId + " (Status: " + newStatus + ")");
     const prevOrderStatus = matchingRows.length ? (matchingRows[0].rowData[oHeaders.indexOf("Order Status")] || 'Pending').toString().trim() : '';
     if (prevOrderStatus !== (newStatus || '').toString().trim()) logOrderStatus_(ss, orderId, prevOrderStatus, newStatus.toString().trim(), secureUser.Username);
     return { status: 'success' };
@@ -2643,7 +2474,7 @@ function updateFullOrder(dataObj, secureUser, ss, opts) {
   }
 }
 
-function saveRecord(tableName, dataObj, idField, secureUser, ss) {
+function saveRecord_(tableName, dataObj, idField, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -2690,7 +2521,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
         }
         if (branch !== 'ALL') {
           const bSheet = ss.getSheetByName("Branches");
-          const known = bSheet ? getTableDataAsJson(bSheet, true).some(b => (b['Branch Code'] === undefined || b['Branch Code'] === null ? '' : b['Branch Code']).toString().trim() === branch) : false;
+          const known = bSheet ? getTableDataAsJson_(bSheet, true).some(b => (b['Branch Code'] === undefined || b['Branch Code'] === null ? '' : b['Branch Code']).toString().trim() === branch) : false;
           if (!known) throw new Error("ไม่พบสาขา \"" + branch + "\" ในข้อมูลสาขา — เพิ่มสาขาก่อน หรือเลือกสาขาที่มีอยู่");
         }
       }
@@ -2718,13 +2549,13 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
         } else {
           // สมาชิกใหม่เว้นรหัสผ่านว่าง — สุ่มรหัสผ่านแบบเดียวกับ initialAdmin ใน setupDatabase (ห้าม hardcode ค่าเดาง่ายอย่าง "1234")
           generatedPassword = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
-          dataObj.Password = hashPassword(generatedPassword);
+          dataObj.Password = hashPassword_(generatedPassword);
         }
       } else if (!looksLikePasswordHash_(dataObj.Password)) {
-        dataObj.Password = hashPassword(dataObj.Password);
+        dataObj.Password = hashPassword_(dataObj.Password);
       }
     }
-    // กัน formula injection (rule 24) — เดิม saveRecord (CRUD กลางของ Products/Branches/Channels/Promotions/Interests/GiftMappings/AutoPromotions/Members)
+    // กัน formula injection (rule 24) — เดิม saveRecord_ (CRUD กลางของ Products/Branches/Channels/Promotions/Interests/GiftMappings/AutoPromotions/Members)
     // ไม่เคยผ่าน sanitizeSheetText_ เลยสักคอลัมน์ ทั้งที่เป็นจุดที่ Admin พิมพ์ข้อความอิสระบ่อยที่สุดในระบบ — ห้ามครอบคอลัมน์ตัวเลข/select/ID
     // (เช่น Value ที่ตั้งใจติดลบ) จึงต้องระบุเฉพาะคอลัมน์ข้อความอิสระจริงๆ ต่อชีต ไม่ blanket-apply ทั้งแถว
     const SAVE_RECORD_FREE_TEXT_COLS_ = {
@@ -2742,7 +2573,7 @@ function saveRecord(tableName, dataObj, idField, secureUser, ss) {
     let rowData = headers.map(h => dataObj[h] !== undefined ? (freeTextCols.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]) : "");
     const skuCi = headers.indexOf('SKU');
     if (skuCi > -1) skuAsText_(sheet, [rowData], rowIndex > -1 ? rowIndex : sheet.getLastRow() + 1, skuCi);
-    if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit(secureUser.Username, "INSERT", "Added to " + tableName); }
+    if (rowIndex > -1) { sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]); logAudit_(secureUser.Username, "UPDATE", "Updated " + tableName); } else { sheet.appendRow(rowData); logAudit_(secureUser.Username, "INSERT", "Added to " + tableName); }
     // วันที่ของคูปองต้องเป็นเซลล์ข้อความ — ไม่งั้น Sheets แปลงเป็น Date แล้วอ่านกลับเป็นรูปแบบตามภาษาของชีต (แบบเดียวกับ writeBannerDates_)
     if (couponDateCols.length) {
       const wRow = rowIndex > -1 ? rowIndex : sheet.getLastRow();
@@ -2766,7 +2597,7 @@ function buildAutoProductName_(model, color) {
   return [model, color].map(s => (s || '').toString().trim()).filter(Boolean).join(' ');
 }
 
-function saveProductGroup(payload, secureUser, ss) {
+function saveProductGroup_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -2862,7 +2693,7 @@ function saveProductGroup(payload, secureUser, ss) {
 
     writeProductRows_(sheet, headers, newRows);
     CacheService.getScriptCache().remove("TABLE_Products");
-    logAudit(secureUser.Username, isAppend ? "INSERT_PRODUCT_SKUS" : "INSERT_PRODUCT_GROUP",
+    logAudit_(secureUser.Username, isAppend ? "INSERT_PRODUCT_SKUS" : "INSERT_PRODUCT_GROUP",
       (isAppend ? "Added " + newRows.length + " SKU(s) to existing product: " : "Created product: ") + model + " (" + newRows.length + " SKUs)");
 
     return { status: 'success', model: model, skuCount: newRows.length, appended: isAppend };
@@ -2873,10 +2704,10 @@ function saveProductGroup(payload, secureUser, ss) {
   }
 }
 
-// แก้ไขสินค้าเดิมทั้งกลุ่ม (ทุก SKU ของ Model เดียวกัน) ในคำขอเดียว — คู่กับ saveProductGroup ด้านบน
+// แก้ไขสินค้าเดิมทั้งกลุ่ม (ทุก SKU ของ Model เดียวกัน) ในคำขอเดียว — คู่กับ saveProductGroup_ ด้านบน
 // ลบแถวเดิมทั้งหมดของ originalModel แล้วเขียนชุด SKU ใหม่ทั้งหมดแทน (เพิ่ม/ลบ/แก้ SKU ได้อิสระในหน้าเดียว)
 // ห้ามเปลี่ยนชื่อ Model ผ่านฟังก์ชันนี้ (ฟอร์มฝั่ง client ล็อกฟิลด์ Model ไว้แล้ว แต่ตรวจซ้ำฝั่ง server) — กัน SKU เดิมหลุดกลุ่ม/ชนกับ Model อื่นโดยไม่ตั้งใจ
-function updateProductGroup(payload, secureUser, ss) {
+function updateProductGroup_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -2972,7 +2803,7 @@ function updateProductGroup(payload, secureUser, ss) {
     }
     writeProductRows_(sheet, headers, newRows);
     CacheService.getScriptCache().remove("TABLE_Products");
-    logAudit(secureUser.Username, "UPDATE_PRODUCT_GROUP", "Updated product: " + originalModel + " (" + newRows.length + " SKUs)");
+    logAudit_(secureUser.Username, "UPDATE_PRODUCT_GROUP", "Updated product: " + originalModel + " (" + newRows.length + " SKUs)");
 
     return { status: 'success', model: originalModel, skuCount: newRows.length };
   } catch(e) {
@@ -2983,14 +2814,14 @@ function updateProductGroup(payload, secureUser, ss) {
 }
 
 // ลบหลายรายการพร้อมกัน (Admin) — ตารางและคอลัมน์ ID มาจากตารางกำหนดฝั่งนี้เท่านั้น (ไม่เชื่อ idField จาก client)
-// ลบแถวแรกที่ ID ตรงของแต่ละค่า (เหมือน deleteRecord ทีละรายการ); ID ที่ไม่พบรายงานใน notFound; ไม่ลบบัญชีของตัวเอง
+// ลบแถวแรกที่ ID ตรงของแต่ละค่า (เหมือน deleteRecord_ ทีละรายการ); ID ที่ไม่พบรายงานใน notFound; ไม่ลบบัญชีของตัวเอง
 var BULK_DELETE_TABLES_ = {
   Products: { idField: 'SKU' }, Branches: { idField: 'Branch Code' }, Channels: { idField: 'Channel ID' },
   Members: { idField: 'Username' }, GiftMappings: { idField: 'Mapping ID' }, AutoPromotions: { idField: 'Rule ID' },
   Promotions: { idField: 'Promo ID' }
 };
 var BULK_DELETE_MAX_ = 200;
-function deleteRecords(payload, secureUser, ss) {
+function deleteRecords_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -3025,7 +2856,7 @@ function deleteRecords(payload, secureUser, ss) {
     if (rowsToDelete.length > 0) {
       const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions", "Members"];
       if (cacheableTables.includes(table)) CacheService.getScriptCache().remove("TABLE_" + table);
-      logAudit(secureUser.Username, "BULK_DELETE", "Deleted " + rowsToDelete.length + " row(s) from " + table + ": " + deletedIds.slice(0, 10).join(','));
+      logAudit_(secureUser.Username, "BULK_DELETE", "Deleted " + rowsToDelete.length + " row(s) from " + table + ": " + deletedIds.slice(0, 10).join(','));
     }
     return { status: 'success', deleted: rowsToDelete.length, notFound: notFound, protectedIds: protectedIds };
   } catch (e) {
@@ -3039,7 +2870,7 @@ function deleteRecords(payload, secureUser, ss) {
 var BULK_STATUS_TABLES_ = {
   Products: { idField: 'SKU' }, GiftMappings: { idField: 'Mapping ID' }, AutoPromotions: { idField: 'Rule ID' }, Promotions: { idField: 'Promo ID' }
 };
-function bulkSetStatus(payload, secureUser, ss) {
+function bulkSetStatus_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -3076,7 +2907,7 @@ function bulkSetStatus(payload, secureUser, ss) {
     const notFound = ids.filter(id => !found[id]);
     if (updated > 0) {
       CacheService.getScriptCache().remove("TABLE_" + table);
-      logAudit(secureUser.Username, "BULK_STATUS", "Set " + updated + " row(s) in " + table + " to " + target);
+      logAudit_(secureUser.Username, "BULK_STATUS", "Set " + updated + " row(s) in " + table + " to " + target);
     }
     return { status: 'success', updated: updated, unchanged: unchanged, notFound: notFound, newStatus: target };
   } catch (e) {
@@ -3111,9 +2942,9 @@ function resetMemberPasswordFromProperties() {
     let row = -1;
     for (let i = 1; i < data.length; i++) { if ((data[i][uCol] || '').toString().trim() === username) { row = i + 1; break; } }
     if (row === -1) throw new Error("ไม่พบ Username '" + username + "' ในชีต Members (ตัวพิมพ์เล็ก/ใหญ่ต้องตรง)");
-    sheet.getRange(row, pCol + 1).setNumberFormat('@').setValue(hashPassword(password));
+    sheet.getRange(row, pCol + 1).setNumberFormat('@').setValue(hashPassword_(password));
     CacheService.getScriptCache().remove('LOGIN_FAIL_' + username); // ปลดล็อกการล็อกอินผิดเกินกำหนดของ user นี้
-    logAudit('SCRIPT_OWNER', 'RESET_PASSWORD', "Password reset for '" + username + "' via script properties");
+    logAudit_('SCRIPT_OWNER', 'RESET_PASSWORD', "Password reset for '" + username + "' via script properties");
     return "รีเซ็ตรหัสผ่านของ '" + username + "' แล้ว — ล็อกอินด้วยรหัสใหม่ได้ทันที (แนะนำให้เปลี่ยนรหัสอีกครั้งหลังเข้าระบบ)";
   } finally {
     ['MPOS_RESET_ENABLE', 'MPOS_RESET_USERNAME', 'MPOS_RESET_PASSWORD'].forEach(function(k) { props.deleteProperty(k); });
@@ -3121,7 +2952,7 @@ function resetMemberPasswordFromProperties() {
   }
 }
 
-function deleteRecord(tableName, idField, idValue, secureUser, ss) {
+function deleteRecord_(tableName, idField, idValue, secureUser, ss) {
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
@@ -3167,7 +2998,7 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
               for (let p = 1; p < prodData.length; p++) {
                 if (prodData[p][pSkuIdx] == rowSku) {
                   prodData[p][pStockIdx] = parseInt(prodData[p][pStockIdx] || 0) + rowQty;
-                  invRows.push([generateId('INV'), now, rowSku, "DELETE (REVERT)", rowQty, rowBranch, secureUser.Username]);
+                  invRows.push([generateId_('INV'), now, rowSku, "DELETE (REVERT)", rowQty, rowBranch, secureUser.Username]);
                   break;
                 }
               }
@@ -3191,14 +3022,14 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
           if (invRows.length > 0) {
             { const invStart = invSheet.getLastRow() + 1; skuAsText_(invSheet, invRows, invStart, 2); invSheet.getRange(invStart, 1, invRows.length, invRows[0].length).setValues(invRows); }
           }
-          logAudit(secureUser.Username, "DELETE_ORDER", "Deleted Order ID: " + idValue + " (" + deletedCount + " rows)");
+          logAudit_(secureUser.Username, "DELETE_ORDER", "Deleted Order ID: " + idValue + " (" + deletedCount + " rows)");
           return { status: 'success' };
         }
       } else {
         for (let i = 1; i < data.length; i++) {
           if (data[i][idIndex] == idValue) {
             sheet.deleteRow(i + 1); 
-            logAudit(secureUser.Username, "DELETE", "Deleted ID: " + idValue + " from " + tableName); 
+            logAudit_(secureUser.Username, "DELETE", "Deleted ID: " + idValue + " from " + tableName); 
             const cacheableTables = ["Products", "Promotions", "Branches", "Channels", "Interests", "GiftMappings", "AutoPromotions"];
             if (cacheableTables.includes(tableName)) CacheService.getScriptCache().remove("TABLE_" + tableName);
             return { status: 'success' }; 
@@ -3213,7 +3044,7 @@ function deleteRecord(tableName, idField, idValue, secureUser, ss) {
   }
 }
 
-function getSettingsList(ss) {
+function getSettingsList_(ss) {
   const bannersSheet = ss.getSheetByName("UI_Banners");
   const settingsSheet = ss.getSheetByName("Settings");
   if (bannersSheet) migrateStatusColumn_(bannersSheet, 'Status'); // ค่าเก่า Active → เปิด (Admin เปิดหน้าแบนเนอร์)
@@ -3254,7 +3085,7 @@ function getSettingsList(ss) {
       heroBanners: heroBanners,
       promoGrids: promoGrids,
       popupBanners: popupBanners,
-      keyValueSettings: getKeyValueSettings(ss)
+      keyValueSettings: getKeyValueSettings_(ss)
     }
   };
 }
@@ -3367,7 +3198,7 @@ function validateBannerFields_(f) {
   if (f.targetLink && !(/^https?:\/\/[^\s<>"']+$/i.test(f.targetLink) || /^#[A-Za-z0-9_-]{1,40}$/.test(f.targetLink))) throw new Error('ลิงก์ปลายทางต้องขึ้นต้นด้วย http:// หรือ https:// (หรือ #ชื่อหน้า)');
 }
 
-function saveSettingsItem(payload, secureUser, ss) {
+function saveSettingsItem_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -3428,7 +3259,7 @@ function saveSettingsItem(payload, secureUser, ss) {
         }
       });
       // AuditLog: ค่าที่เป็นความลับ (Webhook ฯลฯ) ถูกแทนด้วย [redacted]
-      logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Booking Settings: " + JSON.stringify(redactSettingsForAudit_(clean)));
+      logAudit_(secureUser.Username, "SETTING_UPDATE", "Updated Booking Settings: " + JSON.stringify(redactSettingsForAudit_(clean)));
       return { status: 'success' };
     }
 
@@ -3467,9 +3298,9 @@ function saveSettingsItem(payload, secureUser, ss) {
         }
       }
       if (!found) {
-        bannersSheet.appendRow([generateId('BAN'), 'loginbg', url, 'เปิด', '']);
+        bannersSheet.appendRow([generateId_('BAN'), 'loginbg', url, 'เปิด', '']);
       }
-      logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Login BG: " + url);
+      logAudit_(secureUser.Username, "SETTING_UPDATE", "Updated Login BG: " + url);
       return { status: 'success' };
     }
 
@@ -3491,11 +3322,11 @@ function saveSettingsItem(payload, secureUser, ss) {
       bannersSheet.getRange(ri, 7).setValue(title);
       bannersSheet.getRange(ri, 8).setValue(buttonText);
       writeBannerDates_(bannersSheet, ri, rawFields.startDate, rawFields.endDate);
-      logAudit(secureUser.Username, "SETTING_UPDATE", "Updated Setting " + type + " at row " + ri + ": " + url);
+      logAudit_(secureUser.Username, "SETTING_UPDATE", "Updated Setting " + type + " at row " + ri + ": " + url);
     } else {
-      bannersSheet.appendRow([generateId('BAN'), type, url, 'เปิด', targetLink, details, title, buttonText]);
+      bannersSheet.appendRow([generateId_('BAN'), type, url, 'เปิด', targetLink, details, title, buttonText]);
       writeBannerDates_(bannersSheet, bannersSheet.getLastRow(), rawFields.startDate, rawFields.endDate);
-      logAudit(secureUser.Username, "SETTING_INSERT", "Added Setting " + type + ": " + url);
+      logAudit_(secureUser.Username, "SETTING_INSERT", "Added Setting " + type + ": " + url);
     }
     return { status: 'success' };
   } catch(e) {
@@ -3525,7 +3356,7 @@ function ensureLinkViewable_(file) {
   }
 }
 
-function uploadImage(payload, secureUser, ss) {
+function uploadImage_(payload, secureUser, ss) {
   if (secureUser.Role !== 'Admin') throw new Error("ไม่มีสิทธิ์อัปโหลดรูป (Admin only)");
 
   const mimeType = (payload.mimeType || '').toString();
@@ -3542,7 +3373,7 @@ function uploadImage(payload, secureUser, ss) {
   const ext = (dotIdx > 0 ? rawName.slice(dotIdx) : '').replace(/[^a-zA-Z0-9.]/g, '');
   const fileName = baseName + '_' + new Date().getTime() + ext;
 
-  const settings = getKeyValueSettings(ss);
+  const settings = getKeyValueSettings_(ss);
   const driveFolderId = (settings.DriveFolderId || '').toString().trim();
   let folder;
   if (driveFolderId) {
@@ -3571,7 +3402,7 @@ function uploadImage(payload, secureUser, ss) {
     throw new Error("อัปโหลดรูปสำเร็จแต่ตั้งค่าการแชร์ลิงก์ไม่สำเร็จ กรุณาลองอัปโหลดใหม่อีกครั้ง");
   }
 
-  logAudit(secureUser.Username, "UPLOAD_IMAGE", "Uploaded image: " + fileName);
+  logAudit_(secureUser.Username, "UPLOAD_IMAGE", "Uploaded image: " + fileName);
 
   return { status: 'success', url: 'https://drive.google.com/uc?export=view&id=' + file.getId() };
 }
@@ -3579,8 +3410,8 @@ function uploadImage(payload, secureUser, ss) {
 // ===== ใบเสนอราคา/ใบแจ้งหนี้ (Invoices) — เก็บลงชีต + workflow อนุมัติ (2026-07-11) =====
 // หนึ่งเอกสาร = หนึ่งแถว; รายการสินค้าเก็บเป็น JSON ใน "Items JSON" (เอกสารอิสระ ไม่ผูกกับ Orders/Stock)
 // สถานะ: "รออนุมัติ" → "อนุมัติแล้ว" (Admin/Manager กดอนุมัติ; เอกสารที่อนุมัติแล้วแก้ไข/ลบไม่ได้ ยกเว้น Admin ลบได้)
-// ลำดับคอลัมน์ Orders ตามชีวิตจริง (setupDatabase ใช้สร้างชีตใหม่ + processCheckout ใช้ตรวจว่าชีตเดิมไม่ถูกสลับคอลัมน์)
-// orderRows.push() ทั้ง 3 จุดใน processCheckout เป็น array ตำแหน่งตรงตัว (ไม่ได้ map ด้วยชื่อ header) — ถ้าคอลัมน์ในชีตจริงสลับตำแหน่งไปจากนี้
+// ลำดับคอลัมน์ Orders ตามชีวิตจริง (setupDatabase ใช้สร้างชีตใหม่ + processCheckout_ ใช้ตรวจว่าชีตเดิมไม่ถูกสลับคอลัมน์)
+// orderRows.push() ทั้ง 3 จุดใน processCheckout_ เป็น array ตำแหน่งตรงตัว (ไม่ได้ map ด้วยชื่อ header) — ถ้าคอลัมน์ในชีตจริงสลับตำแหน่งไปจากนี้
 // (เช่น มีคนแทรก/ย้ายคอลัมน์ใน Sheets UI ตรงๆ) ข้อมูลจะเขียนผิดคอลัมน์แบบเงียบๆ จึงต้องเช็คก่อนเขียนทุกครั้ง ดู rule ที่เกี่ยวข้องใน CLAUDE.md
 // ประวัติการเปลี่ยนสถานะออเดอร์ (ชีตแยก — ไม่แตะ Orders ที่เขียนแบบ positional) สร้างเองอัตโนมัติเมื่อมีการเขียนครั้งแรก
 var ORDER_STATUS_LOG_HEADERS_ = ["OrderID", "Timestamp", "From", "To", "By"];
@@ -3646,16 +3477,16 @@ function getOrCreateInvoicesSheet_(ss) {
   return sheet;
 }
 
-function getInvoices(secureUser, ss) {
+function getInvoices_(secureUser, ss) {
   const sheet = getOrCreateInvoicesSheet_(ss);
-  let rows = getTableDataAsJson(sheet);
+  let rows = getTableDataAsJson_(sheet);
   if (!['Admin', 'Manager'].includes(secureUser.Role)) {
     rows = rows.filter(r => r['Requested By'] === secureUser.Username);
   }
   return { status: 'success', data: rows };
 }
 
-function saveInvoice(payload, secureUser, ss) {
+function saveInvoice_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -3730,9 +3561,9 @@ function saveInvoice(payload, secureUser, ss) {
       const range = sheet.getRange(rowIdx + 1, 1, 1, headers.length);
       range.setNumberFormat('@'); // กัน Sheets แปลงวันที่/เบอร์โทร/JSON เป็นชนิดอื่น
       range.setValues([rowArr]);
-      logAudit(secureUser.Username, "INVOICE_UPDATE", "Updated invoice " + invoiceNo + " (" + invoiceId + ")");
+      logAudit_(secureUser.Username, "INVOICE_UPDATE", "Updated invoice " + invoiceNo + " (" + invoiceId + ")");
     } else {
-      invoiceId = generateId('INVD');
+      invoiceId = generateId_('INVD');
       values["Invoice ID"] = invoiceId;
       values["Requested By"] = secureUser.Username;
       values["Requested At"] = now;
@@ -3741,7 +3572,7 @@ function saveInvoice(payload, secureUser, ss) {
       const range = sheet.getRange(newRow, 1, 1, headers.length);
       range.setNumberFormat('@');
       range.setValues([rowArr]);
-      logAudit(secureUser.Username, "INVOICE_CREATE", "Created invoice " + invoiceNo + " (" + invoiceId + ")");
+      logAudit_(secureUser.Username, "INVOICE_CREATE", "Created invoice " + invoiceNo + " (" + invoiceId + ")");
     }
 
     return { status: 'success', invoiceId: invoiceId };
@@ -3750,7 +3581,7 @@ function saveInvoice(payload, secureUser, ss) {
   }
 }
 
-function approveInvoice(payload, secureUser, ss) {
+function approveInvoice_(payload, secureUser, ss) {
   if (!['Admin', 'Manager'].includes(secureUser.Role)) throw new Error("เฉพาะ Admin/Manager เท่านั้นที่อนุมัติเอกสารได้");
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -3773,7 +3604,7 @@ function approveInvoice(payload, secureUser, ss) {
 
     // ชื่อบนตราประทับ = ชื่อผู้อนุมัติที่กำหนดใน ตั้งค่าระบบ → ข้อมูลบริษัท (ApproverName)
     // ไม่ใช่ชื่อ user ที่ล็อกอินกดปุ่ม (คนกดถูกบันทึกใน AuditLog อยู่แล้ว) — fallback เป็นชื่อคนกดเมื่อยังไม่ตั้งค่า
-    const settings = getKeyValueSettings(ss);
+    const settings = getKeyValueSettings_(ss);
     const approverName = ((settings.ApproverName || '').toString().trim() || secureUser.Name || secureUser.Username).toString();
     const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
     data[rowIdx][statusCol] = 'อนุมัติแล้ว';
@@ -3783,14 +3614,14 @@ function approveInvoice(payload, secureUser, ss) {
     range.setNumberFormat('@');
     range.setValues([data[rowIdx]]); // เขียนทั้งแถวครั้งเดียว (rule 8: batch write)
 
-    logAudit(secureUser.Username, "INVOICE_APPROVE", "Approved invoice " + data[rowIdx][headers.indexOf("Invoice No")] + " (" + invoiceId + ")");
+    logAudit_(secureUser.Username, "INVOICE_APPROVE", "Approved invoice " + data[rowIdx][headers.indexOf("Invoice No")] + " (" + invoiceId + ")");
     return { status: 'success', approvedBy: approverName, approvedAt: now };
   } finally {
     lock.releaseLock();
   }
 }
 
-function deleteInvoice(payload, secureUser, ss) {
+function deleteInvoice_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -3814,7 +3645,7 @@ function deleteInvoice(payload, secureUser, ss) {
     }
 
     sheet.deleteRow(rowIdx + 1);
-    logAudit(secureUser.Username, "INVOICE_DELETE", "Deleted invoice " + data[rowIdx][headers.indexOf("Invoice No")] + " (" + invoiceId + ")");
+    logAudit_(secureUser.Username, "INVOICE_DELETE", "Deleted invoice " + data[rowIdx][headers.indexOf("Invoice No")] + " (" + invoiceId + ")");
     return { status: 'success' };
   } finally {
     lock.releaseLock();
@@ -3905,7 +3736,7 @@ function getLiveNews_(ss) {
     .map(function(n) { return { id: n.id, category: n.category, title: n.title, detail: n.detail.slice(0, 600), imageUrl: n.imageUrl, link: n.link, startDate: n.startDate, endDate: n.endDate }; });
 }
 
-function newsList(secureUser, ss) {
+function newsList_(secureUser, ss) {
   if (secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
   ensureNewsSheets_(ss);
   const nsh = ss.getSheetByName('News'), csh = ss.getSheetByName('NewsCategories');
@@ -3921,7 +3752,7 @@ function newsList(secureUser, ss) {
 
 function newsLinkOk_(v) { return /^https?:\/\/[^\s<>"']+$/i.test(v) || /^#[A-Za-z0-9_-]{1,40}$/.test(v); }
 
-function saveNews(payload, secureUser, ss) {
+function saveNews_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -3959,16 +3790,16 @@ function saveNews(payload, secureUser, ss) {
       sh.getRange(row, 7, 1, 2).setValues([[seq, f.status]]);
       sh.getRange(row, 9, 1, 2).setNumberFormat('@').setValues([[f.startDate, f.endDate]]);
       sh.getRange(row, 13, 1, 2).setNumberFormat('@').setValues([[now, secureUser.Username]]);
-      logAudit(secureUser.Username, 'NEWS_UPDATE', 'Updated news ' + f.id + ': ' + f.title.slice(0, 80));
+      logAudit_(secureUser.Username, 'NEWS_UPDATE', 'Updated news ' + f.id + ': ' + f.title.slice(0, 80));
       return { status: 'success', id: f.id };
     }
     if (last - 1 >= NEWS_MAX_ROWS_) throw new Error('จำนวนข่าวถึงขีดจำกัด (' + NEWS_MAX_ROWS_ + ') — ลบข่าวเก่าก่อน');
-    const id = generateId('NEWS');
+    const id = generateId_('NEWS');
     const row = last + 1;
     sh.getRange(row, 1, 1, 14).setNumberFormat('@');
     sh.getRange(row, 1, 1, 14).setValues([[id, clean[0], clean[1], clean[2], clean[3], clean[4], seq, f.status, f.startDate, f.endDate, now, secureUser.Username, '', '']]);
     sh.getRange(row, 7).setNumberFormat('0');
-    logAudit(secureUser.Username, 'NEWS_INSERT', 'Added news ' + id + ': ' + f.title.slice(0, 80));
+    logAudit_(secureUser.Username, 'NEWS_INSERT', 'Added news ' + id + ': ' + f.title.slice(0, 80));
     return { status: 'success', id: id };
   } catch (e) {
     return { status: 'error', message: e.toString() };
@@ -3984,7 +3815,7 @@ function newsIdList_(payload) {
   return ids;
 }
 
-function deleteNews(payload, secureUser, ss) {
+function deleteNews_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -4000,7 +3831,7 @@ function deleteNews(payload, secureUser, ss) {
         if (ids.indexOf(have[i]) !== -1) { sh.deleteRow(i + 2); deleted++; }
       }
     }
-    logAudit(secureUser.Username, 'NEWS_DELETE', 'Deleted ' + deleted + ' news: ' + ids.slice(0, 10).join(','));
+    logAudit_(secureUser.Username, 'NEWS_DELETE', 'Deleted ' + deleted + ' news: ' + ids.slice(0, 10).join(','));
     return { status: 'success', deleted: deleted };
   } catch (e) {
     return { status: 'error', message: e.toString() };
@@ -4009,7 +3840,7 @@ function deleteNews(payload, secureUser, ss) {
   }
 }
 
-function setNewsSeq(payload, secureUser, ss) {
+function setNewsSeq_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -4033,7 +3864,7 @@ function setNewsSeq(payload, secureUser, ss) {
   }
 }
 
-function saveNewsCategory(payload, secureUser, ss) {
+function saveNewsCategory_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -4057,10 +3888,10 @@ function saveNewsCategory(payload, secureUser, ss) {
     });
     if (id && at === -1) throw new Error('ไม่พบหมวดหมู่นี้ (อาจถูกลบไปแล้ว)');
     if (at === -1) {
-      const newId = generateId('NCAT');
+      const newId = generateId_('NCAT');
       const row = last + 1;
       sh.getRange(row, 1, 1, 3).setNumberFormat('@').setValues([[newId, clean, status]]);
-      logAudit(secureUser.Username, 'NEWS_CAT_INSERT', 'Added news category: ' + name);
+      logAudit_(secureUser.Username, 'NEWS_CAT_INSERT', 'Added news category: ' + name);
       return { status: 'success', id: newId };
     }
     const oldName = newsStr_(rows[at][1]);
@@ -4075,7 +3906,7 @@ function saveNewsCategory(payload, secureUser, ss) {
         if (changed) nsh.getRange(2, 2, nl - 1, 1).setValues(out);
       }
     }
-    logAudit(secureUser.Username, 'NEWS_CAT_UPDATE', 'Updated news category: ' + oldName + ' -> ' + name);
+    logAudit_(secureUser.Username, 'NEWS_CAT_UPDATE', 'Updated news category: ' + oldName + ' -> ' + name);
     return { status: 'success', id: id };
   } catch (e) {
     return { status: 'error', message: e.toString() };
@@ -4084,7 +3915,7 @@ function saveNewsCategory(payload, secureUser, ss) {
   }
 }
 
-function deleteNewsCategories(payload, secureUser, ss) {
+function deleteNewsCategories_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -4103,7 +3934,7 @@ function deleteNewsCategories(payload, secureUser, ss) {
     for (let i = rows.length - 1; i >= 0; i--) {
       if (ids.indexOf(newsStr_(rows[i][0]).trim()) !== -1) { csh.deleteRow(i + 2); deleted++; }
     }
-    logAudit(secureUser.Username, 'NEWS_CAT_DELETE', 'Deleted ' + deleted + ' news categories');
+    logAudit_(secureUser.Username, 'NEWS_CAT_DELETE', 'Deleted ' + deleted + ' news categories');
     return { status: 'success', deleted: deleted };
   } catch (e) {
     return { status: 'error', message: e.toString() };
@@ -4112,7 +3943,7 @@ function deleteNewsCategories(payload, secureUser, ss) {
   }
 }
 
-function deleteSettingsItem(payload, secureUser, ss) {
+function deleteSettingsItem_(payload, secureUser, ss) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -4123,7 +3954,7 @@ function deleteSettingsItem(payload, secureUser, ss) {
     const type = payload.type;
     let rowIndex = parseInt(payload.rowIndex);
     const bannerId = payload.bannerId ? payload.bannerId.toString().trim() : '';
-    // เดิมเช็คแค่ขอบล่าง (saveSettingsItem เช็คทั้งขอบบน-ล่างอยู่แล้ว) — rowIndex ที่เกิน lastRow ยังหลุดผ่านมาถึง deleteRow() ได้ถ้าไม่มี bannerId แนบมา
+    // เดิมเช็คแค่ขอบล่าง (saveSettingsItem_ เช็คทั้งขอบบน-ล่างอยู่แล้ว) — rowIndex ที่เกิน lastRow ยังหลุดผ่านมาถึง deleteRow() ได้ถ้าไม่มี bannerId แนบมา
     if (!rowIndex || rowIndex < 2 || rowIndex > bannersSheet.getLastRow()) throw new Error("Invalid row index");
 
     // กันลบผิดแถวเมื่อชีตขยับ (มีคนลบ/แทรกแถวไปก่อน) — ยืนยันด้วย Banner ID ถ้าไม่ตรงให้ re-scan หาแถวจริง
@@ -4145,7 +3976,7 @@ function deleteSettingsItem(payload, secureUser, ss) {
     const rowType = (bannersSheet.getRange(rowIndex, 2).getValue() || '').toString().trim();
     if (rowType !== type) throw new Error("ข้อมูลแบนเนอร์เปลี่ยนไปแล้ว กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง");
     bannersSheet.deleteRow(rowIndex);
-    logAudit(secureUser.Username, "SETTING_DELETE", "Deleted Setting " + type + " at row " + rowIndex);
+    logAudit_(secureUser.Username, "SETTING_DELETE", "Deleted Setting " + type + " at row " + rowIndex);
     return { status: 'success' };
   } catch(e) {
     return { status: 'error', message: e.toString() };
