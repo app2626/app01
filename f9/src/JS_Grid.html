@@ -497,8 +497,17 @@ window.app.grid = {
                     }
                 });
             } else {
+                // ของแถม: ตัวเลือก = Product Group ของสินค้าหมวดนั้น (กลุ่มเดียว = ทุกสี/ทุกชิ้นในกลุ่ม) — เทียบตรงตัวทั้งคำ
+                // ค่าที่บันทึกไว้แล้วแต่ไม่ตรงกับกลุ่มไหน (ชื่อสินค้าเดิม, คำค้นบางส่วน, กลุ่มที่ปิดไปแล้ว) ต้องโผล่เป็นตัวเลือกของตัวเองแบบติ๊กไว้
+                // เคยเทียบแบบ substring กับ Product Name แล้วบันทึกกลับเป็นชื่อสินค้าทุกตัวที่ตรง — ค่า Product Group ที่ตั้งไว้กลายเป็น Product Name หลังกดแก้ไข
                 let targetCat = c.type === 'multi_select_brand_gifts' ? 'ของแถมแบรนด์' : 'ของแถมช่องทาง';
-                opts = window.app.globalData.products.filter(p => p.Category === targetCat && p.Status === 'เปิด').map(p => ({id: p['Product Name'], label: p['Product Name']}));
+                const seenG = {};
+                window.app.globalData.products.filter(p => p.Category === targetCat && p.Status === 'เปิด').forEach(p => {
+                    const g = String(p['Product Group'] || '').trim() || String(p['Product Name'] || '').trim();
+                    if (g && !seenG[g.toLowerCase()]) { seenG[g.toLowerCase()] = true; opts.push({id: g, label: window.app.titleCaseName(g)}); }
+                });
+                opts.sort((a, b) => a.label.localeCompare(b.label, 'th'));
+                currentVals.filter(v => v && v !== allVal && !seenG[v.toLowerCase()]).forEach(v => { seenG[v.toLowerCase()] = true; opts.unshift({id: v, label: v + ' (ค่าเดิม)'}); });
             }
             
             inp = `<div class="fm-checks max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 mt-1 shadow-inner">`;
@@ -511,10 +520,8 @@ window.app.grid = {
             opts.forEach(opt => {
                 // สิทธิ์เมนู/ช่องทางต้องเทียบตรงตัวทั้งคำ — substring เคยทำให้ค่า 'promotions' ติ๊ก 'autopromotions' ให้เกินสิทธิ์
                 // ของแถม (brand/channel gifts) คงเทียบแบบ keyword ตาม semantics ของ GiftMappings
-                let matchExact = (c.type === 'multi_select_menu' || c.type === 'multi_select_channel');
-                let isChecked = !isAll && currentVals.some(cv => matchExact
-                    ? String(opt.id || '').toLowerCase() === cv.toLowerCase()
-                    : String(opt.id || '').toLowerCase().includes(cv.toLowerCase()));
+                // ของแถมก็เทียบตรงตัวแล้ว (ตัวเลือกเป็น Product Group + ค่าเดิมทุกค่า) — substring เคยติ๊กชื่อสินค้าทุกตัวที่มีคำนั้นแล้วบันทึกทับ
+                let isChecked = !isAll && currentVals.some(cv => String(opt.id || '').toLowerCase() === cv.toLowerCase());
                 inp += `<label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-slate-100 rounded-lg transition-colors">
                            <input type="checkbox" class="chk-group-${safeKey} w-5 h-5 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500" value="${window.app.esc(opt.id)}" onchange="if(this.checked) { let allCb = document.querySelector('.chk-group-${safeKey}[value=\\'${allVal}\\']'); if(allCb) allCb.checked=false; }" ${isChecked?'checked':''}>
                            <span class="text-[11px] font-normal text-slate-700">${window.app.esc(opt.label)}</span>

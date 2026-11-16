@@ -149,6 +149,17 @@ t('CHECKOUT channel gifts: only one of the three sets per item; brandGifts canno
     eq(run([PB], [BAG]).status, 'error', 'channel gift smuggled through brandGifts');
   } finally { row[c2] = old; cache.remove('TABLE_GiftMappings'); }
 });
+t('CHECKOUT gift lists can name a gift Product Group (exact, case-insensitive), not only part of the name', () => {
+  const gm = sheets.GiftMappings, h = gm.rows[0], bi = h.indexOf('Brand Gifts'), row = gm.rows.find(r => r[0] === 'GM-001'), oldB = row[bi];
+  const ph = sheets.Products.rows[0], gi = ph.indexOf('Product Group'), prow = sheets.Products.rows.find(r => r[0] === 'GF-SAM-CASE'), oldG = prow[gi];
+  const run = () => api('CHECKOUT', co({ cart: [{ SKU: 'SKU-S24U', qty: 1, brandGifts: [{ name: 'Samsung Clear Case S24U', qty: 1 }], channelGifts: [] }] }), sales);
+  try {
+    prow[gi] = 'Shield Group'; row[bi] = 'shield group'; cache.remove('TABLE_GiftMappings'); cache.remove('TABLE_Products');
+    eq(run().status, 'success', 'gift allowed through its Product Group');
+    row[bi] = 'Nope Group'; cache.remove('TABLE_GiftMappings');
+    eq(run().status, 'error', 'unrelated group must not allow the gift');
+  } finally { prow[gi] = oldG; row[bi] = oldB; cache.remove('TABLE_GiftMappings'); cache.remove('TABLE_Products'); }
+});
 t('GiftMappings: set 2/3 columns are moved/inserted right after Channel Gifts, data follows, system still works', () => {
   const gm = sheets.GiftMappings, keep = gm.rows.map(r => r.slice());
   const col = n => gm.rows[0].indexOf(n);

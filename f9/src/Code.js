@@ -1540,13 +1540,27 @@ function processCheckout(payload, secureUser, ss) {
       
       isFirstRow = false; 
 
+      // Product Group ของสินค้าหมวดของแถมตามชื่อ (ค่าในช่องของแถมของ GiftMappings ใช้ Product Group ได้ — ดู giftInList)
+      const giftGroupOf = (nameLower) => {
+        if (groupIdx === -1) return '';
+        for (let i = 1; i < prodData.length; i++) {
+          const cat = catIdx > -1 ? (prodData[i][catIdx] || '').toString() : '';
+          if (cat.indexOf('ของแถม') !== -1 && (prodData[i][nameIdx] || '').toString().trim().toLowerCase() === nameLower) return (prodData[i][groupIdx] || '').toString().trim().toLowerCase();
+        }
+        return '';
+      };
+      // ค่าในรายการตรงกับของแถม: * หรือ เป็นส่วนหนึ่งของชื่อ หรือ = Product Group ทั้งคำ — กฎเดียวกับ pos.giftMatch ฝั่ง client
+      const giftInList = (list, nameLower) => {
+        if (list.includes('*')) return true;
+        if (list.some(v => v !== '*' && nameLower.includes(v))) return true;
+        const g = giftGroupOf(nameLower);
+        return g !== '' && list.includes(g);
+      };
       const processGift = (giftObj) => {
         if(giftObj && giftObj.name) {
           const giftName = giftObj.name.toString().trim();
           const giftNameLower = giftName.toLowerCase();
-          const giftAllowed = allowedGifts.brand.includes('*') || allowedGifts.channel.includes('*') ||
-            allowedGifts.brand.some(v => v !== '*' && giftNameLower.includes(v)) ||
-            allowedGifts.channel.some(v => v !== '*' && giftNameLower.includes(v));
+          const giftAllowed = giftInList(allowedGifts.brand, giftNameLower) || giftInList(allowedGifts.channel, giftNameLower);
           if (!giftAllowed) throw new Error("Gift is not allowed for this product/channel: " + giftName);
           const gQty = Number(giftObj.qty);
           if (!Number.isInteger(gQty) || gQty < 1) throw new Error("จำนวนของแถมไม่ถูกต้อง: " + giftName);
@@ -1591,7 +1605,6 @@ function processCheckout(payload, secureUser, ss) {
 
       // ของแถมช่องทางเลือกได้ชุดเดียว (ชุดที่ 1/2/3) ต่อสินค้า 1 รายการ — ต้องมีอย่างน้อยหนึ่งชุดที่ครอบคลุมของแถมช่องทางทุกชิ้นที่ส่งมา
       // ของแถมในช่อง brandGifts ต้องอยู่ในรายการ Brand Gifts เท่านั้น ไม่งั้นย้ายของแถมช่องทางอีกชุดมาใส่ช่องนี้เพื่อเลี่ยงกฎได้
-      const giftInList = (list, nameLower) => list.includes('*') || list.some(v => v !== '*' && nameLower.includes(v));
       const giftNamesOf = (arr) => (Array.isArray(arr) ? arr : []).filter(g => g && g.name).map(g => g.name.toString().trim().toLowerCase());
       giftNamesOf(item.brandGifts).forEach(n => { if (!giftInList(allowedGifts.brand, n)) throw new Error("Gift is not allowed for this product/channel: " + n); });
       const chGiftNames = giftNamesOf(item.channelGifts);

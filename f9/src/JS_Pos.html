@@ -599,6 +599,13 @@ window.app.pos = {
     // ของแถมช่องทาง 3 ชุด (GiftMappings): คอลัมน์เดิม = ชุดที่ 1, สองคอลัมน์ใหม่ = ชุดที่ 2/3 — ต้องตรงกับ GIFT_SET_COLS_ ใน Code.js
     // ลูกค้าเลือกรับได้ชุดเดียวต่อสินค้า 1 รายการ (server ตรวจซ้ำใน processCheckout)
     GIFT_SET_COLS: ['Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3'],
+    // ค่าในช่องของแถม (Brand Gifts / Channel Gifts*) ตรงกับสินค้าของแถม p เมื่อ: * หรือ เป็นส่วนหนึ่งของ Product Name หรือ = Product Group ทั้งคำ
+    // (ไม่สนตัวพิมพ์) — กฎเดียวกับ giftMatches_ ใน Code.js
+    giftMatch: function(tokens, p) {
+      const name = ((p && p['Product Name']) || '').toString().toLowerCase();
+      const group = ((p && p['Product Group']) || '').toString().trim().toLowerCase();
+      return tokens.some(g => g === '*' || (name !== '' && name.includes(g)) || (group !== '' && group === g));
+    },
     // ติ๊กของแถมช่องทาง: เปิด/ปิดช่องจำนวนของตัวเอง และถ้าติ๊กในชุดหนึ่ง ให้ยกเลิกที่ติ๊กไว้ในชุดอื่นทั้งหมด
     onChannelGiftToggle: function(cb) {
       const qtyOf = (c) => document.getElementById(c.id.replace('cgift', 'cgiftQty'));
@@ -664,10 +671,10 @@ window.app.pos = {
         if (p.Status !== 'เปิด') return;
         const pName = (p['Product Name'] || '').toString();
         const pNameLower = pName.toLowerCase();
-        if (p.Category === 'ของแถมแบรนด์' && allowedBrand.some(g => g === '*' || pNameLower.includes(g))) {
+        if (p.Category === 'ของแถมแบรนด์' && this.giftMatch(allowedBrand, p)) {
           res.brandCount++;
           res.giftNames.push(pName);
-        } else if (p.Category === 'ของแถมช่องทาง' && allowedChannel.some(g => g === '*' || pNameLower.includes(g))) {
+        } else if (p.Category === 'ของแถมช่องทาง' && this.giftMatch(allowedChannel, p)) {
           res.channelCount++;
           res.giftNames.push(pName);
         }
@@ -2718,11 +2725,11 @@ window.app.pos = {
           let pNameLower = (p['Product Name'] || '').toLowerCase();
           const gImg = window.app.formatImageUrl(p['Image URL']);
           
-          if(p.Category==='ของแถมแบรนด์' && hasMapping && allowedBrandGifts.some(g => g === '*' || pNameLower.includes(g))) {
+          if(p.Category==='ของแถมแบรนด์' && hasMapping && this.giftMatch(allowedBrandGifts, p)) {
             bGiftsHTML += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-emerald-400 hover:bg-emerald-50/20 transition-all"><input class="w-4 h-4 text-emerald-500 bg-slate-50 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="bgift${idx}" onchange="document.getElementById('bgiftQty${idx}').disabled = !this.checked"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="bgift${idx}">${window.app.pn(p['Product Name'])} <span class="inline-block text-[9px] text-emerald-600 font-extrabold ml-1 bg-emerald-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="bgiftQty${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`;
           } 
-          else if(p.Category==='ของแถมช่องทาง' && hasMapping && allowedChannelGifts.some(g => g === '*' || pNameLower.includes(g))) {
-            allowedSets.forEach((names, si) => { if (names.some(g => g === '*' || pNameLower.includes(g))) setHtml[si] += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all"><input class="w-4 h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${si}_${idx}" data-set="${si + 1}" onchange="window.app.pos.onChannelGiftToggle(this)"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="cgift${si}_${idx}">${window.app.pn(p['Product Name'])} <span class="inline-block text-[9px] text-indigo-600 font-extrabold ml-1 bg-indigo-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="cgiftQty${si}_${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`; });
+          else if(p.Category==='ของแถมช่องทาง' && hasMapping && this.giftMatch(allowedChannelGifts, p)) {
+            allowedSets.forEach((names, si) => { if (this.giftMatch(names, p)) setHtml[si] += `<div class="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm mb-2 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all"><input class="w-4 h-4 text-indigo-500 bg-slate-50 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0" type="checkbox" value="${window.app.esc(p['Product Name'])}" id="cgift${si}_${idx}" data-set="${si + 1}" onchange="window.app.pos.onChannelGiftToggle(this)"><img src="${window.app.esc(gImg)}" alt="" onerror="this.remove()" class="w-8 h-8 object-contain rounded-lg border border-slate-100 bg-white p-0.5 shrink-0"><label class="flex-1 text-[10px] md:text-[11px] font-semibold text-slate-700 break-words whitespace-normal cursor-pointer select-none leading-snug" for="cgift${si}_${idx}">${window.app.pn(p['Product Name'])} <span class="inline-block text-[9px] text-indigo-600 font-extrabold ml-1 bg-indigo-50 px-1.5 py-0.5 rounded">(คงเหลือ ${window.app.esc(p.Stock)})</span></label><input type="number" id="cgiftQty${si}_${idx}" class="w-12 md:w-14 px-1.5 py-1 text-[10px] md:text-[11px] font-bold text-center border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shrink-0" value="1" min="1" max="${this.stockOf(p)}" disabled></div>`; });
           }
         } 
       });

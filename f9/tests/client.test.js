@@ -1294,6 +1294,15 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await shot('admin-giftmapping-form');
     await closeForm();
   });
+  await T('gift set form: gift lists offer Product Groups and keep stored values exactly (a Product Group must not turn into product names on edit)', async () => {
+    const r = JSON.parse(await ev("(()=>{const G=window.app.grid;G.openForm({'Mapping ID':'GM-T1','Target Mobile (SKU or Group)':'*',Channel:'',' Brand Gifts':'','Brand Gifts':'adapter, Old Thing','Channel Gifts':'Bag','Channel Gifts 2':'','Channel Gifts 3':'',Status:'เปิด'});const vals=k=>[...document.querySelectorAll('.chk-group-'+k)].map(x=>x.value);const on=k=>[...document.querySelectorAll('.chk-group-'+k+':checked')].map(x=>x.value);const groups=[...new Set(window.app.globalData.products.filter(p=>p.Category==='ของแถมแบรนด์'&&p.Status==='เปิด').map(p=>p['Product Group']))];return JSON.stringify({bOpts:vals('BrandGifts'),bOn:on('BrandGifts'),cOn:on('ChannelGifts'),groups:groups})})()"));
+    ok(r.groups.every(g => r.bOpts.includes(g)), 'brand gift options must be the Product Groups: ' + r.bOpts.join('|'));
+    ok(!r.bOpts.some(v => /Samsung Adapter/.test(v)), 'no product names as options: ' + r.bOpts.join('|'));
+    eq(r.bOn.map(v => v.toLowerCase()).sort(), ['adapter', 'old thing'], 'stored values ticked exactly (case-insensitive group + unknown value kept): ' + r.bOpts.join('|'));
+    eq(new Set(r.bOpts.map(v => v.toLowerCase())).size, r.bOpts.length, 'no duplicate options: ' + r.bOpts.join('|'));
+    eq(r.cOn, ['Bag']);
+    await closeForm();
+  });
   await T('system tab holds the technical cards (webhook, cache, drive, collapsed Auto Setup); booking tab keeps only booking fields', async () => {
     await ev("window.location.hash='#systemsettings';true"); await sleep(1500);
     await ev("window.app.systemSettings.showTab('autosetup');true"); await sleep(1000);
