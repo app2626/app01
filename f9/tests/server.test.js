@@ -793,6 +793,13 @@ console.log('== SET_ORDER_STATUS');
     try { rows.forEach(x => { x[bi] = 'OTHER'; }); const r2 = api('SET_ORDER_STATUS', { orderIds: [b], status: 'Paid' }, sales); eq(r2.failed.length, 1, JSON.stringify(r2)); eq(statusOf(b), 'Pending'); }
     finally { rows.forEach((x, i) => { x[bi] = old[i]; }); }
     eq(api('SET_ORDER_STATUS', { orderIds: [c], status: 'Pending' }, admin).updated.join(), c, 'Admin can still restore');
+    const mgrSave = api('SAVE_RECORD', { tableName: 'Members', idField: 'Username', data: { Username: 'mgr.lock', Password: 'Pass1234!', Role: 'Manager', Name: 'ผู้จัดการ', 'Branch Code': 'ALL', 'Accessible Menus': '*' } }, admin); ok(mgrSave.status !== 'error', JSON.stringify(mgrSave));
+    const ml = api('LOGIN', { username: 'mgr.lock', password: 'Pass1234!' }), mgr = ml.Token ? ml : ml.user; ok(mgr && mgr.Token, JSON.stringify(ml).slice(0, 150));
+    eq(api('SET_ORDER_STATUS', { orderIds: [c], status: 'Cancelled' }, mgr).updated.join(), c, 'Manager can cancel');
+    const rm = api('SET_ORDER_STATUS', { orderIds: [c], status: 'Pending' }, mgr); eq(rm.failed.length, 1, 'Manager cannot restore: ' + JSON.stringify(rm)); eq(statusOf(c), 'Cancelled');
+    const oh2 = sheets.Orders.rows[0], ri = sheets.Orders.rows.findIndex(x => x[oh2.indexOf('OrderID')] === c) + 1;
+    eq(api('UPDATE_FULL_ORDER', { data: { _rowIndex: ri, 'Order Status': 'Paid' } }, mgr).status, 'error', 'Manager full edit cannot restore either'); eq(statusOf(c), 'Cancelled');
+    eq(api('SET_ORDER_STATUS', { orderIds: [c], status: 'Pending' }, admin).updated.join(), c, 'Admin restores again');
   });
   t('SET_ORDER_STATUS: Admin changes several orders by OrderID, every row of each order, history logged', () => {
     const r = api('SET_ORDER_STATUS', { orderIds: [a, b, a], status: 'Confirmed' }, admin);

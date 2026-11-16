@@ -28,7 +28,8 @@ window.app.orders = {
   SALES_STATUSES: ['Paid', 'Delivered', 'Cancelled'],
   isSales: function() { return (window.app.user || {}).Role === 'Sales'; },
   canStatus: function() { return this.canEdit() || this.isSales(); },
-  lockedFor: function(o) { return this.isSales() && o && o.status === 'Cancelled'; },
+  // ใบที่ยกเลิกแล้วล็อกทุก Role ยกเว้น Admin (server ตรวจซ้ำใน updateFullOrder)
+  lockedFor: function(o) { return (window.app.user || {}).Role !== 'Admin' && !!o && o.status === 'Cancelled'; },
   statusLabel: function(s) { return this.STATUS_TH[s] || s; },
   statusColor: function(s) {
     if (this.STATUS_COLOR[s]) return this.STATUS_COLOR[s];
@@ -268,7 +269,7 @@ window.app.orders = {
     if (status === 'Cancelled' || o.status === 'Cancelled') {
       const r = await Swal.fire({
         icon: 'warning', title: window.app.esc(status === 'Cancelled' ? 'ยกเลิกใบจองนี้?' : 'นำใบจองที่ยกเลิกกลับมาใช้?'),
-        html: '<b>' + window.app.esc(id) + '</b><br>' + (status === 'Cancelled' ? 'สต๊อกของสินค้าในใบจองจะถูกคืนเข้าระบบ' + (this.isSales() ? '<br><b>ยกเลิกแล้วจะเปลี่ยนสถานะกลับไม่ได้อีก</b>' : '') : 'ระบบจะตัดสต๊อกสินค้าในใบจองอีกครั้ง (ถ้าสต๊อกไม่พอจะเปลี่ยนไม่ได้)'),
+        html: '<b>' + window.app.esc(id) + '</b><br>' + (status === 'Cancelled' ? 'สต๊อกของสินค้าในใบจองจะถูกคืนเข้าระบบ' + ((window.app.user || {}).Role !== 'Admin' ? '<br><b>ยกเลิกแล้วจะเปลี่ยนสถานะกลับไม่ได้อีก</b>' : '') : 'ระบบจะตัดสต๊อกสินค้าในใบจองอีกครั้ง (ถ้าสต๊อกไม่พอจะเปลี่ยนไม่ได้)'),
         showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ไม่เปลี่ยน', confirmButtonColor: '#0f2a43'
       });
       if (!r.isConfirmed) { revert(); return; }
@@ -287,7 +288,7 @@ window.app.orders = {
     if (ids.length > 50) { Swal.fire({ icon: 'warning', title: 'เลือกได้ครั้งละไม่เกิน 50 ใบ', text: 'ตอนนี้เลือกไว้ ' + ids.length + ' ใบ' }); return; }
     const r = await Swal.fire({
       icon: status === 'Cancelled' ? 'warning' : 'question', title: 'เปลี่ยนสถานะ ' + ids.length + ' ใบจอง?',
-      html: 'เป็น <b>' + window.app.esc(this.statusLabel(status)) + '</b>' + (status === 'Cancelled' ? '<br>สต๊อกของสินค้าในใบจองที่ยกเลิกจะถูกคืนเข้าระบบ' + (this.isSales() ? '<br><b>ยกเลิกแล้วจะเปลี่ยนสถานะกลับไม่ได้อีก</b>' : '') : ''),
+      html: 'เป็น <b>' + window.app.esc(this.statusLabel(status)) + '</b>' + (status === 'Cancelled' ? '<br>สต๊อกของสินค้าในใบจองที่ยกเลิกจะถูกคืนเข้าระบบ' + ((window.app.user || {}).Role !== 'Admin' ? '<br><b>ยกเลิกแล้วจะเปลี่ยนสถานะกลับไม่ได้อีก</b>' : '') : ''),
       showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#0f2a43'
     });
     if (!r.isConfirmed) return;

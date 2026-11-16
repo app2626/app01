@@ -2381,7 +2381,7 @@ function getCustomerByPhone(payload, secureUser, ss) {
 
 // เปลี่ยนสถานะใบจองทีละใบหรือหลายใบจากหน้ารายการใบจอง (payload: { orderIds: [...], status })
 // - Admin/Manager เปลี่ยนเป็นสถานะใดก็ได้; Sales (owner 2026-11-16) เปลี่ยนได้เฉพาะ SALES_ORDER_STATUSES_ (ชำระแล้ว/ส่งมอบแล้ว/ยกเลิก),
-//   เฉพาะใบจองของสาขาตัวเอง และใบที่ยกเลิกแล้วเปลี่ยนต่อไม่ได้ (ตรวจซ้ำใน updateFullOrder ภายใต้ lock)
+//   เฉพาะใบจองของสาขาตัวเอง; ใบที่ยกเลิกแล้วเปลี่ยนต่อได้เฉพาะ Admin (ตรวจใน updateFullOrder ภายใต้ lock)
 // - สูงสุด SET_ORDER_STATUS_MAX_ ใบต่อครั้ง
 // - หาแถวจาก OrderID ฝั่ง server เอง (ไม่รับ _rowIndex จาก client — ตำแหน่งแถวที่ client ถืออยู่อาจเก่าถ้ามีคนลบแถวไปแล้ว)
 // - งานจริงทำโดย updateFullOrder ทีละใบ: ตรวจชื่อสถานะกับชีต OrderStatus, คืน/ตัดสต๊อกเมื่อยกเลิกหรือนำกลับมา, เขียน AuditLog + OrderStatusLog
@@ -2455,8 +2455,11 @@ function updateFullOrder(dataObj, secureUser, ss, opts) {
       const brI = oHeaders.indexOf("Branch Code");
       if (brI === -1 || (oldDataRow[brI] || '').toString().trim() !== (secureUser['Branch Code'] || '').toString().trim()) throw new Error("ไม่พบใบจองนี้");
       if (SALES_ORDER_STATUSES_.indexOf((dataObj["Order Status"] || '').toString().trim()) === -1) throw new Error("พนักงานขายเปลี่ยนสถานะได้เฉพาะ ชำระแล้ว / ส่งมอบแล้ว / ยกเลิก");
-      if ((oldDataRow[oHeaders.indexOf("Order Status")] || '').toString().trim() === 'Cancelled') throw new Error("ใบจองที่ยกเลิกแล้วเปลี่ยนสถานะไม่ได้");
     }
+    // ใบจองที่ยกเลิกแล้วล็อกสถานะ ทุก Role ยกเว้น Admin (owner 2026-11-16) — Admin ยังนำกลับมาใช้ได้กรณียกเลิกผิด
+    if (secureUser.Role !== 'Admin' && dataObj["Order Status"] !== undefined
+        && (oldDataRow[oHeaders.indexOf("Order Status")] || '').toString().trim() === 'Cancelled'
+        && (dataObj["Order Status"] || '').toString().trim() !== 'Cancelled') throw new Error("ใบจองที่ยกเลิกแล้วเปลี่ยนสถานะไม่ได้ (เฉพาะแอดมิน)");
     
     let newStatus = dataObj["Order Status"] || oldDataRow[oHeaders.indexOf("Order Status")];
     // Order Status/Reservation Status เป็นค่าจาก <select> ที่ควบคุมชุดค่าตายตัว — ไม่อยู่ใน FREE_TEXT_COLS_ (ห้าม sanitize ทับ ดู comment บรรทัดล่าง)
