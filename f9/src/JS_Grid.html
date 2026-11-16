@@ -142,7 +142,7 @@ window.app.grid = {
     // error state มาตรฐาน (5A.4) — แสดงในตารางพร้อมปุ่มลองใหม่ แทนการเด้ง Swal อย่างเดียว
     renderLoadError: function(msg) {
       const tbody = document.getElementById('dataGridBody');
-      if (!tbody) { Swal.fire('Error', msg, 'error'); return; }
+      if (!tbody) { window.app.alertError('Error', msg); return; }
       tbody.innerHTML = this.stateRow(window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',
@@ -318,8 +318,8 @@ window.app.grid = {
           if (res.notFound && res.notFound.length) msg += ' · ไม่พบ ' + res.notFound.length;
           await this.loadData();
           Swal.fire({ icon: 'success', title: msg, showConfirmButton: false, timer: 1800 });
-        } else Swal.fire('Error', res ? res.message : 'Error', 'error');
-      } catch (e) { window.app.hideLoading(); Swal.fire('Error', e.message || 'Error', 'error'); }
+        } else window.app.alertError('Error', res ? res.message : 'Error');
+      } catch (e) { window.app.hideLoading(); window.app.alertError('Error', e.message || 'Error'); }
     },
     deleteSelected: async function() {
       const ids = Object.keys(this.selected);
@@ -339,8 +339,8 @@ window.app.grid = {
           if (res.notFound && res.notFound.length) msg += ' · ไม่พบ ' + res.notFound.length + ' รายการ';
           await this.loadData();
           Swal.fire({ icon: 'success', title: msg, showConfirmButton: false, timer: 1800 });
-        } else Swal.fire('Error', res ? res.message : 'Error', 'error');
-      } catch (e) { window.app.hideLoading(); Swal.fire('Error', e.message || 'Error', 'error'); }
+        } else window.app.alertError('Error', res ? res.message : 'Error');
+      } catch (e) { window.app.hideLoading(); window.app.alertError('Error', e.message || 'Error'); }
     },
     filter: function() {
       const input = document.getElementById('gridSearch'); if(!input) return;
@@ -750,7 +750,7 @@ window.app.grid = {
         const noGift = !['Brand Gifts', 'Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3'].some(k => String(pay[k] || '').trim());
         if (noTarget || noGift) {
           restoreBtn();
-          Swal.fire(noTarget ? 'ยังไม่ได้ระบุสินค้า' : 'ยังไม่ได้เลือกของแถม', noTarget ? 'ใส่รุ่น กลุ่มสินค้า หรือ SKU ที่จะได้ของแถม (หรือ * = ทุกรุ่น)' : 'เลือกของแถมแบรนด์ หรือของแถมช่องทางอย่างน้อยหนึ่งรายการ', 'warning');
+          window.app.alertError(noTarget ? 'ยังไม่ได้ระบุสินค้า' : 'ยังไม่ได้เลือกของแถม', noTarget ? 'ใส่รุ่น กลุ่มสินค้า หรือ SKU ที่จะได้ของแถม (หรือ * = ทุกรุ่น)' : 'เลือกของแถมแบรนด์ หรือของแถมช่องทางอย่างน้อยหนึ่งรายการ', 'warning');
           return;
         }
       }
@@ -779,7 +779,7 @@ window.app.grid = {
           if (uploadedUrl) pay['Image URL'] = uploadedUrl;
         } catch (e) {
           restoreBtn();
-          Swal.fire('ผิดพลาด', e.message || 'อัปโหลดรูปไม่สำเร็จ', 'error');
+          window.app.alertError('ผิดพลาด', e.message || 'อัปโหลดรูปไม่สำเร็จ');
           return;
         }
       }
@@ -802,8 +802,8 @@ window.app.grid = {
                const savedId = String(pay[this.idField] === undefined || pay[this.idField] === null ? '' : pay[this.idField]).trim();
                Swal.fire({ icon: 'success', title: (this.editingData ? 'บันทึกการแก้ไข' : 'เพิ่ม') + this.subject() + 'แล้ว', text: savedId, showConfirmButton: false, timer: 1600 });
              }
-           } else Swal.fire('ผิดพลาด',res ? res.message : 'Error', 'error');
-         } catch(e) { Swal.fire('ผิดพลาด', e.message || 'Error', 'error'); }
+           } else window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
+         } catch(e) { window.app.alertError('ผิดพลาด', e.message || 'Error'); }
          finally { restoreBtn(); }
       }, 350);
     },
@@ -812,8 +812,8 @@ window.app.grid = {
         window.app.showLoading('กำลังลบข้อมูล...');
         try {
           const res = await window.app.api('DELETE_RECORD', { tableName:this.tableName, idField:this.idField, idValue:id });
-          if(res && res.status==='success') { await window.app.refreshGlobalData(); await this.loadData(); Swal.fire({ icon: 'success', title: 'ลบ' + this.subject() + 'แล้ว', text: String(id === undefined || id === null ? '' : id), showConfirmButton: false, timer: 1400 }); } else Swal.fire('Error',res ? res.message : 'Error','error');
-        } catch(e) { Swal.fire('Error', e.message || 'Error', 'error'); }
+          if(res && res.status==='success') { await window.app.refreshGlobalData(); await this.loadData(); Swal.fire({ icon: 'success', title: 'ลบ' + this.subject() + 'แล้ว', text: String(id === undefined || id === null ? '' : id), showConfirmButton: false, timer: 1400 }); } else window.app.alertError('Error', res ? res.message : 'Error');
+        } catch(e) { window.app.alertError('Error', e.message || 'Error'); }
       }
     },
     // 5B.3 — export ตามที่กรอง/ค้น/เรียงอยู่ (filteredDataList ไม่ใช่ dataList) เป็น CSV ที่ Excel เปิดภาษาไทยถูก (BOM)

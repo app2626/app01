@@ -458,7 +458,7 @@ window.app = {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       window.app.toast('คัดลอกภาพกราฟแล้ว — วางได้เลย (Ctrl+V)');
     } catch (err) {
-      Swal.fire('คัดลอกไม่สำเร็จ', (err && err.message ? err.message : 'ไม่ทราบสาเหตุ') + ' — ลองใช้ปุ่มดาวน์โหลดแทน', 'warning');
+      window.app.alertError('คัดลอกไม่สำเร็จ', (err && err.message ? err.message : 'ไม่ทราบสาเหตุ') + ' — ลองใช้ปุ่มดาวน์โหลดแทน', 'warning');
     }
   },
 
@@ -518,7 +518,7 @@ window.app = {
       a.click();
       document.body.removeChild(a);
     } catch (err) {
-      Swal.fire('ผิดพลาด', 'สร้างภาพตารางไม่สำเร็จ: ' + (err && err.message ? err.message : err), 'error');
+      window.app.alertError('ผิดพลาด', 'สร้างภาพตารางไม่สำเร็จ: ' + (err && err.message ? err.message : err));
     } finally {
       restore();
     }
@@ -536,7 +536,7 @@ window.app = {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       window.app.toast('คัดลอกภาพตารางแล้ว — วางได้เลย (Ctrl+V)');
     } catch (err) {
-      Swal.fire('คัดลอกไม่สำเร็จ', (err && err.message ? err.message : 'ไม่ทราบสาเหตุ') + ' — ลองใช้ปุ่มดาวน์โหลดแทน', 'warning');
+      window.app.alertError('คัดลอกไม่สำเร็จ', (err && err.message ? err.message : 'ไม่ทราบสาเหตุ') + ' — ลองใช้ปุ่มดาวน์โหลดแทน', 'warning');
     } finally {
       restore();
     }
@@ -722,7 +722,7 @@ window.app = {
        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
        pdf.save('ใบจอง-' + orderId + '.pdf');
      } catch (e) {
-       Swal.fire('ผิดพลาด', 'สร้างไฟล์ PDF ไม่สำเร็จ: ' + (e && e.message ? e.message : e), 'error');
+       window.app.alertError('ผิดพลาด', 'สร้างไฟล์ PDF ไม่สำเร็จ: ' + (e && e.message ? e.message : e));
      } finally {
        document.body.removeChild(holder);
        window.app.hideLoading();
@@ -1565,7 +1565,7 @@ window.app = {
          : 'ฐานข้อมูลพร้อมใช้งานแล้ว';
        Swal.fire({ icon: 'success', title: 'สร้างฐานข้อมูลสำเร็จ!', html: adminText, confirmButtonColor: '#254d71' });
     } catch(e) {
-      Swal.fire('ข้อผิดพลาด', e.toString(), 'error');
+      window.app.alertError('ข้อผิดพลาด', e.toString());
     }
   },
 
@@ -1961,7 +1961,7 @@ window.app = {
       }
     } catch(err) {
       console.error(err);
-      Swal.fire('ข้อผิดพลาดระบบ', err.message, 'error');
+      window.app.alertError('ข้อผิดพลาดระบบ', err.message);
     }
   },
 
@@ -2001,6 +2001,13 @@ window.app = {
             { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text' },
             { key: 'Deposit', label: 'เงินมัดจำ', type: 'number' }
           ], isSalesRole);
+  },
+
+  // ข้อความที่ไม่ได้เขียนเองในโค้ด (error จาก server, e.message, ค่าจากชีต) ต้องแสดงผ่านตัวนี้เสมอ:
+  // อาร์กิวเมนต์ตัวที่ 2 ของ Swal.fire(title, x, icon) คือ HTML — ข้อความ error บางอันมีชื่อสินค้า/SKU/ค่าที่ผู้ใช้พิมพ์ ปนมาได้
+  // ตัวนี้ส่งเป็น text จึงไม่ถูกตีความเป็นแท็ก (title ยังเป็น HTML — ใส่เฉพาะข้อความคงที่)
+  alertError: function(title, msg, icon) {
+    return Swal.fire({ title: title, text: (msg === null || msg === undefined) ? '' : String(msg), icon: icon || 'error' });
   },
 
   // token ใช้ไม่ได้แล้ว (หมดอายุ 30 วัน, เปลี่ยนหรือรีเซ็ตรหัสผ่าน, หมุนคีย์ลับ, บัญชีถูกลบ) = พากลับหน้า login พร้อมบอกเหตุผล
@@ -2067,11 +2074,11 @@ window.app = {
         Swal.fire({icon: 'success', title: 'Welcome', text: res.user.Name, timer: 1500, showConfirmButton: false});
         window.app.renderLayout();
       } else {
-        Swal.fire('Error', res ? res.message : 'Unknown Error', 'error');
+        window.app.alertError('Error', res ? res.message : 'Unknown Error');
         btn.disabled = false; btn.innerHTML = btn.dataset.label || 'เข้าสู่ระบบ';
       }
     } catch (err) {
-      Swal.fire('Error', err && err.message ? err.message : 'เชื่อมต่อระบบไม่สำเร็จ', 'error');
+      window.app.alertError('Error', err && err.message ? err.message : 'เชื่อมต่อระบบไม่สำเร็จ');
       btn.disabled = false; btn.innerHTML = btn.dataset.label || 'เข้าสู่ระบบ';
     }
   },
@@ -2148,11 +2155,11 @@ window.app = {
           }
           Swal.fire({ icon: 'success', title: 'เปลี่ยนรหัสผ่านสำเร็จ', showConfirmButton: false, timer: 1500 });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch (e) {
         Swal.close();
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       }
     });
   },

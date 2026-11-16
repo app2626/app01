@@ -1468,6 +1468,15 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     try { await waitFor("document.querySelectorAll('#productGrid .pos-card').length>0", 6000); }
     catch (e) { throw new Error('no cards; user=' + (await ev('JSON.stringify(window.app.user && {r: window.app.user.Role, b: window.app.user["Branch Code"], c: window.app.user.Channel})')) + ' hash=' + (await ev('location.hash')) + ' grid=' + (await ev("(document.getElementById('productGrid')||{innerText:'(none)'}).innerText.slice(0,150)"))); } ok(await ev("document.getElementById('posBranchSelect').disabled===true")); ok((await cnt()) > 0, 'no cards'); });
   await T('restricted user (menus=pos) cannot open #products', async () => { await ev("window.app.user['Accessible Menus']='pos';window.location.hash='#products';true"); await sleep(800); const d = await ev("JSON.stringify({hash:location.hash,role:window.app.user.Role,swal:(window.Swal&&Swal.isVisible&&Swal.isVisible())?document.querySelector('.swal2-title').textContent:null,menu:(window.app.menuConfig.flatMap(x=>x.children||[x]).find(x=>x.id==='products')||{}).roles})"); const o = JSON.parse(d); ok(o.hash !== '#products' || /ปฏิเสธ/.test(o.swal || ''), d); await ev("window.Swal&&Swal.close();true"); });
+  await T('alertError shows a server message as plain text, never as HTML; CDN scripts are pinned with integrity', async () => {
+    await ev("window.app.alertError('ผิดพลาด','<img src=x onerror=window.__xss=1><b>SKU-1</b>');true"); await sleep(400);
+    const o = JSON.parse(await ev("JSON.stringify({text:document.querySelector('.swal2-html-container').textContent,kids:document.querySelector('.swal2-html-container').children.length,xss:window.__xss||0,icon:!!document.querySelector('.swal2-icon.swal2-error')})"));
+    ok(o.text === '<img src=x onerror=window.__xss=1><b>SKU-1</b>' && o.kids === 0 && o.xss === 0 && o.icon, JSON.stringify(o));
+    await ev("window.Swal&&Swal.close();true");
+    const idx = fs.readFileSync(SRC + 'Index.html', 'utf8'), tags = idx.match(/<script src="https:[^>]+>/g) || [];
+    ok(tags.length >= 5, 'script tags=' + tags.length);
+    tags.forEach(s => ok(/integrity="sha384-[A-Za-z0-9+\/=]{64}"/.test(s) && /crossorigin="anonymous"/.test(s) && /@[0-9]+\.[0-9]+\.[0-9]+\//.test(s), 'not pinned: ' + s));
+  });
   // keep this one last: it ends the session
   await T('a token the server no longer accepts sends the user back to the login page with a message', async () => {
     await ev("window.app.user=Object.assign({},window.app.user,{Token:'bad.token'});window.app.api('GET_TABLE',{tableName:'Products'}).catch(function(){});true");

@@ -22,7 +22,7 @@ window.app.target = {
     },
     renderLoadError: function(msg) {
       const tbody = document.getElementById('targetTableBody');
-      if (!tbody) { Swal.fire('Error', msg, 'error'); return; }
+      if (!tbody) { window.app.alertError('Error', msg); return; }
       tbody.innerHTML = '<tr><td colspan="5">' + window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',

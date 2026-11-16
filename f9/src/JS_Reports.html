@@ -47,7 +47,7 @@ window.app.bookingSummary = {
     // error state มาตรฐาน (5A.4) พร้อมปุ่มลองใหม่ — ห้ามเงียบเฉยตาม error contract
     renderLoadError: function(msg) {
       const wrap = document.getElementById('bookingSummaryTableWrap');
-      if (!wrap) { Swal.fire('Error', msg, 'error'); return; }
+      if (!wrap) { window.app.alertError('Error', msg); return; }
       wrap.innerHTML = window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',
@@ -366,7 +366,7 @@ window.app.salesSummary = {
     // error state มาตรฐาน (5A.4) พร้อมปุ่มลองใหม่ — ห้ามเงียบเฉยตาม error contract
     renderLoadError: function(msg) {
       const wrap = document.getElementById('salesSummaryTablesWrap');
-      if (!wrap) { Swal.fire('Error', msg, 'error'); return; }
+      if (!wrap) { window.app.alertError('Error', msg); return; }
       wrap.innerHTML = window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',
@@ -603,7 +603,7 @@ window.app.branchBookingSummary = {
     },
     renderLoadError: function(msg) {
       const wrap = document.getElementById('branchBookingSummaryTablesWrap');
-      if (!wrap) { Swal.fire('Error', msg, 'error'); return; }
+      if (!wrap) { window.app.alertError('Error', msg); return; }
       wrap.innerHTML = window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',
@@ -856,7 +856,7 @@ window.app.allBookingSummary = {
     // error state มาตรฐาน (5A.4) พร้อมปุ่มลองใหม่ — ห้ามเงียบเฉยตาม error contract
     renderLoadError: function(msg) {
       const container = document.getElementById('allBookingSummaryTablesContainer');
-      if (!container) { Swal.fire('Error', msg, 'error'); return; }
+      if (!container) { window.app.alertError('Error', msg); return; }
       container.innerHTML = window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',

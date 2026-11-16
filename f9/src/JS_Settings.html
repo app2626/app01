@@ -104,11 +104,11 @@ window.app.settingsManager = {
           this.data = res.data;
           this.render();
         } else {
-          Swal.fire('ข้อผิดพลาด', res ? res.message : 'ไม่สามารถโหลดข้อมูลได้', 'error');
+          window.app.alertError('ข้อผิดพลาด', res ? res.message : 'ไม่สามารถโหลดข้อมูลได้');
         }
       } catch(e) {
         Swal.close();
-        Swal.fire('ข้อผิดพลาด', e.message || 'ไม่สามารถโหลดข้อมูลได้', 'error');
+        window.app.alertError('ข้อผิดพลาด', e.message || 'ไม่สามารถโหลดข้อมูลได้');
       }
     },
     
@@ -459,10 +459,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกภาพพื้นหลังสำเร็จ', showConfirmButton: false, timer: 1500 });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch(e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally {
         restoreBtn();
       }
@@ -471,7 +471,7 @@ window.app.settingsManager = {
     clearCache: async function() {
       try {
         const res = await window.app.api('CLEAR_CACHE', {});
-        if (!res || res.status !== 'success') return Swal.fire('ล้างแคชไม่สำเร็จ', (res && res.message) ? res.message : 'เกิดข้อผิดพลาด', 'error');
+        if (!res || res.status !== 'success') return window.app.alertError('ล้างแคชไม่สำเร็จ', (res && res.message) ? res.message : 'เกิดข้อผิดพลาด');
         try {
           const fresh = await window.app.api('GET_ALL_DATA', {});
           if (fresh && fresh.status === 'success') window.app.globalData = fresh;
@@ -513,10 +513,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกการตั้งค่าการจองแล้ว', showConfirmButton: false, timer: 1500 });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch(e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally {
         restoreBtn();
       }
@@ -537,10 +537,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกการแจ้งเตือนแล้ว', timer: 1500, showConfirmButton: false });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch (e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally { restoreBtn(); }
     },
 
@@ -561,10 +561,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลติดต่อแล้ว', timer: 1500, showConfirmButton: false });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch (e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally { restoreBtn(); }
     },
 
@@ -581,10 +581,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกเงื่อนไขและนโยบายแล้ว', timer: 1500, showConfirmButton: false });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch (e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally { restoreBtn(); }
     },
 
@@ -610,10 +610,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกชื่อเว็บแอปสำเร็จ', text: 'รีเฟรชหน้าเว็บเพื่อให้ชื่อใหม่แสดงผลทุกจุด', showConfirmButton: false, timer: 2000 });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch(e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally {
         restoreBtn();
       }
@@ -636,10 +636,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกโฟลเดอร์สำเร็จ', showConfirmButton: false, timer: 1500 });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch(e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally {
         restoreBtn();
       }
@@ -670,10 +670,10 @@ window.app.settingsManager = {
           await this.init(this.currentType);
           Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลบริษัทสำเร็จ', showConfirmButton: false, timer: 1500 });
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
         }
       } catch(e) {
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       } finally {
         restoreBtn();
       }

@@ -246,10 +246,10 @@ window.app.invoice = {
               Swal.fire({ icon: 'success', title: 'บันทึกเอกสารแล้ว', text: 'สถานะ: รออนุมัติ', showConfirmButton: false, timer: 1800 });
               this.loadList();
            } else {
-              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+              window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
            }
         } catch(e) {
-           Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+           window.app.alertError('ผิดพลาด', e.message || 'Error');
         } finally {
            restore();
         }
@@ -366,11 +366,11 @@ window.app.invoice = {
               }
               this.loadList();
            } else {
-              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+              window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
            }
         } catch(e) {
            Swal.close();
-           Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+           window.app.alertError('ผิดพลาด', e.message || 'Error');
         }
      },
      del: async function(invoiceId) {
@@ -396,11 +396,11 @@ window.app.invoice = {
               if(this.currentId === invoiceId) { this.currentId = null; this.currentStatus = null; this.applyLockState(); }
               this.loadList();
            } else {
-              Swal.fire('ผิดพลาด', res ? res.message : 'Error', 'error');
+              window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
            }
         } catch(e) {
            Swal.close();
-           Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+           window.app.alertError('ผิดพลาด', e.message || 'Error');
         }
      }
   };

@@ -347,7 +347,7 @@ window.app.productGroup = {
       if (variants.length === 0) return Swal.fire('ผิดพลาด', 'กรุณาเพิ่มอย่างน้อย 1 SKU', 'error');
       for (const v of variants) {
         if (!v.sku) return Swal.fire('ผิดพลาด', 'กรุณาระบุ SKU ให้ครบทุกแถว', 'error');
-        if (v.stock === '' || !Number.isInteger(Number(v.stock)) || Number(v.stock) < 0) return Swal.fire('ผิดพลาด', 'สต๊อกของ SKU ' + v.sku + ' ไม่ถูกต้อง', 'error');
+        if (v.stock === '' || !Number.isInteger(Number(v.stock)) || Number(v.stock) < 0) return window.app.alertError('ผิดพลาด', 'สต๊อกของ SKU ' + v.sku + ' ไม่ถูกต้อง');
       }
 
       window.app.showLoading();
@@ -377,11 +377,11 @@ window.app.productGroup = {
               ? 'เพิ่ม SKU ใหม่ ' + res.skuCount + ' รายการเข้าสินค้า "' + shared['Model'] + '" สำเร็จ'
               : 'เพิ่มสินค้า "' + shared['Model'] + '" (' + res.skuCount + ' SKU) สำเร็จ'));
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ');
         }
       } catch (e) {
         window.app.hideLoading();
-        Swal.fire('ผิดพลาด', e.message, 'error');
+        window.app.alertError('ผิดพลาด', e.message);
       }
     },
 
@@ -505,11 +505,11 @@ window.app.productGroup = {
           }
           if (res.updatedCount > 0) window.app.toast('อัปเดตราคาและสต๊อกสำเร็จ ' + res.updatedCount + ' SKU'); else window.app.toast('ไม่มีรายการที่ถูกอัปเดต (ไม่พบ SKU ในระบบ)', 'warning');
         } else {
-          Swal.fire('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ', 'error');
+          window.app.alertError('ผิดพลาด', res ? res.message : 'บันทึกไม่สำเร็จ');
         }
       } catch (e) {
         window.app.hideLoading();
-        Swal.fire('ผิดพลาด', e.message || 'Error', 'error');
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
       }
     },
     // ===== นำเข้าสินค้าจากไฟล์ CSV (Admin) — เพิ่ม SKU ใหม่เท่านั้น ข้าม SKU ที่มีอยู่แล้ว =====

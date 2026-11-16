@@ -66,7 +66,7 @@ window.app.dashboard = {
     // error state มาตรฐาน (5A.4) พร้อมปุ่มลองใหม่ — ห้ามเงียบเฉยตาม error contract
     renderLoadError: function(msg) {
       const emptyEl = document.getElementById('dashEmptyState');
-      if (!emptyEl) { Swal.fire('Error', msg, 'error'); return; }
+      if (!emptyEl) { window.app.alertError('Error', msg); return; }
       emptyEl.innerHTML = window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',

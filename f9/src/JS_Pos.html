@@ -304,7 +304,7 @@ window.app.pos = {
       try {
         const res = await window.app.api('VALIDATE_COUPON', { code: code, subtotal: subtotal });
         if (!res || res.status !== 'success') {
-          return Swal.fire('ใช้โค้ดไม่ได้', (res && res.message) ? res.message : 'ตรวจสอบโค้ดไม่สำเร็จ', 'warning');
+          return window.app.alertError('ใช้โค้ดไม่ได้', (res && res.message) ? res.message : 'ตรวจสอบโค้ดไม่สำเร็จ', 'warning');
         }
         this.appliedCoupons.push({ code: res.coupon.code, type: res.coupon.type, value: res.coupon.value, minSpend: res.coupon.minSpend || 0 });
         if (inp) inp.value = '';
@@ -2394,7 +2394,7 @@ window.app.pos = {
     // opts.editIdx = แก้ของแถมของบรรทัดในตะกร้า (editCartGifts): เปิดเฉพาะ SKU นั้น ไม่ให้เปลี่ยนสี/ความจุ และข้ามเช็คสิทธิ์โมบาย 1 เครื่อง (เครื่องนั้นอยู่ในตะกร้าอยู่แล้ว)
     openAddToCartModal: function(id, opts) {
       if (this.isBookingBlocked) {
-        return Swal.fire('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
+        return window.app.alertError('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
       }
       const editIdx = (opts && Number.isInteger(opts.editIdx)) ? opts.editIdx : null;
       const editLine = editIdx !== null ? this.cartData[editIdx] : null;
@@ -2751,7 +2751,7 @@ window.app.pos = {
     },
     confirmAddToCart: function() {
       if (this.isBookingBlocked) {
-        return Swal.fire('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
+        return window.app.alertError('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
       }
       const sku=document.getElementById('modalProdSKU').value; const qty=parseInt(document.getElementById('modalProdQty').value);
       const p = window.app.globalData.products.find(x=>x.SKU==sku);
@@ -2805,7 +2805,7 @@ window.app.pos = {
       
       for (let model in modelCounts) {
          if (modelCounts[model] > 1) {
-             return Swal.fire('ข้อจำกัดของแถม', 'ของแถมรุ่นเดียวกัน (' + model + ') สามารถเลือกได้สูงสุด 1 ชิ้นเท่านั้น', 'warning');
+             return window.app.alertError('ข้อจำกัดของแถม', 'ของแถมรุ่นเดียวกัน (' + model + ') สามารถเลือกได้สูงสุด 1 ชิ้นเท่านั้น', 'warning');
          }
       }
       
@@ -2944,7 +2944,7 @@ window.app.pos = {
       return true;
     },
     addCompanion: function(sku, viaPrompt) {
-      if (this.isBookingBlocked) return Swal.fire('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
+      if (this.isBookingBlocked) return window.app.alertError('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
       const p = (window.app.globalData.products || []).find(x => x.SKU == sku);
       if (!p || (p.Status || '') !== 'เปิด') return;
       const inCartQty = this.cartData.filter(i => i.SKU == sku).reduce((s, i) => s + i.qty, 0);
@@ -3206,7 +3206,7 @@ window.app.pos = {
     },
     openCheckoutModal: function() {
       if (this.isBookingBlocked) {
-        return Swal.fire('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
+        return window.app.alertError('ไม่สามารถดำเนินการได้', this.bookingBlockedMessage || 'ไม่อยู่ในช่วงเวลาการจองสินค้า', 'warning');
       }
       const chSel = document.getElementById('posChannelSelect');
       const brSel = document.getElementById('posBranchSelect');
@@ -3406,11 +3406,11 @@ window.app.pos = {
                     if(newGlobal && newGlobal.status === 'success') window.app.globalData = newGlobal;
                     window.app.pos.filter();
                   } catch(refreshErr) { console.warn('รีเฟรชข้อมูลหลังบันทึกออเดอร์ไม่สำเร็จ (สต๊อกบนการ์ดอาจยังเป็นค่าเก่า):', refreshErr); }
-               } else { Swal.fire('ระบบขัดข้อง',res ? res.message : 'Error', 'error'); }
+               } else { window.app.alertError('ระบบขัดข้อง', res ? res.message : 'Error'); }
              } catch(e) {
                // timeout ≠ บันทึกไม่สำเร็จ — ออเดอร์อาจเข้าแล้ว (idempotency key กันซ้ำอยู่) อย่าให้ผู้ใช้รีบคีย์ใหม่ทันที
                if (e && e.isTimeout) Swal.fire('การเชื่อมต่อช้า', 'กรุณาตรวจสอบหน้ารายการจองก่อนคีย์ซ้ำ — หากออเดอร์ยังไม่เข้า กดยืนยันอีกครั้งได้ (ระบบกันบันทึกซ้ำให้)', 'warning');
-               else Swal.fire('เกิดข้อผิดพลาด', e.message, 'error');
+               else window.app.alertError('เกิดข้อผิดพลาด', e.message);
              }
              finally {
                window.app.pos.isSubmitting = false;
