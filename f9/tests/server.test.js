@@ -770,7 +770,19 @@ console.log('== SET_ORDER_STATUS');
   const place = () => { const r = api('CHECKOUT', co({ clientRequestId: 'SOS-' + Math.random() }), sales); eq(r.status, 'success', JSON.stringify(r)); return r.orderId; };
   const statusOf = (id) => [...new Set(tbl('Orders').filter(x => x.OrderID === id).map(x => x['Order Status']))].join(',');
   let a, b;
-  t('SET_ORDER_STATUS: Sales cannot change a status', () => { a = place(); b = place(); const r = api('SET_ORDER_STATUS', { orderIds: [a], status: 'Confirmed' }, sales); eq(r.status, 'error', JSON.stringify(r)); eq(statusOf(a), 'Pending'); });
+  t('SET_ORDER_STATUS: Sales cannot set a status outside Paid/Delivered/Cancelled', () => { a = place(); b = place(); const r = api('SET_ORDER_STATUS', { orderIds: [a], status: 'Confirmed' }, sales); eq(r.status, 'error', JSON.stringify(r)); eq(statusOf(a), 'Pending'); });
+  t('SET_ORDER_STATUS: Sales sets Paid / Delivered / Cancelled on own branch; cancelled is locked; other branch = not found', () => {
+    const c = place(), s0 = stockOf('SKU-S24U');
+    eq(api('SET_ORDER_STATUS', { orderIds: [c], status: 'Paid' }, sales).updated.join(), c); eq(statusOf(c), 'Paid');
+    eq(api('SET_ORDER_STATUS', { orderIds: [c], status: 'Delivered' }, sales).updated.join(), c); eq(statusOf(c), 'Delivered');
+    eq(api('SET_ORDER_STATUS', { orderIds: [c], status: 'Cancelled' }, sales).updated.join(), c); eq(statusOf(c), 'Cancelled'); eq(stockOf('SKU-S24U'), s0 + 1);
+    const r = api('SET_ORDER_STATUS', { orderIds: [c], status: 'Paid' }, sales); eq(r.failed.length, 1, JSON.stringify(r)); ok(/ยกเลิกแล้ว/.test(r.failed[0].message), r.failed[0].message); eq(statusOf(c), 'Cancelled');
+    eq(api('UPDATE_FULL_ORDER', { data: { _rowIndex: 2, 'Order Status': 'Paid' } }, sales).status, 'error', 'full edit still blocked for Sales');
+    const oh = sheets.Orders.rows[0], bi = oh.indexOf('Branch Code'), rows = sheets.Orders.rows.filter(x => x[oh.indexOf('OrderID')] === b), old = rows.map(x => x[bi]);
+    try { rows.forEach(x => { x[bi] = 'OTHER'; }); const r2 = api('SET_ORDER_STATUS', { orderIds: [b], status: 'Paid' }, sales); eq(r2.failed.length, 1, JSON.stringify(r2)); eq(statusOf(b), 'Pending'); }
+    finally { rows.forEach((x, i) => { x[bi] = old[i]; }); }
+    eq(api('SET_ORDER_STATUS', { orderIds: [c], status: 'Pending' }, admin).updated.join(), c, 'Admin can still restore');
+  });
   t('SET_ORDER_STATUS: Admin changes several orders by OrderID, every row of each order, history logged', () => {
     const r = api('SET_ORDER_STATUS', { orderIds: [a, b, a], status: 'Confirmed' }, admin);
     eq(r.status, 'success', JSON.stringify(r)); eq(r.updated.length, 2, JSON.stringify(r)); eq(r.failed.length, 0);

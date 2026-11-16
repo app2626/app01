@@ -2367,16 +2367,21 @@ function getCustomerByPhone(payload, secureUser, ss) {
 }
 
 // เปลี่ยนสถานะใบจองทีละใบหรือหลายใบจากหน้ารายการใบจอง (payload: { orderIds: [...], status })
-// - Admin/Manager เท่านั้น, สูงสุด SET_ORDER_STATUS_MAX_ ใบต่อครั้ง
+// - Admin/Manager เปลี่ยนเป็นสถานะใดก็ได้; Sales (owner 2026-11-16) เปลี่ยนได้เฉพาะ SALES_ORDER_STATUSES_ (ชำระแล้ว/ส่งมอบแล้ว/ยกเลิก),
+//   เฉพาะใบจองของสาขาตัวเอง และใบที่ยกเลิกแล้วเปลี่ยนต่อไม่ได้ (ตรวจซ้ำใน updateFullOrder ภายใต้ lock)
+// - สูงสุด SET_ORDER_STATUS_MAX_ ใบต่อครั้ง
 // - หาแถวจาก OrderID ฝั่ง server เอง (ไม่รับ _rowIndex จาก client — ตำแหน่งแถวที่ client ถืออยู่อาจเก่าถ้ามีคนลบแถวไปแล้ว)
 // - งานจริงทำโดย updateFullOrder ทีละใบ: ตรวจชื่อสถานะกับชีต OrderStatus, คืน/ตัดสต๊อกเมื่อยกเลิกหรือนำกลับมา, เขียน AuditLog + OrderStatusLog
 // - ใบที่ไม่ผ่าน (ไม่พบ / สต๊อกไม่พอ ฯลฯ) รายงานใน failed โดยไม่ทำให้ใบอื่นล้ม
 var SET_ORDER_STATUS_MAX_ = 50;
+var SALES_ORDER_STATUSES_ = ['Paid', 'Delivered', 'Cancelled'];
 function setOrderStatus(payload, secureUser, ss) {
   try {
-    if (!['Admin', 'Manager'].includes(secureUser.Role)) throw new Error("ไม่มีสิทธิ์เปลี่ยนสถานะใบจอง");
+    if (!['Admin', 'Manager', 'Sales'].includes(secureUser.Role)) throw new Error("ไม่มีสิทธิ์เปลี่ยนสถานะใบจอง");
+    const isSales = secureUser.Role === 'Sales';
     const status = ((payload && payload.status) == null ? '' : payload.status).toString().trim();
     if (!status) throw new Error("กรุณาเลือกสถานะ");
+    if (isSales && SALES_ORDER_STATUSES_.indexOf(status) === -1) throw new Error("พนักงานขายเปลี่ยนสถานะได้เฉพาะ ชำระแล้ว / ส่งมอบแล้ว / ยกเลิก");
     const rawIds = (payload && Array.isArray(payload.orderIds)) ? payload.orderIds : [];
     const ids = [];
     rawIds.forEach(v => {
@@ -2402,7 +2407,7 @@ function setOrderStatus(payload, secureUser, ss) {
       if (!rowIdx) { failed.push({ orderId: id, message: "ไม่พบใบจองนี้" }); return; }
       const current = (sheet.getRange(rowIdx, stCol + 1).getValue() || 'Pending').toString().trim();
       if (current === status) { unchanged.push(id); return; }
-      const r = updateFullOrder({ "_rowIndex": rowIdx, "Order Status": status }, secureUser, ss);
+      const r = updateFullOrder({ "_rowIndex": rowIdx, "Order Status": status }, secureUser, ss, { statusOnly: true });
       if (r && r.status === 'success') updated.push(id);
       else failed.push({ orderId: id, message: ((r && r.message) || 'ไม่สำเร็จ').toString().replace(/^Error:\s*/, '') });
     });
@@ -2412,10 +2417,12 @@ function setOrderStatus(payload, secureUser, ss) {
   }
 }
 
-function updateFullOrder(dataObj, secureUser, ss) {
+// opts.statusOnly = เรียกจาก setOrderStatus (เปลี่ยนสถานะอย่างเดียว) — ทางเดียวที่ Sales เข้ามาได้; UPDATE_FULL_ORDER ไม่ส่ง opts
+function updateFullOrder(dataObj, secureUser, ss, opts) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
-    if (secureUser.Role === 'Sales') throw new Error("พนักงานขาย (Sales) ไม่มีสิทธิ์แก้ไขออเดอร์");
+    const salesStatusOnly = secureUser.Role === 'Sales' && !!(opts && opts.statusOnly);
+    if (secureUser.Role === 'Sales' && !salesStatusOnly) throw new Error("พนักงานขาย (Sales) ไม่มีสิทธิ์แก้ไขออเดอร์");
 
     const orderSheet = ss.getSheetByName("Orders"); 
     const prodSheet = ss.getSheetByName("Products"); 
@@ -2430,6 +2437,13 @@ function updateFullOrder(dataObj, secureUser, ss) {
     
     const orderId = oldDataRow[oHeaders.indexOf("OrderID")];
     if (!orderId) throw new Error("ไม่พบ OrderID");
+    if (salesStatusOnly) {
+      // Sales: เฉพาะสาขาตัวเอง (ตอบเหมือนไม่พบ — ไม่บอกว่ามีใบจองของสาขาอื่น), สถานะใหม่ต้องอยู่ในชุดที่อนุญาต, ใบที่ยกเลิกแล้วล็อก
+      const brI = oHeaders.indexOf("Branch Code");
+      if (brI === -1 || (oldDataRow[brI] || '').toString().trim() !== (secureUser['Branch Code'] || '').toString().trim()) throw new Error("ไม่พบใบจองนี้");
+      if (SALES_ORDER_STATUSES_.indexOf((dataObj["Order Status"] || '').toString().trim()) === -1) throw new Error("พนักงานขายเปลี่ยนสถานะได้เฉพาะ ชำระแล้ว / ส่งมอบแล้ว / ยกเลิก");
+      if ((oldDataRow[oHeaders.indexOf("Order Status")] || '').toString().trim() === 'Cancelled') throw new Error("ใบจองที่ยกเลิกแล้วเปลี่ยนสถานะไม่ได้");
+    }
     
     let newStatus = dataObj["Order Status"] || oldDataRow[oHeaders.indexOf("Order Status")];
     // Order Status/Reservation Status เป็นค่าจาก <select> ที่ควบคุมชุดค่าตายตัว — ไม่อยู่ใน FREE_TEXT_COLS_ (ห้าม sanitize ทับ ดู comment บรรทัดล่าง)
@@ -2446,7 +2460,7 @@ function updateFullOrder(dataObj, secureUser, ss) {
       const validResStatuses = ['', 'จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'];
       if (!validResStatuses.includes(dataObj["Reservation Status"].toString().trim())) throw new Error("ประเภทการจองไม่ถูกต้อง: " + dataObj["Reservation Status"]);
     }
-      if (secureUser.Role === 'Manager') {
+      if (secureUser.Role === 'Manager' || salesStatusOnly) {
         dataObj = { "_rowIndex": dataObj["_rowIndex"], "Order Status": newStatus };
       }
 

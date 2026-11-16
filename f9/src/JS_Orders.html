@@ -24,6 +24,11 @@ window.app.orders = {
   },
   setQuick: function(v) { this.quick = this.QUICK[v] ? v : ''; this.applyFilter(true); },
   canEdit: function() { return ['Admin', 'Manager'].includes((window.app.user || {}).Role); },
+  // เปลี่ยนสถานะได้: Admin/Manager ทุกสถานะ; Sales เฉพาะ SALES_STATUSES (= SALES_ORDER_STATUSES_ ใน Code.js) และใบที่ยกเลิกแล้วล็อก — server ตรวจซ้ำเสมอ
+  SALES_STATUSES: ['Paid', 'Delivered', 'Cancelled'],
+  isSales: function() { return (window.app.user || {}).Role === 'Sales'; },
+  canStatus: function() { return this.canEdit() || this.isSales(); },
+  lockedFor: function(o) { return this.isSales() && o && o.status === 'Cancelled'; },
   statusLabel: function(s) { return this.STATUS_TH[s] || s; },
   statusColor: function(s) {
     if (this.STATUS_COLOR[s]) return this.STATUS_COLOR[s];
@@ -31,7 +36,7 @@ window.app.orders = {
     const c = row ? String(row['Color Code'] || '').trim() : '';
     return /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : '#475569';
   },
-  statusOptions: function() { return window.app.getOrderStatusFlow().concat(['Cancelled']); },
+  statusOptions: function() { return this.isSales() ? this.SALES_STATUSES.slice() : window.app.getOrderStatusFlow().concat(['Cancelled']); },
   num: function(v) { const n = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isNaN(n) ? 0 : n; },
   baht: function(n) { return '฿' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }); },
   clean: function(v) { return String(v == null ? '' : v).replace(/^'+/, '').trim(); },
@@ -51,7 +56,7 @@ window.app.orders = {
     // preset = ตัวกรองที่หน้าอื่นส่งมา (แดชบอร์ด "วันนี้ต้องทำ" -> orders.openWith)
     const pre = this.preset || {}; this.preset = null;
     this.tab = pre.tab || ''; this.quick = this.QUICK[pre.quick] ? pre.quick : ''; this.resType = ''; this.page = 1; this.selected = {}; this.openId = '';
-    const edit = this.canEdit(), esc = window.app.esc;
+    const edit = this.canStatus(), esc = window.app.esc;
     const opts = this.statusOptions().map(s => '<option value="' + esc(s) + '">' + esc(this.statusLabel(s)) + '</option>').join('');
     content.innerHTML = '<div class="cms-page od-page mb-8">'
       + '<div class="cms-head"><h1 id="odTitle">รายการใบจอง</h1><span class="cms-crumb">ข้อมูลระบบ &gt; รายการใบจอง</span></div>'
@@ -181,7 +186,7 @@ window.app.orders = {
 
   render: function() {
     const body = document.getElementById('odBody'); if (!body) return;
-    const esc = window.app.esc, escJs = window.app.escAttrJs, edit = this.canEdit();
+    const esc = window.app.esc, escJs = window.app.escAttrJs, edit = this.canStatus();
     const total = this.view.length, pages = Math.max(1, Math.ceil(total / this.pageSize));
     if (this.page > pages) this.page = pages;
     const start = (this.page - 1) * this.pageSize, pageRows = this.view.slice(start, start + this.pageSize);
@@ -198,12 +203,12 @@ window.app.orders = {
         const more = o.items.length + o.gifts.length - 1;
         const itemTxt = firstItem ? window.app.pn(firstItem.name || firstItem.sku) : '-';
         const stOpts = (opts.indexOf(o.status) === -1 ? [o.status] : []).concat(opts);
-        const stCell = edit
+        const stCell = edit && !this.lockedFor(o)
           ? '<select class="od-st" style="--od-c:' + esc(this.statusColor(o.status)) + '" aria-label="สถานะของ ' + esc(o.id) + '" onclick="event.stopPropagation()" onchange="window.app.orders.changeStatus(\'' + escJs(o.id) + '\', this.value, this)">'
             + stOpts.map(s => '<option value="' + esc(s) + '"' + (s === o.status ? ' selected' : '') + '>' + esc(this.statusLabel(s)) + '</option>').join('') + '</select>'
           : this.pill(o.status);
         return '<tr class="od-row' + (this.selected[o.id] ? ' cms-sel-row' : '') + '" data-id="' + esc(o.id) + '" tabindex="0" onclick="window.app.orders.rowClick(event, \'' + escJs(o.id) + '\')" onkeydown="if(event.key===\'Enter\'&&event.target===this)window.app.orders.openDrawer(\'' + escJs(o.id) + '\')">'
-          + (edit ? '<td class="cms-c-chk"><input type="checkbox" aria-label="เลือก ' + esc(o.id) + '"' + (this.selected[o.id] ? ' checked' : '') + ' onchange="window.app.orders.toggleOne(\'' + escJs(o.id) + '\', this.checked)"></td>' : '')
+          + (edit ? '<td class="cms-c-chk">' + (this.lockedFor(o) ? '' : '<input type="checkbox" aria-label="เลือก ' + esc(o.id) + '"' + (this.selected[o.id] ? ' checked' : '') + ' onchange="window.app.orders.toggleOne(\'' + escJs(o.id) + '\', this.checked)">') + '</td>' : '')
           + '<td><span class="od-id">' + esc(o.id) + '</span></td>'
           + '<td class="od-date">' + esc(this.fmtDate(o.ts)) + '</td>'
           + '<td><div class="od-cust">' + esc(o.customer || '-') + '</div><div class="od-sub">' + esc(o.phone || '') + '</div></td>'
@@ -243,7 +248,7 @@ window.app.orders = {
 
   // ---- เลือกหลายใบ ----
   toggleOne: function(id, on) { if (on) this.selected[id] = true; else delete this.selected[id]; this.syncSelection(); },
-  toggleAll: function(on) { (this.pageIds || []).forEach(id => { if (on) this.selected[id] = true; else delete this.selected[id]; }); this.render(); },
+  toggleAll: function(on) { (this.pageIds || []).filter(id => !this.lockedFor(this.list.find(x => x.id === id))).forEach(id => { if (on) this.selected[id] = true; else delete this.selected[id]; }); this.render(); },
   syncSelection: function() {
     const n = Object.keys(this.selected).length;
     const btn = document.getElementById('odBulkBtn'), sel = document.getElementById('odBulkStatus'), lab = document.getElementById('odBulkLabel');
@@ -251,7 +256,7 @@ window.app.orders = {
     if (sel) sel.disabled = n === 0;
     if (lab) lab.textContent = n ? 'ใช้กับที่เลือก (' + n + ')' : 'ใช้กับที่เลือก';
     const all = document.getElementById('odSelAll');
-    if (all) { const ids = this.pageIds || []; all.checked = ids.length > 0 && ids.every(id => this.selected[id]); }
+    if (all) { const ids = this.pageIds || []; const open = ids.filter(id => !this.lockedFor(this.list.find(x => x.id === id))); all.checked = open.length > 0 && open.every(id => this.selected[id]); }
     document.querySelectorAll('#odBody tr.od-row').forEach(tr => tr.classList.toggle('cms-sel-row', !!this.selected[tr.getAttribute('data-id')]));
   },
 
@@ -263,7 +268,7 @@ window.app.orders = {
     if (status === 'Cancelled' || o.status === 'Cancelled') {
       const r = await Swal.fire({
         icon: 'warning', title: window.app.esc(status === 'Cancelled' ? 'ยกเลิกใบจองนี้?' : 'นำใบจองที่ยกเลิกกลับมาใช้?'),
-        html: '<b>' + window.app.esc(id) + '</b><br>' + (status === 'Cancelled' ? 'สต๊อกของสินค้าในใบจองจะถูกคืนเข้าระบบ' : 'ระบบจะตัดสต๊อกสินค้าในใบจองอีกครั้ง (ถ้าสต๊อกไม่พอจะเปลี่ยนไม่ได้)'),
+        html: '<b>' + window.app.esc(id) + '</b><br>' + (status === 'Cancelled' ? 'สต๊อกของสินค้าในใบจองจะถูกคืนเข้าระบบ' + (this.isSales() ? '<br><b>ยกเลิกแล้วจะเปลี่ยนสถานะกลับไม่ได้อีก</b>' : '') : 'ระบบจะตัดสต๊อกสินค้าในใบจองอีกครั้ง (ถ้าสต๊อกไม่พอจะเปลี่ยนไม่ได้)'),
         showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ไม่เปลี่ยน', confirmButtonColor: '#0f2a43'
       });
       if (!r.isConfirmed) { revert(); return; }
@@ -282,7 +287,7 @@ window.app.orders = {
     if (ids.length > 50) { Swal.fire({ icon: 'warning', title: 'เลือกได้ครั้งละไม่เกิน 50 ใบ', text: 'ตอนนี้เลือกไว้ ' + ids.length + ' ใบ' }); return; }
     const r = await Swal.fire({
       icon: status === 'Cancelled' ? 'warning' : 'question', title: 'เปลี่ยนสถานะ ' + ids.length + ' ใบจอง?',
-      html: 'เป็น <b>' + window.app.esc(this.statusLabel(status)) + '</b>' + (status === 'Cancelled' ? '<br>สต๊อกของสินค้าในใบจองที่ยกเลิกจะถูกคืนเข้าระบบ' : ''),
+      html: 'เป็น <b>' + window.app.esc(this.statusLabel(status)) + '</b>' + (status === 'Cancelled' ? '<br>สต๊อกของสินค้าในใบจองที่ยกเลิกจะถูกคืนเข้าระบบ' + (this.isSales() ? '<br><b>ยกเลิกแล้วจะเปลี่ยนสถานะกลับไม่ได้อีก</b>' : '') : ''),
       showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#0f2a43'
     });
     if (!r.isConfirmed) return;
@@ -321,7 +326,7 @@ window.app.orders = {
     const o = this.list.find(x => x.id === id), box = document.getElementById('odDrawerBody'), dr = document.getElementById('odDrawer');
     if (!o || !box || !dr) return;
     this.openId = id;
-    const esc = window.app.esc, escJs = window.app.escAttrJs, edit = this.canEdit();
+    const esc = window.app.esc, escJs = window.app.escAttrJs, edit = this.canStatus() && !this.lockedFor(o);
     const row = (label, val) => val ? '<div><dt>' + esc(label) + '</dt><dd>' + esc(val) + '</dd></div>' : '';
     const opts = this.statusOptions(), stOpts = (opts.indexOf(o.status) === -1 ? [o.status] : []).concat(opts);
     let h = '<header class="od-dh"><div><p class="od-dh-s">ใบจอง</p><h2 id="odDrawerId">' + esc(o.id) + '</h2></div>'

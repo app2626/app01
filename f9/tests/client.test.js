@@ -976,6 +976,11 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(await ev("Swal.isVisible()"), 'bulk change must ask for confirmation'); await ev("Swal.clickConfirm();true"); await sleep(1800);
     eq(st(id), 'Paid'); eq(await ev("Object.keys(window.app.orders.selected).length"), 0, 'selection cleared after a clean bulk change');
     eq(await ev("[...document.querySelectorAll('#odTabs .od-tab')].find(b=>b.classList.contains('on')).textContent.replace(/\\d+/,'').trim()"), 'ทั้งหมด');
+    // มุมมอง Sales (สลับ Role ฝั่ง client เพื่อดู UI เท่านั้น — server ตรวจสิทธิ์จริงใน server.test.js)
+    const sv = JSON.parse(await ev(`(()=>{const O=window.app.orders,u=window.app.user,r0=u.Role;u.Role='Sales';const o=O.list[0],st0=o.status;try{o.status='Pending';O.render();const tr=()=>document.querySelector('#odBody tr.od-row[data-id="'+o.id+'"]');const opts=[...tr().querySelectorAll('.od-st option')].map(x=>x.value);const chk=!!tr().querySelector('input[type=checkbox]');o.status='Cancelled';O.render();const lockedSel=!!tr().querySelector('.od-st'),lockedChk=!!tr().querySelector('input[type=checkbox]');O.openDrawer(o.id);const dSel=!!document.getElementById('odDrawerStatus');O.closeDrawer();return JSON.stringify({opts:opts,chk:chk,lockedSel:lockedSel,lockedChk:lockedChk,dSel:dSel})}finally{o.status=st0;u.Role=r0;O.render()}})()`));
+    eq(sv.opts.join(), 'Pending,Paid,Delivered,Cancelled', 'Sales row select: current status + Paid/Delivered/Cancelled only');
+    ok(sv.chk, 'Sales can select an open order');
+    ok(!sv.lockedSel && !sv.lockedChk && !sv.dSel, 'a cancelled order is locked for Sales: ' + JSON.stringify(sv));
     await ev("window.Swal&&Swal.close();window.location.hash='#pos';true"); await sleep(1500);
     await ev(`(()=>{const c=document.getElementById('posChannelSelect');c.value='Retail';c.dispatchEvent(new Event('change'));const b=document.getElementById('posBranchSelect');b.value='B01';b.dispatchEvent(new Event('change'));window.app.pos.checkCriteria();return true})()`); await sleep(900);
   });
