@@ -751,7 +751,7 @@ window.app = {
   // route() จะวาดหน้าจริงทับ และตั้ง/ถอด sf-site เองอีกครั้งหลังข้อมูลมา
   showBootSkeleton: function() {
     try {
-      const target = window.location.hash.substring(1) || (window.__DEEP_MODEL ? 'pos' : (window.app.savedRoute_() || 'dashboard'));
+      const target = window.location.hash.substring(1) || (window.__DEEP_MODEL ? 'pos' : (window.app.savedRoute_() || window.app.homeRoute_()));
       if (target !== 'pos') return;
       const m = window.app.menuConfig.flatMap(x => x.children || [x]).find(x => x.id === 'pos');
       if (!m || !window.app.checkMenuAccess('pos', m.roles)) return;
@@ -1202,6 +1202,8 @@ window.app = {
   // จำหน้าล่าสุดต่อแท็บ (sessionStorage — อยู่รอดตอนรีเฟรช/ปัดจอลง ไม่ข้ามไปวันอื่น); อ่านแล้วต้องผ่านการเช็คสิทธิ์ใน route() อีกครั้งเสมอ
   saveRoute_: function(hash) { try { if (/^[A-Za-z0-9_-]{1,40}$/.test(hash)) sessionStorage.setItem('f9_last_route', hash); } catch (e) {} },
   savedRoute_: function() { try { const r = sessionStorage.getItem('f9_last_route'); return r && /^[A-Za-z0-9_-]{1,40}$/.test(r) ? r : ''; } catch (e) { return ''; } },
+  // หน้าแรกหลัง login (ไม่มี hash / ไม่มีหน้าที่จำไว้): Sales เข้าหน้าสั่งจองสินค้า (pos) ทันที, Role อื่นเข้า dashboard
+  homeRoute_: function() { return (window.app.user && window.app.user.Role === 'Sales') ? 'pos' : 'dashboard'; },
   clearSavedRoute_: function() { try { sessionStorage.removeItem('f9_last_route'); } catch (e) {} },
 
   // สถานะ เปิด/ปิด ของ AutoPromotions (ค่าเก่า Active ยังนับเป็นเปิด)
@@ -1653,7 +1655,7 @@ window.app = {
          // ลิงก์สินค้าที่แชร์ (?p=) ไม่มี hash → พาไปหน้าสั่งจอง (pos) แทน dashboard
          // ปัดจอลงเพื่อรีเฟรช (มือถือ) = โหลด iframe ใหม่ hash หาย → กลับหน้าที่เปิดค้างไว้ (จำไว้ใน sessionStorage) แทนการเริ่มที่ dashboard
          // ลิงก์สินค้าที่แชร์ (?p=) ยังมาก่อนเสมอ
-         if(!window.location.hash) window.location.hash = window.__DEEP_MODEL ? '#pos' : ('#' + (window.app.savedRoute_() || 'dashboard'));
+         if(!window.location.hash) window.location.hash = window.__DEEP_MODEL ? '#pos' : ('#' + (window.app.savedRoute_() || window.app.homeRoute_()));
          window.app.route();
 
          setTimeout(() => { window.app.showPopupBanner(); }, 500);
@@ -1786,7 +1788,7 @@ window.app = {
       window.app.pos.countdownInterval = null;
     }
     if(!window.app.user) return window.app.renderLogin();
-    const hash = window.location.hash.substring(1) || 'dashboard';
+    const hash = window.location.hash.substring(1) || window.app.homeRoute_();
     window.app.currentRoute = hash;
 
     // รอบ 9 — hash เก่าของ 6 หน้า settings ที่ยุบรวมเป็น systemsettings: redirect แล้วเปิด tab เดิม (bookmark เก่าต้องไม่เจอหน้าตาย)
@@ -1805,7 +1807,7 @@ window.app = {
     const targetMenu = this.menuConfig.flatMap(x => x.children || [x]).find(x => x.id === hash);
     if (!targetMenu || !this.checkMenuAccess(hash, targetMenu.roles)) {
        Swal.fire('ปฏิเสธการเข้าถึง', 'คุณไม่มีสิทธิ์เข้าถึงข้อมูลในส่วนนี้', 'warning');
-       window.location.hash = '#dashboard';
+       window.location.hash = '#' + window.app.homeRoute_();
        return;
     }
     
