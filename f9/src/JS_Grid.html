@@ -512,6 +512,15 @@ window.app.grid = {
                     if (g && !seenG[g.toLowerCase()]) { seenG[g.toLowerCase()] = true; opts.push({id: g, label: window.app.titleCaseName(g) + ' (' + giftCount(g) + ' รายการ)'}); }
                 });
                 opts.sort((a, b) => a.label.localeCompare(b.label, 'th'));
+                // ชื่อกลุ่มที่มีจุลภาคในตัว (เช่น POWERBANK 10,000MAH): ค่าที่บันทึกถูกแยกเป็นหลายคำ — ถ้าคำเหล่านั้นเรียงติดกันครบ ให้ติ๊กกลุ่มนั้นและไม่นับเป็นค่าเดิม
+                const cvLow = currentVals.map(v => v.toLowerCase());
+                opts.forEach(o => {
+                    const gt = o.id.toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+                    if (gt.length < 2) return;
+                    for (let i = 0; i + gt.length <= cvLow.length; i++) {
+                        if (gt.every((x, j) => cvLow[i + j] === x)) { o.pre = true; for (let j = 0; j < gt.length; j++) { cvLow[i + j] = null; currentVals[i + j] = ''; } break; }
+                    }
+                });
                 currentVals.filter(v => v && v !== allVal && !seenG[v.toLowerCase()]).forEach(v => { seenG[v.toLowerCase()] = true; const n = giftCount(v); opts.unshift({id: v, label: v + (n ? ' (ค่าเดิม - ตรงกับ ' + n + ' รายการ)' : ' (ค่าเดิม - ไม่ตรงกับของแถมใดเลย)')}); });
             }
             
@@ -526,7 +535,7 @@ window.app.grid = {
                 // สิทธิ์เมนู/ช่องทางต้องเทียบตรงตัวทั้งคำ — substring เคยทำให้ค่า 'promotions' ติ๊ก 'autopromotions' ให้เกินสิทธิ์
                 // ของแถม (brand/channel gifts) คงเทียบแบบ keyword ตาม semantics ของ GiftMappings
                 // ของแถมก็เทียบตรงตัวแล้ว (ตัวเลือกเป็น Product Group + ค่าเดิมทุกค่า) — substring เคยติ๊กชื่อสินค้าทุกตัวที่มีคำนั้นแล้วบันทึกทับ
-                let isChecked = !isAll && currentVals.some(cv => String(opt.id || '').toLowerCase() === cv.toLowerCase());
+                let isChecked = !isAll && (opt.pre === true || currentVals.some(cv => cv !== '' && String(opt.id || '').toLowerCase() === cv.toLowerCase()));
                 inp += `<label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-slate-100 rounded-lg transition-colors">
                            <input type="checkbox" class="chk-group-${safeKey} w-5 h-5 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500" value="${window.app.esc(opt.id)}" onchange="if(this.checked) { let allCb = document.querySelector('.chk-group-${safeKey}[value=\\'${allVal}\\']'); if(allCb) allCb.checked=false; }" ${isChecked?'checked':''}>
                            <span class="text-[11px] font-normal text-slate-700">${window.app.esc(opt.label)}</span>

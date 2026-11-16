@@ -156,6 +156,10 @@ t('CHECKOUT gift lists can name a gift Product Group (exact, case-insensitive), 
   try {
     prow[gi] = 'Shield Group'; row[bi] = 'shield group'; cache.remove('TABLE_GiftMappings'); cache.remove('TABLE_Products');
     eq(run().status, 'success', 'gift allowed through its Product Group');
+prow[gi] = 'Shield 1,000 Group'; row[bi] = 'Adapter, shield 1,000 group'; cache.remove('TABLE_GiftMappings'); cache.remove('TABLE_Products');
+    eq(run().status, 'success', 'a group name with a comma in it still matches');
+    row[bi] = '000 group, shield 1'; cache.remove('TABLE_GiftMappings');
+    eq(run().status, 'error', 'pieces in another order are not the group');
     row[bi] = 'Nope Group'; cache.remove('TABLE_GiftMappings');
     eq(run().status, 'error', 'unrelated group must not allow the gift');
   } finally { prow[gi] = oldG; row[bi] = oldB; cache.remove('TABLE_GiftMappings'); cache.remove('TABLE_Products'); }

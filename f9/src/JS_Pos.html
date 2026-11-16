@@ -604,7 +604,10 @@ window.app.pos = {
     giftMatch: function(tokens, p) {
       const name = ((p && p['Product Name']) || '').toString().toLowerCase();
       const group = ((p && p['Product Group']) || '').toString().trim().toLowerCase();
-      return tokens.some(g => g === '*' || (name !== '' && name.includes(g)) || (group !== '' && group === g));
+      if (tokens.some(g => g === '*' || (name !== '' && name.includes(g)))) return true;
+      // ชื่อกลุ่มที่มีจุลภาคในตัว (เช่น POWERBANK 10,000MAH) ถูกแยกเป็นหลายคำตอนอ่านค่า — เทียบเป็นลำดับคำที่ติดกัน
+      const gt = group.split(',').map(s => s.trim()).filter(Boolean);
+      return gt.length > 0 && tokens.some((_, i) => gt.every((x, j) => tokens[i + j] === x));
     },
     // ติ๊กของแถมช่องทาง: เปิด/ปิดช่องจำนวนของตัวเอง และถ้าติ๊กในชุดหนึ่ง ให้ยกเลิกที่ติ๊กไว้ในชุดอื่นทั้งหมด
     onChannelGiftToggle: function(cb) {

@@ -1553,8 +1553,9 @@ function processCheckout(payload, secureUser, ss) {
       const giftInList = (list, nameLower) => {
         if (list.includes('*')) return true;
         if (list.some(v => v !== '*' && nameLower.includes(v))) return true;
-        const g = giftGroupOf(nameLower);
-        return g !== '' && list.includes(g);
+        // ชื่อกลุ่มที่มีจุลภาคในตัว (เช่น POWERBANK 10,000MAH) ถูกแยกเป็นหลายคำตอนอ่านค่า — เทียบเป็นลำดับคำที่ติดกัน
+        const gt = giftGroupOf(nameLower).split(',').map(v => v.trim()).filter(Boolean);
+        return gt.length > 0 && list.some((_, i) => gt.every((x, j) => list[i + j] === x));
       };
       const processGift = (giftObj) => {
         if(giftObj && giftObj.name) {
