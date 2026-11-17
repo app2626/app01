@@ -293,6 +293,9 @@
     .btn-backup { border-radius: 10px; background: #d97706; border: 1px solid #d97706; color: #fff; font-weight: 500; }
     .btn-backup:hover, .btn-backup:focus { background: #b45309; border-color: #b45309; color: #fff; }
     .btn-backup:disabled { background: #fff; border-color: var(--line); color: var(--muted); opacity: 1; }
+    .btn-restore { border-radius: 10px; background: #0f766e; border: 1px solid #0f766e; color: #fff; font-weight: 500; }
+    .btn-restore:hover, .btn-restore:focus { background: #115e59; border-color: #115e59; color: #fff; }
+    .btn-restore:disabled { background: #fff; border-color: var(--line); color: var(--muted); opacity: 1; }
     .status-filter { width: auto; border-radius: 12px; border: 1px solid var(--line); padding-top: .45rem; padding-bottom: .45rem; font-size: .92rem; }
     .recent-table .col-status { white-space: nowrap; width: 1%; }
     .status-badge { display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 999px; padding: .2rem .6rem; font: inherit; font-size: .8rem; font-weight: 500; line-height: 1.3; white-space: nowrap; }
@@ -866,6 +869,7 @@
               <option value="500">500 รายการ</option>
             </select>
             <button type="button" class="btn btn-sm btn-backup" id="btnBackup" disabled>แบ็คอัพที่เลือก (<span id="selCount">0</span>)</button>
+            <button type="button" class="btn btn-sm btn-restore d-none" id="btnRestore" disabled>ย้ายกลับไป Data (<span id="selCount2">0</span>)</button>
             <button type="button" class="btn btn-light-x btn-sm d-none" id="btnRecentExpand">+ ขยายทั้งหมด</button>
             <button type="button" class="btn btn-light-x btn-sm" id="btnRecentRefresh">รีเฟรช</button>
           </div>
@@ -889,7 +893,7 @@
           </form>
         </div>
         <div class="recent-hint" id="hintData">กด <span class="row-toggle demo" aria-hidden="true">+</span> หรือกดสถานะ เพื่อดูข้อมูลทั้งหมด ติ๊ก <b>คีย์ต่อแล้ว</b> และกรอก <b>ชื่อผู้ดำเนินการ</b> ติ๊กช่องหน้ารายการแล้วกด <b>แบ็คอัพที่เลือก</b> เพื่อย้ายไปชีต BackupData</div>
-        <div class="recent-hint d-none" id="hintBackup">รายการที่แบ็คอัพแล้ว (ดูอย่างเดียว) กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดและวันที่แบ็คอัพ</div>
+        <div class="recent-hint d-none" id="hintBackup">รายการที่แบ็คอัพแล้ว กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดและวันที่แบ็คอัพ ติ๊กช่องหน้ารายการแล้วกด <b>ย้ายกลับไป Data</b> เพื่อนำกลับไปชีต Data</div>
         <div class="card-body-x pb-3">
           <div class="recent-wrap" id="recentWrap">
             <div class="empty-state">กดรีเฟรชเพื่อโหลดข้อมูล</div>
@@ -1879,6 +1883,7 @@
         wrap.appendChild(loading);
         var isBackup = recentSource === 'backup';
         byId('btnBackup').classList.toggle('d-none', isBackup);
+        byId('btnRestore').classList.toggle('d-none', !isBackup);
         byId('hintData').classList.toggle('d-none', isBackup);
         byId('hintBackup').classList.toggle('d-none', !isBackup);
         updateSelCount();
@@ -1904,7 +1909,7 @@
             info = 'ทั้งหมด ' + r.total + ' รายการในชีต ' + sheetName + ' | แสดง ' + r.rows.length + ' รายการล่าสุด';
           }
           byId('recentInfo').textContent = info + ' | ' + other + ' รายการ';
-          admin.recentMeta = isBackup ? { rowNums: [], sigs: [] } : { rowNums: r.rowNums || [], sigs: r.sigs || [] };
+          admin.recentMeta = { rowNums: r.rowNums || [], sigs: r.sigs || [] };
           renderRecent(r.rows, isBackup, q);
           updateSelCount();
         }).catch(function (err) {
@@ -1919,7 +1924,7 @@
 
       function renderRecent(rows, isBackup, q) {
         var wrap = byId('recentWrap');
-        var selectable = !isBackup;
+        var selectable = true;
         wrap.innerHTML = '';
         if (!rows.length) {
           var empty = document.createElement('div');
@@ -2080,7 +2085,9 @@
       function updateSelCount() {
         var n = selectedBoxes().length;
         byId('selCount').textContent = String(n);
+        byId('selCount2').textContent = String(n);
         byId('btnBackup').disabled = n === 0;
+        byId('btnRestore').disabled = n === 0;
         var all = byId('selAll');
         if (all) {
           var total = byId('recentWrap').querySelectorAll('input.row-sel').length;
@@ -2117,6 +2124,37 @@
             Swal.fire({ icon: 'error', title: 'แบ็คอัพไม่สำเร็จ', text: errMessage(err) }).then(function () {
               if (!isAuthError(err)) loadRecent();
             });
+          });
+        });
+      }
+
+      function onRestore() {
+        var meta = admin.recentMeta || { rowNums: [], sigs: [] };
+        var items = selectedBoxes().map(function (c) {
+          var i = Number(c.getAttribute('data-idx'));
+          return { row: meta.rowNums[i], sig: meta.sigs[i] };
+        }).filter(function (it) { return it.row && it.sig; });
+        if (!items.length) return;
+        Swal.fire({
+          icon: 'question',
+          title: 'ย้ายกลับ ' + items.length + ' รายการ?',
+          html: 'รายการที่เลือกจะถูก<b>คัดลอกกลับไปชีต Data</b> (ต่อท้ายชีต) แล้ว<b>ลบออกจากชีต BackupData</b><br>สถานะคีย์และชื่อผู้ดำเนินการยังอยู่ครบ',
+          showCancelButton: true,
+          confirmButtonText: 'ย้ายกลับไป Data',
+          cancelButtonText: 'ยกเลิก',
+          confirmButtonColor: '#0f766e',
+          focusCancel: true
+        }).then(function (res) {
+          if (!res.isConfirmed) return;
+          showLoading(true, 'กำลังย้ายกลับ ' + items.length + ' รายการ...');
+          adminCall('adminRestoreRows', items).then(function (r) {
+            showLoading(false);
+            Swal.fire({ icon: r.skipped ? 'info' : 'success', title: 'ย้ายกลับเรียบร้อย', text: r.message });
+            loadRecent();
+          }).catch(function (err) {
+            showLoading(false);
+            if (isAuthError(err)) return;
+            Swal.fire({ icon: 'error', title: 'ย้ายกลับไม่สำเร็จ', text: errMessage(err) }).then(loadRecent);
           });
         });
       }
@@ -2553,6 +2591,7 @@
       byId('btnFolderSave').addEventListener('click', onFolderSave);
       byId('btnFormSave').addEventListener('click', onFormSave);
       byId('btnBackup').addEventListener('click', onBackup);
+      byId('btnRestore').addEventListener('click', onRestore);
       byId('btnRecordsLogout').addEventListener('click', onRecordsLogout);
       byId('btnMyPassword').addEventListener('click', onMyPassword);
       byId('staffAddForm').addEventListener('submit', onStaffAdd);

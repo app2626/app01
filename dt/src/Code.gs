@@ -1065,7 +1065,7 @@ function adminGetBackup(token, limit, query, status) {
   if (!sheet || sheet.getLastRow() < 2) return Object.assign({ total: 0, matched: 0, rows: [] }, base);
   ensureBackupLayout_(sheet);
   const r = readNewest_(sheet, DATA_HEADERS.length + 1, n, query, status);
-  delete r.rowNums;
+  r.sigs = r.rows.map(rowSig_);
   return Object.assign(r, base);
 }
 
@@ -1159,17 +1159,96 @@ function ensureBackupLayout_(sh) {
     .setFontWeight('bold');
 }
 
-function adminBackupRows(token, items) {
-  const me = requireStaff_(token);
-  if (!Array.isArray(items) || !items.length) throw new Error('กรุณาเลือกรายการที่ต้องการแบ็คอัพ');
-  if (items.length > MAX_RECENT) throw new Error('แบ็คอัพได้ครั้งละไม่เกิน ' + MAX_RECENT + ' รายการ');
-
+// แปลง items [{row, sig}] -> { แถว: sig } พร้อมตรวจรูปแบบ
+function parseRowItems_(items, verb) {
+  if (!Array.isArray(items) || !items.length) throw new Error('กรุณาเลือกรายการที่ต้องการ' + verb);
+  if (items.length > MAX_RECENT) throw new Error(verb + 'ได้ครั้งละไม่เกิน ' + MAX_RECENT + ' รายการ');
   const wanted = {};
   items.forEach(function (it) {
     const r = Number(it && it.row);
     if (!(r >= 2) || Math.floor(r) !== r) throw new Error('ข้อมูลแถวไม่ถูกต้อง');
     wanted[r] = String(it.sig || '');
   });
+  return wanted;
+}
+
+// คืนแถวที่ลายเซ็น A–S ยังตรงกับที่หน้าเว็บแสดง (เรียงจากน้อยไปมาก) และจำนวนที่ถูกข้าม
+function verifyRows_(sheet, wanted) {
+  const last = sheet.getLastRow();
+  const rows = Object.keys(wanted).map(Number).sort(function (a, b) { return a - b; });
+  const inRange = rows.filter(function (r) { return r <= last; });
+  const ok = [];
+  let skipped = rows.length - inRange.length;
+  if (inRange.length) {
+    const lo = inRange[0];
+    const hi = inRange[inRange.length - 1];
+    const block = sheet.getRange(lo, 1, hi - lo + 1, BASE_COLS).getDisplayValues();
+    inRange.forEach(function (r) {
+      if (rowSig_(block[r - lo]) === wanted[r]) ok.push(r); else skipped++;
+    });
+  }
+  return { ok: ok, skipped: skipped };
+}
+
+// ลบหลายแถว (เรียงน้อยไปมาก) จากล่างขึ้นบน; Sheets ไม่ยอมให้ลบจนเหลือแค่แถวหัวตาราง จึงเติมแถวว่างไว้ก่อน
+function deleteRowList_(sheet, sortedRows) {
+  if (sheet.getMaxRows() - sortedRows.length < 2) sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+  toRuns_(sortedRows).reverse().forEach(function (run) {
+    sheet.deleteRows(run[0], run[1]);
+  });
+}
+
+// ย้ายข้อมูลกลับ: BackupData -> Data (คัดลอกก่อน แล้วค่อยลบจาก BackupData)
+// แถวที่ย้ายกลับจะต่อท้ายชีต Data (จึงแสดงเป็นรายการบนสุดในหน้าดูข้อมูล)
+function adminRestoreRows(token, items) {
+  const me = requireStaff_(token);
+  const wanted = parseRowItems_(items, 'ย้ายกลับ');
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (e) {
+    throw new Error('ระบบกำลังมีผู้ใช้งานพร้อมกันจำนวนมาก กรุณาลองใหม่อีกครั้ง');
+  }
+
+  try {
+    const ss = getSpreadsheet_();
+    const backup = ss.getSheetByName(BACKUP_SHEET_NAME);
+    if (!backup || backup.getLastRow() < 2) throw new Error('ไม่มีข้อมูลในชีต ' + BACKUP_SHEET_NAME);
+    ensureBackupLayout_(backup);
+    const v = verifyRows_(backup, wanted);
+    if (!v.ok.length) {
+      throw new Error('ข้อมูลในชีต ' + BACKUP_SHEET_NAME + ' เปลี่ยนไปแล้ว ไม่มีรายการที่ย้ายกลับได้ กรุณากดรีเฟรชแล้วเลือกใหม่');
+    }
+    const cols = DATA_HEADERS.length;   // A–U (ไม่เอาวันที่แบ็คอัพ)
+
+    // 1) คัดลอกกลับไปต่อท้าย Data
+    const data = getOrCreateDataSheet_(ss);
+    const start = data.getLastRow() + 1;
+    let dest = start;
+    toRuns_(v.ok).forEach(function (run) {
+      backup.getRange(run[0], 1, run[1], cols).copyTo(data.getRange(dest, 1, run[1], cols));
+      dest += run[1];
+    });
+    data.getRange(start, COL_KEYED, v.ok.length, 1).insertCheckboxes();   // แถวที่แบ็คอัพไว้ก่อนมีคอลัมน์ T
+    SpreadsheetApp.flush();
+
+    // 2) ลบออกจาก BackupData
+    deleteRowList_(backup, v.ok);
+    SpreadsheetApp.flush();
+    console.log('adminRestoreRows ' + v.ok.length + ' rows by ' + me.username);
+
+    let msg = 'ย้ายกลับ ' + v.ok.length + ' รายการไปชีต ' + DATA_SHEET_NAME + ' แล้ว';
+    if (v.skipped) msg += ' (ข้าม ' + v.skipped + ' รายการที่ข้อมูลเปลี่ยนไป)';
+    return { moved: v.ok.length, skipped: v.skipped, message: msg };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function adminBackupRows(token, items) {
+  const me = requireStaff_(token);
+  const wanted = parseRowItems_(items, 'แบ็คอัพ');
 
   const lock = LockService.getScriptLock();
   try {
