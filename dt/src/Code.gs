@@ -65,6 +65,10 @@ const PROP_PW_HASH = 'ADMIN_PW_HASH';
 const PROP_PW_VER = 'ADMIN_PW_VER';
 const PROP_SETUP_CODE = 'ADMIN_SETUP_CODE';
 const PROP_SETUP_EXP = 'ADMIN_SETUP_EXP';
+const BACKUP_SHEET_NAME = 'BackupData';
+const BACKUP_TIME_HEADER = 'วันที่แบ็คอัพ';
+const MAX_RECENT = 500;
+
 const PROP_BANNER_ID = 'BANNER_FILE_ID';
 const PROP_BANNER_VER = 'BANNER_VER';
 
@@ -734,15 +738,132 @@ function adminSaveFolder(token, input) {
 }
 
 // รายการที่บันทึกล่าสุด (ใหม่สุดอยู่บน)
+// rowNums/sigs ใช้ยืนยันแถวตอนแบ็คอัพ (กันลบผิดแถวถ้าชีตเปลี่ยนระหว่างนั้น)
 function adminGetRecent(token, limit) {
   requireAdmin_(token);
-  const n = Math.max(1, Math.min(100, Number(limit) || 20));
+  const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
   const sheet = getSpreadsheet_().getSheetByName(DATA_SHEET_NAME);
-  if (!sheet || sheet.getLastRow() < 2) return { total: 0, rows: [] };
+  const backupTotal = countBackup_();
+  if (!sheet || sheet.getLastRow() < 2) return { total: 0, rows: [], rowNums: [], sigs: [], backupTotal: backupTotal };
   const last = sheet.getLastRow();
   const count = Math.min(n, last - 1);
-  const values = sheet.getRange(last - count + 1, 1, count, DATA_HEADERS.length).getDisplayValues();
-  return { total: last - 1, rows: values.reverse() };
+  const first = last - count + 1;
+  const values = sheet.getRange(first, 1, count, DATA_HEADERS.length).getDisplayValues();
+  const rowNums = values.map(function (_, i) { return first + i; });
+  const sigs = values.map(rowSig_);
+  return {
+    total: last - 1,
+    rows: values.reverse(),
+    rowNums: rowNums.reverse(),
+    sigs: sigs.reverse(),
+    backupTotal: backupTotal
+  };
+}
+
+// ===== แบ็คอัพข้อมูล: ย้ายแถวที่เลือกจาก Data ไป BackupData =====
+function rowSig_(displayRow) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(displayRow), Utilities.Charset.UTF_8);
+  return Utilities.base64Encode(bytes);
+}
+
+// [2,3,4,7,9,10] -> [[2,3],[7,1],[9,2]]  (แถวเริ่ม, จำนวนแถว)
+function toRuns_(sortedRows) {
+  const runs = [];
+  sortedRows.forEach(function (r) {
+    const lastRun = runs[runs.length - 1];
+    if (lastRun && lastRun[0] + lastRun[1] === r) lastRun[1]++;
+    else runs.push([r, 1]);
+  });
+  return runs;
+}
+
+function countBackup_() {
+  const sh = getSpreadsheet_().getSheetByName(BACKUP_SHEET_NAME);
+  return sh ? Math.max(0, sh.getLastRow() - 1) : 0;
+}
+
+function getOrCreateBackupSheet_(ss) {
+  let sh = ss.getSheetByName(BACKUP_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(BACKUP_SHEET_NAME);
+    const headers = DATA_HEADERS.concat([BACKUP_TIME_HEADER]);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function adminBackupRows(token, items) {
+  requireAdmin_(token);
+  if (!Array.isArray(items) || !items.length) throw new Error('กรุณาเลือกรายการที่ต้องการแบ็คอัพ');
+  if (items.length > MAX_RECENT) throw new Error('แบ็คอัพได้ครั้งละไม่เกิน ' + MAX_RECENT + ' รายการ');
+
+  const wanted = {};
+  items.forEach(function (it) {
+    const r = Number(it && it.row);
+    if (!(r >= 2) || Math.floor(r) !== r) throw new Error('ข้อมูลแถวไม่ถูกต้อง');
+    wanted[r] = String(it.sig || '');
+  });
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (e) {
+    throw new Error('ระบบกำลังมีผู้ใช้งานพร้อมกันจำนวนมาก กรุณาลองใหม่อีกครั้ง');
+  }
+
+  try {
+    const ss = getSpreadsheet_();
+    const data = ss.getSheetByName(DATA_SHEET_NAME);
+    if (!data) throw new Error('ไม่พบชีต ' + DATA_SHEET_NAME);
+    const last = data.getLastRow();
+    const cols = DATA_HEADERS.length;
+
+    // ตรวจทุกแถวว่ายังเป็นข้อมูลเดียวกับที่หน้าเว็บแสดงอยู่
+    const rows = Object.keys(wanted).map(Number).sort(function (a, b) { return a - b; });
+    const ok = [];
+    let skipped = 0;
+    const inRange = rows.filter(function (r) { return r <= last; });
+    skipped += rows.length - inRange.length;
+    if (inRange.length) {
+      const lo = inRange[0];
+      const hi = inRange[inRange.length - 1];
+      const block = data.getRange(lo, 1, hi - lo + 1, cols).getDisplayValues();
+      inRange.forEach(function (r) {
+        if (rowSig_(block[r - lo]) === wanted[r]) ok.push(r); else skipped++;
+      });
+    }
+    if (!ok.length) {
+      throw new Error('ข้อมูลในชีตเปลี่ยนไปแล้ว ไม่มีรายการที่แบ็คอัพได้ กรุณากดรีเฟรชแล้วเลือกใหม่');
+    }
+    const runs = toRuns_(ok);
+
+    // 1) คัดลอกไป BackupData ก่อน (copyTo เก็บค่า/รูปแบบเดิม เช่น เบอร์โทรที่ขึ้นต้นด้วย 0)
+    const backup = getOrCreateBackupSheet_(ss);
+    const startDest = backup.getLastRow() + 1;
+    let dest = startDest;
+    runs.forEach(function (run) {
+      data.getRange(run[0], 1, run[1], cols).copyTo(backup.getRange(dest, 1, run[1], cols));
+      dest += run[1];
+    });
+    const stamp = Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss');
+    backup.getRange(startDest, cols + 1, ok.length, 1).setValues(ok.map(function () { return [stamp]; }));
+    SpreadsheetApp.flush();
+
+    // 2) ลบออกจาก Data จากล่างขึ้นบน เพื่อไม่ให้เลขแถวที่เหลือเลื่อน
+    // Sheets ไม่ยอมให้ลบแถวจนเหลือแค่แถวหัวตาราง จึงเติมแถวว่างไว้ 1 แถวก่อน
+    if (data.getMaxRows() - ok.length < 2) data.insertRowsAfter(data.getMaxRows(), 1);
+    runs.slice().reverse().forEach(function (run) {
+      data.deleteRows(run[0], run[1]);
+    });
+    SpreadsheetApp.flush();
+
+    let msg = 'แบ็คอัพ ' + ok.length + ' รายการไปชีต ' + BACKUP_SHEET_NAME + ' และลบออกจาก ' + DATA_SHEET_NAME + ' แล้ว';
+    if (skipped) msg += ' (ข้าม ' + skipped + ' รายการที่ข้อมูลเปลี่ยนไป)';
+    return { moved: ok.length, skipped: skipped, message: msg };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // =====================================================================

@@ -287,6 +287,12 @@
     .recent-table td.col-wrap { white-space: normal; min-width: 120px; }
     .recent-table td.col-product { min-width: 160px; }
     .recent-table .col-toggle { width: 44px; padding-right: 0; }
+    .recent-table .col-sel { width: 36px; padding-right: 0; }
+    .recent-table .col-sel .form-check-input { margin: 0; width: 1.15em; height: 1.15em; cursor: pointer; }
+    .recent-table tr.main-row.selected > td { background: #fff7e6; }
+    .btn-backup { border-radius: 10px; background: #d97706; border: 1px solid #d97706; color: #fff; font-weight: 500; }
+    .btn-backup:hover, .btn-backup:focus { background: #b45309; border-color: #b45309; color: #fff; }
+    .btn-backup:disabled { background: #fff; border-color: var(--line); color: #9aa3b5; opacity: 1; }
     .recent-table tr.main-row:hover td { background: #fafbfe; }
     .recent-table tr.main-row.expanded td { background: var(--brand-soft); border-bottom-color: transparent; }
     .recent-table tr.detail-row td { background: #fbfcff; padding: 4px 12px 14px 56px; }
@@ -355,6 +361,7 @@
       .recent-table { font-size: .85rem; }
       .recent-table th, .recent-table td { padding-left: 6px; padding-right: 6px; }
       .recent-table .col-toggle { width: 36px; }
+      .recent-table .col-sel { width: 30px; }
       .recent-table td.col-time { white-space: normal; min-width: 72px; }
       .recent-table td.col-wrap, .recent-table td.col-product { min-width: 0; word-break: break-word; }
       .recent-table tr.detail-row td { padding: 4px 10px 12px; }
@@ -775,12 +782,15 @@
               <option value="20">20 รายการ</option>
               <option value="50">50 รายการ</option>
               <option value="100">100 รายการ</option>
+              <option value="200">200 รายการ</option>
+              <option value="500">500 รายการ</option>
             </select>
+            <button type="button" class="btn btn-sm btn-backup" id="btnBackup" disabled>แบ็คอัพที่เลือก (<span id="selCount">0</span>)</button>
             <button type="button" class="btn btn-light-x btn-sm d-none" id="btnRecentExpand">+ ขยายทั้งหมด</button>
             <button type="button" class="btn btn-light-x btn-sm" id="btnRecentRefresh">รีเฟรช</button>
           </div>
         </div>
-        <div class="recent-hint">กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดของรายการ คอลัมน์จะซ่อน/แสดงอัตโนมัติตามขนาดหน้าจอ</div>
+        <div class="recent-hint">กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดของรายการ ติ๊กช่องหน้ารายการแล้วกด <b>แบ็คอัพที่เลือก</b> เพื่อย้ายไปชีต BackupData และลบออกจากชีต Data</div>
         <div class="card-body-x pb-3">
           <div class="recent-wrap" id="recentWrap">
             <div class="empty-state">กดรีเฟรชเพื่อโหลดข้อมูล</div>
@@ -1701,10 +1711,13 @@
         loading.className = 'empty-state';
         loading.textContent = 'กำลังโหลด...';
         wrap.appendChild(loading);
+        updateSelCount();
         adminCall('adminGetRecent', Number(byId('recentLimit').value)).then(function (r) {
           admin.recentLoaded = true;
-          byId('recentInfo').textContent = 'ทั้งหมด ' + r.total + ' รายการในชีต Data | แสดง ' + r.rows.length + ' รายการล่าสุด';
+          admin.recentMeta = { rowNums: r.rowNums || [], sigs: r.sigs || [] };
+          byId('recentInfo').textContent = 'ทั้งหมด ' + r.total + ' รายการในชีต Data | แสดง ' + r.rows.length + ' รายการล่าสุด | BackupData ' + (r.backupTotal || 0) + ' รายการ';
           renderRecent(r.rows);
+          updateSelCount();
         }).catch(function (err) {
           wrap.innerHTML = '';
           var e = document.createElement('div');
@@ -1728,6 +1741,22 @@
         table.className = 'table recent-table';
         var thead = document.createElement('thead');
         var hr = document.createElement('tr');
+        var thSel = document.createElement('th');
+        thSel.className = 'col-sel';
+        var selAll = document.createElement('input');
+        selAll.type = 'checkbox';
+        selAll.className = 'form-check-input';
+        selAll.id = 'selAll';
+        selAll.setAttribute('aria-label', 'เลือกทั้งหมด');
+        selAll.addEventListener('change', function () {
+          Array.prototype.forEach.call(wrap.querySelectorAll('input.row-sel'), function (c) {
+            c.checked = selAll.checked;
+            c.closest('tr').classList.toggle('selected', selAll.checked);
+          });
+          updateSelCount();
+        });
+        thSel.appendChild(selAll);
+        hr.appendChild(thSel);
         var thToggle = document.createElement('th');
         thToggle.className = 'col-toggle';
         hr.appendChild(thToggle);
@@ -1739,12 +1768,26 @@
         });
         thead.appendChild(hr);
         table.appendChild(thead);
-        var colCount = RECENT_VIEW.length + 1;
+        var colCount = RECENT_VIEW.length + 2;
         var tbody = document.createElement('tbody');
         rows.forEach(function (row, i) {
           var tr = document.createElement('tr');
           tr.className = 'main-row';
           var detail = buildDetailRow(row, colCount, 'recent-detail-' + i);
+
+          var tdSel = document.createElement('td');
+          tdSel.className = 'col-sel';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.className = 'form-check-input row-sel';
+          cb.setAttribute('data-idx', String(i));
+          cb.setAttribute('aria-label', 'เลือกรายการ ' + (row[3] || '') + ' ' + (row[0] || ''));
+          cb.addEventListener('change', function () {
+            tr.classList.toggle('selected', cb.checked);
+            updateSelCount();
+          });
+          tdSel.appendChild(cb);
+          tr.appendChild(tdSel);
 
           var tdToggle = document.createElement('td');
           tdToggle.className = 'col-toggle';
@@ -1776,6 +1819,54 @@
         wrap.appendChild(table);
         byId('btnRecentExpand').classList.remove('d-none');
         byId('btnRecentExpand').textContent = '+ ขยายทั้งหมด';
+      }
+
+      function selectedBoxes() {
+        return Array.prototype.slice.call(byId('recentWrap').querySelectorAll('input.row-sel:checked'));
+      }
+
+      function updateSelCount() {
+        var n = selectedBoxes().length;
+        byId('selCount').textContent = String(n);
+        byId('btnBackup').disabled = n === 0;
+        var all = byId('selAll');
+        if (all) {
+          var total = byId('recentWrap').querySelectorAll('input.row-sel').length;
+          all.checked = total > 0 && n === total;
+          all.indeterminate = n > 0 && n < total;
+        }
+      }
+
+      function onBackup() {
+        var meta = admin.recentMeta || { rowNums: [], sigs: [] };
+        var items = selectedBoxes().map(function (c) {
+          var i = Number(c.getAttribute('data-idx'));
+          return { row: meta.rowNums[i], sig: meta.sigs[i] };
+        }).filter(function (it) { return it.row && it.sig; });
+        if (!items.length) return;
+        Swal.fire({
+          icon: 'warning',
+          title: 'แบ็คอัพ ' + items.length + ' รายการ?',
+          html: 'รายการที่เลือกจะถูก<b>คัดลอกไปชีต BackupData</b> แล้ว<b>ลบออกจากชีต Data</b><br>ข้อมูลยังอยู่ครบในชีต BackupData',
+          showCancelButton: true,
+          confirmButtonText: 'แบ็คอัพและลบออกจาก Data',
+          cancelButtonText: 'ยกเลิก',
+          confirmButtonColor: '#d97706',
+          focusCancel: true
+        }).then(function (res) {
+          if (!res.isConfirmed) return;
+          showLoading(true, 'กำลังแบ็คอัพ ' + items.length + ' รายการ...');
+          adminCall('adminBackupRows', items).then(function (r) {
+            showLoading(false);
+            Swal.fire({ icon: r.skipped ? 'info' : 'success', title: 'แบ็คอัพเรียบร้อย', text: r.message });
+            loadRecent();
+          }).catch(function (err) {
+            showLoading(false);
+            Swal.fire({ icon: 'error', title: 'แบ็คอัพไม่สำเร็จ', text: errMessage(err) }).then(function () {
+              if (!isAuthError(err)) loadRecent();
+            });
+          });
+        });
       }
 
       function appendSlipLink(parent, rawUrl) {
@@ -1912,6 +2003,7 @@
       byId('btnFolderTest').addEventListener('click', onFolderTest);
       byId('btnFolderSave').addEventListener('click', onFolderSave);
       byId('btnFormSave').addEventListener('click', onFormSave);
+      byId('btnBackup').addEventListener('click', onBackup);
       byId('bannerInput').addEventListener('change', onBannerPick);
       byId('btnBannerSave').addEventListener('click', onBannerSave);
       byId('btnBannerCancel').addEventListener('click', onBannerCancel);
