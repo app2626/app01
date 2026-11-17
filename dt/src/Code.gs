@@ -65,6 +65,12 @@ const PROP_PW_HASH = 'ADMIN_PW_HASH';
 const PROP_PW_VER = 'ADMIN_PW_VER';
 const PROP_SETUP_CODE = 'ADMIN_SETUP_CODE';
 const PROP_SETUP_EXP = 'ADMIN_SETUP_EXP';
+const PROP_BANNER_ID = 'BANNER_FILE_ID';
+const PROP_BANNER_VER = 'BANNER_VER';
+
+const MAX_BANNER_BYTES = 3 * 1024 * 1024;  // 3 MB หลังถอด Base64
+const BANNER_CACHE_SECONDS = 6 * 60 * 60;
+const BANNER_CHUNK = 90000;                // CacheService เก็บได้ไม่เกิน 100KB ต่อ key
 
 const SESSION_SECONDS = 6 * 60 * 60;   // อยู่ในระบบได้ 6 ชั่วโมง
 const LOGIN_MAX_FAILS = 5;             // ผิดเกิน 5 ครั้ง
@@ -311,29 +317,121 @@ function getOrCreateDataSheet_(ss) {
 }
 
 // ===== Helpers: รูปสลิป =====
-function saveSlip_(dataUrl, billNo, firstName) {
+// แปลง data URL รูปภาพ -> { mime, bytes } พร้อมตรวจชนิด ขนาด และ signature ของไฟล์จริง
+function parseImageDataUrl_(dataUrl, maxBytes, label) {
   const s = String(dataUrl || '');
-  if (!s) throw new Error('กรุณาแนบรูปสลิป');
-
   const comma = s.indexOf(',');
   const header = comma > 0 ? s.substring(0, comma) : '';
   const m = /^data:(image\/(?:jpeg|png|webp));base64$/.exec(header);
-  if (!m) throw new Error('รูปแบบไฟล์สลิปไม่ถูกต้อง (รองรับ JPG / PNG / WEBP)');
+  if (!m) throw new Error('รูปแบบไฟล์' + label + 'ไม่ถูกต้อง (รองรับ JPG / PNG / WEBP)');
   const mime = m[1];
 
   let bytes;
   try {
     bytes = Utilities.base64Decode(s.substring(comma + 1));
   } catch (e) {
-    throw new Error('ไฟล์สลิปเสียหาย กรุณาเลือกรูปใหม่');
+    throw new Error('ไฟล์' + label + 'เสียหาย กรุณาเลือกรูปใหม่');
   }
-  if (!bytes.length) throw new Error('ไฟล์สลิปว่างเปล่า');
-  if (bytes.length > MAX_SLIP_BYTES) throw new Error('ไฟล์สลิปใหญ่เกิน 5 MB');
+  if (!bytes.length) throw new Error('ไฟล์' + label + 'ว่างเปล่า');
+  if (bytes.length > maxBytes) throw new Error('ไฟล์' + label + 'ใหญ่เกิน ' + Math.round(maxBytes / 1048576) + ' MB');
   if (!hasImageSignature_(bytes, mime)) throw new Error('ไฟล์ที่แนบไม่ใช่รูปภาพจริง');
+  return { mime: mime, bytes: bytes };
+}
 
-  const fileName = sanitizeFileName_('Slip_' + billNo + '_' + firstName) + '.' + SLIP_MIME_EXT[mime];
-  const blob = Utilities.newBlob(bytes, mime, fileName);
+function saveSlip_(dataUrl, billNo, firstName) {
+  if (!dataUrl) throw new Error('กรุณาแนบรูปสลิป');
+  const img = parseImageDataUrl_(dataUrl, MAX_SLIP_BYTES, 'สลิป');
+  const fileName = sanitizeFileName_('Slip_' + billNo + '_' + firstName) + '.' + SLIP_MIME_EXT[img.mime];
+  const blob = Utilities.newBlob(img.bytes, img.mime, fileName);
   return getSlipFolder_().createFile(blob);
+}
+
+// ===== แบนเนอร์หน้าฟอร์ม =====
+// ไฟล์เก็บใน Drive (ไม่แชร์สาธารณะ) แล้ว Server ส่งเป็น data URL ให้หน้าเว็บ พร้อมพักไว้ใน Cache
+function getBanner() {
+  const p = props_();
+  const id = p.getProperty(PROP_BANNER_ID);
+  if (!id) return { dataUrl: '' };
+  const ver = p.getProperty(PROP_BANNER_VER) || '0';
+  const cache = CacheService.getScriptCache();
+  const prefix = 'banner_' + ver + '_';
+
+  const count = Number(cache.get(prefix + 'n') || 0);
+  if (count > 0) {
+    const keys = [];
+    for (let i = 0; i < count; i++) keys.push(prefix + i);
+    const got = cache.getAll(keys);
+    if (keys.every(function (k) { return typeof got[k] === 'string'; })) {
+      return { dataUrl: keys.map(function (k) { return got[k]; }).join('') };
+    }
+  }
+
+  let dataUrl;
+  try {
+    const blob = DriveApp.getFileById(id).getBlob();
+    dataUrl = 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+  } catch (e) {
+    console.warn('อ่านไฟล์แบนเนอร์ไม่ได้: ' + e.message);
+    return { dataUrl: '' };
+  }
+  try {
+    const parts = {};
+    let n = 0;
+    for (let i = 0; i < dataUrl.length; i += BANNER_CHUNK) {
+      parts[prefix + n] = dataUrl.substring(i, i + BANNER_CHUNK);
+      n++;
+    }
+    cache.putAll(parts, BANNER_CACHE_SECONDS);
+    cache.put(prefix + 'n', String(n), BANNER_CACHE_SECONDS);
+  } catch (e) {
+    console.warn('พักแบนเนอร์ใน Cache ไม่สำเร็จ: ' + e.message);
+  }
+  return { dataUrl: dataUrl };
+}
+
+function describeBanner_() {
+  const id = props_().getProperty(PROP_BANNER_ID);
+  if (!id) return { has: false };
+  try {
+    const f = DriveApp.getFileById(id);
+    return {
+      has: true,
+      name: f.getName(),
+      size: f.getSize(),
+      updated: Utilities.formatDate(f.getLastUpdated(), 'GMT+7', 'dd/MM/yyyy HH:mm')
+    };
+  } catch (e) {
+    return { has: false, missing: true };
+  }
+}
+
+function adminSaveBanner(token, dataUrl) {
+  requireAdmin_(token);
+  const img = parseImageDataUrl_(dataUrl, MAX_BANNER_BYTES, 'แบนเนอร์');
+  const stamp = Utilities.formatDate(new Date(), 'GMT+7', 'yyyyMMdd_HHmmss');
+  const blob = Utilities.newBlob(img.bytes, img.mime, 'Banner_' + stamp + '.' + SLIP_MIME_EXT[img.mime]);
+  const file = getSlipFolder_().createFile(blob);
+
+  const p = props_();
+  const oldId = p.getProperty(PROP_BANNER_ID);
+  p.setProperty(PROP_BANNER_ID, file.getId());
+  p.setProperty(PROP_BANNER_VER, Utilities.getUuid().substring(0, 8));
+  if (oldId && oldId !== file.getId()) {
+    try { DriveApp.getFileById(oldId).setTrashed(true); } catch (e) { console.warn('ลบแบนเนอร์เก่าไม่สำเร็จ: ' + e.message); }
+  }
+  return { banner: describeBanner_(), message: 'บันทึกแบนเนอร์แล้ว' };
+}
+
+function adminDeleteBanner(token) {
+  requireAdmin_(token);
+  const p = props_();
+  const id = p.getProperty(PROP_BANNER_ID);
+  if (id) {
+    try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { console.warn('ลบไฟล์แบนเนอร์ไม่สำเร็จ: ' + e.message); }
+  }
+  p.deleteProperty(PROP_BANNER_ID);
+  p.setProperty(PROP_BANNER_VER, Utilities.getUuid().substring(0, 8));
+  return { banner: describeBanner_(), message: 'ลบแบนเนอร์แล้ว' };
 }
 
 function hasImageSignature_(bytes, mime) {
@@ -517,7 +615,8 @@ function adminGetAll(token) {
     }),
     settings: { title: s.title, subtitle: s.subtitle, required: s.required },
     requiredLabels: OPTIONAL_REQUIRED,
-    folder: describeFolder_()
+    folder: describeFolder_(),
+    banner: describeBanner_()
   };
 }
 
