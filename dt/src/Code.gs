@@ -27,8 +27,13 @@ const DATA_HEADERS = [
   'ประทับเวลา', 'สาขา', 'โครงการ', 'ชื่อ', 'นามสกุล', 'เบอร์ลูกค้า',
   'รายละเอียดสินค้า', 'imei', 'ราคา', 'ส่วนลด', 'โค้ดผ่อน', 'เลขที่บิล',
   'เลขบัตรเครดิต', 'ชื่อเจ้าของบัตรเครดิต', 'ชื่อธนาคาร', 'Tid เครื่อง',
-  'Trace', 'จำนวนเดือนที่ผ่อน', 'รูปสลิป'
+  'Trace', 'จำนวนเดือนที่ผ่อน', 'รูปสลิป',
+  'คีย์ต่อแล้ว', 'ชื่อผู้ดำเนินการ'
 ];
+const BASE_COLS = 19;     // A–S มาจากฟอร์ม (ใช้ยืนยันตัวตนของแถว)
+const COL_KEYED = 20;     // T  ติ๊กถูก: เจ้าหน้าที่รับเรื่องคีย์ต่อแล้ว
+const COL_OPERATOR = 21;  // U  ชื่อผู้ดำเนินการ
+const MAX_OPERATOR_LENGTH = 100;
 
 // ช่องที่บังคับกรอกเสมอ (ปิดไม่ได้)
 const ALWAYS_REQUIRED = [
@@ -82,6 +87,13 @@ const LOGIN_LOCK_SECONDS = 10 * 60;    // ล็อก 10 นาที
 const SETUP_CODE_MINUTES = 30;         // รหัสตั้งค่าใช้ได้ 30 นาที
 const PW_HASH_ROUNDS = 1000;
 const PW_MIN_LENGTH = 8;
+const LOGIN_MAX_FAILS_GLOBAL = 30;     // ผิดรวมทุกบัญชีเกิน 30 ครั้ง -> ล็อกการเข้าสู่ระบบชั่วคราว
+
+// บัญชีเจ้าหน้าที่รับเรื่อง เก็บใน Script Properties คีย์ละ 1 คน: STAFF_<username>
+const ADMIN_USERNAME = 'admin';
+const STAFF_PREFIX = 'STAFF_';
+const MAX_STAFF = 50;
+const ROLE_LABELS = { admin: 'แอดมิน', staff: 'เจ้าหน้าที่รับเรื่อง' };
 
 // ===== Web App =====
 function doGet() {
@@ -207,9 +219,12 @@ function saveData(formData) {
       forceText_(f.tid),
       forceText_(f.trace),
       safeText_(f.installmentMonths),
-      slipUrl
+      slipUrl,
+      false,
+      ''
     ];
     sheet.appendRow(row);
+    sheet.getRange(sheet.getLastRow(), COL_KEYED).insertCheckboxes();
     SpreadsheetApp.flush();
 
     return {
@@ -317,7 +332,34 @@ function getOrCreateDataSheet_(ss) {
     sheet.getRange(1, 1, 1, DATA_HEADERS.length).setValues([DATA_HEADERS]).setFontWeight('bold');
     sheet.setFrozenRows(1);
   }
+  ensureDataColumns_(sheet);
   return sheet;
+}
+
+// เพิ่มคอลัมน์ T (คีย์ต่อแล้ว เป็นช่องติ๊ก) และ U (ชื่อผู้ดำเนินการ) ให้ชีต Data ที่สร้างไว้ก่อนมีคอลัมน์นี้
+// ทำครั้งเดียว: ถ้าหัวตาราง T/U ถูกต้องแล้วจะไม่แตะอะไรเลย
+function ensureDataColumns_(sheet) {
+  const want = [DATA_HEADERS[COL_KEYED - 1], DATA_HEADERS[COL_OPERATOR - 1]];
+  if (sheet.getMaxColumns() >= COL_OPERATOR) {
+    const head = sheet.getRange(1, COL_KEYED, 1, 2).getDisplayValues()[0];
+    if (head[0] === want[0] && head[1] === want[1]) return;
+    if (head[0] || head[1]) {
+      throw new Error('คอลัมน์ T/U ของชีต ' + DATA_SHEET_NAME + ' มีหัวตารางอื่นอยู่แล้ว (' + head.join(', ') +
+        ') กรุณาย้ายข้อมูลนั้นออกก่อน ระบบต้องใช้ T = ' + want[0] + ', U = ' + want[1]);
+    }
+  } else {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), COL_OPERATOR - sheet.getMaxColumns());
+  }
+  const last = sheet.getLastRow();
+  if (last >= 2) {
+    const used = sheet.getRange(2, COL_KEYED, last - 1, 2).getDisplayValues()
+      .some(function (r) { return r[0] !== '' || r[1] !== ''; });
+    if (used) {
+      throw new Error('คอลัมน์ T/U ของชีต ' + DATA_SHEET_NAME + ' มีข้อมูลอยู่แต่ไม่มีหัวตาราง กรุณาตรวจสอบและย้ายข้อมูลออกก่อน');
+    }
+  }
+  sheet.getRange(1, COL_KEYED, 1, 2).setValues([want]).setFontWeight('bold');
+  if (last >= 2) sheet.getRange(2, COL_KEYED, last - 1, 1).insertCheckboxes();
 }
 
 // ===== Helpers: รูปสลิป =====
@@ -496,16 +538,20 @@ function makePasswordRecord_(password) {
   return ['v1', PW_HASH_ROUNDS, salt, hashPassword_(password, salt, PW_HASH_ROUNDS)].join('$');
 }
 
-function verifyPassword_(password) {
-  const rec = props_().getProperty(PROP_PW_HASH);
+// ตรวจรหัสผ่านกับ record รูปแบบ v1$rounds$salt$hash (เทียบแบบเวลาคงที่)
+function verifyRecord_(rec, password) {
   if (!rec) return false;
-  const parts = rec.split('$');
+  const parts = String(rec).split('$');
   if (parts.length !== 4 || parts[0] !== 'v1') return false;
   const computed = hashPassword_(String(password), parts[2], Number(parts[1]));
   if (computed.length !== parts[3].length) return false;
   let diff = 0;
   for (let i = 0; i < computed.length; i++) diff |= computed.charCodeAt(i) ^ parts[3].charCodeAt(i);
   return diff === 0;
+}
+
+function verifyPassword_(password) {
+  return verifyRecord_(props_().getProperty(PROP_PW_HASH), password);
 }
 
 function checkNewPassword_(pw) {
@@ -521,31 +567,126 @@ function storePassword_(pw) {
   p.setProperty(PROP_PW_VER, Utilities.getUuid());  // เปลี่ยนรุ่น -> session เก่าใช้ไม่ได้ทันที
 }
 
-function createSession_() {
+// ===== Session: เก็บใน Cache เป็น JSON {r: role, u: username, v: รุ่นรหัสผ่าน} =====
+function createSession_(role, username) {
   const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
-  CacheService.getScriptCache().put('adm_' + token, props_().getProperty(PROP_PW_VER) || '', SESSION_SECONDS);
+  let ver;
+  if (role === 'admin') {
+    ver = props_().getProperty(PROP_PW_VER) || '';
+  } else {
+    const rec = getStaff_(username);
+    ver = rec ? rec.ver : '';
+  }
+  CacheService.getScriptCache().put('adm_' + token, JSON.stringify({ r: role, u: username, v: ver }), SESSION_SECONDS);
   return token;
 }
 
-function requireAdmin_(token) {
+function getSession_(token) {
   const t = String(token || '');
   if (!/^[0-9a-f]{64}$/.test(t)) throw new Error('[AUTH] กรุณาเข้าสู่ระบบ');
-  const ver = CacheService.getScriptCache().get('adm_' + t);
-  const current = props_().getProperty(PROP_PW_VER) || '';
-  if (ver === null || !current || ver !== current) throw new Error('[AUTH] หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่');
+  let s = null;
+  try { s = JSON.parse(CacheService.getScriptCache().get('adm_' + t)); } catch (e) { s = null; }
+  const expired = '[AUTH] หมดเวลาการใช้งาน กรุณาเข้าสู่ระบบใหม่';
+  if (!s || typeof s !== 'object') throw new Error(expired);
+  if (s.r === 'admin') {
+    const current = props_().getProperty(PROP_PW_VER) || '';
+    if (!current || s.v !== current) throw new Error(expired);
+    return adminMe_();
+  }
+  if (s.r === 'staff') {
+    const rec = getStaff_(s.u);
+    if (!rec || rec.active === false || !rec.ver || s.v !== rec.ver) throw new Error(expired);
+    return { role: 'staff', username: s.u, name: rec.name };
+  }
+  throw new Error(expired);
 }
 
-function checkLoginLock_() {
-  const fails = Number(CacheService.getScriptCache().get('adm_fails') || 0);
-  if (fails >= LOGIN_MAX_FAILS) {
+function adminMe_() {
+  return { role: 'admin', username: ADMIN_USERNAME, name: ROLE_LABELS.admin };
+}
+
+// แอดมินเท่านั้น (ไม่ใส่ [AUTH] เพราะเจ้าหน้าที่ยังอยู่ในระบบได้ แค่ไม่มีสิทธิ์ทำเรื่องนี้)
+function requireAdmin_(token) {
+  const s = getSession_(token);
+  if (s.role !== 'admin') throw new Error('เฉพาะแอดมินเท่านั้นที่ทำรายการนี้ได้');
+  return s;
+}
+
+// แอดมิน หรือ เจ้าหน้าที่รับเรื่อง
+function requireStaff_(token) {
+  return getSession_(token);
+}
+
+function publicMe_(s) {
+  return { role: s.role, roleLabel: ROLE_LABELS[s.role], username: s.username, name: s.name };
+}
+
+// ===== ล็อกเมื่อใส่รหัสผิด: แยกรายบัญชี + เพดานรวมทุกบัญชี =====
+function failKey_(username) {
+  const u = String(username || ADMIN_USERNAME).toLowerCase();
+  return 'adm_fails_' + (/^[a-z0-9._-]{1,30}$/.test(u) ? u : '?');
+}
+
+function checkLoginLock_(username) {
+  const cache = CacheService.getScriptCache();
+  const fails = Number(cache.get(failKey_(username)) || 0);
+  const all = Number(cache.get('adm_fails_all') || 0);
+  if (fails >= LOGIN_MAX_FAILS || all >= LOGIN_MAX_FAILS_GLOBAL) {
     throw new Error('ใส่รหัสผิดหลายครั้งเกินไป กรุณารอ ' + (LOGIN_LOCK_SECONDS / 60) + ' นาทีแล้วลองใหม่');
   }
 }
 
-function recordLoginFail_() {
+function recordLoginFail_(username) {
   const cache = CacheService.getScriptCache();
-  const fails = Number(cache.get('adm_fails') || 0) + 1;
-  cache.put('adm_fails', String(fails), LOGIN_LOCK_SECONDS);
+  const k = failKey_(username);
+  cache.put(k, String(Number(cache.get(k) || 0) + 1), LOGIN_LOCK_SECONDS);
+  cache.put('adm_fails_all', String(Number(cache.get('adm_fails_all') || 0) + 1), LOGIN_LOCK_SECONDS);
+}
+
+function clearLoginFails_(username) {
+  CacheService.getScriptCache().remove(failKey_(username));
+}
+
+// ===== บัญชีเจ้าหน้าที่รับเรื่อง =====
+function normUsername_(u) {
+  const s = String(u || '').trim().toLowerCase();
+  if (!/^[a-z0-9._-]{3,30}$/.test(s)) {
+    throw new Error('ชื่อผู้ใช้ต้องเป็นตัวอักษร a-z ตัวเลข หรือ . _ - ยาว 3–30 ตัว');
+  }
+  if (s === ADMIN_USERNAME) throw new Error('ชื่อผู้ใช้ admin สงวนไว้สำหรับแอดมิน');
+  return s;
+}
+
+function cleanName_(name) {
+  const s = str_(name).replace(/\s+/g, ' ');
+  if (!s) throw new Error('กรุณากรอกชื่อ-นามสกุลเจ้าหน้าที่');
+  if (s.length > MAX_OPERATOR_LENGTH) throw new Error('ชื่อยาวเกิน ' + MAX_OPERATOR_LENGTH + ' ตัวอักษร');
+  return s;
+}
+
+function getStaff_(username) {
+  if (!/^[a-z0-9._-]{3,30}$/.test(String(username || ''))) return null;
+  const raw = props_().getProperty(STAFF_PREFIX + username);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+function putStaff_(username, rec) {
+  props_().setProperty(STAFF_PREFIX + username, JSON.stringify(rec));
+}
+
+function listStaff_() {
+  const all = props_().getProperties();
+  return Object.keys(all).filter(function (k) { return k.indexOf(STAFF_PREFIX) === 0; }).map(function (k) {
+    let r;
+    try { r = JSON.parse(all[k]); } catch (e) { return null; }
+    return {
+      username: k.substring(STAFF_PREFIX.length),
+      name: r.name || '',
+      active: r.active !== false,
+      created: r.created || ''
+    };
+  }).filter(Boolean).sort(function (a, b) { return a.username < b.username ? -1 : 1; });
 }
 
 // สถานะ: ตั้งรหัสผ่านแอดมินแล้วหรือยัง
@@ -553,33 +694,58 @@ function adminStatus() {
   return { hasPassword: !!props_().getProperty(PROP_PW_HASH) };
 }
 
-function adminLogin(password) {
-  checkLoginLock_();
-  if (!props_().getProperty(PROP_PW_HASH)) throw new Error('ยังไม่ได้ตั้งรหัสผ่านแอดมิน');
-  if (!verifyPassword_(password)) {
-    recordLoginFail_();
-    throw new Error('รหัสผ่านไม่ถูกต้อง');
+// เข้าสู่ระบบ: ชื่อผู้ใช้ admin (หรือเว้นว่าง) = แอดมิน, อื่น ๆ = เจ้าหน้าที่รับเรื่อง
+function adminLogin(username, password) {
+  if (password === undefined) { password = username; username = ''; }  // รองรับการเรียกแบบเดิม adminLogin(password)
+  const u = String(username || '').trim().toLowerCase() || ADMIN_USERNAME;
+  checkLoginLock_(u);
+  const pw = String(password || '');
+
+  if (u === ADMIN_USERNAME) {
+    if (!props_().getProperty(PROP_PW_HASH)) throw new Error('ยังไม่ได้ตั้งรหัสผ่านแอดมิน');
+    if (!verifyPassword_(pw)) {
+      recordLoginFail_(u);
+      throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+    }
+    clearLoginFails_(u);
+    return { token: createSession_('admin', ADMIN_USERNAME), me: publicMe_(adminMe_()) };
   }
-  CacheService.getScriptCache().remove('adm_fails');
-  return { token: createSession_() };
+
+  const rec = getStaff_(u);
+  let ok = false;
+  if (rec) {
+    ok = verifyRecord_(rec.hash, pw);
+  } else {
+    hashPassword_(pw, 'no-such-user', PW_HASH_ROUNDS);  // ใช้เวลาเท่ากัน กันเดาชื่อผู้ใช้จากเวลาตอบกลับ
+  }
+  if (!ok) {
+    recordLoginFail_(u);
+    throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  }
+  if (rec.active === false) throw new Error('บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อแอดมิน');
+  clearLoginFails_(u);
+  return {
+    token: createSession_('staff', u),
+    me: publicMe_({ role: 'staff', username: u, name: rec.name })
+  };
 }
 
 // ตั้งรหัสผ่านครั้งแรก หรือรีเซ็ตรหัสผ่าน: ต้องใช้รหัสตั้งค่าที่เจ้าของสคริปต์สร้างจาก Editor
 function adminSetup(setupCode, newPassword) {
-  checkLoginLock_();
+  checkLoginLock_(ADMIN_USERNAME);
   const p = props_();
   const code = p.getProperty(PROP_SETUP_CODE);
   const exp = Number(p.getProperty(PROP_SETUP_EXP) || 0);
   const given = String(setupCode || '').trim().toUpperCase();
   if (!code || Date.now() > exp || given !== code) {
-    recordLoginFail_();
+    recordLoginFail_(ADMIN_USERNAME);
     throw new Error('รหัสตั้งค่าไม่ถูกต้องหรือหมดอายุ (ให้เจ้าของสคริปต์รัน createAdminSetupCode ใน Editor เพื่อสร้างรหัสใหม่)');
   }
   storePassword_(checkNewPassword_(newPassword));
   p.deleteProperty(PROP_SETUP_CODE);
   p.deleteProperty(PROP_SETUP_EXP);
-  CacheService.getScriptCache().remove('adm_fails');
-  return { token: createSession_() };
+  clearLoginFails_(ADMIN_USERNAME);
+  return { token: createSession_('admin', ADMIN_USERNAME), me: publicMe_(adminMe_()) };
 }
 
 function adminLogout(token) {
@@ -593,13 +759,98 @@ function adminLogout(token) {
 
 function adminChangePassword(token, oldPassword, newPassword) {
   requireAdmin_(token);
-  checkLoginLock_();
+  checkLoginLock_(ADMIN_USERNAME);
   if (!verifyPassword_(oldPassword)) {
-    recordLoginFail_();
+    recordLoginFail_(ADMIN_USERNAME);
     throw new Error('รหัสผ่านเดิมไม่ถูกต้อง');
   }
   storePassword_(checkNewPassword_(newPassword));
-  return { token: createSession_(), message: 'เปลี่ยนรหัสผ่านเรียบร้อย' };
+  return { token: createSession_('admin', ADMIN_USERNAME), message: 'เปลี่ยนรหัสผ่านเรียบร้อย' };
+}
+
+// ใครกำลังใช้งานอยู่ (ใช้ตรวจ token ตอนเปิดหน้า)
+function whoAmI(token) {
+  return publicMe_(requireStaff_(token));
+}
+
+// เจ้าหน้าที่เปลี่ยนรหัสผ่านตัวเอง
+function staffChangePassword(token, oldPassword, newPassword) {
+  const me = requireStaff_(token);
+  if (me.role !== 'staff') throw new Error('แอดมินเปลี่ยนรหัสผ่านได้ที่หน้าตั้งค่าระบบ แท็บรหัสผ่าน');
+  checkLoginLock_(me.username);
+  const rec = getStaff_(me.username);
+  if (!rec || !verifyRecord_(rec.hash, oldPassword)) {
+    recordLoginFail_(me.username);
+    throw new Error('รหัสผ่านเดิมไม่ถูกต้อง');
+  }
+  rec.hash = makePasswordRecord_(checkNewPassword_(newPassword));
+  rec.ver = Utilities.getUuid();
+  putStaff_(me.username, rec);
+  return { token: createSession_('staff', me.username), message: 'เปลี่ยนรหัสผ่านเรียบร้อย' };
+}
+
+// ===== แอดมินจัดการบัญชีเจ้าหน้าที่รับเรื่อง =====
+function adminListStaff(token) {
+  requireAdmin_(token);
+  return listStaff_();
+}
+
+function adminCreateStaff(token, data) {
+  requireAdmin_(token);
+  const d = data || {};
+  const u = normUsername_(d.username);
+  const name = cleanName_(d.name);
+  const pw = checkNewPassword_(d.password);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (getStaff_(u)) throw new Error('มีชื่อผู้ใช้ ' + u + ' อยู่แล้ว');
+    if (listStaff_().length >= MAX_STAFF) throw new Error('เพิ่มเจ้าหน้าที่ได้ไม่เกิน ' + MAX_STAFF + ' คน');
+    putStaff_(u, {
+      name: name,
+      hash: makePasswordRecord_(pw),
+      ver: Utilities.getUuid(),
+      active: true,
+      created: Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm')
+    });
+  } finally {
+    lock.releaseLock();
+  }
+  return { staff: listStaff_(), message: 'เพิ่มเจ้าหน้าที่ ' + name + ' แล้ว' };
+}
+
+// changes: { name?, active?, password? } ปิดใช้งาน/ตั้งรหัสใหม่ -> ออกจากระบบทุกเครื่องทันที
+function adminUpdateStaff(token, username, changes) {
+  requireAdmin_(token);
+  const u = normUsername_(username);
+  const rec = getStaff_(u);
+  if (!rec) throw new Error('ไม่พบบัญชี ' + u);
+  const c = changes || {};
+  let msg = 'บันทึกแล้ว';
+  if (c.name !== undefined) {
+    rec.name = cleanName_(c.name);
+    msg = 'แก้ไขชื่อแล้ว';
+  }
+  if (c.active !== undefined) {
+    rec.active = c.active === true;
+    if (!rec.active) rec.ver = Utilities.getUuid();
+    msg = rec.active ? 'เปิดใช้งานบัญชีแล้ว' : 'ปิดใช้งานบัญชีแล้ว';
+  }
+  if (c.password !== undefined) {
+    rec.hash = makePasswordRecord_(checkNewPassword_(c.password));
+    rec.ver = Utilities.getUuid();
+    clearLoginFails_(u);
+    msg = 'ตั้งรหัสผ่านใหม่แล้ว';
+  }
+  putStaff_(u, rec);
+  return { staff: listStaff_(), message: msg };
+}
+
+function adminDeleteStaff(token, username) {
+  requireAdmin_(token);
+  const u = normUsername_(username);
+  props_().deleteProperty(STAFF_PREFIX + u);
+  return { staff: listStaff_(), message: 'ลบบัญชี ' + u + ' แล้ว' };
 }
 
 // ข้อมูลทั้งหมดที่หน้าตั้งค่าต้องใช้
@@ -620,7 +871,9 @@ function adminGetAll(token) {
     settings: { title: s.title, subtitle: s.subtitle, required: s.required },
     requiredLabels: OPTIONAL_REQUIRED,
     folder: describeFolder_(),
-    banner: describeBanner_()
+    banner: describeBanner_(),
+    staff: listStaff_(),
+    maxStaff: MAX_STAFF
   };
 }
 
@@ -737,19 +990,23 @@ function adminSaveFolder(token, input) {
   return { folder: describeFolder_(), message: 'บันทึกโฟลเดอร์เก็บสลิปแล้ว' };
 }
 
-// รายการที่บันทึกล่าสุด (ใหม่สุดอยู่บน)
-// rowNums/sigs ใช้ยืนยันแถวตอนแบ็คอัพ (กันลบผิดแถวถ้าชีตเปลี่ยนระหว่างนั้น)
-function adminGetRecent(token, limit, query) {
-  requireAdmin_(token);
+// รายการที่บันทึกล่าสุด (ใหม่สุดอยู่บน) — แอดมินและเจ้าหน้าที่รับเรื่อง
+// rowNums/sigs ใช้ยืนยันแถวตอนแบ็คอัพ/ติ๊กคีย์ (กันแก้ผิดแถวถ้าชีตเปลี่ยนระหว่างนั้น)
+// status: '' ทั้งหมด | 'pending' รอคีย์ | 'done' คีย์ต่อแล้ว
+function adminGetRecent(token, limit, query, status) {
+  const me = requireStaff_(token);
   const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
-  const sheet = getSpreadsheet_().getSheetByName(DATA_SHEET_NAME);
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName(DATA_SHEET_NAME);
   const backupTotal = countBackup_();
-  const empty = { total: 0, matched: 0, rows: [], rowNums: [], sigs: [], backupTotal: backupTotal };
-  if (!sheet || sheet.getLastRow() < 2) return empty;
-  const r = readNewest_(sheet, DATA_HEADERS.length, n, query);
+  const base = { me: publicMe_(me), backupTotal: backupTotal };
+  if (!sheet || sheet.getLastRow() < 2) {
+    return Object.assign({ total: 0, matched: 0, rows: [], rowNums: [], sigs: [] }, base);
+  }
+  ensureDataColumns_(sheet);
+  const r = readNewest_(sheet, DATA_HEADERS.length, n, query, status);
   r.sigs = r.rows.map(rowSig_);
-  r.backupTotal = backupTotal;
-  return r;
+  return Object.assign(r, base);
 }
 
 // คำค้นหา: แยกคำด้วยช่องว่าง ทุกคำต้องเจอในแถว (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
@@ -758,54 +1015,108 @@ function parseQuery_(query) {
     .map(function (w) { return w.substring(0, 100); });
 }
 
+function isKeyed_(row) {
+  return String(row[COL_KEYED - 1]).toUpperCase() === 'TRUE';
+}
+
 // อ่านแถวใหม่สุดก่อน คืน {total, matched, rows, rowNums}
-// ไม่มีคำค้น: อ่านเฉพาะ n แถวท้ายชีต / มีคำค้น: ค้นทั้งชีต แล้วคืนที่ตรงไม่เกิน n แถว
-function readNewest_(sheet, cols, n, query) {
+// ไม่มีตัวกรอง: อ่านเฉพาะ n แถวท้ายชีต / มีคำค้นหรือสถานะ: ค้นทั้งชีต แล้วคืนที่ตรงไม่เกิน n แถว
+function readNewest_(sheet, cols, n, query, status) {
   const last = sheet.getLastRow();
   const total = last - 1;
   const words = parseQuery_(query);
-  let first, values;
-  if (!words.length) {
+  const st = status === 'pending' || status === 'done' ? status : '';
+  if (!words.length && !st) {
     const count = Math.min(n, total);
-    first = last - count + 1;
-    values = sheet.getRange(first, 1, count, cols).getDisplayValues();
-    const rowNums = values.map(function (_, i) { return first + i; });
-    return { total: total, matched: total, rows: values.reverse(), rowNums: rowNums.reverse() };
+    const first = last - count + 1;
+    const vals = sheet.getRange(first, 1, count, cols).getDisplayValues();
+    const nums = vals.map(function (_, i) { return first + i; });
+    return { total: total, matched: total, rows: vals.reverse(), rowNums: nums.reverse() };
   }
-  values = sheet.getRange(2, 1, total, cols).getDisplayValues();
+  const values = sheet.getRange(2, 1, total, cols).getDisplayValues();
   const rows = [];
   const rowNums = [];
   let matched = 0;
   for (let i = values.length - 1; i >= 0; i--) {
-    const hay = values[i].join('\u0001').toLowerCase();
-    if (words.every(function (w) { return hay.indexOf(w) !== -1; })) {
-      matched++;
-      if (rows.length < n) {
-        rows.push(values[i]);
-        rowNums.push(i + 2);
-      }
+    const row = values[i];
+    if (st && isKeyed_(row) !== (st === 'done')) continue;
+    if (words.length) {
+      const hay = row.join('\u0001').toLowerCase();
+      if (!words.every(function (w) { return hay.indexOf(w) !== -1; })) continue;
+    }
+    matched++;
+    if (rows.length < n) {
+      rows.push(row);
+      rowNums.push(i + 2);
     }
   }
   return { total: total, matched: matched, rows: rows, rowNums: rowNums };
 }
 
 // รายการในชีต BackupData (ใหม่สุดอยู่บน) อ่านอย่างเดียว คอลัมน์สุดท้ายคือวันที่แบ็คอัพ
-function adminGetBackup(token, limit, query) {
-  requireAdmin_(token);
+function adminGetBackup(token, limit, query, status) {
+  const me = requireStaff_(token);
   const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
-  const sheet = getSpreadsheet_().getSheetByName(BACKUP_SHEET_NAME);
-  const dataSheet = getSpreadsheet_().getSheetByName(DATA_SHEET_NAME);
+  const ss = getSpreadsheet_();
+  const sheet = ss.getSheetByName(BACKUP_SHEET_NAME);
+  const dataSheet = ss.getSheetByName(DATA_SHEET_NAME);
   const dataTotal = dataSheet ? Math.max(0, dataSheet.getLastRow() - 1) : 0;
-  if (!sheet || sheet.getLastRow() < 2) return { total: 0, matched: 0, rows: [], dataTotal: dataTotal };
-  const r = readNewest_(sheet, DATA_HEADERS.length + 1, n, query);
+  const base = { me: publicMe_(me), dataTotal: dataTotal };
+  if (!sheet || sheet.getLastRow() < 2) return Object.assign({ total: 0, matched: 0, rows: [] }, base);
+  ensureBackupLayout_(sheet);
+  const r = readNewest_(sheet, DATA_HEADERS.length + 1, n, query, status);
   delete r.rowNums;
-  r.dataTotal = dataTotal;
-  return r;
+  return Object.assign(r, base);
+}
+
+// เจ้าหน้าที่ติ๊ก "คีย์ต่อแล้ว" และกรอกชื่อผู้ดำเนินการ ของแถวในชีต Data
+// item: { row, sig, keyed: true/false, operator: 'ชื่อ' }
+function staffUpdateRow(token, item) {
+  const me = requireStaff_(token);
+  const it = item || {};
+  const r = Number(it.row);
+  if (!(r >= 2) || Math.floor(r) !== r) throw new Error('ข้อมูลแถวไม่ถูกต้อง');
+  const keyed = it.keyed === true;
+  const operator = str_(it.operator).replace(/\s+/g, ' ');
+  if (operator.length > MAX_OPERATOR_LENGTH) throw new Error('ชื่อผู้ดำเนินการยาวเกิน ' + MAX_OPERATOR_LENGTH + ' ตัวอักษร');
+  if (keyed && !operator) throw new Error('กรุณากรอกชื่อผู้ดำเนินการก่อนติ๊กคีย์ต่อแล้ว');
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+  } catch (e) {
+    throw new Error('ระบบกำลังมีผู้ใช้งานพร้อมกันจำนวนมาก กรุณาลองใหม่อีกครั้ง');
+  }
+  try {
+    const sheet = getSpreadsheet_().getSheetByName(DATA_SHEET_NAME);
+    if (!sheet) throw new Error('ไม่พบชีต ' + DATA_SHEET_NAME);
+    ensureDataColumns_(sheet);
+    const stale = 'ข้อมูลแถวนี้ถูกแก้ไขหรือย้ายไปแล้ว กรุณากดรีเฟรชแล้วลองใหม่';
+    if (r > sheet.getLastRow()) throw new Error(stale);
+    const disp = sheet.getRange(r, 1, 1, BASE_COLS).getDisplayValues()[0];
+    if (rowSig_(disp) !== String(it.sig || '')) throw new Error(stale);
+
+    sheet.getRange(r, COL_KEYED).insertCheckboxes();
+    sheet.getRange(r, COL_KEYED, 1, 2).setValues([[keyed, safeText_(operator)]]);
+    SpreadsheetApp.flush();
+    const after = sheet.getRange(r, COL_KEYED, 1, 2).getDisplayValues()[0];
+    console.log('staffUpdateRow row ' + r + ' keyed=' + keyed + ' by ' + me.username);
+    return {
+      keyed: keyed,
+      keyedText: after[0],
+      operator: after[1],
+      message: keyed ? 'บันทึกว่าคีย์ต่อแล้ว' : 'บันทึกแล้ว'
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ===== แบ็คอัพข้อมูล: ย้ายแถวที่เลือกจาก Data ไป BackupData =====
+// ลายเซ็นแถวคิดจากคอลัมน์ A–S เท่านั้น การติ๊กคีย์/แก้ชื่อผู้ดำเนินการจึงไม่ทำให้แบ็คอัพถูกข้าม
 function rowSig_(displayRow) {
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(displayRow), Utilities.Charset.UTF_8);
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5,
+    JSON.stringify(displayRow.slice(0, BASE_COLS)), Utilities.Charset.UTF_8);
   return Utilities.base64Encode(bytes);
 }
 
@@ -833,11 +1144,23 @@ function getOrCreateBackupSheet_(ss) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
     sh.setFrozenRows(1);
   }
+  ensureBackupLayout_(sh);
   return sh;
 }
 
+// BackupData รุ่นเก่า: วันที่แบ็คอัพอยู่คอลัมน์ T -> แทรก 2 คอลัมน์ (คีย์ต่อแล้ว, ชื่อผู้ดำเนินการ) ก่อนหน้า
+function ensureBackupLayout_(sh) {
+  if (sh.getLastColumn() < BASE_COLS + 1) return;
+  const t = sh.getRange(1, BASE_COLS + 1).getDisplayValue();
+  if (t !== BACKUP_TIME_HEADER) return;
+  sh.insertColumnsBefore(BASE_COLS + 1, 2);
+  sh.getRange(1, COL_KEYED, 1, 2)
+    .setValues([[DATA_HEADERS[COL_KEYED - 1], DATA_HEADERS[COL_OPERATOR - 1]]])
+    .setFontWeight('bold');
+}
+
 function adminBackupRows(token, items) {
-  requireAdmin_(token);
+  const me = requireStaff_(token);
   if (!Array.isArray(items) || !items.length) throw new Error('กรุณาเลือกรายการที่ต้องการแบ็คอัพ');
   if (items.length > MAX_RECENT) throw new Error('แบ็คอัพได้ครั้งละไม่เกิน ' + MAX_RECENT + ' รายการ');
 
@@ -859,6 +1182,7 @@ function adminBackupRows(token, items) {
     const ss = getSpreadsheet_();
     const data = ss.getSheetByName(DATA_SHEET_NAME);
     if (!data) throw new Error('ไม่พบชีต ' + DATA_SHEET_NAME);
+    ensureDataColumns_(data);
     const last = data.getLastRow();
     const cols = DATA_HEADERS.length;
 
@@ -871,7 +1195,7 @@ function adminBackupRows(token, items) {
     if (inRange.length) {
       const lo = inRange[0];
       const hi = inRange[inRange.length - 1];
-      const block = data.getRange(lo, 1, hi - lo + 1, cols).getDisplayValues();
+      const block = data.getRange(lo, 1, hi - lo + 1, BASE_COLS).getDisplayValues();
       inRange.forEach(function (r) {
         if (rowSig_(block[r - lo]) === wanted[r]) ok.push(r); else skipped++;
       });
@@ -881,7 +1205,7 @@ function adminBackupRows(token, items) {
     }
     const runs = toRuns_(ok);
 
-    // 1) คัดลอกไป BackupData ก่อน (copyTo เก็บค่า/รูปแบบเดิม เช่น เบอร์โทรที่ขึ้นต้นด้วย 0)
+    // 1) คัดลอกไป BackupData ก่อน (copyTo เก็บค่า/รูปแบบเดิม เช่น เบอร์โทรที่ขึ้นต้นด้วย 0, ช่องติ๊ก)
     const backup = getOrCreateBackupSheet_(ss);
     const startDest = backup.getLastRow() + 1;
     let dest = startDest;
@@ -900,6 +1224,7 @@ function adminBackupRows(token, items) {
       data.deleteRows(run[0], run[1]);
     });
     SpreadsheetApp.flush();
+    console.log('adminBackupRows ' + ok.length + ' rows by ' + me.username);
 
     let msg = 'แบ็คอัพ ' + ok.length + ' รายการไปชีต ' + BACKUP_SHEET_NAME + ' และลบออกจาก ' + DATA_SHEET_NAME + ' แล้ว';
     if (skipped) msg += ' (ข้าม ' + skipped + ' รายการที่ข้อมูลเปลี่ยนไป)';

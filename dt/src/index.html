@@ -293,6 +293,30 @@
     .btn-backup { border-radius: 10px; background: #d97706; border: 1px solid #d97706; color: #fff; font-weight: 500; }
     .btn-backup:hover, .btn-backup:focus { background: #b45309; border-color: #b45309; color: #fff; }
     .btn-backup:disabled { background: #fff; border-color: var(--line); color: var(--muted); opacity: 1; }
+    .status-filter { width: auto; border-radius: 12px; border: 1px solid var(--line); padding-top: .45rem; padding-bottom: .45rem; font-size: .92rem; }
+    .recent-table .col-status { white-space: nowrap; width: 1%; }
+    .status-badge { display: inline-flex; align-items: center; gap: 4px; border: 1px solid transparent; border-radius: 999px; padding: .2rem .6rem; font: inherit; font-size: .8rem; font-weight: 500; line-height: 1.3; white-space: nowrap; }
+    .status-badge.done { background: #e7f6ec; color: #11692f; border-color: #bfe5cb; }
+    .status-badge.pending { background: #fff4e0; color: #8a4b00; border-color: #f6d79b; }
+    .status-badge.none { background: #f1f3f7; color: var(--muted); }
+    button.status-badge { cursor: pointer; }
+    button.status-badge:hover { filter: brightness(.96); }
+    button.status-badge:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    .keyed-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 12px; background: #f6f8fd; border: 1px solid #dfe5f3; border-radius: 12px; }
+    .keyed-check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; margin: 0; white-space: nowrap; }
+    .keyed-check .form-check-input { margin: 0; width: 1.25em; height: 1.25em; cursor: pointer; }
+    .keyed-panel .keyed-name { flex: 1 1 200px; max-width: 360px; border-radius: 10px; }
+    .keyed-panel .btn { border-radius: 10px; }
+    .user-chip { display: inline-flex; align-items: center; max-width: 260px; padding: .35rem .8rem; border-radius: 999px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .28); color: #fff; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .staff-add { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: end; }
+    .staff-add .form-control { border-radius: 10px; }
+    .staff-table td, .staff-table th { vertical-align: middle; }
+    .staff-table tr.inactive td { color: var(--muted); }
+    .staff-table .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9rem; }
+    .staff-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .staff-actions .btn { border-radius: 9px; padding: .25rem .6rem; font-size: .82rem; }
+    @media (max-width: 991.98px) { .staff-add { grid-template-columns: 1fr 1fr; } .staff-add-btn { grid-column: 1 / -1; } }
+    @media (max-width: 575.98px) { .staff-add { grid-template-columns: 1fr; } .status-filter { flex: 1 1 auto; } .user-chip { max-width: 100%; } .keyed-panel .keyed-name { max-width: none; } }
     .source-bar { padding: 12px 20px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .search-box { position: relative; flex: 1 1 260px; max-width: 460px; margin: 0 0 0 auto; }
     .search-box svg { position: absolute; left: 12px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
@@ -610,8 +634,8 @@
     <header class="app-header settings">
       <div class="container-fluid settings-wrap head-row">
         <div>
-          <h1>ตั้งค่าระบบ</h1>
-          <p>จัดการรายการตัวเลือก โฟลเดอร์สลิป และการตั้งค่าฟอร์ม</p>
+          <h1 id="settingsTitle">ตั้งค่าระบบ</h1>
+          <p id="settingsSub">จัดการรายการตัวเลือก โฟลเดอร์สลิป และการตั้งค่าฟอร์ม</p>
         </div>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-head d-none" id="btnLogout">
@@ -633,8 +657,11 @@
     <main class="container-fluid settings-wrap app-main">
 
       <section class="section-card auth-card d-none" id="loginCard">
-        <div class="card-head"><div><h2>เข้าสู่ระบบแอดมิน</h2><small>ใส่รหัสผ่านแอดมินเพื่อจัดการการตั้งค่า</small></div></div>
+        <div class="card-head"><div><h2>เข้าสู่ระบบ</h2><small>แอดมิน หรือ เจ้าหน้าที่รับเรื่อง</small></div></div>
         <form class="card-body-x pb-3" id="loginForm" novalidate>
+          <label class="form-label" for="loginUser">ชื่อผู้ใช้</label>
+          <input type="text" class="form-control mb-1" id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required>
+          <div class="form-text mb-3">แอดมินใช้ชื่อผู้ใช้ <b>admin</b></div>
           <label class="form-label" for="loginPassword">รหัสผ่าน</label>
           <input type="password" class="form-control mb-3" id="loginPassword" autocomplete="current-password" required>
           <button type="submit" class="btn btn-brand w-100">เข้าสู่ระบบ</button>
@@ -670,6 +697,7 @@
           <button type="button" data-tab="folder">โฟลเดอร์สลิป</button>
           <button type="button" data-tab="form">ตั้งค่าฟอร์ม</button>
           <button type="button" data-tab="banner">แบนเนอร์</button>
+          <button type="button" data-tab="staff">เจ้าหน้าที่</button>
           <button type="button" data-tab="password">รหัสผ่าน</button>
         </nav>
 
@@ -749,6 +777,32 @@
           </div>
         </section>
 
+        <section class="section-card tab-pane-x d-none" data-pane="staff">
+          <div class="card-head">
+            <div><h2>เจ้าหน้าที่รับเรื่อง</h2><small id="staffInfo">บัญชีสำหรับเข้าหน้าดูข้อมูล ติ๊กคีย์ต่อแล้ว กรอกชื่อผู้ดำเนินการ และแบ็คอัพข้อมูล (เข้าหน้าตั้งค่าไม่ได้)</small></div>
+          </div>
+          <div class="card-body-x pb-3">
+            <form class="staff-add" id="staffAddForm" novalidate autocomplete="off">
+              <div>
+                <label class="form-label" for="staffUser">ชื่อผู้ใช้ (a-z, 0-9)</label>
+                <input type="text" class="form-control" id="staffUser" maxlength="30" autocapitalize="none" spellcheck="false" placeholder="เช่น somchai" required>
+              </div>
+              <div>
+                <label class="form-label" for="staffName">ชื่อ-นามสกุล</label>
+                <input type="text" class="form-control" id="staffName" maxlength="100" placeholder="ใช้เป็นชื่อผู้ดำเนินการ" required>
+              </div>
+              <div>
+                <label class="form-label" for="staffPw">รหัสผ่าน (อย่างน้อย 8 ตัว)</label>
+                <input type="password" class="form-control" id="staffPw" minlength="8" autocomplete="new-password" required>
+              </div>
+              <div class="staff-add-btn">
+                <button type="submit" class="btn btn-brand">+ เพิ่มเจ้าหน้าที่</button>
+              </div>
+            </form>
+            <div id="staffList" class="mt-3"></div>
+          </div>
+        </section>
+
         <section class="section-card tab-pane-x d-none" data-pane="password" style="max-width:520px">
           <div class="card-head">
             <div><h2>เปลี่ยนรหัสผ่านแอดมิน</h2><small>เปลี่ยนแล้ว ทุกเครื่องที่เข้าสู่ระบบอยู่จะถูกออกจากระบบ</small></div>
@@ -775,7 +829,20 @@
           <h1>ข้อมูลที่บันทึก</h1>
           <p>รายการล่าสุดจากชีต Data</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
+          <span class="user-chip d-none" id="userChip" title=""></span>
+          <button type="button" class="btn btn-head d-none" id="btnMyPassword" title="เปลี่ยนรหัสผ่าน">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"/>
+            </svg>
+            <span class="lbl">เปลี่ยนรหัสผ่าน</span>
+          </button>
+          <button type="button" class="btn btn-head d-none" id="btnRecordsLogout">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/>
+            </svg>
+            <span class="lbl">ออกจากระบบ</span>
+          </button>
           <button type="button" class="btn btn-head" id="btnRecordsBack">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
@@ -808,6 +875,11 @@
             <button type="button" class="active" data-source="data" aria-pressed="true">ชีต Data</button>
             <button type="button" data-source="backup" aria-pressed="false">ชีต BackupData</button>
           </div>
+          <select class="form-select status-filter" id="recentStatus" aria-label="กรองตามสถานะการคีย์">
+            <option value="">ทุกสถานะ</option>
+            <option value="pending">รอคีย์</option>
+            <option value="done">คีย์ต่อแล้ว</option>
+          </select>
           <form class="search-box" id="recentSearchForm" role="search" autocomplete="off">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
@@ -816,7 +888,7 @@
             <button type="button" class="search-clear d-none" id="btnSearchClear" aria-label="ล้างคำค้นหา">&times;</button>
           </form>
         </div>
-        <div class="recent-hint" id="hintData">กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดของรายการ ติ๊กช่องหน้ารายการแล้วกด <b>แบ็คอัพที่เลือก</b> เพื่อย้ายไปชีต BackupData และลบออกจากชีต Data</div>
+        <div class="recent-hint" id="hintData">กด <span class="row-toggle demo" aria-hidden="true">+</span> หรือกดสถานะ เพื่อดูข้อมูลทั้งหมด ติ๊ก <b>คีย์ต่อแล้ว</b> และกรอก <b>ชื่อผู้ดำเนินการ</b> ติ๊กช่องหน้ารายการแล้วกด <b>แบ็คอัพที่เลือก</b> เพื่อย้ายไปชีต BackupData</div>
         <div class="recent-hint d-none" id="hintBackup">รายการที่แบ็คอัพแล้ว (ดูอย่างเดียว) กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดและวันที่แบ็คอัพ</div>
         <div class="card-body-x pb-3">
           <div class="recent-wrap" id="recentWrap">
@@ -832,6 +904,7 @@
       var MAX_DIM = 1280;
       var JPEG_QUALITY = 0.8;
       var TOKEN_KEY = 'dt_admin_token';
+      var ME_KEY = 'dt_me';
       var SELECT_MAP = {
         location: 'locations',
         project: 'projects',
@@ -851,8 +924,10 @@
       function colOf(i) { return function (r) { return r[i]; }; }
       var RECENT_VIEW = [
         { label: 'วันเวลา', get: colOf(0), cls: 'col-time' },
+        { label: 'สถานะ', status: true, cls: 'col-status' },
         { label: 'ลูกค้า', get: function (r) { return ((r[3] || '') + ' ' + (r[4] || '')).trim(); }, cls: 'col-wrap' },
-        { label: 'สินค้า', get: colOf(6), cls: 'col-wrap col-product' },
+        { label: 'สินค้า', get: colOf(6), cls: 'd-none d-sm-table-cell col-wrap col-product' },
+        { label: 'ผู้ดำเนินการ', get: colOf(20), op: true, cls: 'd-none d-lg-table-cell col-wrap' },
         { label: 'ราคา', get: colOf(8), cls: 'd-none d-sm-table-cell text-end' },
         { label: 'สาขา', get: colOf(1), cls: 'd-none d-md-table-cell col-wrap' },
         { label: 'สลิป', slip: true, cls: 'd-none d-md-table-cell' },
@@ -881,6 +956,7 @@
 
       var admin = {
         token: storeGet(TOKEN_KEY),
+        me: readMe(),
         data: null,
         listKey: null,
         listDirty: false,
@@ -897,6 +973,33 @@
           if (v === null) window.sessionStorage.removeItem(k);
           else window.sessionStorage.setItem(k, v);
         } catch (e) { }
+      }
+
+      function readMe() {
+        try {
+          var m = JSON.parse(storeGet(ME_KEY) || 'null');
+          return m && typeof m === 'object' ? m : null;
+        } catch (e) { return null; }
+      }
+
+      function isStaff() {
+        return !!(admin.me && admin.me.role === 'staff');
+      }
+
+      function setMe(me) {
+        admin.me = me || null;
+        storeSet(ME_KEY, me ? JSON.stringify(me) : null);
+        renderUserChip();
+      }
+
+      function renderUserChip() {
+        var me = admin.token ? admin.me : null;
+        var chip = byId('userChip');
+        chip.classList.toggle('d-none', !me);
+        chip.textContent = me ? me.name + ' · ' + me.roleLabel : '';
+        chip.title = me ? 'ชื่อผู้ใช้: ' + me.username : '';
+        byId('btnRecordsLogout').classList.toggle('d-none', !admin.token);
+        byId('btnMyPassword').classList.toggle('d-none', !(me && me.role === 'staff'));
       }
 
       function errMessage(err) {
@@ -940,10 +1043,13 @@
         });
       }
 
-      function setToken(t) {
+      function setToken(t, me) {
         admin.token = t;
         storeSet(TOKEN_KEY, t);
+        if (!t) setMe(null);
+        else if (me !== undefined) setMe(me);
         byId('btnLogout').classList.toggle('d-none', !t);
+        renderUserChip();
       }
 
       function showView(name) {
@@ -1224,17 +1330,35 @@
       }
 
       function afterAuth() {
-        if (authReturn === 'records') {
+        if (authReturn === 'records' || isStaff()) {
+          var blocked = authReturn !== 'records';
           authReturn = 'settings';
           showLoading(false);
           showView('records');
           loadRecent();
+          if (blocked) toast('info', 'บัญชีเจ้าหน้าที่ใช้ได้เฉพาะหน้าดูข้อมูล');
         } else {
           loadAdmin();
         }
       }
 
       function openSettings() {
+        if (admin.token && isStaff()) {
+          Swal.fire({
+            icon: 'info',
+            title: 'เฉพาะแอดมิน',
+            text: 'บัญชีเจ้าหน้าที่รับเรื่องเข้าหน้าตั้งค่าระบบไม่ได้ ต้องการออกจากระบบเพื่อเข้าด้วยบัญชีแอดมินหรือไม่?',
+            showCancelButton: true,
+            confirmButtonText: 'ออกจากระบบ',
+            cancelButtonText: 'ยกเลิก'
+          }).then(function (r) {
+            if (!r.isConfirmed) return;
+            authReturn = 'settings';
+            showView('settings');
+            onLogout();
+          });
+          return;
+        }
         authReturn = 'settings';
         showView('settings');
         if (admin.token) {
@@ -1270,13 +1394,21 @@
         }).then(function (r) { return r.isConfirmed; });
       }
 
+      function setSettingsHeader(isLogin) {
+        byId('settingsTitle').textContent = isLogin ? 'เข้าสู่ระบบ' : 'ตั้งค่าระบบ';
+        byId('settingsSub').textContent = isLogin
+          ? (authReturn === 'records' ? 'เข้าสู่ระบบเพื่อดูข้อมูลที่บันทึก' : 'เข้าสู่ระบบเพื่อจัดการการตั้งค่า')
+          : 'จัดการรายการตัวเลือก โฟลเดอร์สลิป เจ้าหน้าที่ และการตั้งค่าฟอร์ม';
+      }
+
       function showAuth(mode) {
+        setSettingsHeader(true);
         byId('adminPanel').classList.add('d-none');
         byId('btnLogout').classList.add('d-none');
         var render = function (m) {
           byId('loginCard').classList.toggle('d-none', m !== 'login');
           byId('setupCard').classList.toggle('d-none', m !== 'setup');
-          var focusEl = m === 'login' ? byId('loginPassword') : byId('setupCode');
+          var focusEl = m === 'login' ? (byId('loginUser').value ? byId('loginPassword') : byId('loginUser')) : byId('setupCode');
           setTimeout(function () { focusEl.focus(); }, 50);
         };
         if (mode) {
@@ -1295,12 +1427,17 @@
 
       function onLogin(e) {
         e.preventDefault();
+        var user = byId('loginUser').value.trim().toLowerCase();
         var pw = byId('loginPassword').value;
-        if (!pw) return;
+        if (!user) {
+          byId('loginUser').focus();
+          return Swal.fire({ icon: 'warning', title: 'กรุณากรอกชื่อผู้ใช้', text: 'แอดมินใช้ชื่อผู้ใช้ admin' });
+        }
+        if (!pw) return byId('loginPassword').focus();
         showLoading(true, 'กำลังเข้าสู่ระบบ...');
-        call('adminLogin', [pw]).then(function (res) {
+        call('adminLogin', [user, pw]).then(function (res) {
           byId('loginPassword').value = '';
-          setToken(res.token);
+          setToken(res.token, res.me);
           afterAuth();
         }).catch(function (err) {
           showLoading(false);
@@ -1319,7 +1456,7 @@
         showLoading(true, 'กำลังตั้งรหัสผ่าน...');
         call('adminSetup', [code, p1]).then(function (res) {
           byId('setupForm').reset();
-          setToken(res.token);
+          setToken(res.token, res.me);
           afterAuth();
           toast('success', 'ตั้งรหัสผ่านแอดมินแล้ว');
         }).catch(function (err) {
@@ -1344,6 +1481,7 @@
           admin.data = d;
           admin.listDirty = false;
           admin.recentLoaded = false;
+          setSettingsHeader(false);
           byId('loginCard').classList.add('d-none');
           byId('setupCard').classList.add('d-none');
           byId('adminPanel').classList.remove('d-none');
@@ -1352,6 +1490,7 @@
           renderFolder(d.folder);
           renderFormSettings(d.settings, d.requiredLabels);
           renderBannerAdmin(d.banner);
+          renderStaff(d.staff || []);
           switchTab('lists');
         }).catch(function (err) {
           showLoading(false);
@@ -1745,16 +1884,21 @@
         updateSelCount();
         var limit = Number(byId('recentLimit').value);
         var q = byId('recentSearch').value.trim();
+        var status = byId('recentStatus').value;
         var reqId = ++recentReqId;
-        var req = isBackup ? adminCall('adminGetBackup', limit, q) : adminCall('adminGetRecent', limit, q);
+        var req = isBackup ? adminCall('adminGetBackup', limit, q, status) : adminCall('adminGetRecent', limit, q, status);
         req.then(function (r) {
           if (reqId !== recentReqId) return;
           admin.recentLoaded = true;
+          if (r.me) setMe(r.me);
           var sheetName = isBackup ? 'BackupData' : 'Data';
           var other = isBackup ? 'Data ' + (r.dataTotal || 0) : 'BackupData ' + (r.backupTotal || 0);
           var info;
-          if (q) {
-            info = 'ค้นหา "' + q + '" พบ ' + r.matched + ' จาก ' + r.total + ' รายการในชีต ' + sheetName +
+          if (q || status) {
+            var what = [];
+            if (q) what.push('ค้นหา "' + q + '"');
+            if (status) what.push(status === 'done' ? 'สถานะ: คีย์ต่อแล้ว' : 'สถานะ: รอคีย์');
+            info = what.join(' + ') + ' พบ ' + r.matched + ' จาก ' + r.total + ' รายการในชีต ' + sheetName +
               (r.matched > r.rows.length ? ' | แสดง ' + r.rows.length + ' รายการล่าสุด' : '');
           } else {
             info = 'ทั้งหมด ' + r.total + ' รายการในชีต ' + sheetName + ' | แสดง ' + r.rows.length + ' รายการล่าสุด';
@@ -1780,7 +1924,7 @@
         if (!rows.length) {
           var empty = document.createElement('div');
           empty.className = 'empty-state';
-          if (q) empty.textContent = 'ไม่พบข้อมูลที่ตรงกับ "' + q + '"';
+          if (q || byId('recentStatus').value) empty.textContent = 'ไม่พบข้อมูลที่ตรงกับเงื่อนไข' + (q ? ' "' + q + '"' : '');
           else empty.textContent = isBackup ? 'ยังไม่มีข้อมูลในชีต BackupData' : 'ยังไม่มีข้อมูลที่บันทึก';
           wrap.appendChild(empty);
           return;
@@ -1850,16 +1994,40 @@
           tdToggle.appendChild(btn);
           tr.appendChild(tdToggle);
 
+          var statusTd = null;
+          var opTd = null;
           RECENT_VIEW.forEach(function (c) {
             var td = document.createElement('td');
             td.className = c.cls;
             if (c.slip) {
               appendSlipLink(td, row[18]);
+            } else if (c.status) {
+              statusTd = td;
             } else {
               td.textContent = c.get(row) || '-';
+              if (c.op) opTd = td;
             }
             tr.appendChild(td);
           });
+
+          var paint = function () {
+            statusTd.innerHTML = '';
+            var b = statusBadge(row, isBackup);
+            if (!isBackup) {
+              b.addEventListener('click', function () {
+                toggleDetail(btn, tr, detail, true);
+                var inp = detail.querySelector('.keyed-name');
+                if (inp) inp.focus();
+              });
+            }
+            statusTd.appendChild(b);
+            if (opTd) opTd.textContent = row[20] || '-';
+          };
+          paint();
+          if (!isBackup) {
+            var cell = detail.firstChild;
+            cell.insertBefore(buildKeyedPanel(row, i, paint), cell.firstChild);
+          }
           tbody.appendChild(tr);
           tbody.appendChild(detail);
         });
@@ -1976,7 +2144,7 @@
         var grid = document.createElement('dl');
         grid.className = 'detail-grid';
         var cols = RECENT_COLS.concat([['รูปสลิป', 18]]);
-        if (isBackup) cols = cols.concat([['วันที่แบ็คอัพ', 19]]);
+        if (isBackup) cols = cols.concat([['คีย์ต่อแล้ว', 19], ['ชื่อผู้ดำเนินการ', 20], ['วันที่แบ็คอัพ', 21]]);
         cols.forEach(function (c) {
           var item = document.createElement('div');
           item.className = 'detail-item';
@@ -1985,6 +2153,8 @@
           var dd = document.createElement('dd');
           if (c[1] === 18) {
             appendSlipLink(dd, row[18]);
+          } else if (c[1] === 19) {
+            dd.textContent = keyedState(row) === 'done' ? '✓ คีย์ต่อแล้ว' : keyedState(row) === 'pending' ? 'ยังไม่ได้คีย์' : '-';
           } else {
             dd.textContent = row[c[1]] === '' || row[c[1]] === undefined ? '-' : String(row[c[1]]);
           }
@@ -1995,6 +2165,99 @@
         td.appendChild(grid);
         tr.appendChild(td);
         return tr;
+      }
+
+      function keyedState(row) {
+        var v = String(row[19] === undefined ? '' : row[19]).toUpperCase();
+        if (v === 'TRUE') return 'done';
+        if (v === 'FALSE') return 'pending';
+        return '';
+      }
+
+      function statusBadge(row, readOnly) {
+        var st = keyedState(row);
+        var b = document.createElement(readOnly ? 'span' : 'button');
+        if (!readOnly) {
+          b.type = 'button';
+          b.title = 'กดเพื่อติ๊กคีย์ต่อแล้ว / กรอกชื่อผู้ดำเนินการ';
+        }
+        if (st === 'done') {
+          b.className = 'status-badge done';
+          b.textContent = '✓ คีย์แล้ว';
+        } else if (st === 'pending' || !readOnly) {
+          b.className = 'status-badge pending';
+          b.textContent = 'รอคีย์';
+        } else {
+          b.className = 'status-badge none';
+          b.textContent = '-';
+        }
+        return b;
+      }
+
+      function buildKeyedPanel(row, idx, onSaved) {
+        var box = document.createElement('div');
+        box.className = 'keyed-panel';
+
+        var lab = document.createElement('label');
+        lab.className = 'keyed-check';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'form-check-input';
+        cb.checked = keyedState(row) === 'done';
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(' คีย์ต่อแล้ว'));
+
+        var name = document.createElement('input');
+        name.type = 'text';
+        name.className = 'form-control form-control-sm keyed-name';
+        name.maxLength = 100;
+        name.placeholder = 'ชื่อผู้ดำเนินการ';
+        name.setAttribute('aria-label', 'ชื่อผู้ดำเนินการ');
+        name.value = row[20] || '';
+
+        cb.addEventListener('change', function () {
+          if (cb.checked && !name.value.trim() && isStaff()) name.value = admin.me.name;
+        });
+
+        var save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'btn btn-brand btn-sm';
+        save.textContent = 'บันทึก';
+
+        var doSave = function () {
+          var meta = admin.recentMeta || { rowNums: [], sigs: [] };
+          var payload = { row: meta.rowNums[idx], sig: meta.sigs[idx], keyed: cb.checked, operator: name.value.trim() };
+          if (!payload.row || !payload.sig) return;
+          if (payload.keyed && !payload.operator) {
+            name.focus();
+            Swal.fire({ icon: 'warning', title: 'กรุณากรอกชื่อผู้ดำเนินการ' });
+            return;
+          }
+          save.disabled = true;
+          save.textContent = 'กำลังบันทึก...';
+          adminCall('staffUpdateRow', payload).then(function (r) {
+            row[19] = r.keyedText;
+            row[20] = r.operator;
+            name.value = r.operator;
+            cb.checked = r.keyed;
+            onSaved();
+            toast('success', r.message);
+          }).catch(function (err) {
+            if (!isAuthError(err)) Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: errMessage(err) });
+          }).then(function () {
+            save.disabled = false;
+            save.textContent = 'บันทึก';
+          });
+        };
+        save.addEventListener('click', doSave);
+        name.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); doSave(); }
+        });
+
+        box.appendChild(lab);
+        box.appendChild(name);
+        box.appendChild(save);
+        return box;
       }
 
       function toggleDetail(btn, mainRow, detailRow, forceOpen) {
@@ -2014,6 +2277,206 @@
           toggleDetail(b, tr, byId(b.getAttribute('aria-controls')), expand);
         });
         btnAll.textContent = expand ? '− ยุบทั้งหมด' : '+ ขยายทั้งหมด';
+      }
+
+      function onRecordsLogout() {
+        authReturn = 'records';
+        showView('settings');
+        onLogout();
+      }
+
+      function onMyPassword() {
+        Swal.fire({
+          title: 'เปลี่ยนรหัสผ่าน',
+          html:
+            '<input type="password" id="swPwOld" class="swal2-input" placeholder="รหัสผ่านเดิม" autocomplete="current-password">' +
+            '<input type="password" id="swPwNew" class="swal2-input" placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)" autocomplete="new-password">' +
+            '<input type="password" id="swPwNew2" class="swal2-input" placeholder="ยืนยันรหัสผ่านใหม่" autocomplete="new-password">',
+          showCancelButton: true,
+          confirmButtonText: 'เปลี่ยนรหัสผ่าน',
+          cancelButtonText: 'ยกเลิก',
+          focusConfirm: false,
+          preConfirm: function () {
+            var o = document.getElementById('swPwOld').value;
+            var n1 = document.getElementById('swPwNew').value;
+            var n2 = document.getElementById('swPwNew2').value;
+            if (!o) return Swal.showValidationMessage('กรุณาใส่รหัสผ่านเดิม');
+            if (n1.length < 8) return Swal.showValidationMessage('รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษร');
+            if (n1 !== n2) return Swal.showValidationMessage('ยืนยันรหัสผ่านใหม่ไม่ตรงกัน');
+            return { o: o, n: n1 };
+          }
+        }).then(function (res) {
+          if (!res.isConfirmed) return;
+          showLoading(true, 'กำลังเปลี่ยนรหัสผ่าน...');
+          adminCall('staffChangePassword', res.value.o, res.value.n).then(function (r) {
+            showLoading(false);
+            setToken(r.token);
+            toast('success', r.message);
+          }).catch(function (err) {
+            showLoading(false);
+            if (!isAuthError(err)) Swal.fire({ icon: 'error', title: 'เปลี่ยนรหัสผ่านไม่สำเร็จ', text: errMessage(err) });
+          });
+        });
+      }
+
+      function renderStaff(list) {
+        if (admin.data) admin.data.staff = list;
+        var box = byId('staffList');
+        box.innerHTML = '';
+        if (!list.length) {
+          var empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'ยังไม่มีบัญชีเจ้าหน้าที่รับเรื่อง';
+          box.appendChild(empty);
+          return;
+        }
+        var table = document.createElement('table');
+        table.className = 'table staff-table';
+        var head = document.createElement('tr');
+        [['ชื่อผู้ใช้', ''], ['ชื่อ-นามสกุล', ''], ['สถานะ', ''], ['สร้างเมื่อ', 'd-none d-md-table-cell'], ['จัดการ', 'text-end']].forEach(function (h) {
+          var th = document.createElement('th');
+          th.textContent = h[0];
+          if (h[1]) th.className = h[1];
+          head.appendChild(th);
+        });
+        var thead = document.createElement('thead');
+        thead.appendChild(head);
+        table.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        list.forEach(function (s) {
+          var tr = document.createElement('tr');
+          if (!s.active) tr.className = 'inactive';
+          var cells = [s.username, s.name, null, s.created || '-', null];
+          cells.forEach(function (v, ci) {
+            var td = document.createElement('td');
+            if (ci === 0) td.className = 'mono';
+            if (ci === 3) td.className = 'd-none d-md-table-cell';
+            if (ci === 2) {
+              var b = document.createElement('span');
+              b.className = 'status-badge ' + (s.active ? 'done' : 'none');
+              b.textContent = s.active ? 'ใช้งาน' : 'ปิดใช้งาน';
+              td.appendChild(b);
+            } else if (ci === 4) {
+              td.className = 'text-end';
+              var acts = document.createElement('div');
+              acts.className = 'staff-actions';
+              [
+                ['แก้ชื่อ', function () { onStaffRename(s); }],
+                ['ตั้งรหัสใหม่', function () { onStaffResetPw(s); }],
+                [s.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน', function () { onStaffToggle(s); }],
+                ['ลบ', function () { onStaffDelete(s); }, 'danger']
+              ].forEach(function (a) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-sm ' + (a[2] === 'danger' ? 'btn-outline-danger' : 'btn-light-x');
+                btn.textContent = a[0];
+                btn.addEventListener('click', a[1]);
+                acts.appendChild(btn);
+              });
+              td.appendChild(acts);
+            } else {
+              td.textContent = v;
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        var wrap = document.createElement('div');
+        wrap.className = 'recent-wrap';
+        wrap.appendChild(table);
+        box.appendChild(wrap);
+      }
+
+      function staffRequest(fn, args, loadingText) {
+        showLoading(true, loadingText || 'กำลังบันทึก...');
+        return adminCall.apply(null, [fn].concat(args)).then(function (r) {
+          showLoading(false);
+          renderStaff(r.staff);
+          toast('success', r.message);
+          return r;
+        }).catch(function (err) {
+          showLoading(false);
+          if (!isAuthError(err)) Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: errMessage(err) });
+          throw err;
+        });
+      }
+
+      function onStaffAdd(e) {
+        e.preventDefault();
+        var u = byId('staffUser').value.trim().toLowerCase();
+        var n = byId('staffName').value.trim();
+        var p = byId('staffPw').value;
+        if (!/^[a-z0-9._-]{3,30}$/.test(u)) return Swal.fire({ icon: 'warning', title: 'ชื่อผู้ใช้ไม่ถูกต้อง', text: 'ใช้ a-z ตัวเลข หรือ . _ - ยาว 3–30 ตัว' });
+        if (u === 'admin') return Swal.fire({ icon: 'warning', title: 'ชื่อผู้ใช้ admin สงวนไว้สำหรับแอดมิน' });
+        if (!n) return Swal.fire({ icon: 'warning', title: 'กรุณากรอกชื่อ-นามสกุล' });
+        if (p.length < 8) return Swal.fire({ icon: 'warning', title: 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร' });
+        staffRequest('adminCreateStaff', [{ username: u, name: n, password: p }], 'กำลังเพิ่มเจ้าหน้าที่...').then(function () {
+          byId('staffAddForm').reset();
+        }).catch(function () { });
+      }
+
+      function onStaffRename(s) {
+        Swal.fire({
+          title: 'แก้ชื่อ ' + s.username,
+          input: 'text',
+          inputValue: s.name,
+          inputAttributes: { maxlength: '100' },
+          showCancelButton: true,
+          confirmButtonText: 'บันทึก',
+          cancelButtonText: 'ยกเลิก',
+          inputValidator: function (v) { return v && v.trim() ? null : 'กรุณากรอกชื่อ'; }
+        }).then(function (r) {
+          if (r.isConfirmed) staffRequest('adminUpdateStaff', [s.username, { name: r.value.trim() }]).catch(function () { });
+        });
+      }
+
+      function onStaffResetPw(s) {
+        Swal.fire({
+          title: 'ตั้งรหัสผ่านใหม่ให้ ' + s.username,
+          input: 'password',
+          inputPlaceholder: 'รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)',
+          inputAttributes: { autocomplete: 'new-password', maxlength: '100' },
+          text: 'เจ้าหน้าที่คนนี้จะถูกออกจากระบบทุกเครื่อง',
+          showCancelButton: true,
+          confirmButtonText: 'ตั้งรหัสใหม่',
+          cancelButtonText: 'ยกเลิก',
+          inputValidator: function (v) { return v && v.length >= 8 ? null : 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร'; }
+        }).then(function (r) {
+          if (r.isConfirmed) staffRequest('adminUpdateStaff', [s.username, { password: r.value }]).catch(function () { });
+        });
+      }
+
+      function onStaffToggle(s) {
+        if (!s.active) {
+          staffRequest('adminUpdateStaff', [s.username, { active: true }]).catch(function () { });
+          return;
+        }
+        Swal.fire({
+          icon: 'warning',
+          title: 'ปิดใช้งาน ' + s.username + '?',
+          text: 'เข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง และจะถูกออกจากระบบทันที',
+          showCancelButton: true,
+          confirmButtonText: 'ปิดใช้งาน',
+          cancelButtonText: 'ยกเลิก'
+        }).then(function (r) {
+          if (r.isConfirmed) staffRequest('adminUpdateStaff', [s.username, { active: false }]).catch(function () { });
+        });
+      }
+
+      function onStaffDelete(s) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'ลบบัญชี ' + s.username + '?',
+          text: 'ลบแล้วกู้คืนไม่ได้ (ข้อมูลที่เคยกรอกในชีตยังอยู่ครบ)',
+          showCancelButton: true,
+          confirmButtonText: 'ลบ',
+          cancelButtonText: 'ยกเลิก',
+          confirmButtonColor: '#dc3545',
+          focusCancel: true
+        }).then(function (r) {
+          if (r.isConfirmed) staffRequest('adminDeleteStaff', [s.username], 'กำลังลบ...').catch(function () { });
+        });
       }
 
       function onChangePassword(e) {
@@ -2090,6 +2553,11 @@
       byId('btnFolderSave').addEventListener('click', onFolderSave);
       byId('btnFormSave').addEventListener('click', onFormSave);
       byId('btnBackup').addEventListener('click', onBackup);
+      byId('btnRecordsLogout').addEventListener('click', onRecordsLogout);
+      byId('btnMyPassword').addEventListener('click', onMyPassword);
+      byId('staffAddForm').addEventListener('submit', onStaffAdd);
+      byId('recentStatus').addEventListener('change', loadRecent);
+      renderUserChip();
       byId('recentSearch').addEventListener('input', onSearchInput);
       byId('recentSearchForm').addEventListener('submit', onSearchSubmit);
       byId('btnSearchClear').addEventListener('click', onSearchClear);
