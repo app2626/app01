@@ -1477,6 +1477,11 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(tags.length >= 5, 'script tags=' + tags.length);
     tags.forEach(s => ok(/integrity="sha384-[A-Za-z0-9+\/=]{64}"/.test(s) && /crossorigin="anonymous"/.test(s) && /@[0-9]+\.[0-9]+\.[0-9]+\//.test(s), 'not pinned: ' + s));
   });
+  await T('grid sorts dates and numbers by value, not as text', async () => {
+    const o = JSON.parse(await ev("(()=>{const g=window.app.grid,sv={c:g.sortCol,a:g.sortAsc,f:g.filteredDataList};g.filteredDataList=[{t:'11/17/2026, 9:22:38 PM',n:'1,599'},{t:'9/19/2026, 3:31:32 PM',n:'599'},{t:'11/17/2026, 8:57:41 AM',n:'10'},{t:'9/5/2026, 11:55:52',n:'9982'},{t:'2026-11-18 10:00',n:''}];g.sortCol='t';g.sortAsc=false;g.applyCurrentSort();const t=g.filteredDataList.map(r=>r.t);g.sortCol='n';g.sortAsc=true;g.applyCurrentSort();const n=g.filteredDataList.map(r=>r.n);g.sortCol=sv.c;g.sortAsc=sv.a;g.filteredDataList=sv.f;return JSON.stringify({t:t,n:n})})()"));
+    ok(JSON.stringify(o.t) === JSON.stringify(['2026-11-18 10:00', '11/17/2026, 9:22:38 PM', '11/17/2026, 8:57:41 AM', '9/19/2026, 3:31:32 PM', '9/5/2026, 11:55:52']), JSON.stringify(o.t));
+    ok(JSON.stringify(o.n) === JSON.stringify(['', '10', '599', '1,599', '9982']), JSON.stringify(o.n));
+  });
   // keep this one last: it ends the session
   await T('a token the server no longer accepts sends the user back to the login page with a message', async () => {
     await ev("window.app.user=Object.assign({},window.app.user,{Token:'bad.token'});window.app.api('GET_TABLE',{tableName:'Products'}).catch(function(){});true");

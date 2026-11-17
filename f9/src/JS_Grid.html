@@ -372,15 +372,48 @@ window.app.grid = {
     applyCurrentSort: function() {
       if (!this.sortCol) return;
       const colKey = this.sortCol;
+      const key = this.sortKey_;
       this.filteredDataList.sort((a,b) => {
-        let valA = a[colKey] !== undefined && a[colKey] !== null ? a[colKey] : '';
-        let valB = b[colKey] !== undefined && b[colKey] !== null ? b[colKey] : '';
-        if(typeof valA === 'string') valA = valA.toLowerCase();
-        if(typeof valB === 'string') valB = valB.toLowerCase();
+        let valA = key(a[colKey]);
+        let valB = key(b[colKey]);
+        // วันที่/ตัวเลขเทียบเป็นตัวเลขเมื่อทั้งสองฝั่งอ่านได้ ไม่งั้นเทียบเป็นข้อความ (เดิมเทียบข้อความล้วน: 9/19/2026 มาก่อน 11/17/2026)
+        if (typeof valA !== typeof valB) { valA = String(valA); valB = String(valB); }
         if (valA < valB) return this.sortAsc ? -1 : 1;
         if (valA > valB) return this.sortAsc ? 1 : -1;
         return 0;
       });
+    },
+    // ค่าที่ใช้เรียง: วันที่ (m/d/yyyy[, h:mm[:ss] [AM|PM]] ตามที่ server เขียนด้วย en-US, d/m/yyyy เมื่อเลขแรก > 12,
+    // yyyy-mm-dd[ hh:mm[:ss]], ปี พ.ศ. ลบ 543) และตัวเลขล้วน (มีคอมมาได้) → number; อย่างอื่น → ข้อความตัวเล็ก
+    sortKey_: function(v) {
+      if (v === undefined || v === null) return '';
+      if (typeof v === 'number') return v;
+      if (v instanceof Date) return v.getTime();
+      const s = String(v).trim();
+      if (s === '') return '';
+      if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$|^-?\d+(\.\d+)?$/.test(s) && !/^0\d/.test(s)) return parseFloat(s.replace(/,/g, ''));
+      let y, mo, d, rest;
+      let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T,]+(.*))?$/);
+      if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; rest = m[4] || ''; }
+      else {
+        m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(.*))?$/);
+        if (!m) return s.toLowerCase();
+        const p = +m[1], q = +m[2];
+        if (p > 12) { d = p; mo = q; } else { mo = p; d = q; }
+        y = +m[3]; rest = m[4] || '';
+      }
+      if (y > 2400) y -= 543;
+      let hh = 0, mi = 0, ss = 0;
+      if (rest) {
+        const t = rest.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+        if (!t) return s.toLowerCase();
+        hh = +t[1]; mi = +t[2]; ss = +(t[3] || 0);
+        const ap = (t[4] || '').toUpperCase();
+        if (ap === 'PM' && hh < 12) hh += 12;
+        if (ap === 'AM' && hh === 12) hh = 0;
+      }
+      const ts = Date.UTC(y, mo - 1, d, hh, mi, ss);
+      return isNaN(ts) ? s.toLowerCase() : ts;
     },
     sortColumn: function(colKey) {
       if(this.sortCol === colKey) this.sortAsc = !this.sortAsc;
