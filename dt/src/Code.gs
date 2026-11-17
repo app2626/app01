@@ -739,39 +739,68 @@ function adminSaveFolder(token, input) {
 
 // รายการที่บันทึกล่าสุด (ใหม่สุดอยู่บน)
 // rowNums/sigs ใช้ยืนยันแถวตอนแบ็คอัพ (กันลบผิดแถวถ้าชีตเปลี่ยนระหว่างนั้น)
-function adminGetRecent(token, limit) {
+function adminGetRecent(token, limit, query) {
   requireAdmin_(token);
   const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
   const sheet = getSpreadsheet_().getSheetByName(DATA_SHEET_NAME);
   const backupTotal = countBackup_();
-  if (!sheet || sheet.getLastRow() < 2) return { total: 0, rows: [], rowNums: [], sigs: [], backupTotal: backupTotal };
+  const empty = { total: 0, matched: 0, rows: [], rowNums: [], sigs: [], backupTotal: backupTotal };
+  if (!sheet || sheet.getLastRow() < 2) return empty;
+  const r = readNewest_(sheet, DATA_HEADERS.length, n, query);
+  r.sigs = r.rows.map(rowSig_);
+  r.backupTotal = backupTotal;
+  return r;
+}
+
+// คำค้นหา: แยกคำด้วยช่องว่าง ทุกคำต้องเจอในแถว (ไม่สนตัวพิมพ์เล็ก/ใหญ่)
+function parseQuery_(query) {
+  return String(query || '').toLowerCase().trim().split(/\s+/).filter(String).slice(0, 10)
+    .map(function (w) { return w.substring(0, 100); });
+}
+
+// อ่านแถวใหม่สุดก่อน คืน {total, matched, rows, rowNums}
+// ไม่มีคำค้น: อ่านเฉพาะ n แถวท้ายชีต / มีคำค้น: ค้นทั้งชีต แล้วคืนที่ตรงไม่เกิน n แถว
+function readNewest_(sheet, cols, n, query) {
   const last = sheet.getLastRow();
-  const count = Math.min(n, last - 1);
-  const first = last - count + 1;
-  const values = sheet.getRange(first, 1, count, DATA_HEADERS.length).getDisplayValues();
-  const rowNums = values.map(function (_, i) { return first + i; });
-  const sigs = values.map(rowSig_);
-  return {
-    total: last - 1,
-    rows: values.reverse(),
-    rowNums: rowNums.reverse(),
-    sigs: sigs.reverse(),
-    backupTotal: backupTotal
-  };
+  const total = last - 1;
+  const words = parseQuery_(query);
+  let first, values;
+  if (!words.length) {
+    const count = Math.min(n, total);
+    first = last - count + 1;
+    values = sheet.getRange(first, 1, count, cols).getDisplayValues();
+    const rowNums = values.map(function (_, i) { return first + i; });
+    return { total: total, matched: total, rows: values.reverse(), rowNums: rowNums.reverse() };
+  }
+  values = sheet.getRange(2, 1, total, cols).getDisplayValues();
+  const rows = [];
+  const rowNums = [];
+  let matched = 0;
+  for (let i = values.length - 1; i >= 0; i--) {
+    const hay = values[i].join('\u0001').toLowerCase();
+    if (words.every(function (w) { return hay.indexOf(w) !== -1; })) {
+      matched++;
+      if (rows.length < n) {
+        rows.push(values[i]);
+        rowNums.push(i + 2);
+      }
+    }
+  }
+  return { total: total, matched: matched, rows: rows, rowNums: rowNums };
 }
 
 // รายการในชีต BackupData (ใหม่สุดอยู่บน) อ่านอย่างเดียว คอลัมน์สุดท้ายคือวันที่แบ็คอัพ
-function adminGetBackup(token, limit) {
+function adminGetBackup(token, limit, query) {
   requireAdmin_(token);
   const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
   const sheet = getSpreadsheet_().getSheetByName(BACKUP_SHEET_NAME);
   const dataSheet = getSpreadsheet_().getSheetByName(DATA_SHEET_NAME);
   const dataTotal = dataSheet ? Math.max(0, dataSheet.getLastRow() - 1) : 0;
-  if (!sheet || sheet.getLastRow() < 2) return { total: 0, rows: [], dataTotal: dataTotal };
-  const last = sheet.getLastRow();
-  const count = Math.min(n, last - 1);
-  const values = sheet.getRange(last - count + 1, 1, count, DATA_HEADERS.length + 1).getDisplayValues();
-  return { total: last - 1, rows: values.reverse(), dataTotal: dataTotal };
+  if (!sheet || sheet.getLastRow() < 2) return { total: 0, matched: 0, rows: [], dataTotal: dataTotal };
+  const r = readNewest_(sheet, DATA_HEADERS.length + 1, n, query);
+  delete r.rowNums;
+  r.dataTotal = dataTotal;
+  return r;
 }
 
 // ===== แบ็คอัพข้อมูล: ย้ายแถวที่เลือกจาก Data ไป BackupData =====
