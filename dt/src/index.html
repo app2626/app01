@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบบันทึกข้อมูลการขาย</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+  <style>
+    :root {
+      --brand: #2f5bea;
+      --brand-dark: #1e3fb0;
+      --brand-soft: #eaf0ff;
+      --ink: #1d2433;
+      --muted: #6b7489;
+      --line: #e3e7ef;
+      --bg: #f4f6fb;
+    }
+    html, body {
+      font-family: 'Prompt', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    body.has-submit-bar { padding-bottom: 96px; }
+    body { padding-bottom: 32px; }
+    .app-header {
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+      color: #fff;
+      padding: 28px 0 64px;
+    }
+    .app-header.settings { background: linear-gradient(135deg, #283149 0%, #161b29 100%); }
+    .app-header .head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .app-header h1 { font-size: 1.4rem; font-weight: 600; margin: 0; }
+    .app-header p { margin: 4px 0 0; opacity: .85; font-weight: 300; font-size: .95rem; }
+    .btn-head {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #fff;
+      background: rgba(255, 255, 255, .14);
+      border: 1px solid rgba(255, 255, 255, .28);
+      border-radius: 10px;
+      padding: .4rem .8rem;
+      font-size: .9rem;
+    }
+    .btn-head:hover, .btn-head:focus { background: rgba(255, 255, 255, .24); color: #fff; }
+    .btn-head svg { width: 18px; height: 18px; }
+    .app-main { margin-top: -44px; }
+    .section-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(29, 36, 51, .04);
+      margin-bottom: 16px;
+    }
+    .section-card .card-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .section-no {
+      flex: 0 0 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--brand-soft);
+      color: var(--brand);
+      font-weight: 600;
+      display: grid;
+      place-items: center;
+    }
+    .card-head h2 { font-size: 1.05rem; font-weight: 500; margin: 0; }
+    .card-head small { color: var(--muted); font-weight: 300; }
+    .section-card .card-body-x { padding: 18px 20px 6px; }
+    .form-label { font-weight: 500; font-size: .92rem; margin-bottom: 6px; }
+    .req { color: #e5484d; margin-left: 2px; }
+    .form-control, .form-select {
+      border-radius: 10px;
+      border-color: var(--line);
+      padding: .6rem .85rem;
+      font-size: 1rem;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 .2rem rgba(47, 91, 234, .15);
+    }
+    .input-group-text { border-radius: 10px; border-color: var(--line); background: #f8f9fc; }
+    .form-text { color: var(--muted); }
+
+    .slip-drop {
+      display: block;
+      border: 2px dashed #c9d2e6;
+      border-radius: 14px;
+      background: #fafbfe;
+      padding: 28px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .slip-drop:hover, .slip-drop.dragover { border-color: var(--brand); background: var(--brand-soft); }
+    .slip-drop.is-invalid { border-color: #e5484d; background: #fff5f5; }
+    .slip-drop svg { width: 40px; height: 40px; color: var(--brand); }
+    .slip-drop .t1 { font-weight: 500; margin-top: 8px; }
+    .slip-drop .t2 { color: var(--muted); font-size: .85rem; font-weight: 300; }
+    .slip-preview {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      background: #fafbfe;
+      text-align: center;
+    }
+    .slip-preview img { max-width: 100%; max-height: 420px; border-radius: 10px; }
+    .slip-meta { color: var(--muted); font-size: .85rem; margin-top: 8px; word-break: break-all; }
+
+    .submit-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, .96);
+      border-top: 1px solid var(--line);
+      padding: 12px 0;
+      z-index: 20;
+      backdrop-filter: blur(6px);
+    }
+    .btn-brand {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+      border-radius: 12px;
+      padding: .7rem 1.4rem;
+      font-weight: 500;
+    }
+    .btn-brand:hover, .btn-brand:focus { background: var(--brand-dark); border-color: var(--brand-dark); color: #fff; }
+    .btn-brand.btn-sm { padding: .45rem .9rem; border-radius: 10px; }
+    .btn-light-x { border-radius: 12px; padding: .7rem 1.2rem; border: 1px solid var(--line); background: #fff; }
+    .btn-light-x.btn-sm { padding: .45rem .9rem; border-radius: 10px; }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(244, 246, 251, .92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 50;
+    }
+    .loading-overlay.hidden { display: none; }
+    .loading-overlay .spinner-border { width: 3rem; height: 3rem; color: var(--brand); }
+    .loading-overlay p { color: var(--muted); margin: 0; }
+    .swal2-popup { font-family: 'Prompt', sans-serif; border-radius: 16px; }
+
+    .ts-wrapper.form-select {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background-color: #fff;
+      min-height: 46px;
+    }
+    .ts-wrapper.form-select .ts-control {
+      background: transparent;
+      padding: .6rem 2.25rem .6rem .85rem;
+      font-size: 1rem;
+    }
+    .ts-wrapper.form-select.focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 .2rem rgba(47, 91, 234, .15);
+    }
+    .ts-wrapper .ts-control input { font-size: 1rem; }
+    .ts-dropdown { z-index: 30; border-radius: 10px; font-size: 1rem; }
+    .ts-dropdown .option { padding: .55rem .85rem; }
+    .ts-dropdown .active { background: var(--brand-soft); color: var(--ink); }
+    .ts-dropdown .no-results { padding: .55rem .85rem; color: var(--muted); }
+    .was-validated select:invalid + .ts-wrapper.form-select { border-color: #dc3545; }
+    .was-validated select:valid + .ts-wrapper.form-select { border-color: #198754; }
+    .was-validated select:invalid + .ts-wrapper.form-select.focus { box-shadow: 0 0 0 .2rem rgba(220, 53, 69, .2); }
+
+    .tabs-x {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 6px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin-bottom: 16px;
+      scrollbar-width: none;
+    }
+    .tabs-x::-webkit-scrollbar { display: none; }
+    .tabs-x button, .pills-x button {
+      flex: 0 0 auto;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 10px;
+      padding: .5rem .9rem;
+      font-size: .93rem;
+      white-space: nowrap;
+    }
+    .tabs-x button.active { background: var(--brand); color: #fff; }
+    .tabs-x button:not(.active):hover { background: var(--bg); color: var(--ink); }
+    .pills-x { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .pills-x button { border: 1px solid var(--line); background: #fff; color: var(--ink); }
+    .pills-x button.active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); font-weight: 500; }
+    .pills-x .count {
+      display: inline-block;
+      min-width: 22px;
+      margin-left: 4px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--bg);
+      color: var(--muted);
+      font-size: .78rem;
+    }
+    .pills-x button.active .count { background: #fff; color: var(--brand); }
+    textarea.form-control.list-editor {
+      font-family: 'Prompt', sans-serif;
+      font-size: .97rem;
+      line-height: 1.7;
+      min-height: max(320px, calc(100vh - 380px));
+      resize: vertical;
+    }
+    .list-stats { color: var(--muted); font-size: .88rem; }
+    .list-stats .warn { color: #b7791f; }
+    .dirty-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .info-box {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: .93rem;
+    }
+    .info-box .k { color: var(--muted); font-size: .82rem; }
+    .info-box a { word-break: break-all; }
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .switch-row:last-child { border-bottom: 0; }
+    .form-switch .form-check-input { width: 2.6em; height: 1.4em; cursor: pointer; }
+    .form-check-input:checked { background-color: var(--brand); border-color: var(--brand); }
+    .recent-table { font-size: .9rem; margin: 0; width: 100%; }
+    .recent-table th {
+      white-space: nowrap; color: var(--muted); font-weight: 500;
+      background: #fafbfe; position: sticky; top: 0; z-index: 1;
+    }
+    .recent-table td { white-space: nowrap; vertical-align: middle; }
+    .recent-table td.col-wrap { white-space: normal; min-width: 120px; }
+    .recent-table td.col-product { min-width: 160px; }
+    .recent-table .col-toggle { width: 44px; padding-right: 0; }
+    .recent-table tr.main-row:hover td { background: #fafbfe; }
+    .recent-table tr.main-row.expanded td { background: var(--brand-soft); border-bottom-color: transparent; }
+    .recent-table tr.detail-row td { background: #fbfcff; padding: 4px 12px 14px 56px; }
+    .row-toggle {
+      display: inline-grid;
+      place-items: center;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 0;
+      background: var(--brand);
+      color: #fff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      line-height: 1;
+      padding: 0;
+      transition: background .15s, transform .15s;
+    }
+    .row-toggle:hover { transform: scale(1.08); }
+    .row-toggle.open { background: #e5484d; }
+    .row-toggle.demo { width: 20px; height: 20px; font-size: .85rem; vertical-align: middle; }
+    .recent-hint { color: var(--muted); font-size: .85rem; padding: 10px 20px 0; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px 20px;
+      margin: 0;
+    }
+    .detail-item { min-width: 0; }
+    .detail-grid dt { font-weight: 400; color: var(--muted); font-size: .8rem; }
+    .detail-grid dd { margin: 0; font-weight: 500; white-space: normal; word-break: break-word; }
+    .recent-wrap { max-height: calc(100vh - 280px); min-height: 240px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+    .settings-wrap { max-width: 1200px; margin-left: auto; margin-right: auto; padding-left: 16px; padding-right: 16px; }
+    .pane-narrow { max-width: 760px; }
+    .settings-wrap.records-wrap { max-width: calc(1200px + 4in); }
+    @media (min-width: 992px) { .settings-wrap { padding-left: 32px; padding-right: 32px; } }
+    .empty-state { text-align: center; color: var(--muted); padding: 32px 12px; }
+    .auth-card { max-width: 440px; margin: 0 auto; }
+    .link-btn { background: none; border: 0; color: var(--brand); padding: 0; font-size: .9rem; }
+    .link-btn:hover { text-decoration: underline; }
+
+    .submit-bar { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+    body.has-submit-bar { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+
+    @media (min-width: 1400px) {
+      .settings-wrap { max-width: 1320px; }
+      .settings-wrap.records-wrap { max-width: calc(1320px + 4in); }
+    }
+    @media (max-width: 991.98px) {
+      .app-header h1 { font-size: 1.3rem; }
+      .recent-table tr.detail-row td { padding-left: 16px; }
+    }
+    @media (max-width: 767.98px) {
+      .recent-wrap { max-height: none; }
+      .recent-hint { padding: 10px 16px 0; }
+      .tabs-x { border-radius: 12px; }
+    }
+    @media (max-width: 575.98px) {
+      .app-header { padding: 20px 0 56px; }
+      .app-header h1 { font-size: 1.15rem; }
+      .app-header p { font-size: .85rem; }
+      .btn-head { padding: .45rem .6rem; }
+      .btn-head .lbl { display: none; }
+      .section-card .card-head, .section-card .card-body-x { padding-left: 14px; padding-right: 14px; }
+      .section-card .card-head { flex-wrap: wrap; }
+      .submit-bar .btn { padding: .65rem 1rem; }
+      .pills-x button { padding: .4rem .7rem; font-size: .88rem; }
+      .recent-table { font-size: .85rem; }
+      .recent-table th, .recent-table td { padding-left: 6px; padding-right: 6px; }
+      .recent-table .col-toggle { width: 36px; }
+      .recent-table td.col-time { white-space: normal; min-width: 72px; }
+      .recent-table td.col-wrap, .recent-table td.col-product { min-width: 0; word-break: break-word; }
+      .recent-table tr.detail-row td { padding: 4px 10px 12px; }
+      .detail-grid { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+      .swal2-popup { width: calc(100% - 32px) !important; }
+    }
+    @media (max-width: 359.98px) {
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="has-submit-bar">
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner-border" role="status"></div>
+    <p id="loadingText">กำลังโหลดข้อมูลตัวเลือก...</p>
+  </div>
+
+  <!-- ================= หน้าฟอร์ม ================= -->
+  <div id="viewForm">
+    <header class="app-header">
+      <div class="container head-row" style="max-width: 860px;">
+        <div>
+          <h1 id="appTitle">ระบบบันทึกข้อมูลการขาย / ผ่อนชำระ</h1>
+          <p id="appSubtitle">กรอกข้อมูลให้ครบถ้วน ช่องที่มีเครื่องหมาย * จำเป็นต้องกรอก</p>
+        </div>
+        <div class="d-flex gap-2">
+        <button type="button" class="btn btn-head" id="btnOpenRecords" title="ดูข้อมูลที่บันทึก">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0 1 12 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m17.25-3.75h-7.5c-.621 0-1.125.504-1.125 1.125m8.625-1.125c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M12 10.875v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125M13.125 12h7.5m-7.5 0c-.621 0-1.125.504-1.125 1.125M20.625 12c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h7.5M12 14.625v-1.5m0 1.5c0 .621-.504 1.125-1.125 1.125M12 14.625c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m0 1.5v-1.5m0 0c0-.621.504-1.125 1.125-1.125m0 0h7.5"/>
+          </svg>
+          <span class="lbl">ดูข้อมูล</span>
+        </button>
+        <button type="button" class="btn btn-head" id="btnOpenSettings" title="ตั้งค่าระบบ">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+          </svg>
+          <span class="lbl">ตั้งค่าระบบ</span>
+        </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container app-main" style="max-width: 860px;">
+      <form id="mainForm" novalidate autocomplete="off">
+
+        <section class="section-card">
+          <div class="card-head">
+            <span class="section-no">1</span>
+            <div><h2>สาขาและโครงการ</h2></div>
+          </div>
+          <div class="card-body-x">
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="location">สาขา<span class="req">*</span></label>
+                <select class="form-select" id="location" name="location" required></select>
+                <div class="invalid-feedback">กรุณาเลือกสาขา</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="project">โครงการ<span class="req">*</span></label>
+                <select class="form-select" id="project" name="project" required></select>
+                <div class="invalid-feedback">กรุณาเลือกโครงการ</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="card-head">
+            <span class="section-no">2</span>
+            <div><h2>ข้อมูลลูกค้า</h2></div>
+          </div>
+          <div class="card-body-x">
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="firstName">ชื่อ<span class="req">*</span></label>
+                <input type="text" class="form-control" id="firstName" name="firstName" maxlength="100" required>
+                <div class="invalid-feedback">กรุณากรอกชื่อ</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="lastName">นามสกุล<span class="req">*</span></label>
+                <input type="text" class="form-control" id="lastName" name="lastName" maxlength="100" required>
+                <div class="invalid-feedback">กรุณากรอกนามสกุล</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="phone">เบอร์ลูกค้า<span class="req">*</span></label>
+                <input type="tel" class="form-control" id="phone" name="phone" inputmode="numeric"
+                       maxlength="10" pattern="0[0-9]{8,9}" placeholder="08xxxxxxxx" required>
+                <div class="invalid-feedback">กรุณากรอกเบอร์ 9-10 หลัก ขึ้นต้นด้วย 0</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="card-head">
+            <span class="section-no">3</span>
+            <div><h2>ข้อมูลสินค้า</h2></div>
+          </div>
+          <div class="card-body-x">
+            <div class="row g-3 mb-3">
+              <div class="col-12">
+                <label class="form-label" for="product">รายละเอียดสินค้า<span class="req">*</span></label>
+                <select class="form-select" id="product" name="product" required></select>
+                <div class="invalid-feedback">กรุณาเลือกสินค้า</div>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="imei">IMEI<span class="req">*</span></label>
+                <input type="text" class="form-control" id="imei" name="imei" inputmode="numeric"
+                       maxlength="16" pattern="[0-9]{14,16}" placeholder="ตัวเลข 15 หลัก" required>
+                <div class="invalid-feedback">IMEI ต้องเป็นตัวเลข 14-16 หลัก</div>
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="price">ราคา<span class="req">*</span></label>
+                <div class="input-group has-validation">
+                  <input type="number" class="form-control" id="price" name="price" inputmode="decimal"
+                         min="0" step="0.01" required>
+                  <span class="input-group-text">฿</span>
+                  <div class="invalid-feedback">กรุณากรอกราคา</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="discount">ส่วนลด</label>
+                <div class="input-group has-validation">
+                  <input type="number" class="form-control" id="discount" name="discount" inputmode="decimal"
+                         min="0" step="0.01" placeholder="0">
+                  <span class="input-group-text">฿</span>
+                  <div class="invalid-feedback" id="discountFeedback">ส่วนลดไม่ถูกต้อง</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="card-head">
+            <span class="section-no">4</span>
+            <div><h2>ข้อมูลการชำระเงินและผ่อน</h2></div>
+          </div>
+          <div class="card-body-x">
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="installCode">โค้ดผ่อน<span class="req" id="req-installCode">*</span></label>
+                <input type="text" class="form-control" id="installCode" name="installCode" maxlength="100" required>
+                <div class="invalid-feedback">กรุณากรอกโค้ดผ่อน</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="billNo">เลขที่บิล<span class="req">*</span></label>
+                <input type="text" class="form-control" id="billNo" name="billNo" maxlength="100" required>
+                <div class="invalid-feedback">กรุณากรอกเลขที่บิล</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="cardNumber">เลขบัตรเครดิต<span class="req" id="req-cardNumber">*</span></label>
+                <input type="text" class="form-control" id="cardNumber" name="cardNumber" inputmode="numeric"
+                       maxlength="23" placeholder="เช่น 4111XXXXXXXX1111" required>
+                <div class="form-text">ใส่ตัวเลขหรือ X ตามที่พิมพ์บนสลิป</div>
+                <div class="invalid-feedback">เลขบัตรเครดิตไม่ถูกต้อง (ตัวเลข/X 4-19 หลัก)</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="cardHolder">ชื่อเจ้าของบัตรเครดิต<span class="req" id="req-cardHolder">*</span></label>
+                <input type="text" class="form-control" id="cardHolder" name="cardHolder" maxlength="150" required>
+                <div class="invalid-feedback">กรุณากรอกชื่อเจ้าของบัตร</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="bank">ชื่อธนาคาร<span class="req">*</span></label>
+                <select class="form-select" id="bank" name="bank" required></select>
+                <div class="invalid-feedback">กรุณาเลือกธนาคาร</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="installmentMonths">จำนวนเดือนที่ผ่อน<span class="req">*</span></label>
+                <select class="form-select" id="installmentMonths" name="installmentMonths" required></select>
+                <div class="invalid-feedback">กรุณาเลือกจำนวนเดือน</div>
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="tid">Tid เครื่อง<span class="req" id="req-tid">*</span></label>
+                <input type="text" class="form-control" id="tid" name="tid" maxlength="50" required>
+                <div class="invalid-feedback">กรุณากรอก Tid</div>
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="trace">Trace<span class="req" id="req-trace">*</span></label>
+                <input type="text" class="form-control" id="trace" name="trace" maxlength="50" required>
+                <div class="invalid-feedback">กรุณากรอก Trace</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <div class="card-head">
+            <span class="section-no">5</span>
+            <div>
+              <h2>อัปโหลดรูปสลิป<span class="req" id="req-slip">*</span></h2>
+              <small>ระบบจะย่อขนาดรูปอัตโนมัติก่อนส่ง</small>
+            </div>
+          </div>
+          <div class="card-body-x pb-3">
+            <input type="file" id="slipInput" class="d-none"
+                   accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif">
+            <label for="slipInput" id="slipDrop" class="slip-drop">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/>
+              </svg>
+              <div class="t1">แตะเพื่อเลือกรูป หรือถ่ายรูปสลิป</div>
+              <div class="t2">รองรับ JPG, PNG, WEBP</div>
+            </label>
+            <div id="slipError" class="text-danger small mt-2 d-none">กรุณาแนบรูปสลิป</div>
+            <div id="slipPreview" class="slip-preview d-none">
+              <img id="slipImg" alt="ตัวอย่างรูปสลิป">
+              <div class="slip-meta" id="slipMeta"></div>
+              <div class="d-flex gap-2 justify-content-center mt-2">
+                <label for="slipInput" class="btn btn-light-x btn-sm">เปลี่ยนรูป</label>
+                <button type="button" class="btn btn-outline-danger btn-sm" id="slipRemove" style="border-radius:10px">ลบรูป</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="submit-bar">
+          <div class="container d-flex gap-2 justify-content-end" style="max-width: 860px;">
+            <button type="button" class="btn btn-light-x" id="btnReset">ล้างฟอร์ม</button>
+            <button type="submit" class="btn btn-brand flex-grow-1 flex-sm-grow-0" id="btnSubmit" disabled>บันทึกข้อมูล</button>
+          </div>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <!-- ================= หน้าตั้งค่าระบบ ================= -->
+  <div id="viewSettings" class="d-none">
+    <header class="app-header settings">
+      <div class="container-fluid settings-wrap head-row">
+        <div>
+          <h1>ตั้งค่าระบบ</h1>
+          <p>จัดการรายการตัวเลือก โฟลเดอร์สลิป และการตั้งค่าฟอร์ม</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-head d-none" id="btnLogout">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/>
+            </svg>
+            <span class="lbl">ออกจากระบบ</span>
+          </button>
+          <button type="button" class="btn btn-head" id="btnBackToForm">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+            </svg>
+            <span class="lbl">กลับหน้าฟอร์ม</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container-fluid settings-wrap app-main">
+
+      <section class="section-card auth-card d-none" id="loginCard">
+        <div class="card-head"><div><h2>เข้าสู่ระบบแอดมิน</h2><small>ใส่รหัสผ่านแอดมินเพื่อจัดการการตั้งค่า</small></div></div>
+        <form class="card-body-x pb-3" id="loginForm" novalidate>
+          <label class="form-label" for="loginPassword">รหัสผ่าน</label>
+          <input type="password" class="form-control mb-3" id="loginPassword" autocomplete="current-password" required>
+          <button type="submit" class="btn btn-brand w-100">เข้าสู่ระบบ</button>
+          <div class="text-center mt-3">
+            <button type="button" class="link-btn" id="btnShowSetup">ลืมรหัสผ่าน / ตั้งรหัสใหม่ด้วยรหัสตั้งค่า</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="section-card auth-card d-none" id="setupCard">
+        <div class="card-head"><div><h2>ตั้งรหัสผ่านแอดมิน</h2><small>ใช้รหัสตั้งค่าจาก Apps Script Editor</small></div></div>
+        <form class="card-body-x pb-3" id="setupForm" novalidate>
+          <div class="info-box mb-3">
+            เจ้าของสคริปต์เปิด Apps Script Editor แล้วเลือกฟังก์ชัน <b>createAdminSetupCode</b> กด Run
+            จากนั้นดูรหัสใน Execution log (ใช้ได้ 30 นาที)
+          </div>
+          <label class="form-label" for="setupCode">รหัสตั้งค่า</label>
+          <input type="text" class="form-control mb-3" id="setupCode" autocomplete="off" style="text-transform:uppercase" required>
+          <label class="form-label" for="setupPassword">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label>
+          <input type="password" class="form-control mb-3" id="setupPassword" autocomplete="new-password" minlength="8" required>
+          <label class="form-label" for="setupPassword2">ยืนยันรหัสผ่านใหม่</label>
+          <input type="password" class="form-control mb-3" id="setupPassword2" autocomplete="new-password" minlength="8" required>
+          <button type="submit" class="btn btn-brand w-100">ตั้งรหัสผ่านและเข้าสู่ระบบ</button>
+          <div class="text-center mt-3">
+            <button type="button" class="link-btn" id="btnShowLogin">มีรหัสผ่านแล้ว? เข้าสู่ระบบ</button>
+          </div>
+        </form>
+      </section>
+
+      <div id="adminPanel" class="d-none">
+        <nav class="tabs-x" id="adminTabs">
+          <button type="button" data-tab="lists" class="active">รายการ Dropdown</button>
+          <button type="button" data-tab="folder">โฟลเดอร์สลิป</button>
+          <button type="button" data-tab="form">ตั้งค่าฟอร์ม</button>
+          <button type="button" data-tab="password">รหัสผ่าน</button>
+        </nav>
+
+        <section class="section-card tab-pane-x" data-pane="lists">
+          <div class="card-head">
+            <div><h2>รายการตัวเลือก (Dropdown)</h2><small>1 บรรทัด = 1 รายการ เรียงตามลำดับที่แสดงในฟอร์ม</small></div>
+          </div>
+          <div class="card-body-x pb-3">
+            <div class="pills-x" id="listPills"></div>
+            <textarea class="form-control list-editor" id="listEditor" spellcheck="false" wrap="off"
+                      placeholder="พิมพ์หรือวางรายการ บรรทัดละ 1 รายการ"></textarea>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+              <div class="list-stats" id="listStats"></div>
+              <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-light-x btn-sm" id="btnListSort">เรียง ก-ฮ / A-Z</button>
+                <button type="button" class="btn btn-light-x btn-sm" id="btnListRevert">ยกเลิกการแก้ไข</button>
+                <button type="button" class="btn btn-brand btn-sm" id="btnListSave">บันทึกรายการ</button>
+              </div>
+            </div>
+            <div class="form-text mt-2">
+              บันทึกแล้วจะเขียนทับคอลัมน์ A (แถว 2 ลงไป) ของชีตนั้นใน Google Sheets ทันที ระบบตัดบรรทัดว่างและรายการซ้ำออกให้อัตโนมัติ
+            </div>
+          </div>
+        </section>
+
+        <section class="section-card tab-pane-x d-none" data-pane="folder">
+          <div class="card-head">
+            <div><h2>โฟลเดอร์เก็บรูปสลิป</h2><small>วาง Folder ID หรือลิงก์โฟลเดอร์จาก Google Drive</small></div>
+          </div>
+          <div class="card-body-x pb-3 pane-narrow">
+            <div class="info-box mb-3" id="folderStatus"></div>
+            <label class="form-label" for="folderInput">Folder ID หรือ ลิงก์โฟลเดอร์</label>
+            <input type="text" class="form-control mb-2" id="folderInput" autocomplete="off"
+                   placeholder="เช่น 1AbCdEfGhIjKlMnOpQrStUvWxYz">
+            <div class="form-text mb-3">เว้นว่างแล้วกดบันทึก = เก็บไว้ที่ Root ของ My Drive (บัญชีเจ้าของสคริปต์)</div>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-light-x btn-sm" id="btnFolderTest">ทดสอบการเข้าถึง</button>
+              <button type="button" class="btn btn-brand btn-sm" id="btnFolderSave">บันทึกโฟลเดอร์</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-card tab-pane-x d-none" data-pane="form">
+          <div class="card-head">
+            <div><h2>ตั้งค่าฟอร์ม</h2><small>ชื่อระบบ และช่องที่บังคับกรอก</small></div>
+          </div>
+          <div class="card-body-x pb-3 pane-narrow">
+            <label class="form-label" for="setTitle">ชื่อระบบ (หัวข้อหน้าเว็บ)</label>
+            <input type="text" class="form-control mb-3" id="setTitle" maxlength="100">
+            <label class="form-label" for="setSubtitle">คำอธิบายใต้หัวข้อ</label>
+            <input type="text" class="form-control mb-4" id="setSubtitle" maxlength="200">
+            <div class="form-label mb-1">ช่องที่บังคับกรอก</div>
+            <div class="form-text mb-2">ช่องหลัก (สาขา, โครงการ, ชื่อ-นามสกุล, เบอร์, สินค้า, IMEI, ราคา, เลขที่บิล, ธนาคาร, จำนวนเดือน) บังคับกรอกเสมอ</div>
+            <div id="requiredSwitches" class="mb-3"></div>
+            <button type="button" class="btn btn-brand btn-sm" id="btnFormSave">บันทึกการตั้งค่าฟอร์ม</button>
+          </div>
+        </section>
+
+        <section class="section-card tab-pane-x d-none" data-pane="password" style="max-width:520px">
+          <div class="card-head">
+            <div><h2>เปลี่ยนรหัสผ่านแอดมิน</h2><small>เปลี่ยนแล้ว ทุกเครื่องที่เข้าสู่ระบบอยู่จะถูกออกจากระบบ</small></div>
+          </div>
+          <form class="card-body-x pb-3" id="pwForm" novalidate>
+            <label class="form-label" for="pwOld">รหัสผ่านเดิม</label>
+            <input type="password" class="form-control mb-3" id="pwOld" autocomplete="current-password" required>
+            <label class="form-label" for="pwNew">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label>
+            <input type="password" class="form-control mb-3" id="pwNew" autocomplete="new-password" minlength="8" required>
+            <label class="form-label" for="pwNew2">ยืนยันรหัสผ่านใหม่</label>
+            <input type="password" class="form-control mb-3" id="pwNew2" autocomplete="new-password" minlength="8" required>
+            <button type="submit" class="btn btn-brand btn-sm">เปลี่ยนรหัสผ่าน</button>
+          </form>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= หน้าดูข้อมูล ================= -->
+  <div id="viewRecords" class="d-none">
+    <header class="app-header">
+      <div class="container-fluid settings-wrap records-wrap head-row">
+        <div>
+          <h1>ข้อมูลที่บันทึก</h1>
+          <p>รายการล่าสุดจากชีต Data</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-head" id="btnRecordsBack">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+            </svg>
+            <span class="lbl">กลับหน้าฟอร์ม</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container-fluid settings-wrap records-wrap app-main">
+      <section class="section-card">
+        <div class="card-head justify-content-between flex-wrap">
+          <div><h2>รายการที่บันทึกล่าสุด</h2><small id="recentInfo">จากชีต Data</small></div>
+          <div class="d-flex flex-wrap gap-2 ms-auto">
+            <select class="form-select form-select-sm" id="recentLimit" style="width:auto;border-radius:10px;padding-right:2.2rem">
+              <option value="20">20 รายการ</option>
+              <option value="50">50 รายการ</option>
+              <option value="100">100 รายการ</option>
+            </select>
+            <button type="button" class="btn btn-light-x btn-sm d-none" id="btnRecentExpand">+ ขยายทั้งหมด</button>
+            <button type="button" class="btn btn-light-x btn-sm" id="btnRecentRefresh">รีเฟรช</button>
+          </div>
+        </div>
+        <div class="recent-hint">กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดของรายการ คอลัมน์จะซ่อน/แสดงอัตโนมัติตามขนาดหน้าจอ</div>
+        <div class="card-body-x pb-3">
+          <div class="recent-wrap" id="recentWrap">
+            <div class="empty-state">กดรีเฟรชเพื่อโหลดข้อมูล</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var MAX_DIM = 1280;
+      var JPEG_QUALITY = 0.8;
+      var TOKEN_KEY = 'dt_admin_token';
+      var SELECT_MAP = {
+        location: 'locations',
+        project: 'projects',
+        product: 'products',
+        bank: 'banks',
+        installmentMonths: 'installments'
+      };
+      var SEARCHABLE = ['location', 'product'];
+      var TEXT_FIELDS = ['location', 'project', 'firstName', 'lastName', 'phone', 'product', 'imei',
+        'price', 'discount', 'installCode', 'billNo', 'cardNumber', 'cardHolder', 'bank', 'tid',
+        'trace', 'installmentMonths'];
+      var RECENT_COLS = [
+        ['ประทับเวลา', 0], ['สาขา', 1], ['โครงการ', 2], ['ชื่อ', 3], ['นามสกุล', 4], ['เบอร์', 5],
+        ['สินค้า', 6], ['IMEI', 7], ['ราคา', 8], ['ส่วนลด', 9], ['โค้ดผ่อน', 10], ['เลขที่บิล', 11],
+        ['เลขบัตร', 12], ['เจ้าของบัตร', 13], ['ธนาคาร', 14], ['Tid', 15], ['Trace', 16], ['ผ่อน', 17]
+      ];
+      function colOf(i) { return function (r) { return r[i]; }; }
+      var RECENT_VIEW = [
+        { label: 'วันเวลา', get: colOf(0), cls: 'col-time' },
+        { label: 'ลูกค้า', get: function (r) { return ((r[3] || '') + ' ' + (r[4] || '')).trim(); }, cls: 'col-wrap' },
+        { label: 'สินค้า', get: colOf(6), cls: 'col-wrap col-product' },
+        { label: 'ราคา', get: colOf(8), cls: 'd-none d-sm-table-cell text-end' },
+        { label: 'สาขา', get: colOf(1), cls: 'd-none d-md-table-cell col-wrap' },
+        { label: 'สลิป', slip: true, cls: 'd-none d-md-table-cell' },
+        { label: 'เลขที่บิล', get: colOf(11), cls: 'd-none d-lg-table-cell' },
+        { label: 'ธนาคาร', get: colOf(14), cls: 'd-none d-lg-table-cell' },
+        { label: 'เบอร์', get: colOf(5), cls: 'd-none d-xl-table-cell' },
+        { label: 'ผ่อน', get: colOf(17), cls: 'd-none d-xl-table-cell' },
+        { label: 'IMEI', get: colOf(7), cls: 'd-none d-xxl-table-cell' }
+      ];
+
+      var form = byId('mainForm');
+      var btnSubmit = byId('btnSubmit');
+      var slipInput = byId('slipInput');
+      var slipDrop = byId('slipDrop');
+      var slipPreview = byId('slipPreview');
+      var slipImg = byId('slipImg');
+      var slipMeta = byId('slipMeta');
+      var slipError = byId('slipError');
+      var slipData = null;
+      var slipRequired = true;
+      var saving = false;
+      var tsInstances = {};
+      var formNeedsReload = false;
+      var currentView = 'form';
+      var authReturn = 'settings';
+
+      var admin = {
+        token: storeGet(TOKEN_KEY),
+        data: null,
+        listKey: null,
+        listDirty: false,
+        recentLoaded: false
+      };
+
+      function byId(id) { return document.getElementById(id); }
+
+      function storeGet(k) {
+        try { return window.sessionStorage.getItem(k); } catch (e) { return null; }
+      }
+      function storeSet(k, v) {
+        try {
+          if (v === null) window.sessionStorage.removeItem(k);
+          else window.sessionStorage.setItem(k, v);
+        } catch (e) { }
+      }
+
+      function errMessage(err) {
+        if (!err) return 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+        var m = err.message ? String(err.message) : String(err);
+        return m.replace('[AUTH] ', '').replace(/^Error: /, '');
+      }
+
+      function isAuthError(err) {
+        return String((err && err.message) || err || '').indexOf('[AUTH]') >= 0;
+      }
+
+      function showLoading(on, text) {
+        byId('loadingText').textContent = text || 'กำลังโหลดข้อมูล...';
+        byId('loadingOverlay').classList.toggle('hidden', !on);
+      }
+
+      function toast(icon, title) {
+        Swal.fire({ toast: true, position: 'top', icon: icon, title: title, showConfirmButton: false, timer: 2200, timerProgressBar: true });
+      }
+
+      function call(fn, args) {
+        return new Promise(function (resolve, reject) {
+          var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+          runner[fn].apply(runner, args || []);
+        });
+      }
+
+      function adminCall(fn) {
+        var args = [admin.token].concat(Array.prototype.slice.call(arguments, 1));
+        return call(fn, args).catch(function (err) {
+          if (isAuthError(err)) {
+            setToken(null);
+            if (currentView === 'records') {
+              authReturn = 'records';
+              showView('settings');
+            }
+            showAuth();
+          }
+          throw err;
+        });
+      }
+
+      function setToken(t) {
+        admin.token = t;
+        storeSet(TOKEN_KEY, t);
+        byId('btnLogout').classList.toggle('d-none', !t);
+      }
+
+      function showView(name) {
+        currentView = name;
+        byId('viewForm').classList.toggle('d-none', name !== 'form');
+        byId('viewSettings').classList.toggle('d-none', name !== 'settings');
+        byId('viewRecords').classList.toggle('d-none', name !== 'records');
+        document.body.classList.toggle('has-submit-bar', name === 'form');
+        window.scrollTo(0, 0);
+      }
+
+      function fillSelect(id, items) {
+        var el = byId(id);
+        el.innerHTML = '';
+        var ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = items.length ? '-- กรุณาเลือก --' : '-- ไม่มีข้อมูล --';
+        el.appendChild(ph);
+        items.forEach(function (v) {
+          var opt = document.createElement('option');
+          opt.value = v;
+          opt.textContent = v;
+          el.appendChild(opt);
+        });
+      }
+
+      function destroySearchable() {
+        Object.keys(tsInstances).forEach(function (id) {
+          tsInstances[id].destroy();
+          delete tsInstances[id];
+        });
+      }
+
+      function initSearchable(id) {
+        if (typeof TomSelect === 'undefined') return;
+        tsInstances[id] = new TomSelect(byId(id), {
+          create: false,
+          maxOptions: null,
+          allowEmptyOption: false,
+          placeholder: 'พิมพ์เพื่อค้นหา หรือเลือกจากรายการ',
+          searchField: ['text'],
+          render: {
+            no_results: function () {
+              return '<div class="no-results">ไม่พบรายการที่ค้นหา</div>';
+            }
+          },
+          onChange: function () {
+            byId(id).dispatchEvent(new Event('change'));
+          }
+        });
+      }
+
+      function applyFormSettings(s) {
+        if (!s) return;
+        byId('appTitle').textContent = s.title;
+        byId('appSubtitle').textContent = s.subtitle;
+        var req = s.required || {};
+        Object.keys(req).forEach(function (key) {
+          var on = req[key] !== false;
+          var star = byId('req-' + key);
+          if (star) star.classList.toggle('d-none', !on);
+          if (key === 'slip') {
+            slipRequired = on;
+          } else if (byId(key)) {
+            byId(key).required = on;
+          }
+        });
+      }
+
+      function loadOptions() {
+        showLoading(true, 'กำลังโหลดข้อมูลตัวเลือก...');
+        btnSubmit.disabled = true;
+        call('getInitialData').then(function (data) {
+          data = data || {};
+          destroySearchable();
+          Object.keys(SELECT_MAP).forEach(function (id) {
+            fillSelect(id, data[SELECT_MAP[id]] || []);
+          });
+          SEARCHABLE.forEach(initSearchable);
+          applyFormSettings(data.settings);
+          formNeedsReload = false;
+          showLoading(false);
+          btnSubmit.disabled = false;
+          if (data.missingSheets && data.missingSheets.length) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'ไม่พบบางชีต',
+              text: 'ไม่พบชีต: ' + data.missingSheets.join(', ') + ' กรุณาตรวจสอบชื่อชีตในไฟล์ Google Sheets'
+            });
+          }
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({
+            icon: 'error',
+            title: 'โหลดข้อมูลไม่สำเร็จ',
+            text: errMessage(err),
+            confirmButtonText: 'ลองใหม่',
+            allowOutsideClick: false
+          }).then(loadOptions);
+        });
+      }
+
+      function formatBytes(n) {
+        if (n < 1024) return n + ' B';
+        if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
+        return (n / 1048576).toFixed(2) + ' MB';
+      }
+
+      function resizeImage(file) {
+        return new Promise(function (resolve, reject) {
+          var url = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function () {
+            var w = img.naturalWidth;
+            var h = img.naturalHeight;
+            var scale = Math.min(1, MAX_DIM / Math.max(w, h));
+            var cw = Math.round(w * scale);
+            var ch = Math.round(h * scale);
+            var canvas = document.createElement('canvas');
+            canvas.width = cw;
+            canvas.height = ch;
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, cw, ch);
+            ctx.drawImage(img, 0, 0, cw, ch);
+            URL.revokeObjectURL(url);
+            resolve({ dataUrl: canvas.toDataURL('image/jpeg', JPEG_QUALITY), width: cw, height: ch });
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            reject(new Error('ไม่สามารถอ่านไฟล์รูปนี้ได้ กรุณาเลือกรูป JPG หรือ PNG'));
+          };
+          img.src = url;
+        });
+      }
+
+      function handleFile(file) {
+        if (!file) return;
+        if (!file.type || file.type.indexOf('image') !== 0) {
+          Swal.fire({ icon: 'error', title: 'ไฟล์ไม่ถูกต้อง', text: 'กรุณาเลือกไฟล์รูปภาพเท่านั้น' });
+          return;
+        }
+        resizeImage(file).then(function (r) {
+          slipData = r.dataUrl;
+          var approxBytes = Math.round((r.dataUrl.length - r.dataUrl.indexOf(',') - 1) * 3 / 4);
+          slipImg.src = r.dataUrl;
+          slipMeta.textContent = file.name + ' | ' + formatBytes(file.size) + ' -> ' +
+            formatBytes(approxBytes) + ' (' + r.width + 'x' + r.height + ')';
+          slipDrop.classList.add('d-none');
+          slipDrop.classList.remove('is-invalid');
+          slipError.classList.add('d-none');
+          slipPreview.classList.remove('d-none');
+        }).catch(function (err) {
+          Swal.fire({ icon: 'error', title: 'อ่านรูปไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function clearSlip() {
+        slipData = null;
+        slipInput.value = '';
+        slipImg.removeAttribute('src');
+        slipMeta.textContent = '';
+        slipPreview.classList.add('d-none');
+        slipDrop.classList.remove('d-none', 'is-invalid');
+        slipError.classList.add('d-none');
+      }
+
+      function resetForm() {
+        form.reset();
+        Object.keys(tsInstances).forEach(function (id) { tsInstances[id].clear(true); });
+        form.classList.remove('was-validated');
+        byId('discount').setCustomValidity('');
+        clearSlip();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function digitsOnly(el) {
+        el.addEventListener('input', function () {
+          var v = el.value.replace(/[^0-9]/g, '');
+          if (v !== el.value) el.value = v;
+        });
+      }
+
+      function validateDiscount() {
+        var price = parseFloat(byId('price').value);
+        var discountEl = byId('discount');
+        var discount = parseFloat(discountEl.value);
+        var msg = '';
+        if (discountEl.value !== '' && !isNaN(price) && !isNaN(discount) && discount > price) {
+          msg = 'ส่วนลดต้องไม่มากกว่าราคา';
+        }
+        discountEl.setCustomValidity(msg);
+        byId('discountFeedback').textContent = msg || 'ส่วนลดไม่ถูกต้อง';
+      }
+
+      function validateCard() {
+        var el = byId('cardNumber');
+        var v = el.value.replace(/[\s-]+/g, '');
+        var ok = v === '' || /^[0-9Xx]{4,19}$/.test(v);
+        el.setCustomValidity(ok ? '' : 'invalid');
+      }
+
+      function collectData() {
+        var data = {};
+        TEXT_FIELDS.forEach(function (name) {
+          data[name] = form.elements[name].value.trim();
+        });
+        data.cardNumber = data.cardNumber.replace(/[\s-]+/g, '');
+        data.slip = slipData;
+        return data;
+      }
+
+      function onSubmit(e) {
+        e.preventDefault();
+        if (saving) return;
+        validateDiscount();
+        validateCard();
+        var formOk = form.checkValidity();
+        var slipOk = !!slipData || !slipRequired;
+        form.classList.add('was-validated');
+        if (!slipOk) {
+          slipDrop.classList.add('is-invalid');
+          slipError.classList.remove('d-none');
+        }
+        if (!formOk || !slipOk) {
+          var firstBad = form.querySelector(':invalid') || slipDrop;
+          if (firstBad.id && tsInstances[firstBad.id]) firstBad = tsInstances[firstBad.id].wrapper;
+          firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          Swal.fire({ icon: 'warning', title: 'ข้อมูลยังไม่ครบ', text: 'กรุณาตรวจสอบช่องที่มีกรอบสีแดง' });
+          return;
+        }
+
+        saving = true;
+        btnSubmit.disabled = true;
+        Swal.fire({
+          title: 'กำลังบันทึกข้อมูล...',
+          text: slipData ? 'กรุณารอสักครู่ ระบบกำลังอัปโหลดรูปสลิป' : 'กรุณารอสักครู่',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: function () { Swal.showLoading(); }
+        });
+
+        call('saveData', [collectData()]).then(function (res) {
+          saving = false;
+          btnSubmit.disabled = false;
+          resetForm();
+          Swal.fire({
+            icon: 'success',
+            title: 'บันทึกสำเร็จ',
+            text: (res && res.message) || 'บันทึกข้อมูลเรียบร้อยแล้ว',
+            timer: 2500,
+            timerProgressBar: true
+          });
+          admin.recentLoaded = false;
+        }).catch(function (err) {
+          saving = false;
+          btnSubmit.disabled = false;
+          Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function openRecords() {
+        if (admin.token) {
+          showView('records');
+          loadRecent();
+        } else {
+          authReturn = 'records';
+          showView('settings');
+          showAuth();
+        }
+      }
+
+      function goToForm() {
+        showView('form');
+        if (formNeedsReload) loadOptions();
+      }
+
+      function afterAuth() {
+        if (authReturn === 'records') {
+          authReturn = 'settings';
+          showLoading(false);
+          showView('records');
+          loadRecent();
+        } else {
+          loadAdmin();
+        }
+      }
+
+      function openSettings() {
+        authReturn = 'settings';
+        showView('settings');
+        if (admin.token) {
+          setToken(admin.token);
+          loadAdmin();
+        } else {
+          showAuth();
+        }
+      }
+
+      function backToForm() {
+        var go = goToForm;
+        if (admin.listDirty) {
+          confirmDiscard().then(function (ok) {
+            if (ok) {
+              admin.listDirty = false;
+              go();
+            }
+          });
+        } else {
+          go();
+        }
+      }
+
+      function confirmDiscard() {
+        return Swal.fire({
+          icon: 'warning',
+          title: 'ยังไม่ได้บันทึกรายการ',
+          text: 'การแก้ไขรายการที่ยังไม่บันทึกจะหายไป ต้องการดำเนินการต่อหรือไม่?',
+          showCancelButton: true,
+          confirmButtonText: 'ทิ้งการแก้ไข',
+          cancelButtonText: 'กลับไปแก้ไข'
+        }).then(function (r) { return r.isConfirmed; });
+      }
+
+      function showAuth(mode) {
+        byId('adminPanel').classList.add('d-none');
+        byId('btnLogout').classList.add('d-none');
+        var render = function (m) {
+          byId('loginCard').classList.toggle('d-none', m !== 'login');
+          byId('setupCard').classList.toggle('d-none', m !== 'setup');
+          var focusEl = m === 'login' ? byId('loginPassword') : byId('setupCode');
+          setTimeout(function () { focusEl.focus(); }, 50);
+        };
+        if (mode) {
+          render(mode);
+          return;
+        }
+        showLoading(true, 'กำลังตรวจสอบ...');
+        call('adminStatus').then(function (st) {
+          showLoading(false);
+          render(st && st.hasPassword ? 'login' : 'setup');
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: errMessage(err) });
+        });
+      }
+
+      function onLogin(e) {
+        e.preventDefault();
+        var pw = byId('loginPassword').value;
+        if (!pw) return;
+        showLoading(true, 'กำลังเข้าสู่ระบบ...');
+        call('adminLogin', [pw]).then(function (res) {
+          byId('loginPassword').value = '';
+          setToken(res.token);
+          afterAuth();
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'เข้าสู่ระบบไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function onSetup(e) {
+        e.preventDefault();
+        var code = byId('setupCode').value.trim();
+        var p1 = byId('setupPassword').value;
+        var p2 = byId('setupPassword2').value;
+        if (!code) return Swal.fire({ icon: 'warning', title: 'กรุณาใส่รหัสตั้งค่า' });
+        if (p1.length < 8) return Swal.fire({ icon: 'warning', title: 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร' });
+        if (p1 !== p2) return Swal.fire({ icon: 'warning', title: 'ยืนยันรหัสผ่านไม่ตรงกัน' });
+        showLoading(true, 'กำลังตั้งรหัสผ่าน...');
+        call('adminSetup', [code, p1]).then(function (res) {
+          byId('setupForm').reset();
+          setToken(res.token);
+          afterAuth();
+          toast('success', 'ตั้งรหัสผ่านแอดมินแล้ว');
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'ตั้งรหัสผ่านไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function onLogout() {
+        var t = admin.token;
+        setToken(null);
+        admin.data = null;
+        admin.listDirty = false;
+        call('adminLogout', [t]).catch(function () { });
+        showAuth('login');
+      }
+
+      function loadAdmin() {
+        showLoading(true, 'กำลังโหลดการตั้งค่า...');
+        adminCall('adminGetAll').then(function (d) {
+          showLoading(false);
+          admin.data = d;
+          admin.listDirty = false;
+          admin.recentLoaded = false;
+          byId('loginCard').classList.add('d-none');
+          byId('setupCard').classList.add('d-none');
+          byId('adminPanel').classList.remove('d-none');
+          renderListPills();
+          selectList(admin.listKey || d.listDefs[0].key, true);
+          renderFolder(d.folder);
+          renderFormSettings(d.settings, d.requiredLabels);
+          switchTab('lists');
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'โหลดการตั้งค่าไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function switchTab(name) {
+        var buttons = byId('adminTabs').querySelectorAll('button');
+        Array.prototype.forEach.call(buttons, function (b) {
+          b.classList.toggle('active', b.getAttribute('data-tab') === name);
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('.tab-pane-x'), function (p) {
+          p.classList.toggle('d-none', p.getAttribute('data-pane') !== name);
+        });
+      }
+
+      function parseLines(text) {
+        var seen = {};
+        var items = [];
+        var dupes = 0;
+        text.split('\n').forEach(function (line) {
+          var v = line.trim();
+          if (!v) return;
+          if (seen[v]) { dupes++; return; }
+          seen[v] = true;
+          items.push(v);
+        });
+        return { items: items, dupes: dupes };
+      }
+
+      function renderListPills() {
+        var wrap = byId('listPills');
+        wrap.innerHTML = '';
+        admin.data.listDefs.forEach(function (def) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.setAttribute('data-key', def.key);
+          b.classList.toggle('active', def.key === admin.listKey);
+          b.appendChild(document.createTextNode(def.label));
+          var c = document.createElement('span');
+          c.className = 'count';
+          c.textContent = String((admin.data.lists[def.key] || []).length);
+          b.appendChild(c);
+          b.addEventListener('click', function () { selectList(def.key); });
+          wrap.appendChild(b);
+        });
+      }
+
+      function selectList(key, force) {
+        if (!force && key === admin.listKey) return;
+        var proceed = function () {
+          admin.listKey = key;
+          admin.listDirty = false;
+          byId('listEditor').value = (admin.data.lists[key] || []).join('\n');
+          renderListPills();
+          updateListStats();
+        };
+        if (!force && admin.listDirty) {
+          confirmDiscard().then(function (ok) { if (ok) proceed(); });
+        } else {
+          proceed();
+        }
+      }
+
+      function currentListDef() {
+        var found = null;
+        admin.data.listDefs.forEach(function (d) { if (d.key === admin.listKey) found = d; });
+        return found;
+      }
+
+      function updateListStats() {
+        var p = parseLines(byId('listEditor').value);
+        var def = currentListDef();
+        var el = byId('listStats');
+        el.innerHTML = '';
+        var main = document.createElement('span');
+        main.textContent = p.items.length + ' รายการ' + (def ? ' | ชีต ' + def.sheet : '');
+        el.appendChild(main);
+        if (p.dupes) {
+          var w = document.createElement('span');
+          w.className = 'warn';
+          w.textContent = ' | ซ้ำ ' + p.dupes + ' บรรทัด (จะถูกตัดออก)';
+          el.appendChild(w);
+        }
+        if (admin.listDirty) {
+          var dot = document.createElement('span');
+          dot.className = 'dirty-dot';
+          dot.title = 'ยังไม่ได้บันทึก';
+          el.appendChild(dot);
+        }
+      }
+
+      function onListSave() {
+        var def = currentListDef();
+        if (!def) return;
+        var p = parseLines(byId('listEditor').value);
+        var doSave = function () {
+          showLoading(true, 'กำลังบันทึกรายการ...');
+          adminCall('adminSaveList', def.key, p.items).then(function (res) {
+            showLoading(false);
+            admin.data.lists[def.key] = res.items;
+            admin.listDirty = false;
+            byId('listEditor').value = res.items.join('\n');
+            renderListPills();
+            updateListStats();
+            formNeedsReload = true;
+            toast('success', res.message);
+          }).catch(function (err) {
+            showLoading(false);
+            Swal.fire({ icon: 'error', title: 'บันทึกรายการไม่สำเร็จ', text: errMessage(err) });
+          });
+        };
+        if (!p.items.length) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'รายการว่างเปล่า',
+            text: 'บันทึกแล้วช่อง ' + def.label + ' ในฟอร์มจะไม่มีตัวเลือกให้เลือก ยืนยันหรือไม่?',
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยัน',
+            cancelButtonText: 'ยกเลิก'
+          }).then(function (r) { if (r.isConfirmed) doSave(); });
+        } else {
+          doSave();
+        }
+      }
+
+      function onListSort() {
+        var p = parseLines(byId('listEditor').value);
+        p.items.sort(function (a, b) { return a.localeCompare(b, 'th', { numeric: true }); });
+        byId('listEditor').value = p.items.join('\n');
+        admin.listDirty = true;
+        updateListStats();
+      }
+
+      function onListRevert() {
+        if (!admin.listDirty) return;
+        byId('listEditor').value = (admin.data.lists[admin.listKey] || []).join('\n');
+        admin.listDirty = false;
+        updateListStats();
+      }
+
+      function safeHttpsUrl(u) {
+        var s = String(u || '');
+        return s.indexOf('https:') === 0 ? s : '';
+      }
+
+      function renderFolder(f) {
+        var box = byId('folderStatus');
+        box.innerHTML = '';
+        var k = document.createElement('div');
+        k.className = 'k';
+        k.textContent = 'ตอนนี้รูปสลิปจะถูกบันทึกที่';
+        box.appendChild(k);
+        var nameRow = document.createElement('div');
+        var url = safeHttpsUrl(f.activeUrl);
+        var nameEl = document.createElement(url ? 'a' : 'span');
+        if (url) {
+          nameEl.href = url;
+          nameEl.target = '_blank';
+          nameEl.rel = 'noopener';
+        }
+        nameEl.textContent = f.activeName;
+        nameEl.style.fontWeight = '500';
+        nameRow.appendChild(nameEl);
+        box.appendChild(nameRow);
+        var src = document.createElement('div');
+        src.className = 'k mt-1';
+        var srcText = {
+          settings: 'ตั้งค่าจากหน้านี้',
+          code: 'ใช้ค่า DRIVE_FOLDER_ID ในโค้ด',
+          root: 'ยังไม่ได้ระบุโฟลเดอร์ จึงใช้ Root ของ Drive'
+        };
+        src.textContent = srcText[f.source] || '';
+        box.appendChild(src);
+        byId('folderInput').value = f.savedId || '';
+      }
+
+      function onFolderTest() {
+        var v = byId('folderInput').value.trim();
+        showLoading(true, 'กำลังทดสอบ...');
+        adminCall('adminTestFolder', v).then(function (r) {
+          showLoading(false);
+          Swal.fire({ icon: 'success', title: r.message, text: 'โฟลเดอร์: ' + r.name });
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'ทดสอบไม่ผ่าน', text: errMessage(err) });
+        });
+      }
+
+      function onFolderSave() {
+        var v = byId('folderInput').value.trim();
+        showLoading(true, 'กำลังบันทึก...');
+        adminCall('adminSaveFolder', v).then(function (r) {
+          showLoading(false);
+          admin.data.folder = r.folder;
+          renderFolder(r.folder);
+          toast('success', r.message);
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function renderFormSettings(s, labels) {
+        byId('setTitle').value = s.title;
+        byId('setSubtitle').value = s.subtitle;
+        var wrap = byId('requiredSwitches');
+        wrap.innerHTML = '';
+        Object.keys(labels).forEach(function (key) {
+          var row = document.createElement('div');
+          row.className = 'switch-row';
+          var lab = document.createElement('label');
+          lab.setAttribute('for', 'sw-' + key);
+          lab.textContent = labels[key];
+          lab.style.cursor = 'pointer';
+          var sw = document.createElement('div');
+          sw.className = 'form-check form-switch m-0';
+          var inp = document.createElement('input');
+          inp.type = 'checkbox';
+          inp.className = 'form-check-input';
+          inp.id = 'sw-' + key;
+          inp.setAttribute('data-key', key);
+          inp.checked = s.required[key] !== false;
+          sw.appendChild(inp);
+          row.appendChild(lab);
+          row.appendChild(sw);
+          wrap.appendChild(row);
+        });
+      }
+
+      function onFormSave() {
+        var req = {};
+        Array.prototype.forEach.call(byId('requiredSwitches').querySelectorAll('input'), function (i) {
+          req[i.getAttribute('data-key')] = i.checked;
+        });
+        var payload = {
+          title: byId('setTitle').value.trim(),
+          subtitle: byId('setSubtitle').value.trim(),
+          required: req
+        };
+        showLoading(true, 'กำลังบันทึก...');
+        adminCall('adminSaveSettings', payload).then(function (r) {
+          showLoading(false);
+          admin.data.settings = r.settings;
+          renderFormSettings(r.settings, admin.data.requiredLabels);
+          applyFormSettings(r.settings);
+          toast('success', r.message);
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function loadRecent() {
+        var wrap = byId('recentWrap');
+        wrap.innerHTML = '';
+        byId('btnRecentExpand').classList.add('d-none');
+        var loading = document.createElement('div');
+        loading.className = 'empty-state';
+        loading.textContent = 'กำลังโหลด...';
+        wrap.appendChild(loading);
+        adminCall('adminGetRecent', Number(byId('recentLimit').value)).then(function (r) {
+          admin.recentLoaded = true;
+          byId('recentInfo').textContent = 'ทั้งหมด ' + r.total + ' รายการในชีต Data | แสดง ' + r.rows.length + ' รายการล่าสุด';
+          renderRecent(r.rows);
+        }).catch(function (err) {
+          wrap.innerHTML = '';
+          var e = document.createElement('div');
+          e.className = 'empty-state text-danger';
+          e.textContent = errMessage(err);
+          wrap.appendChild(e);
+        });
+      }
+
+      function renderRecent(rows) {
+        var wrap = byId('recentWrap');
+        wrap.innerHTML = '';
+        if (!rows.length) {
+          var empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'ยังไม่มีข้อมูลที่บันทึก';
+          wrap.appendChild(empty);
+          return;
+        }
+        var table = document.createElement('table');
+        table.className = 'table recent-table';
+        var thead = document.createElement('thead');
+        var hr = document.createElement('tr');
+        var thToggle = document.createElement('th');
+        thToggle.className = 'col-toggle';
+        hr.appendChild(thToggle);
+        RECENT_VIEW.forEach(function (c) {
+          var th = document.createElement('th');
+          th.className = c.cls;
+          th.textContent = c.label;
+          hr.appendChild(th);
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        var colCount = RECENT_VIEW.length + 1;
+        var tbody = document.createElement('tbody');
+        rows.forEach(function (row, i) {
+          var tr = document.createElement('tr');
+          tr.className = 'main-row';
+          var detail = buildDetailRow(row, colCount, 'recent-detail-' + i);
+
+          var tdToggle = document.createElement('td');
+          tdToggle.className = 'col-toggle';
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'row-toggle';
+          btn.textContent = '+';
+          btn.setAttribute('aria-expanded', 'false');
+          btn.setAttribute('aria-controls', detail.id);
+          btn.setAttribute('aria-label', 'ดูรายละเอียดทั้งหมด');
+          btn.addEventListener('click', function () { toggleDetail(btn, tr, detail); });
+          tdToggle.appendChild(btn);
+          tr.appendChild(tdToggle);
+
+          RECENT_VIEW.forEach(function (c) {
+            var td = document.createElement('td');
+            td.className = c.cls;
+            if (c.slip) {
+              appendSlipLink(td, row[18]);
+            } else {
+              td.textContent = c.get(row) || '-';
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+          tbody.appendChild(detail);
+        });
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        byId('btnRecentExpand').classList.remove('d-none');
+        byId('btnRecentExpand').textContent = '+ ขยายทั้งหมด';
+      }
+
+      function appendSlipLink(parent, rawUrl) {
+        var url = safeHttpsUrl(rawUrl);
+        if (!url) {
+          parent.appendChild(document.createTextNode('-'));
+          return;
+        }
+        var a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = 'ดูสลิป';
+        parent.appendChild(a);
+      }
+
+      function buildDetailRow(row, colCount, id) {
+        var tr = document.createElement('tr');
+        tr.className = 'detail-row d-none';
+        tr.id = id;
+        var td = document.createElement('td');
+        td.colSpan = colCount;
+        var grid = document.createElement('dl');
+        grid.className = 'detail-grid';
+        RECENT_COLS.concat([['รูปสลิป', 18]]).forEach(function (c) {
+          var item = document.createElement('div');
+          item.className = 'detail-item';
+          var dt = document.createElement('dt');
+          dt.textContent = c[0];
+          var dd = document.createElement('dd');
+          if (c[1] === 18) {
+            appendSlipLink(dd, row[18]);
+          } else {
+            dd.textContent = row[c[1]] === '' || row[c[1]] === undefined ? '-' : String(row[c[1]]);
+          }
+          item.appendChild(dt);
+          item.appendChild(dd);
+          grid.appendChild(item);
+        });
+        td.appendChild(grid);
+        tr.appendChild(td);
+        return tr;
+      }
+
+      function toggleDetail(btn, mainRow, detailRow, forceOpen) {
+        var open = typeof forceOpen === 'boolean' ? forceOpen : btn.getAttribute('aria-expanded') !== 'true';
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.textContent = open ? '−' : '+';
+        btn.classList.toggle('open', open);
+        mainRow.classList.toggle('expanded', open);
+        detailRow.classList.toggle('d-none', !open);
+      }
+
+      function onRecentExpandAll() {
+        var btnAll = byId('btnRecentExpand');
+        var expand = btnAll.textContent.indexOf('+') === 0;
+        Array.prototype.forEach.call(byId('recentWrap').querySelectorAll('tr.main-row'), function (tr) {
+          var b = tr.querySelector('.row-toggle');
+          toggleDetail(b, tr, byId(b.getAttribute('aria-controls')), expand);
+        });
+        btnAll.textContent = expand ? '− ยุบทั้งหมด' : '+ ขยายทั้งหมด';
+      }
+
+      function onChangePassword(e) {
+        e.preventDefault();
+        var o = byId('pwOld').value;
+        var n1 = byId('pwNew').value;
+        var n2 = byId('pwNew2').value;
+        if (!o) return Swal.fire({ icon: 'warning', title: 'กรุณาใส่รหัสผ่านเดิม' });
+        if (n1.length < 8) return Swal.fire({ icon: 'warning', title: 'รหัสผ่านใหม่ต้องยาวอย่างน้อย 8 ตัวอักษร' });
+        if (n1 !== n2) return Swal.fire({ icon: 'warning', title: 'ยืนยันรหัสผ่านใหม่ไม่ตรงกัน' });
+        showLoading(true, 'กำลังเปลี่ยนรหัสผ่าน...');
+        adminCall('adminChangePassword', o, n1).then(function (r) {
+          showLoading(false);
+          byId('pwForm').reset();
+          setToken(r.token);
+          toast('success', r.message);
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'เปลี่ยนรหัสผ่านไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      ['phone', 'imei'].forEach(function (id) { digitsOnly(byId(id)); });
+      byId('price').addEventListener('input', validateDiscount);
+      byId('discount').addEventListener('input', validateDiscount);
+      byId('cardNumber').addEventListener('input', validateCard);
+
+      slipInput.addEventListener('change', function () {
+        handleFile(slipInput.files && slipInput.files[0]);
+      });
+      byId('slipRemove').addEventListener('click', clearSlip);
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        slipDrop.addEventListener(ev, function (e) { e.preventDefault(); slipDrop.classList.add('dragover'); });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        slipDrop.addEventListener(ev, function (e) { e.preventDefault(); slipDrop.classList.remove('dragover'); });
+      });
+      slipDrop.addEventListener('drop', function (e) {
+        handleFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+      });
+
+      byId('btnReset').addEventListener('click', function () {
+        Swal.fire({
+          icon: 'question',
+          title: 'ล้างข้อมูลทั้งหมด?',
+          showCancelButton: true,
+          confirmButtonText: 'ล้างฟอร์ม',
+          cancelButtonText: 'ยกเลิก'
+        }).then(function (r) { if (r.isConfirmed) resetForm(); });
+      });
+      form.addEventListener('submit', onSubmit);
+
+      byId('btnOpenSettings').addEventListener('click', openSettings);
+      byId('btnOpenRecords').addEventListener('click', openRecords);
+      byId('btnRecordsBack').addEventListener('click', goToForm);
+      byId('btnBackToForm').addEventListener('click', backToForm);
+      byId('btnLogout').addEventListener('click', onLogout);
+      byId('loginForm').addEventListener('submit', onLogin);
+      byId('setupForm').addEventListener('submit', onSetup);
+      byId('btnShowSetup').addEventListener('click', function () { showAuth('setup'); });
+      byId('btnShowLogin').addEventListener('click', function () { showAuth('login'); });
+      byId('pwForm').addEventListener('submit', onChangePassword);
+      Array.prototype.forEach.call(byId('adminTabs').querySelectorAll('button'), function (b) {
+        b.addEventListener('click', function () { switchTab(b.getAttribute('data-tab')); });
+      });
+      byId('listEditor').addEventListener('input', function () {
+        admin.listDirty = true;
+        updateListStats();
+      });
+      byId('btnListSave').addEventListener('click', onListSave);
+      byId('btnListSort').addEventListener('click', onListSort);
+      byId('btnListRevert').addEventListener('click', onListRevert);
+      byId('btnFolderTest').addEventListener('click', onFolderTest);
+      byId('btnFolderSave').addEventListener('click', onFolderSave);
+      byId('btnFormSave').addEventListener('click', onFormSave);
+      byId('btnRecentRefresh').addEventListener('click', loadRecent);
+      byId('btnRecentExpand').addEventListener('click', onRecentExpandAll);
+      byId('recentLimit').addEventListener('change', loadRecent);
+
+      loadOptions();
+      try {
+        google.script.url.getLocation(function (loc) {
+          var page = loc && loc.parameter && loc.parameter.page;
+          if (page === 'settings') openSettings();
+          else if (page === 'records') openRecords();
+        });
+      } catch (e) { }
+    })();
+  </script>
+</body>
+</html>

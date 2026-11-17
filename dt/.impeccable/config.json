@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/index.html"
+        ],
+        "createdAt": "2026-11-17T15:51:02.621Z",
+        "reason": "model: #slipImg is a hidden preview whose src is set by JS after the user picks a slip"
+      }
+    ]
+  }
+}
