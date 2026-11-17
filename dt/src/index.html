@@ -292,7 +292,13 @@
     .recent-table tr.main-row.selected > td { background: #fff7e6; }
     .btn-backup { border-radius: 10px; background: #d97706; border: 1px solid #d97706; color: #fff; font-weight: 500; }
     .btn-backup:hover, .btn-backup:focus { background: #b45309; border-color: #b45309; color: #fff; }
-    .btn-backup:disabled { background: #fff; border-color: var(--line); color: #9aa3b5; opacity: 1; }
+    .btn-backup:disabled { background: #fff; border-color: var(--line); color: var(--muted); opacity: 1; }
+    .source-bar { padding: 12px 20px 0; }
+    .source-switch { display: inline-flex; background: #eef1f8; border-radius: 12px; padding: 4px; gap: 4px; max-width: 100%; }
+    .source-switch button { border: 0; background: transparent; border-radius: 9px; padding: .45rem 1rem; font: inherit; font-size: .92rem; color: var(--muted, #5b6478); cursor: pointer; white-space: nowrap; }
+    .source-switch button.active { background: #fff; color: var(--brand, #2563eb); font-weight: 600; box-shadow: 0 1px 4px rgba(29, 36, 51, .12); }
+    .source-switch button:focus-visible { outline: 2px solid var(--brand, #2563eb); outline-offset: 1px; }
+    @media (max-width: 575.98px) { .source-bar { padding: 10px 14px 0; } .source-switch { display: flex; } .source-switch button { flex: 1; padding: .45rem .5rem; } }
     .recent-table tr.main-row:hover td { background: #fafbfe; }
     .recent-table tr.main-row.expanded td { background: var(--brand-soft); border-bottom-color: transparent; }
     .recent-table tr.detail-row td { background: #fbfcff; padding: 4px 12px 14px 56px; }
@@ -790,7 +796,14 @@
             <button type="button" class="btn btn-light-x btn-sm" id="btnRecentRefresh">รีเฟรช</button>
           </div>
         </div>
-        <div class="recent-hint">กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดของรายการ ติ๊กช่องหน้ารายการแล้วกด <b>แบ็คอัพที่เลือก</b> เพื่อย้ายไปชีต BackupData และลบออกจากชีต Data</div>
+        <div class="source-bar">
+          <div class="source-switch" role="group" aria-label="เลือกชีตที่ต้องการดู">
+            <button type="button" class="active" data-source="data" aria-pressed="true">ชีต Data</button>
+            <button type="button" data-source="backup" aria-pressed="false">ชีต BackupData</button>
+          </div>
+        </div>
+        <div class="recent-hint" id="hintData">กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดของรายการ ติ๊กช่องหน้ารายการแล้วกด <b>แบ็คอัพที่เลือก</b> เพื่อย้ายไปชีต BackupData และลบออกจากชีต Data</div>
+        <div class="recent-hint d-none" id="hintBackup">รายการที่แบ็คอัพแล้ว (ดูอย่างเดียว) กด <span class="row-toggle demo" aria-hidden="true">+</span> เพื่อดูข้อมูลทั้งหมดและวันที่แบ็คอัพ</div>
         <div class="card-body-x pb-3">
           <div class="recent-wrap" id="recentWrap">
             <div class="empty-state">กดรีเฟรชเพื่อโหลดข้อมูล</div>
@@ -1711,12 +1724,24 @@
         loading.className = 'empty-state';
         loading.textContent = 'กำลังโหลด...';
         wrap.appendChild(loading);
+        var isBackup = recentSource === 'backup';
+        byId('btnBackup').classList.toggle('d-none', isBackup);
+        byId('hintData').classList.toggle('d-none', isBackup);
+        byId('hintBackup').classList.toggle('d-none', !isBackup);
         updateSelCount();
-        adminCall('adminGetRecent', Number(byId('recentLimit').value)).then(function (r) {
+        var limit = Number(byId('recentLimit').value);
+        var req = isBackup ? adminCall('adminGetBackup', limit) : adminCall('adminGetRecent', limit);
+        req.then(function (r) {
+          if ((recentSource === 'backup') !== isBackup) return;
           admin.recentLoaded = true;
-          admin.recentMeta = { rowNums: r.rowNums || [], sigs: r.sigs || [] };
-          byId('recentInfo').textContent = 'ทั้งหมด ' + r.total + ' รายการในชีต Data | แสดง ' + r.rows.length + ' รายการล่าสุด | BackupData ' + (r.backupTotal || 0) + ' รายการ';
-          renderRecent(r.rows);
+          if (isBackup) {
+            admin.recentMeta = { rowNums: [], sigs: [] };
+            byId('recentInfo').textContent = 'ทั้งหมด ' + r.total + ' รายการในชีต BackupData | แสดง ' + r.rows.length + ' รายการล่าสุด | Data ' + (r.dataTotal || 0) + ' รายการ';
+          } else {
+            admin.recentMeta = { rowNums: r.rowNums || [], sigs: r.sigs || [] };
+            byId('recentInfo').textContent = 'ทั้งหมด ' + r.total + ' รายการในชีต Data | แสดง ' + r.rows.length + ' รายการล่าสุด | BackupData ' + (r.backupTotal || 0) + ' รายการ';
+          }
+          renderRecent(r.rows, isBackup);
           updateSelCount();
         }).catch(function (err) {
           wrap.innerHTML = '';
@@ -1727,13 +1752,14 @@
         });
       }
 
-      function renderRecent(rows) {
+      function renderRecent(rows, isBackup) {
         var wrap = byId('recentWrap');
+        var selectable = !isBackup;
         wrap.innerHTML = '';
         if (!rows.length) {
           var empty = document.createElement('div');
           empty.className = 'empty-state';
-          empty.textContent = 'ยังไม่มีข้อมูลที่บันทึก';
+          empty.textContent = isBackup ? 'ยังไม่มีข้อมูลในชีต BackupData' : 'ยังไม่มีข้อมูลที่บันทึก';
           wrap.appendChild(empty);
           return;
         }
@@ -1756,7 +1782,7 @@
           updateSelCount();
         });
         thSel.appendChild(selAll);
-        hr.appendChild(thSel);
+        if (selectable) hr.appendChild(thSel);
         var thToggle = document.createElement('th');
         thToggle.className = 'col-toggle';
         hr.appendChild(thToggle);
@@ -1768,12 +1794,12 @@
         });
         thead.appendChild(hr);
         table.appendChild(thead);
-        var colCount = RECENT_VIEW.length + 2;
+        var colCount = RECENT_VIEW.length + (selectable ? 2 : 1);
         var tbody = document.createElement('tbody');
         rows.forEach(function (row, i) {
           var tr = document.createElement('tr');
           tr.className = 'main-row';
-          var detail = buildDetailRow(row, colCount, 'recent-detail-' + i);
+          var detail = buildDetailRow(row, colCount, 'recent-detail-' + i, isBackup);
 
           var tdSel = document.createElement('td');
           tdSel.className = 'col-sel';
@@ -1787,7 +1813,7 @@
             updateSelCount();
           });
           tdSel.appendChild(cb);
-          tr.appendChild(tdSel);
+          if (selectable) tr.appendChild(tdSel);
 
           var tdToggle = document.createElement('td');
           tdToggle.className = 'col-toggle';
@@ -1819,6 +1845,19 @@
         wrap.appendChild(table);
         byId('btnRecentExpand').classList.remove('d-none');
         byId('btnRecentExpand').textContent = '+ ขยายทั้งหมด';
+      }
+
+      var recentSource = 'data';
+
+      function setRecentSource(src) {
+        if (src === recentSource) return;
+        recentSource = src;
+        Array.prototype.forEach.call(document.querySelectorAll('.source-switch button'), function (b) {
+          var on = b.getAttribute('data-source') === src;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        loadRecent();
       }
 
       function selectedBoxes() {
@@ -1883,7 +1922,7 @@
         parent.appendChild(a);
       }
 
-      function buildDetailRow(row, colCount, id) {
+      function buildDetailRow(row, colCount, id, isBackup) {
         var tr = document.createElement('tr');
         tr.className = 'detail-row d-none';
         tr.id = id;
@@ -1891,7 +1930,9 @@
         td.colSpan = colCount;
         var grid = document.createElement('dl');
         grid.className = 'detail-grid';
-        RECENT_COLS.concat([['รูปสลิป', 18]]).forEach(function (c) {
+        var cols = RECENT_COLS.concat([['รูปสลิป', 18]]);
+        if (isBackup) cols = cols.concat([['วันที่แบ็คอัพ', 19]]);
+        cols.forEach(function (c) {
           var item = document.createElement('div');
           item.className = 'detail-item';
           var dt = document.createElement('dt');
@@ -2004,6 +2045,9 @@
       byId('btnFolderSave').addEventListener('click', onFolderSave);
       byId('btnFormSave').addEventListener('click', onFormSave);
       byId('btnBackup').addEventListener('click', onBackup);
+      Array.prototype.forEach.call(document.querySelectorAll('.source-switch button'), function (b) {
+        b.addEventListener('click', function () { setRecentSource(b.getAttribute('data-source')); });
+      });
       byId('bannerInput').addEventListener('change', onBannerPick);
       byId('btnBannerSave').addEventListener('click', onBannerSave);
       byId('btnBannerCancel').addEventListener('click', onBannerCancel);

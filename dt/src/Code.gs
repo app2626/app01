@@ -760,6 +760,20 @@ function adminGetRecent(token, limit) {
   };
 }
 
+// รายการในชีต BackupData (ใหม่สุดอยู่บน) อ่านอย่างเดียว คอลัมน์สุดท้ายคือวันที่แบ็คอัพ
+function adminGetBackup(token, limit) {
+  requireAdmin_(token);
+  const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
+  const sheet = getSpreadsheet_().getSheetByName(BACKUP_SHEET_NAME);
+  const dataSheet = getSpreadsheet_().getSheetByName(DATA_SHEET_NAME);
+  const dataTotal = dataSheet ? Math.max(0, dataSheet.getLastRow() - 1) : 0;
+  if (!sheet || sheet.getLastRow() < 2) return { total: 0, rows: [], dataTotal: dataTotal };
+  const last = sheet.getLastRow();
+  const count = Math.min(n, last - 1);
+  const values = sheet.getRange(last - count + 1, 1, count, DATA_HEADERS.length + 1).getDisplayValues();
+  return { total: last - 1, rows: values.reverse(), dataTotal: dataTotal };
+}
+
 // ===== แบ็คอัพข้อมูล: ย้ายแถวที่เลือกจาก Data ไป BackupData =====
 function rowSig_(displayRow) {
   const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(displayRow), Utilities.Charset.UTF_8);
