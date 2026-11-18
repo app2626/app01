@@ -80,6 +80,8 @@ const PROP_BANNER_ID = 'BANNER_FILE_ID';
 const PROP_TG_ENABLED = 'TG_ENABLED';
 const PROP_TG_TOKEN = 'TG_BOT_TOKEN';
 const PROP_TG_CHAT = 'TG_CHAT_ID';
+
+const SETTINGS_SHEET_NAME = 'Settings';
 const PROP_BANNER_VER = 'BANNER_VER';
 
 const MAX_BANNER_BYTES = 3 * 1024 * 1024;  // 3 MB หลังถอด Base64
@@ -477,6 +479,7 @@ function adminSaveBanner(token, dataUrl) {
   if (oldId && oldId !== file.getId()) {
     try { DriveApp.getFileById(oldId).setTrashed(true); } catch (e) { console.warn('ลบแบนเนอร์เก่าไม่สำเร็จ: ' + e.message); }
   }
+  syncSettingsSheet_();
   return { banner: describeBanner_(), message: 'บันทึกแบนเนอร์แล้ว' };
 }
 
@@ -489,6 +492,7 @@ function adminDeleteBanner(token) {
   }
   p.deleteProperty(PROP_BANNER_ID);
   p.setProperty(PROP_BANNER_VER, Utilities.getUuid().substring(0, 8));
+  syncSettingsSheet_();
   return { banner: describeBanner_(), message: 'ลบแบนเนอร์แล้ว' };
 }
 
@@ -751,7 +755,7 @@ function adminSetup(setupCode, newPassword) {
   const given = String(setupCode || '').trim().toUpperCase();
   if (!code || Date.now() > exp || given !== code) {
     recordLoginFail_(ADMIN_USERNAME);
-    throw new Error('รหัสตั้งค่าไม่ถูกต้องหรือหมดอายุ (ให้เจ้าของสคริปต์รัน createAdminSetupCode ใน Editor เพื่อสร้างรหัสใหม่)');
+    throw new Error('รหัสตั้งค่าไม่ถูกต้องหรือหมดอายุ (ติดต่อแอดมินเพื่อขอรหัสใหม่)');
   }
   storePassword_(checkNewPassword_(newPassword));
   p.deleteProperty(PROP_SETUP_CODE);
@@ -828,6 +832,7 @@ function adminCreateStaff(token, data) {
   } finally {
     lock.releaseLock();
   }
+  syncSettingsSheet_();
   return { staff: listStaff_(), message: 'เพิ่มเจ้าหน้าที่ ' + name + ' แล้ว' };
 }
 
@@ -855,6 +860,7 @@ function adminUpdateStaff(token, username, changes) {
     msg = 'ตั้งรหัสผ่านใหม่แล้ว';
   }
   putStaff_(u, rec);
+  syncSettingsSheet_();
   return { staff: listStaff_(), message: msg };
 }
 
@@ -862,6 +868,7 @@ function adminDeleteStaff(token, username) {
   requireAdmin_(token);
   const u = normUsername_(username);
   props_().deleteProperty(STAFF_PREFIX + u);
+  syncSettingsSheet_();
   return { staff: listStaff_(), message: 'ลบบัญชี ' + u + ' แล้ว' };
 }
 
@@ -945,6 +952,7 @@ function adminSaveSettings(token, data) {
   if (subtitle) p.setProperty(PROP_SUBTITLE, subtitle); else p.deleteProperty(PROP_SUBTITLE);
   p.setProperty(PROP_REQUIRED, JSON.stringify(req));
   const s = getSettings_();
+  syncSettingsSheet_();
   return { settings: { title: s.title, subtitle: s.subtitle, required: s.required }, message: 'บันทึกการตั้งค่าฟอร์มแล้ว' };
 }
 
@@ -996,6 +1004,56 @@ function sendTelegram_(botToken, chatId, html) {
   }
 }
 
+// ===== สำเนาการตั้งค่าลงชีต Settings (ไว้ดูเท่านั้น ระบบอ่านค่าจาก Script Properties) =====
+// ไม่เขียนรหัสผ่าน/แฮชรหัสผ่านลงชีต ส่วน Bot Token เขียนค่าเต็มตามที่เจ้าของระบบเลือก
+function syncSettingsSheet_() {
+  try {
+    const s = getSettings_();
+    const t = getTelegram_();
+    const rows = [];
+    const add = function (group, item, value) { rows.push([group, item, value == null ? '' : String(value)]); };
+
+    add('ฟอร์ม', 'ชื่อระบบ', s.title);
+    add('ฟอร์ม', 'คำอธิบายใต้หัวข้อ', s.subtitle);
+    Object.keys(OPTIONAL_REQUIRED).forEach(function (k) {
+      add('ช่องบังคับกรอก', OPTIONAL_REQUIRED[k], s.required[k] ? 'บังคับ' : 'ไม่บังคับ');
+    });
+
+    let folder = null;
+    try { folder = describeFolder_(); } catch (e) { folder = null; }
+    add('โฟลเดอร์สลิป', 'Folder ID', folder ? folder.activeId : s.folderId);
+    add('โฟลเดอร์สลิป', 'ชื่อโฟลเดอร์', folder ? folder.activeName : '');
+    add('โฟลเดอร์สลิป', 'ลิงก์', folder ? folder.activeUrl : '');
+
+    let banner = { has: false };
+    try { banner = describeBanner_(); } catch (e) { banner = { has: false }; }
+    add('แบนเนอร์', 'ไฟล์', banner.has ? banner.name + ' (' + banner.updated + ')' : 'ไม่มี');
+
+    add('Telegram', 'การแจ้งเตือน', t.enabled ? 'เปิด' : 'ปิด');
+    add('Telegram', 'Bot Token', t.botToken);
+    add('Telegram', 'Chat ID', t.chatId);
+
+    const staff = listStaff_();
+    if (!staff.length) add('เจ้าหน้าที่', '-', 'ยังไม่มีบัญชี');
+    staff.forEach(function (st) {
+      add('เจ้าหน้าที่', st.username, (st.name || '') + (st.active ? '' : ' (ปิดใช้งาน)'));
+    });
+
+    add('ระบบ', 'อัปเดตล่าสุด', Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss'));
+
+    const ss = getSpreadsheet_();
+    let sh = ss.getSheetByName(SETTINGS_SHEET_NAME);
+    if (!sh) sh = ss.insertSheet(SETTINGS_SHEET_NAME);
+    sh.clearContents();
+    sh.getRange(1, 1, 1, 3).setValues([['หมวด', 'รายการ', 'ค่า']]).setFontWeight('bold');
+    sh.getRange(2, 1, rows.length, 3).setNumberFormat('@').setValues(rows);
+    sh.setFrozenRows(1);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    console.error('Settings sheet sync failed: ' + (e && e.message ? e.message : e));
+  }
+}
+
 function notifyNewRecord_(f, stamp) {
   try {
     const t = getTelegram_();
@@ -1030,6 +1088,7 @@ function adminSaveTelegram(token, data) {
   if (botToken) p.setProperty(PROP_TG_TOKEN, botToken);
   if (chatId) p.setProperty(PROP_TG_CHAT, chatId); else p.deleteProperty(PROP_TG_CHAT);
   p.setProperty(PROP_TG_ENABLED, enabled ? 'true' : 'false');
+  syncSettingsSheet_();
   return { telegram: describeTelegram_(), message: 'บันทึกการแจ้งเตือน Telegram แล้ว' };
 }
 
@@ -1038,6 +1097,7 @@ function adminClearTelegramToken(token) {
   const p = props_();
   p.deleteProperty(PROP_TG_TOKEN);
   p.setProperty(PROP_TG_ENABLED, 'false');
+  syncSettingsSheet_();
   return { telegram: describeTelegram_(), message: 'ลบ Bot Token และปิดการแจ้งเตือนแล้ว' };
 }
 
@@ -1106,6 +1166,7 @@ function adminSaveFolder(token, input) {
   } else {
     props_().deleteProperty(PROP_FOLDER_ID);
   }
+  syncSettingsSheet_();
   return { folder: describeFolder_(), message: 'บันทึกโฟลเดอร์เก็บสลิปแล้ว' };
 }
 
@@ -1444,6 +1505,13 @@ function authorizeOnce() {
   console.log('Slip folder: ' + getSlipFolder_().getName());
   console.log(JSON.stringify(getInitialData()));
   if (!props_().getProperty(PROP_PW_HASH)) createAdminSetupCode();
+  syncSettingsSheet_();
+}
+
+// รันเองใน editor เพื่อเขียนค่าปัจจุบันลงชีต Settings ทันที
+function syncSettingsSheetNow() {
+  syncSettingsSheet_();
+  console.log('เขียนการตั้งค่าลงชีต ' + SETTINGS_SHEET_NAME + ' แล้ว');
 }
 
 // สร้างรหัสตั้งค่า (ใช้ตั้งรหัสผ่านแอดมินครั้งแรก หรือรีเซ็ตเมื่อลืมรหัส) ดูรหัสได้ใน Execution log
