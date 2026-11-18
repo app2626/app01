@@ -302,6 +302,13 @@
     .status-badge.done { background: #e7f6ec; color: #11692f; border-color: #bfe5cb; }
     .status-badge.pending { background: #fff4e0; color: #8a4b00; border-color: #f6d79b; }
     .status-badge.none { background: #f1f3f7; color: var(--muted); }
+    .pager-x { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; margin-top: 14px; }
+    .pager-x button { min-width: 38px; height: 36px; padding: 0 10px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font: inherit; font-size: .9rem; color: inherit; cursor: pointer; }
+    .pager-x button:hover:not(:disabled) { background: #f6f8fd; }
+    .pager-x button[aria-current="page"] { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; cursor: default; }
+    .pager-x button:disabled:not([aria-current]) { opacity: .45; cursor: default; }
+    .pager-x .pager-gap { padding: 0 2px; color: var(--muted); }
+    .pager-x .pager-info { flex-basis: 100%; text-align: center; font-size: .82rem; color: var(--muted); }
     .status-badge.cancelled { background: #fdecec; color: #a11d1d; border-color: #f3c2c2; }
     button.status-badge { cursor: pointer; }
     button.status-badge:hover { filter: brightness(.96); }
@@ -925,6 +932,7 @@
           <div class="recent-wrap" id="recentWrap">
             <div class="empty-state">กดรีเฟรชเพื่อโหลดข้อมูล</div>
           </div>
+          <nav class="pager-x d-none" id="recentPager" aria-label="เลือกหน้า"></nav>
         </div>
       </section>
     </main>
@@ -1982,11 +1990,13 @@
         var q = byId('recentSearch').value.trim();
         var status = byId('recentStatus').value;
         var reqId = ++recentReqId;
-        var req = isBackup ? adminCall('adminGetBackup', limit, q, status) : adminCall('adminGetRecent', limit, q, status);
+        var req = isBackup ? adminCall('adminGetBackup', limit, q, status, recentPage)
+                           : adminCall('adminGetRecent', limit, q, status, recentPage);
         req.then(function (r) {
           if (reqId !== recentReqId) return;
           admin.recentLoaded = true;
           if (r.me) setMe(r.me);
+          recentPage = r.page || 1;
           var sheetName = isBackup ? 'BackupData' : 'Data';
           var other = isBackup ? 'Data ' + (r.dataTotal || 0) : 'BackupData ' + (r.backupTotal || 0);
           var info;
@@ -1994,17 +2004,21 @@
             var what = [];
             if (q) what.push('ค้นหา "' + q + '"');
             if (status) what.push('สถานะ: ' + ({ done: 'คีย์ต่อแล้ว', pending: 'รอคีย์', cancelled: 'ยกเลิก' }[status] || status));
-            info = what.join(' + ') + ' พบ ' + r.matched + ' จาก ' + r.total + ' รายการในชีต ' + sheetName +
-              (r.matched > r.rows.length ? ' | แสดง ' + r.rows.length + ' รายการล่าสุด' : '');
+            info = what.join(' + ') + ' พบ ' + r.matched + ' จาก ' + r.total + ' รายการในชีต ' + sheetName;
           } else {
-            info = 'ทั้งหมด ' + r.total + ' รายการในชีต ' + sheetName + ' | แสดง ' + r.rows.length + ' รายการล่าสุด';
+            info = 'ทั้งหมด ' + r.total + ' รายการในชีต ' + sheetName;
+          }
+          if (r.rows.length) {
+            info += ' | แสดง ' + ((r.offset || 0) + 1) + '–' + ((r.offset || 0) + r.rows.length);
           }
           byId('recentInfo').textContent = info + ' | ' + other + ' รายการ';
           admin.recentMeta = { rowNums: r.rowNums || [], sigs: r.sigs || [] };
           renderRecent(r.rows, isBackup, q);
+          renderPager(r.page || 1, r.pages || 1, r.matched || 0);
           updateSelCount();
         }).catch(function (err) {
           if (reqId !== recentReqId) return;
+          byId('recentPager').classList.add('d-none');
           wrap.innerHTML = '';
           var e = document.createElement('div');
           e.className = 'empty-state text-danger';
@@ -2135,26 +2149,91 @@
 
       var recentSource = 'data';
       var recentReqId = 0;
+      var recentPage = 1;
       var searchTimer = null;
+
+      // เปลี่ยนตัวกรอง/คำค้น/จำนวนต่อหน้า/ชีต -> กลับไปหน้า 1  (รีเฟรช/หลังแบ็คอัพ -> อยู่หน้าเดิม)
+      function loadRecentFirstPage() {
+        recentPage = 1;
+        loadRecent();
+      }
+
+      function goRecentPage(p) {
+        if (p === recentPage) return;
+        recentPage = p;
+        loadRecent();
+        var card = byId('recentWrap').closest('.section-card');
+        if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      // ก่อนหน้า 1 … 4 5 [6] 7 8 … 20 ถัดไป
+      function renderPager(page, pages, matched) {
+        var nav = byId('recentPager');
+        nav.innerHTML = '';
+        if (pages <= 1) {
+          nav.classList.add('d-none');
+          return;
+        }
+        nav.classList.remove('d-none');
+        var addBtn = function (label, target, opts) {
+          opts = opts || {};
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = label;
+          if (opts.aria) b.setAttribute('aria-label', opts.aria);
+          if (target === page && !opts.nav) {
+            b.setAttribute('aria-current', 'page');
+            b.disabled = true;
+          } else if (opts.disabled) {
+            b.disabled = true;
+          } else {
+            b.addEventListener('click', function () { goRecentPage(target); });
+          }
+          nav.appendChild(b);
+        };
+        var gap = function () {
+          var s = document.createElement('span');
+          s.className = 'pager-gap';
+          s.textContent = '…';
+          nav.appendChild(s);
+        };
+        addBtn('‹ ก่อนหน้า', page - 1, { nav: true, disabled: page <= 1, aria: 'หน้าก่อนหน้า' });
+        var from = Math.max(1, Math.min(page - 2, pages - 4));
+        var to = Math.min(pages, from + 4);
+        if (from > 1) {
+          addBtn('1', 1, { aria: 'หน้า 1' });
+          if (from > 2) gap();
+        }
+        for (var p = from; p <= to; p++) addBtn(String(p), p, { aria: 'หน้า ' + p });
+        if (to < pages) {
+          if (to < pages - 1) gap();
+          addBtn(String(pages), pages, { aria: 'หน้า ' + pages });
+        }
+        addBtn('ถัดไป ›', page + 1, { nav: true, disabled: page >= pages, aria: 'หน้าถัดไป' });
+        var info = document.createElement('div');
+        info.className = 'pager-info';
+        info.textContent = 'หน้า ' + page + ' / ' + pages + ' (' + matched + ' รายการ)';
+        nav.appendChild(info);
+      }
 
       function onSearchInput() {
         var has = byId('recentSearch').value.length > 0;
         byId('btnSearchClear').classList.toggle('d-none', !has);
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(loadRecent, 500);
+        searchTimer = setTimeout(loadRecentFirstPage, 500);
       }
 
       function onSearchSubmit(e) {
         e.preventDefault();
         clearTimeout(searchTimer);
-        loadRecent();
+        loadRecentFirstPage();
       }
 
       function onSearchClear() {
         byId('recentSearch').value = '';
         byId('btnSearchClear').classList.add('d-none');
         clearTimeout(searchTimer);
-        loadRecent();
+        loadRecentFirstPage();
         byId('recentSearch').focus();
       }
 
@@ -2166,7 +2245,7 @@
           b.classList.toggle('active', on);
           b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
-        loadRecent();
+        loadRecentFirstPage();
       }
 
       function selectedBoxes() {
@@ -2717,7 +2796,7 @@
       byId('btnRecordsLogout').addEventListener('click', onRecordsLogout);
       byId('btnMyPassword').addEventListener('click', onMyPassword);
       byId('staffAddForm').addEventListener('submit', onStaffAdd);
-      byId('recentStatus').addEventListener('change', loadRecent);
+      byId('recentStatus').addEventListener('change', loadRecentFirstPage);
       renderUserChip();
       byId('recentSearch').addEventListener('input', onSearchInput);
       byId('recentSearchForm').addEventListener('submit', onSearchSubmit);
@@ -2731,7 +2810,7 @@
       byId('btnBannerDelete').addEventListener('click', onBannerDelete);
       byId('btnRecentRefresh').addEventListener('click', loadRecent);
       byId('btnRecentExpand').addEventListener('click', onRecentExpandAll);
-      byId('recentLimit').addEventListener('change', loadRecent);
+      byId('recentLimit').addEventListener('change', loadRecentFirstPage);
 
       loadOptions();
       loadBanner();

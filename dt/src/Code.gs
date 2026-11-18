@@ -1204,7 +1204,7 @@ function adminSaveFolder(token, input) {
 // รายการที่บันทึกล่าสุด (ใหม่สุดอยู่บน) — แอดมินและเจ้าหน้าที่รับเรื่อง
 // rowNums/sigs ใช้ยืนยันแถวตอนแบ็คอัพ/ติ๊กคีย์ (กันแก้ผิดแถวถ้าชีตเปลี่ยนระหว่างนั้น)
 // status: '' ทั้งหมด | 'pending' รอคีย์ | 'done' คีย์ต่อแล้ว
-function adminGetRecent(token, limit, query, status) {
+function adminGetRecent(token, limit, query, status, page) {
   const me = requireStaff_(token);
   const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
   const ss = getSpreadsheet_();
@@ -1212,10 +1212,10 @@ function adminGetRecent(token, limit, query, status) {
   const backupTotal = countBackup_();
   const base = { me: publicMe_(me), backupTotal: backupTotal };
   if (!sheet || sheet.getLastRow() < 2) {
-    return Object.assign({ total: 0, matched: 0, rows: [], rowNums: [], sigs: [] }, base);
+    return Object.assign({ total: 0, matched: 0, rows: [], rowNums: [], sigs: [], page: 1, pages: 1, offset: 0 }, base);
   }
   ensureDataColumns_(sheet);
-  const r = readNewest_(sheet, DATA_HEADERS.length, n, query, status);
+  const r = readNewest_(sheet, DATA_HEADERS.length, n, query, status, page);
   r.sigs = r.rows.map(rowSig_);
   return Object.assign(r, base);
 }
@@ -1240,24 +1240,32 @@ function rowStatus_(row) {
   return isKeyed_(row) ? 'done' : 'pending';
 }
 
-// อ่านแถวใหม่สุดก่อน คืน {total, matched, rows, rowNums}
-// ไม่มีตัวกรอง: อ่านเฉพาะ n แถวท้ายชีต / มีคำค้นหรือสถานะ: ค้นทั้งชีต แล้วคืนที่ตรงไม่เกิน n แถว
-function readNewest_(sheet, cols, n, query, status) {
+// อ่านแถวใหม่สุดก่อน แบ่งหน้าละ n แถว คืน {total, matched, rows, rowNums, page, pages, offset}
+// ไม่มีตัวกรอง: อ่านเฉพาะแถวของหน้านั้น / มีคำค้นหรือสถานะ: ค้นทั้งชีต แล้วตัดเอาเฉพาะหน้านั้น
+// page เกินจำนวนหน้าที่มี -> ใช้หน้าสุดท้าย
+function readNewest_(sheet, cols, n, query, status, page) {
   const last = sheet.getLastRow();
   const total = last - 1;
   const words = parseQuery_(query);
   const st = status === 'pending' || status === 'done' || status === 'cancelled' ? status : '';
+  const want = Math.max(1, Math.floor(Number(page)) || 1);
+  const paging = function (matched) {
+    const pages = Math.max(1, Math.ceil(matched / n));
+    const p = Math.min(want, pages);
+    return { page: p, pages: pages, offset: (p - 1) * n };
+  };
   if (!words.length && !st) {
-    const count = Math.min(n, total);
-    const first = last - count + 1;
+    const pg = paging(total);
+    const end = last - pg.offset;                 // แถวใหม่สุดของหน้านี้
+    const count = Math.max(0, Math.min(n, end - 1));
+    if (!count) return Object.assign({ total: total, matched: total, rows: [], rowNums: [] }, pg);
+    const first = end - count + 1;
     const vals = sheet.getRange(first, 1, count, cols).getDisplayValues();
     const nums = vals.map(function (_, i) { return first + i; });
-    return { total: total, matched: total, rows: vals.reverse(), rowNums: nums.reverse() };
+    return Object.assign({ total: total, matched: total, rows: vals.reverse(), rowNums: nums.reverse() }, pg);
   }
   const values = sheet.getRange(2, 1, total, cols).getDisplayValues();
-  const rows = [];
-  const rowNums = [];
-  let matched = 0;
+  const hits = [];
   for (let i = values.length - 1; i >= 0; i--) {
     const row = values[i];
     if (st && rowStatus_(row) !== st) continue;
@@ -1265,17 +1273,20 @@ function readNewest_(sheet, cols, n, query, status) {
       const hay = row.join('\u0001').toLowerCase();
       if (!words.every(function (w) { return hay.indexOf(w) !== -1; })) continue;
     }
-    matched++;
-    if (rows.length < n) {
-      rows.push(row);
-      rowNums.push(i + 2);
-    }
+    hits.push(i);
   }
-  return { total: total, matched: matched, rows: rows, rowNums: rowNums };
+  const pg = paging(hits.length);
+  const slice = hits.slice(pg.offset, pg.offset + n);
+  return Object.assign({
+    total: total,
+    matched: hits.length,
+    rows: slice.map(function (i) { return values[i]; }),
+    rowNums: slice.map(function (i) { return i + 2; })
+  }, pg);
 }
 
 // รายการในชีต BackupData (ใหม่สุดอยู่บน) อ่านอย่างเดียว คอลัมน์สุดท้ายคือวันที่แบ็คอัพ
-function adminGetBackup(token, limit, query, status) {
+function adminGetBackup(token, limit, query, status, page) {
   const me = requireStaff_(token);
   const n = Math.max(1, Math.min(MAX_RECENT, Number(limit) || 20));
   const ss = getSpreadsheet_();
@@ -1283,9 +1294,9 @@ function adminGetBackup(token, limit, query, status) {
   const dataSheet = ss.getSheetByName(DATA_SHEET_NAME);
   const dataTotal = dataSheet ? Math.max(0, dataSheet.getLastRow() - 1) : 0;
   const base = { me: publicMe_(me), dataTotal: dataTotal };
-  if (!sheet || sheet.getLastRow() < 2) return Object.assign({ total: 0, matched: 0, rows: [] }, base);
+  if (!sheet || sheet.getLastRow() < 2) return Object.assign({ total: 0, matched: 0, rows: [], page: 1, pages: 1, offset: 0 }, base);
   ensureBackupLayout_(sheet);
-  const r = readNewest_(sheet, DATA_HEADERS.length + 1, n, query, status);
+  const r = readNewest_(sheet, DATA_HEADERS.length + 1, n, query, status, page);
   r.sigs = r.rows.map(rowSig_);
   return Object.assign(r, base);
 }
