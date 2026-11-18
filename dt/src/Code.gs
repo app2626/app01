@@ -28,11 +28,12 @@ const DATA_HEADERS = [
   'รายละเอียดสินค้า', 'imei', 'ราคา', 'ส่วนลด', 'โค้ดผ่อน', 'เลขที่บิล',
   'เลขบัตรเครดิต', 'ชื่อเจ้าของบัตรเครดิต', 'ชื่อธนาคาร', 'Tid เครื่อง',
   'Trace', 'จำนวนเดือนที่ผ่อน', 'รูปสลิป',
-  'คีย์ต่อแล้ว', 'ชื่อผู้ดำเนินการ'
+  'คีย์ต่อแล้ว', 'ชื่อผู้ดำเนินการ', 'ยกเลิก'
 ];
 const BASE_COLS = 19;     // A–S มาจากฟอร์ม (ใช้ยืนยันตัวตนของแถว)
 const COL_KEYED = 20;     // T  ติ๊กถูก: เจ้าหน้าที่รับเรื่องคีย์ต่อแล้ว
 const COL_OPERATOR = 21;  // U  ชื่อผู้ดำเนินการ
+const COL_CANCEL = 22;    // V  ติ๊กถูก: ยกเลิกรายการ (ติ๊กพร้อมคีย์ต่อแล้วไม่ได้)
 const MAX_OPERATOR_LENGTH = 100;
 
 // ช่องที่บังคับกรอกเสมอ (ปิดไม่ได้)
@@ -231,10 +232,12 @@ function saveData(formData) {
       safeText_(f.installmentMonths),
       slipUrl,
       false,
-      ''
+      '',
+      false
     ];
     sheet.appendRow(row);
     sheet.getRange(sheet.getLastRow(), COL_KEYED).insertCheckboxes();
+    sheet.getRange(sheet.getLastRow(), COL_CANCEL).insertCheckboxes();
     SpreadsheetApp.flush();
     savedRow = sheet.getLastRow();
   } catch (err) {
@@ -350,30 +353,43 @@ function getOrCreateDataSheet_(ss) {
   return sheet;
 }
 
-// เพิ่มคอลัมน์ T (คีย์ต่อแล้ว เป็นช่องติ๊ก) และ U (ชื่อผู้ดำเนินการ) ให้ชีต Data ที่สร้างไว้ก่อนมีคอลัมน์นี้
-// ทำครั้งเดียว: ถ้าหัวตาราง T/U ถูกต้องแล้วจะไม่แตะอะไรเลย
+// เพิ่มคอลัมน์ T (คีย์ต่อแล้ว), U (ชื่อผู้ดำเนินการ), V (ยกเลิก) ให้ชีต Data ที่สร้างไว้ก่อนมีคอลัมน์เหล่านี้
+// ทำทีละคอลัมน์: คอลัมน์ที่หัวตารางถูกต้องแล้วจะไม่แตะ / คอลัมน์ว่างจะใส่หัวตาราง (+ช่องติ๊ก)
 function ensureDataColumns_(sheet) {
-  const want = [DATA_HEADERS[COL_KEYED - 1], DATA_HEADERS[COL_OPERATOR - 1]];
-  if (sheet.getMaxColumns() >= COL_OPERATOR) {
-    const head = sheet.getRange(1, COL_KEYED, 1, 2).getDisplayValues()[0];
-    if (head[0] === want[0] && head[1] === want[1]) return;
-    if (head[0] || head[1]) {
-      throw new Error('คอลัมน์ T/U ของชีต ' + DATA_SHEET_NAME + ' มีหัวตารางอื่นอยู่แล้ว (' + head.join(', ') +
-        ') กรุณาย้ายข้อมูลนั้นออกก่อน ระบบต้องใช้ T = ' + want[0] + ', U = ' + want[1]);
-    }
-  } else {
-    sheet.insertColumnsAfter(sheet.getMaxColumns(), COL_OPERATOR - sheet.getMaxColumns());
+  const LETTER = { 20: 'T', 21: 'U', 22: 'V' };
+  const CHECKBOX = {};
+  CHECKBOX[COL_KEYED] = true;
+  CHECKBOX[COL_CANCEL] = true;
+  const lastCol = DATA_HEADERS.length;
+  if (sheet.getMaxColumns() < lastCol) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), lastCol - sheet.getMaxColumns());
   }
+  const head = sheet.getRange(1, BASE_COLS + 1, 1, lastCol - BASE_COLS).getDisplayValues()[0];
+  const missing = [];
+  for (let c = BASE_COLS + 1; c <= lastCol; c++) {
+    const have = head[c - BASE_COLS - 1];
+    const want = DATA_HEADERS[c - 1];
+    if (have === want) continue;
+    if (have) {
+      throw new Error('คอลัมน์ ' + LETTER[c] + ' ของชีต ' + DATA_SHEET_NAME + ' มีหัวตารางอื่นอยู่แล้ว (' + have +
+        ') กรุณาย้ายข้อมูลนั้นออกก่อน ระบบต้องใช้ ' + LETTER[c] + ' = ' + want);
+    }
+    missing.push(c);
+  }
+  if (!missing.length) return;
   const last = sheet.getLastRow();
-  if (last >= 2) {
-    const used = sheet.getRange(2, COL_KEYED, last - 1, 2).getDisplayValues()
-      .some(function (r) { return r[0] !== '' || r[1] !== ''; });
-    if (used) {
-      throw new Error('คอลัมน์ T/U ของชีต ' + DATA_SHEET_NAME + ' มีข้อมูลอยู่แต่ไม่มีหัวตาราง กรุณาตรวจสอบและย้ายข้อมูลออกก่อน');
+  missing.forEach(function (c) {
+    if (last >= 2) {
+      const used = sheet.getRange(2, c, last - 1, 1).getDisplayValues().some(function (r) { return r[0] !== ''; });
+      if (used) {
+        throw new Error('คอลัมน์ ' + LETTER[c] + ' ของชีต ' + DATA_SHEET_NAME + ' มีข้อมูลอยู่แต่ไม่มีหัวตาราง กรุณาตรวจสอบและย้ายข้อมูลออกก่อน');
+      }
     }
-  }
-  sheet.getRange(1, COL_KEYED, 1, 2).setValues([want]).setFontWeight('bold');
-  if (last >= 2) sheet.getRange(2, COL_KEYED, last - 1, 1).insertCheckboxes();
+  });
+  missing.forEach(function (c) {
+    sheet.getRange(1, c).setValue(DATA_HEADERS[c - 1]).setFontWeight('bold');
+    if (CHECKBOX[c] && last >= 2) sheet.getRange(2, c, last - 1, 1).insertCheckboxes();
+  });
 }
 
 // ===== Helpers: รูปสลิป =====
@@ -1199,13 +1215,23 @@ function isKeyed_(row) {
   return String(row[COL_KEYED - 1]).toUpperCase() === 'TRUE';
 }
 
+function isCancelled_(row) {
+  return String(row[COL_CANCEL - 1]).toUpperCase() === 'TRUE';
+}
+
+// สถานะของแถว: cancelled (ติ๊กยกเลิก) > done (คีย์ต่อแล้ว) > pending (รอคีย์)
+function rowStatus_(row) {
+  if (isCancelled_(row)) return 'cancelled';
+  return isKeyed_(row) ? 'done' : 'pending';
+}
+
 // อ่านแถวใหม่สุดก่อน คืน {total, matched, rows, rowNums}
 // ไม่มีตัวกรอง: อ่านเฉพาะ n แถวท้ายชีต / มีคำค้นหรือสถานะ: ค้นทั้งชีต แล้วคืนที่ตรงไม่เกิน n แถว
 function readNewest_(sheet, cols, n, query, status) {
   const last = sheet.getLastRow();
   const total = last - 1;
   const words = parseQuery_(query);
-  const st = status === 'pending' || status === 'done' ? status : '';
+  const st = status === 'pending' || status === 'done' || status === 'cancelled' ? status : '';
   if (!words.length && !st) {
     const count = Math.min(n, total);
     const first = last - count + 1;
@@ -1219,7 +1245,7 @@ function readNewest_(sheet, cols, n, query, status) {
   let matched = 0;
   for (let i = values.length - 1; i >= 0; i--) {
     const row = values[i];
-    if (st && isKeyed_(row) !== (st === 'done')) continue;
+    if (st && rowStatus_(row) !== st) continue;
     if (words.length) {
       const hay = row.join('\u0001').toLowerCase();
       if (!words.every(function (w) { return hay.indexOf(w) !== -1; })) continue;
@@ -1250,16 +1276,19 @@ function adminGetBackup(token, limit, query, status) {
 }
 
 // เจ้าหน้าที่ติ๊ก "คีย์ต่อแล้ว" และกรอกชื่อผู้ดำเนินการ ของแถวในชีต Data
-// item: { row, sig, keyed: true/false, operator: 'ชื่อ' }
+// item: { row, sig, keyed: true/false, cancelled: true/false, operator: 'ชื่อ' }
 function staffUpdateRow(token, item) {
   const me = requireStaff_(token);
   const it = item || {};
   const r = Number(it.row);
   if (!(r >= 2) || Math.floor(r) !== r) throw new Error('ข้อมูลแถวไม่ถูกต้อง');
   const keyed = it.keyed === true;
+  const cancelled = it.cancelled === true;
   const operator = str_(it.operator).replace(/\s+/g, ' ');
   if (operator.length > MAX_OPERATOR_LENGTH) throw new Error('ชื่อผู้ดำเนินการยาวเกิน ' + MAX_OPERATOR_LENGTH + ' ตัวอักษร');
+  if (keyed && cancelled) throw new Error('เลือกได้อย่างเดียว: คีย์ต่อแล้ว หรือ ยกเลิก');
   if (keyed && !operator) throw new Error('กรุณากรอกชื่อผู้ดำเนินการก่อนติ๊กคีย์ต่อแล้ว');
+  if (cancelled && !operator) throw new Error('กรุณากรอกชื่อผู้ดำเนินการก่อนติ๊กยกเลิก');
 
   const lock = LockService.getScriptLock();
   try {
@@ -1277,15 +1306,18 @@ function staffUpdateRow(token, item) {
     if (rowSig_(disp) !== String(it.sig || '')) throw new Error(stale);
 
     sheet.getRange(r, COL_KEYED).insertCheckboxes();
-    sheet.getRange(r, COL_KEYED, 1, 2).setValues([[keyed, safeText_(operator)]]);
+    sheet.getRange(r, COL_CANCEL).insertCheckboxes();
+    sheet.getRange(r, COL_KEYED, 1, 3).setValues([[keyed, safeText_(operator), cancelled]]);
     SpreadsheetApp.flush();
-    const after = sheet.getRange(r, COL_KEYED, 1, 2).getDisplayValues()[0];
-    console.log('staffUpdateRow row ' + r + ' keyed=' + keyed + ' by ' + me.username);
+    const after = sheet.getRange(r, COL_KEYED, 1, 3).getDisplayValues()[0];
+    console.log('staffUpdateRow row ' + r + ' keyed=' + keyed + ' cancelled=' + cancelled + ' by ' + me.username);
     return {
       keyed: keyed,
       keyedText: after[0],
       operator: after[1],
-      message: keyed ? 'บันทึกว่าคีย์ต่อแล้ว' : 'บันทึกแล้ว'
+      cancelled: cancelled,
+      cancelText: after[2],
+      message: cancelled ? 'บันทึกว่ายกเลิกแล้ว' : keyed ? 'บันทึกว่าคีย์ต่อแล้ว' : 'บันทึกแล้ว'
     };
   } finally {
     lock.releaseLock();
@@ -1328,15 +1360,22 @@ function getOrCreateBackupSheet_(ss) {
   return sh;
 }
 
-// BackupData รุ่นเก่า: วันที่แบ็คอัพอยู่คอลัมน์ T -> แทรก 2 คอลัมน์ (คีย์ต่อแล้ว, ชื่อผู้ดำเนินการ) ก่อนหน้า
+// BackupData รุ่นเก่า (ปรับทีละขั้น):
+// 1) วันที่แบ็คอัพอยู่คอลัมน์ T -> แทรก 2 คอลัมน์ (คีย์ต่อแล้ว, ชื่อผู้ดำเนินการ) ก่อนหน้า
+// 2) วันที่แบ็คอัพอยู่คอลัมน์ V -> แทรก 1 คอลัมน์ (ยกเลิก) ก่อนหน้า วันที่แบ็คอัพจึงย้ายไป W
 function ensureBackupLayout_(sh) {
   if (sh.getLastColumn() < BASE_COLS + 1) return;
-  const t = sh.getRange(1, BASE_COLS + 1).getDisplayValue();
-  if (t !== BACKUP_TIME_HEADER) return;
-  sh.insertColumnsBefore(BASE_COLS + 1, 2);
-  sh.getRange(1, COL_KEYED, 1, 2)
-    .setValues([[DATA_HEADERS[COL_KEYED - 1], DATA_HEADERS[COL_OPERATOR - 1]]])
-    .setFontWeight('bold');
+  if (sh.getRange(1, BASE_COLS + 1).getDisplayValue() === BACKUP_TIME_HEADER) {
+    sh.insertColumnsBefore(BASE_COLS + 1, 2);
+    sh.getRange(1, COL_KEYED, 1, 2)
+      .setValues([[DATA_HEADERS[COL_KEYED - 1], DATA_HEADERS[COL_OPERATOR - 1]]])
+      .setFontWeight('bold');
+  }
+  if (sh.getLastColumn() >= COL_CANCEL &&
+      sh.getRange(1, COL_CANCEL).getDisplayValue() === BACKUP_TIME_HEADER) {
+    sh.insertColumnsBefore(COL_CANCEL, 1);
+    sh.getRange(1, COL_CANCEL).setValue(DATA_HEADERS[COL_CANCEL - 1]).setFontWeight('bold');
+  }
 }
 
 // แปลง items [{row, sig}] -> { แถว: sig } พร้อมตรวจรูปแบบ
@@ -1400,7 +1439,7 @@ function adminRestoreRows(token, items) {
     if (!v.ok.length) {
       throw new Error('ข้อมูลในชีต ' + BACKUP_SHEET_NAME + ' เปลี่ยนไปแล้ว ไม่มีรายการที่ย้ายกลับได้ กรุณากดรีเฟรชแล้วเลือกใหม่');
     }
-    const cols = DATA_HEADERS.length;   // A–U (ไม่เอาวันที่แบ็คอัพ)
+    const cols = DATA_HEADERS.length;   // A–V (ไม่เอาวันที่แบ็คอัพ)
 
     // 1) คัดลอกกลับไปต่อท้าย Data
     const data = getOrCreateDataSheet_(ss);
@@ -1411,6 +1450,7 @@ function adminRestoreRows(token, items) {
       dest += run[1];
     });
     data.getRange(start, COL_KEYED, v.ok.length, 1).insertCheckboxes();   // แถวที่แบ็คอัพไว้ก่อนมีคอลัมน์ T
+    data.getRange(start, COL_CANCEL, v.ok.length, 1).insertCheckboxes();  // แถวที่แบ็คอัพไว้ก่อนมีคอลัมน์ V
     SpreadsheetApp.flush();
 
     // 2) ลบออกจาก BackupData

@@ -302,6 +302,7 @@
     .status-badge.done { background: #e7f6ec; color: #11692f; border-color: #bfe5cb; }
     .status-badge.pending { background: #fff4e0; color: #8a4b00; border-color: #f6d79b; }
     .status-badge.none { background: #f1f3f7; color: var(--muted); }
+    .status-badge.cancelled { background: #fdecec; color: #a11d1d; border-color: #f3c2c2; }
     button.status-badge { cursor: pointer; }
     button.status-badge:hover { filter: brightness(.96); }
     button.status-badge:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
@@ -908,6 +909,7 @@
             <option value="">ทุกสถานะ</option>
             <option value="pending">รอคีย์</option>
             <option value="done">คีย์ต่อแล้ว</option>
+            <option value="cancelled">ยกเลิก</option>
           </select>
           <form class="search-box" id="recentSearchForm" role="search" autocomplete="off">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
@@ -1991,7 +1993,7 @@
           if (q || status) {
             var what = [];
             if (q) what.push('ค้นหา "' + q + '"');
-            if (status) what.push(status === 'done' ? 'สถานะ: คีย์ต่อแล้ว' : 'สถานะ: รอคีย์');
+            if (status) what.push('สถานะ: ' + ({ done: 'คีย์ต่อแล้ว', pending: 'รอคีย์', cancelled: 'ยกเลิก' }[status] || status));
             info = what.join(' + ') + ' พบ ' + r.matched + ' จาก ' + r.total + ' รายการในชีต ' + sheetName +
               (r.matched > r.rows.length ? ' | แสดง ' + r.rows.length + ' รายการล่าสุด' : '');
           } else {
@@ -2271,7 +2273,7 @@
         var grid = document.createElement('dl');
         grid.className = 'detail-grid';
         var cols = RECENT_COLS.concat([['รูปสลิป', 18]]);
-        if (isBackup) cols = cols.concat([['คีย์ต่อแล้ว', 19], ['ชื่อผู้ดำเนินการ', 20], ['วันที่แบ็คอัพ', 21]]);
+        if (isBackup) cols = cols.concat([['คีย์ต่อแล้ว', 19], ['ชื่อผู้ดำเนินการ', 20], ['ยกเลิก', 21], ['วันที่แบ็คอัพ', 22]]);
         cols.forEach(function (c) {
           var item = document.createElement('div');
           item.className = 'detail-item';
@@ -2282,6 +2284,8 @@
             appendSlipLink(dd, row[18]);
           } else if (c[1] === 19) {
             dd.textContent = keyedState(row) === 'done' ? '✓ คีย์ต่อแล้ว' : keyedState(row) === 'pending' ? 'ยังไม่ได้คีย์' : '-';
+          } else if (c[1] === 21) {
+            dd.textContent = isCancelled(row) ? '✕ ยกเลิก' : '-';
           } else {
             dd.textContent = row[c[1]] === '' || row[c[1]] === undefined ? '-' : String(row[c[1]]);
           }
@@ -2301,14 +2305,21 @@
         return '';
       }
 
+      function isCancelled(row) {
+        return String(row[21] === undefined ? '' : row[21]).toUpperCase() === 'TRUE';
+      }
+
       function statusBadge(row, readOnly) {
         var st = keyedState(row);
         var b = document.createElement(readOnly ? 'span' : 'button');
         if (!readOnly) {
           b.type = 'button';
-          b.title = 'กดเพื่อติ๊กคีย์ต่อแล้ว / กรอกชื่อผู้ดำเนินการ';
+          b.title = 'กดเพื่อติ๊กคีย์ต่อแล้ว / ยกเลิก / กรอกชื่อผู้ดำเนินการ';
         }
-        if (st === 'done') {
+        if (isCancelled(row)) {
+          b.className = 'status-badge cancelled';
+          b.textContent = '✕ ยกเลิก';
+        } else if (st === 'done') {
           b.className = 'status-badge done';
           b.textContent = '✓ คีย์แล้ว';
         } else if (st === 'pending' || !readOnly) {
@@ -2334,6 +2345,15 @@
         lab.appendChild(cb);
         lab.appendChild(document.createTextNode(' คีย์ต่อแล้ว'));
 
+        var labCancel = document.createElement('label');
+        labCancel.className = 'keyed-check';
+        var cbCancel = document.createElement('input');
+        cbCancel.type = 'checkbox';
+        cbCancel.className = 'form-check-input';
+        cbCancel.checked = isCancelled(row);
+        labCancel.appendChild(cbCancel);
+        labCancel.appendChild(document.createTextNode(' ยกเลิก'));
+
         var name = document.createElement('input');
         name.type = 'text';
         name.className = 'form-control form-control-sm keyed-name';
@@ -2342,9 +2362,13 @@
         name.setAttribute('aria-label', 'ชื่อผู้ดำเนินการ');
         name.value = row[20] || '';
 
-        cb.addEventListener('change', function () {
-          if (cb.checked && !name.value.trim() && isStaff()) name.value = admin.me.name;
-        });
+        // เลือกได้อย่างเดียว: คีย์ต่อแล้ว หรือ ยกเลิก
+        var onTick = function (me, other) {
+          if (me.checked) other.checked = false;
+          if (me.checked && !name.value.trim() && isStaff()) name.value = admin.me.name;
+        };
+        cb.addEventListener('change', function () { onTick(cb, cbCancel); });
+        cbCancel.addEventListener('change', function () { onTick(cbCancel, cb); });
 
         var save = document.createElement('button');
         save.type = 'button';
@@ -2353,9 +2377,12 @@
 
         var doSave = function () {
           var meta = admin.recentMeta || { rowNums: [], sigs: [] };
-          var payload = { row: meta.rowNums[idx], sig: meta.sigs[idx], keyed: cb.checked, operator: name.value.trim() };
+          var payload = {
+            row: meta.rowNums[idx], sig: meta.sigs[idx],
+            keyed: cb.checked, cancelled: cbCancel.checked, operator: name.value.trim()
+          };
           if (!payload.row || !payload.sig) return;
-          if (payload.keyed && !payload.operator) {
+          if ((payload.keyed || payload.cancelled) && !payload.operator) {
             name.focus();
             Swal.fire({ icon: 'warning', title: 'กรุณากรอกชื่อผู้ดำเนินการ' });
             return;
@@ -2365,8 +2392,10 @@
           adminCall('staffUpdateRow', payload).then(function (r) {
             row[19] = r.keyedText;
             row[20] = r.operator;
+            row[21] = r.cancelText;
             name.value = r.operator;
             cb.checked = r.keyed;
+            cbCancel.checked = r.cancelled;
             onSaved();
             toast('success', r.message);
           }).catch(function (err) {
@@ -2382,6 +2411,7 @@
         });
 
         box.appendChild(lab);
+        box.appendChild(labCancel);
         box.appendChild(name);
         box.appendChild(save);
         return box;
