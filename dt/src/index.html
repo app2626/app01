@@ -958,7 +958,7 @@
         { label: 'สถานะ', status: true, cls: 'col-status' },
         { label: 'ลูกค้า', get: function (r) { return ((r[3] || '') + ' ' + (r[4] || '')).trim(); }, cls: 'col-wrap' },
         { label: 'สินค้า', get: colOf(6), cls: 'd-none d-sm-table-cell col-wrap col-product' },
-        { label: 'ผู้ดำเนินการ', get: colOf(20), op: true, cls: 'd-none d-lg-table-cell col-wrap' },
+        { label: 'ผู้ดำเนินการ', get: colOf(21), op: true, cls: 'd-none d-lg-table-cell col-wrap' },
         { label: 'ราคา', get: colOf(8), cls: 'd-none d-sm-table-cell text-end' },
         { label: 'สาขา', get: colOf(1), cls: 'd-none d-md-table-cell col-wrap' },
         { label: 'สลิป', slip: true, cls: 'd-none d-md-table-cell' },
@@ -2117,7 +2117,7 @@
               });
             }
             statusTd.appendChild(b);
-            if (opTd) opTd.textContent = row[20] || '-';
+            if (opTd) opTd.textContent = row[21] || '-';
           };
           paint();
           if (!isBackup) {
@@ -2273,7 +2273,7 @@
         var grid = document.createElement('dl');
         grid.className = 'detail-grid';
         var cols = RECENT_COLS.concat([['รูปสลิป', 18]]);
-        if (isBackup) cols = cols.concat([['คีย์ต่อแล้ว', 19], ['ชื่อผู้ดำเนินการ', 20], ['ยกเลิก', 21], ['วันที่แบ็คอัพ', 22]]);
+        if (isBackup) cols = cols.concat([['คีย์ต่อแล้ว', 19], ['ยกเลิก', 20], ['ชื่อผู้ดำเนินการ', 21], ['วันที่แบ็คอัพ', 22]]);
         cols.forEach(function (c) {
           var item = document.createElement('div');
           item.className = 'detail-item';
@@ -2284,7 +2284,7 @@
             appendSlipLink(dd, row[18]);
           } else if (c[1] === 19) {
             dd.textContent = keyedState(row) === 'done' ? '✓ คีย์ต่อแล้ว' : keyedState(row) === 'pending' ? 'ยังไม่ได้คีย์' : '-';
-          } else if (c[1] === 21) {
+          } else if (c[1] === 20) {
             dd.textContent = isCancelled(row) ? '✕ ยกเลิก' : '-';
           } else {
             dd.textContent = row[c[1]] === '' || row[c[1]] === undefined ? '-' : String(row[c[1]]);
@@ -2306,7 +2306,7 @@
       }
 
       function isCancelled(row) {
-        return String(row[21] === undefined ? '' : row[21]).toUpperCase() === 'TRUE';
+        return String(row[20] === undefined ? '' : row[20]).toUpperCase() === 'TRUE';
       }
 
       function statusBadge(row, readOnly) {
@@ -2360,7 +2360,7 @@
         name.maxLength = 100;
         name.placeholder = 'ชื่อผู้ดำเนินการ';
         name.setAttribute('aria-label', 'ชื่อผู้ดำเนินการ');
-        name.value = row[20] || '';
+        name.value = row[21] || '';
 
         // เลือกได้อย่างเดียว: คีย์ต่อแล้ว หรือ ยกเลิก
         var onTick = function (me, other) {
@@ -2391,8 +2391,8 @@
           save.textContent = 'กำลังบันทึก...';
           adminCall('staffUpdateRow', payload).then(function (r) {
             row[19] = r.keyedText;
-            row[20] = r.operator;
-            row[21] = r.cancelText;
+            row[20] = r.cancelText;
+            row[21] = r.operator;
             name.value = r.operator;
             cb.checked = r.keyed;
             cbCancel.checked = r.cancelled;

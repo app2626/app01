@@ -28,12 +28,12 @@ const DATA_HEADERS = [
   'รายละเอียดสินค้า', 'imei', 'ราคา', 'ส่วนลด', 'โค้ดผ่อน', 'เลขที่บิล',
   'เลขบัตรเครดิต', 'ชื่อเจ้าของบัตรเครดิต', 'ชื่อธนาคาร', 'Tid เครื่อง',
   'Trace', 'จำนวนเดือนที่ผ่อน', 'รูปสลิป',
-  'คีย์ต่อแล้ว', 'ชื่อผู้ดำเนินการ', 'ยกเลิก'
+  'คีย์ต่อแล้ว', 'ยกเลิก', 'ชื่อผู้ดำเนินการ'
 ];
 const BASE_COLS = 19;     // A–S มาจากฟอร์ม (ใช้ยืนยันตัวตนของแถว)
 const COL_KEYED = 20;     // T  ติ๊กถูก: เจ้าหน้าที่รับเรื่องคีย์ต่อแล้ว
-const COL_OPERATOR = 21;  // U  ชื่อผู้ดำเนินการ
-const COL_CANCEL = 22;    // V  ติ๊กถูก: ยกเลิกรายการ (ติ๊กพร้อมคีย์ต่อแล้วไม่ได้)
+const COL_CANCEL = 21;    // U  ติ๊กถูก: ยกเลิกรายการ (ติ๊กพร้อมคีย์ต่อแล้วไม่ได้)
+const COL_OPERATOR = 22;  // V  ชื่อผู้ดำเนินการ
 const MAX_OPERATOR_LENGTH = 100;
 
 // ช่องที่บังคับกรอกเสมอ (ปิดไม่ได้)
@@ -232,8 +232,8 @@ function saveData(formData) {
       safeText_(f.installmentMonths),
       slipUrl,
       false,
-      '',
-      false
+      false,
+      ''
     ];
     sheet.appendRow(row);
     sheet.getRange(sheet.getLastRow(), COL_KEYED).insertCheckboxes();
@@ -353,9 +353,24 @@ function getOrCreateDataSheet_(ss) {
   return sheet;
 }
 
-// เพิ่มคอลัมน์ T (คีย์ต่อแล้ว), U (ชื่อผู้ดำเนินการ), V (ยกเลิก) ให้ชีต Data ที่สร้างไว้ก่อนมีคอลัมน์เหล่านี้
+// ชีตรุ่นก่อนเรียงเป็น T คีย์ต่อแล้ว, U ชื่อผู้ดำเนินการ (, V ยกเลิก)
+// ปรับเป็น T คีย์ต่อแล้ว, U ยกเลิก, V ชื่อผู้ดำเนินการ โดยย้ายทั้งคอลัมน์ (ข้อมูลและช่องติ๊กไปด้วย)
+function reorderLegacyStatusCols_(sh) {
+  if (sh.getMaxColumns() < COL_KEYED + 1) return;
+  const head = sh.getRange(1, COL_KEYED, 1, 2).getDisplayValues()[0];
+  if (head[0] !== DATA_HEADERS[COL_KEYED - 1] || head[1] !== DATA_HEADERS[COL_OPERATOR - 1]) return;
+  const third = sh.getMaxColumns() >= COL_KEYED + 2 ? sh.getRange(1, COL_KEYED + 2).getDisplayValue() : '';
+  if (third === DATA_HEADERS[COL_CANCEL - 1]) {
+    sh.moveColumns(sh.getRange(1, COL_KEYED + 2), COL_KEYED + 1);   // ยกเลิก (V) -> U
+  } else {
+    sh.insertColumnsBefore(COL_KEYED + 1, 1);                        // เว้น U ไว้ให้ ยกเลิก
+  }
+}
+
+// เพิ่มคอลัมน์ T (คีย์ต่อแล้ว), U (ยกเลิก), V (ชื่อผู้ดำเนินการ) ให้ชีต Data ที่สร้างไว้ก่อนมีคอลัมน์เหล่านี้
 // ทำทีละคอลัมน์: คอลัมน์ที่หัวตารางถูกต้องแล้วจะไม่แตะ / คอลัมน์ว่างจะใส่หัวตาราง (+ช่องติ๊ก)
 function ensureDataColumns_(sheet) {
+  reorderLegacyStatusCols_(sheet);
   const LETTER = { 20: 'T', 21: 'U', 22: 'V' };
   const CHECKBOX = {};
   CHECKBOX[COL_KEYED] = true;
@@ -1307,16 +1322,16 @@ function staffUpdateRow(token, item) {
 
     sheet.getRange(r, COL_KEYED).insertCheckboxes();
     sheet.getRange(r, COL_CANCEL).insertCheckboxes();
-    sheet.getRange(r, COL_KEYED, 1, 3).setValues([[keyed, safeText_(operator), cancelled]]);
+    sheet.getRange(r, COL_KEYED, 1, 3).setValues([[keyed, cancelled, safeText_(operator)]]);
     SpreadsheetApp.flush();
     const after = sheet.getRange(r, COL_KEYED, 1, 3).getDisplayValues()[0];
     console.log('staffUpdateRow row ' + r + ' keyed=' + keyed + ' cancelled=' + cancelled + ' by ' + me.username);
     return {
       keyed: keyed,
       keyedText: after[0],
-      operator: after[1],
+      cancelText: after[1],
+      operator: after[2],
       cancelled: cancelled,
-      cancelText: after[2],
       message: cancelled ? 'บันทึกว่ายกเลิกแล้ว' : keyed ? 'บันทึกว่าคีย์ต่อแล้ว' : 'บันทึกแล้ว'
     };
   } finally {
@@ -1360,20 +1375,19 @@ function getOrCreateBackupSheet_(ss) {
   return sh;
 }
 
-// BackupData รุ่นเก่า (ปรับทีละขั้น):
-// 1) วันที่แบ็คอัพอยู่คอลัมน์ T -> แทรก 2 คอลัมน์ (คีย์ต่อแล้ว, ชื่อผู้ดำเนินการ) ก่อนหน้า
-// 2) วันที่แบ็คอัพอยู่คอลัมน์ V -> แทรก 1 คอลัมน์ (ยกเลิก) ก่อนหน้า วันที่แบ็คอัพจึงย้ายไป W
+// BackupData รุ่นเก่า -> T คีย์ต่อแล้ว, U ยกเลิก, V ชื่อผู้ดำเนินการ, W วันที่แบ็คอัพ
+// 1) วันที่แบ็คอัพอยู่คอลัมน์ T (ก่อนมีสถานะ) -> แทรก 3 คอลัมน์ก่อนหน้า
+// 2) T คีย์ต่อแล้ว, U ชื่อผู้ดำเนินการ (, V ยกเลิก) -> ย้าย/แทรกคอลัมน์ ยกเลิก มาไว้ที่ U
 function ensureBackupLayout_(sh) {
   if (sh.getLastColumn() < BASE_COLS + 1) return;
+  const extras = DATA_HEADERS.slice(BASE_COLS);
   if (sh.getRange(1, BASE_COLS + 1).getDisplayValue() === BACKUP_TIME_HEADER) {
-    sh.insertColumnsBefore(BASE_COLS + 1, 2);
-    sh.getRange(1, COL_KEYED, 1, 2)
-      .setValues([[DATA_HEADERS[COL_KEYED - 1], DATA_HEADERS[COL_OPERATOR - 1]]])
-      .setFontWeight('bold');
+    sh.insertColumnsBefore(BASE_COLS + 1, extras.length);
+    sh.getRange(1, BASE_COLS + 1, 1, extras.length).setValues([extras]).setFontWeight('bold');
+    return;
   }
-  if (sh.getLastColumn() >= COL_CANCEL &&
-      sh.getRange(1, COL_CANCEL).getDisplayValue() === BACKUP_TIME_HEADER) {
-    sh.insertColumnsBefore(COL_CANCEL, 1);
+  reorderLegacyStatusCols_(sh);
+  if (sh.getRange(1, COL_CANCEL).getDisplayValue() === '') {
     sh.getRange(1, COL_CANCEL).setValue(DATA_HEADERS[COL_CANCEL - 1]).setFontWeight('bold');
   }
 }
@@ -1450,7 +1464,7 @@ function adminRestoreRows(token, items) {
       dest += run[1];
     });
     data.getRange(start, COL_KEYED, v.ok.length, 1).insertCheckboxes();   // แถวที่แบ็คอัพไว้ก่อนมีคอลัมน์ T
-    data.getRange(start, COL_CANCEL, v.ok.length, 1).insertCheckboxes();  // แถวที่แบ็คอัพไว้ก่อนมีคอลัมน์ V
+    data.getRange(start, COL_CANCEL, v.ok.length, 1).insertCheckboxes();  // แถวที่แบ็คอัพไว้ก่อนมีคอลัมน์ ยกเลิก
     SpreadsheetApp.flush();
 
     // 2) ลบออกจาก BackupData
