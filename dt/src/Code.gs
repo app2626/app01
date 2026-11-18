@@ -75,6 +75,11 @@ const BACKUP_TIME_HEADER = 'วันที่แบ็คอัพ';
 const MAX_RECENT = 500;
 
 const PROP_BANNER_ID = 'BANNER_FILE_ID';
+
+// แจ้งเตือน Telegram เมื่อมีการบันทึกข้อมูลใหม่ (Bot Token ไม่ถูกส่งกลับไปหน้าเว็บ)
+const PROP_TG_ENABLED = 'TG_ENABLED';
+const PROP_TG_TOKEN = 'TG_BOT_TOKEN';
+const PROP_TG_CHAT = 'TG_CHAT_ID';
 const PROP_BANNER_VER = 'BANNER_VER';
 
 const MAX_BANNER_BYTES = 3 * 1024 * 1024;  // 3 MB หลังถอด Base64
@@ -190,6 +195,7 @@ function saveData(formData) {
   const slipFile = formData.slip ? saveSlip_(formData.slip, f.billNo, f.firstName) : null;
   const slipUrl = slipFile ? slipFile.getUrl() : '';
 
+  let savedRow = 0;
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
@@ -226,19 +232,23 @@ function saveData(formData) {
     sheet.appendRow(row);
     sheet.getRange(sheet.getLastRow(), COL_KEYED).insertCheckboxes();
     SpreadsheetApp.flush();
-
-    return {
-      success: true,
-      message: 'บันทึกข้อมูลเรียบร้อยแล้ว',
-      row: sheet.getLastRow(),
-      fileUrl: slipUrl
-    };
+    savedRow = sheet.getLastRow();
   } catch (err) {
     trashQuietly_(slipFile);
     throw new Error('บันทึกข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err));
   } finally {
     lock.releaseLock();
   }
+
+  // แจ้งเตือนหลังปล่อย Lock แล้ว และไม่ให้ความผิดพลาดของ Telegram ทำให้การบันทึกล้มเหลว
+  notifyNewRecord_(f, slipUrl);
+
+  return {
+    success: true,
+    message: 'บันทึกข้อมูลเรียบร้อยแล้ว',
+    row: savedRow,
+    fileUrl: slipUrl
+  };
 }
 
 // ===== Helpers: ข้อมูลฟอร์ม =====
@@ -872,6 +882,7 @@ function adminGetAll(token) {
     requiredLabels: OPTIONAL_REQUIRED,
     folder: describeFolder_(),
     banner: describeBanner_(),
+    telegram: describeTelegram_(),
     staff: listStaff_(),
     maxStaff: MAX_STAFF
   };
@@ -933,6 +944,128 @@ function adminSaveSettings(token, data) {
   p.setProperty(PROP_REQUIRED, JSON.stringify(req));
   const s = getSettings_();
   return { settings: { title: s.title, subtitle: s.subtitle, required: s.required }, message: 'บันทึกการตั้งค่าฟอร์มแล้ว' };
+}
+
+// ===== แจ้งเตือน Telegram =====
+function getTelegram_() {
+  const p = props_().getProperties();
+  return {
+    enabled: p[PROP_TG_ENABLED] === 'true',
+    botToken: p[PROP_TG_TOKEN] || '',
+    chatId: p[PROP_TG_CHAT] || ''
+  };
+}
+
+function describeTelegram_() {
+  const t = getTelegram_();
+  return {
+    enabled: t.enabled,
+    hasToken: !!t.botToken,
+    tokenHint: t.botToken ? t.botToken.split(':')[0] + ':••••' + t.botToken.slice(-4) : '',
+    chatId: t.chatId
+  };
+}
+
+function checkBotToken_(v) {
+  if (!/^\d{5,15}:[A-Za-z0-9_-]{30,60}$/.test(v)) throw new Error('Bot Token ไม่ถูกต้อง (รูปแบบ 123456789:ABC...)');
+  return v;
+}
+
+function checkChatId_(v) {
+  if (!/^(-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/.test(v)) throw new Error('Chat ID ไม่ถูกต้อง (ตัวเลข เช่น -1001234567890 หรือ @ชื่อช่อง)');
+  return v;
+}
+
+function escHtml_(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function sendTelegram_(botToken, chatId, html) {
+  const res = UrlFetchApp.fetch('https://api.telegram.org/bot' + botToken + '/sendMessage', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ chat_id: chatId, text: html, parse_mode: 'HTML', disable_web_page_preview: true }),
+    muteHttpExceptions: true
+  });
+  let body = {};
+  try { body = JSON.parse(res.getContentText()) || {}; } catch (e) { body = {}; }
+  if (res.getResponseCode() !== 200 || !body.ok) {
+    throw new Error('Telegram ตอบกลับ: ' + (body.description || ('HTTP ' + res.getResponseCode())));
+  }
+}
+
+function maskCard_(v) {
+  const d = String(v || '').replace(/\D/g, '');
+  return d.length >= 4 ? '•••• ' + d.slice(-4) : '';
+}
+
+function notifyNewRecord_(f, slipUrl) {
+  try {
+    const t = getTelegram_();
+    if (!t.enabled || !t.botToken || !t.chatId) return;
+    const money = function (n) {
+      return n === '' || n == null ? '-' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    };
+    const line = function (k, v) { return '<b>' + k + ':</b> ' + escHtml_(v === '' || v == null ? '-' : v); };
+    const lines = [
+      '🧾 <b>มีรายการบันทึกใหม่</b>',
+      line('เวลา', Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm')),
+      line('สาขา', f.location),
+      line('โครงการ', f.project),
+      line('ลูกค้า', (f.firstName + ' ' + f.lastName).trim()),
+      line('เบอร์', f.phone),
+      line('สินค้า', f.product),
+      line('IMEI', f.imei),
+      line('ราคา', money(f.price)) + '  ' + line('ส่วนลด', money(f.discount)),
+      line('เลขที่บิล', f.billNo),
+      line('ธนาคาร', f.bank) + '  ' + line('ผ่อน', f.installmentMonths)
+    ];
+    const card = maskCard_(f.cardNumber);
+    if (card) lines.push(line('บัตร', card));
+    if (/^https:\/\//.test(slipUrl)) {
+      lines.push('<a href="' + escHtml_(slipUrl).replace(/"/g, '&quot;') + '">ดูรูปสลิป</a>');
+    }
+    sendTelegram_(t.botToken, t.chatId, lines.join('\n'));
+  } catch (e) {
+    console.error('Telegram notify failed: ' + (e && e.message ? e.message : e));
+  }
+}
+
+// botToken เว้นว่าง = ใช้ค่าเดิมที่บันทึกไว้
+function adminSaveTelegram(token, data) {
+  requireAdmin_(token);
+  data = data || {};
+  const cur = getTelegram_();
+  const botToken = str_(data.botToken) ? checkBotToken_(str_(data.botToken)) : cur.botToken;
+  const chatId = str_(data.chatId) ? checkChatId_(str_(data.chatId)) : '';
+  const enabled = data.enabled === true;
+  if (enabled && (!botToken || !chatId)) throw new Error('เปิดการแจ้งเตือนต้องมีทั้ง Bot Token และ Chat ID');
+  const p = props_();
+  if (botToken) p.setProperty(PROP_TG_TOKEN, botToken);
+  if (chatId) p.setProperty(PROP_TG_CHAT, chatId); else p.deleteProperty(PROP_TG_CHAT);
+  p.setProperty(PROP_TG_ENABLED, enabled ? 'true' : 'false');
+  return { telegram: describeTelegram_(), message: 'บันทึกการแจ้งเตือน Telegram แล้ว' };
+}
+
+function adminClearTelegramToken(token) {
+  requireAdmin_(token);
+  const p = props_();
+  p.deleteProperty(PROP_TG_TOKEN);
+  p.setProperty(PROP_TG_ENABLED, 'false');
+  return { telegram: describeTelegram_(), message: 'ลบ Bot Token และปิดการแจ้งเตือนแล้ว' };
+}
+
+// ส่งข้อความทดสอบ (ใช้ค่าที่กรอกในหน้าจอ ถ้าเว้นว่างใช้ค่าที่บันทึกไว้)
+function adminTestTelegram(token, data) {
+  requireAdmin_(token);
+  data = data || {};
+  const cur = getTelegram_();
+  const botToken = str_(data.botToken) ? checkBotToken_(str_(data.botToken)) : cur.botToken;
+  const chatId = str_(data.chatId) ? checkChatId_(str_(data.chatId)) : cur.chatId;
+  if (!botToken || !chatId) throw new Error('กรุณาใส่ Bot Token และ Chat ID');
+  sendTelegram_(botToken, chatId, '✅ <b>ทดสอบการแจ้งเตือน</b>\n' + escHtml_(getSettings_().title) +
+    '\nเวลา: ' + Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss'));
+  return { message: 'ส่งข้อความทดสอบแล้ว ตรวจสอบในกลุ่ม Telegram' };
 }
 
 function extractFolderId_(input) {

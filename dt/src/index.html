@@ -700,6 +700,7 @@
           <button type="button" data-tab="folder">โฟลเดอร์สลิป</button>
           <button type="button" data-tab="form">ตั้งค่าฟอร์ม</button>
           <button type="button" data-tab="banner">แบนเนอร์</button>
+          <button type="button" data-tab="telegram">แจ้งเตือน Telegram</button>
           <button type="button" data-tab="staff">เจ้าหน้าที่</button>
           <button type="button" data-tab="password">รหัสผ่าน</button>
         </nav>
@@ -739,6 +740,31 @@
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-light-x btn-sm" id="btnFolderTest">ทดสอบการเข้าถึง</button>
               <button type="button" class="btn btn-brand btn-sm" id="btnFolderSave">บันทึกโฟลเดอร์</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="section-card tab-pane-x d-none" data-pane="telegram">
+          <div class="card-head">
+            <div><h2>แจ้งเตือน Telegram</h2><small>ส่งข้อความเข้ากลุ่มทุกครั้งที่มีการบันทึกรายการใหม่</small></div>
+          </div>
+          <div class="card-body-x pb-3 pane-narrow">
+            <div class="switch-row mb-3">
+              <label for="tgEnabled" style="cursor:pointer">เปิดการแจ้งเตือน</label>
+              <div class="form-check form-switch m-0"><input type="checkbox" class="form-check-input" id="tgEnabled"></div>
+            </div>
+            <label class="form-label" for="tgToken">Bot Token</label>
+            <input type="password" class="form-control mb-1" id="tgToken" autocomplete="off" spellcheck="false"
+                   placeholder="123456789:ABCdef...">
+            <div class="form-text mb-3" id="tgTokenHint"></div>
+            <label class="form-label" for="tgChat">Chat ID</label>
+            <input type="text" class="form-control mb-1" id="tgChat" autocomplete="off" spellcheck="false"
+                   placeholder="เช่น -1001234567890">
+            <div class="form-text mb-3">กลุ่มใช้เลขติดลบ ต้องเพิ่มบอทเข้ากลุ่มก่อน</div>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-light-x btn-sm" id="btnTgTest">ส่งข้อความทดสอบ</button>
+              <button type="button" class="btn btn-light-x btn-sm d-none" id="btnTgClear">ลบ Bot Token</button>
+              <button type="button" class="btn btn-brand btn-sm" id="btnTgSave">บันทึกการแจ้งเตือน</button>
             </div>
           </div>
         </section>
@@ -1494,6 +1520,7 @@
           renderFolder(d.folder);
           renderFormSettings(d.settings, d.requiredLabels);
           renderBannerAdmin(d.banner);
+          renderTelegram(d.telegram);
           renderStaff(d.staff || []);
           switchTab('lists');
         }).catch(function (err) {
@@ -1696,6 +1723,69 @@
         }).catch(function (err) {
           showLoading(false);
           Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function renderTelegram(t) {
+        t = t || {};
+        byId('tgEnabled').checked = !!t.enabled;
+        byId('tgChat').value = t.chatId || '';
+        byId('tgToken').value = '';
+        byId('tgToken').placeholder = t.hasToken ? 'เว้นว่าง = ใช้ Token เดิม' : '123456789:ABCdef...';
+        byId('tgTokenHint').textContent = t.hasToken
+          ? 'บันทึกไว้แล้ว: ' + t.tokenHint + ' (กรอกใหม่เฉพาะเมื่อต้องการเปลี่ยน)'
+          : 'สร้างบอทและรับ Token จาก @BotFather';
+        byId('btnTgClear').classList.toggle('d-none', !t.hasToken);
+      }
+
+      function tgPayload() {
+        return {
+          enabled: byId('tgEnabled').checked,
+          botToken: byId('tgToken').value.trim(),
+          chatId: byId('tgChat').value.trim()
+        };
+      }
+
+      function onTgTest() {
+        showLoading(true, 'กำลังส่งข้อความทดสอบ...');
+        adminCall('adminTestTelegram', tgPayload()).then(function (r) {
+          showLoading(false);
+          Swal.fire({ icon: 'success', title: r.message });
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'ส่งไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function onTgSave() {
+        showLoading(true, 'กำลังบันทึก...');
+        adminCall('adminSaveTelegram', tgPayload()).then(function (r) {
+          showLoading(false);
+          admin.data.telegram = r.telegram;
+          renderTelegram(r.telegram);
+          toast('success', r.message);
+        }).catch(function (err) {
+          showLoading(false);
+          Swal.fire({ icon: 'error', title: 'บันทึกไม่สำเร็จ', text: errMessage(err) });
+        });
+      }
+
+      function onTgClear() {
+        Swal.fire({
+          icon: 'warning', title: 'ลบ Bot Token?', text: 'การแจ้งเตือนจะถูกปิดด้วย',
+          showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก'
+        }).then(function (res) {
+          if (!res.isConfirmed) return;
+          showLoading(true, 'กำลังลบ...');
+          adminCall('adminClearTelegramToken').then(function (r) {
+            showLoading(false);
+            admin.data.telegram = r.telegram;
+            renderTelegram(r.telegram);
+            toast('success', r.message);
+          }).catch(function (err) {
+            showLoading(false);
+            Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: errMessage(err) });
+          });
         });
       }
 
@@ -2590,6 +2680,9 @@
       byId('btnFolderTest').addEventListener('click', onFolderTest);
       byId('btnFolderSave').addEventListener('click', onFolderSave);
       byId('btnFormSave').addEventListener('click', onFormSave);
+      byId('btnTgTest').addEventListener('click', onTgTest);
+      byId('btnTgSave').addEventListener('click', onTgSave);
+      byId('btnTgClear').addEventListener('click', onTgClear);
       byId('btnBackup').addEventListener('click', onBackup);
       byId('btnRestore').addEventListener('click', onRestore);
       byId('btnRecordsLogout').addEventListener('click', onRecordsLogout);
