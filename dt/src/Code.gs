@@ -196,6 +196,7 @@ function saveData(formData) {
   const slipUrl = slipFile ? slipFile.getUrl() : '';
 
   let savedRow = 0;
+  let savedStamp = '';
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(20000);
@@ -206,8 +207,9 @@ function saveData(formData) {
 
   try {
     const sheet = getOrCreateDataSheet_(ss);
+    savedStamp = Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss');
     const row = [
-      Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm:ss'),
+      savedStamp,
       safeText_(f.location),
       safeText_(f.project),
       safeText_(f.firstName),
@@ -241,7 +243,7 @@ function saveData(formData) {
   }
 
   // แจ้งเตือนหลังปล่อย Lock แล้ว และไม่ให้ความผิดพลาดของ Telegram ทำให้การบันทึกล้มเหลว
-  notifyNewRecord_(f, slipUrl);
+  notifyNewRecord_(f, savedStamp);
 
   return {
     success: true,
@@ -994,37 +996,21 @@ function sendTelegram_(botToken, chatId, html) {
   }
 }
 
-function maskCard_(v) {
-  const d = String(v || '').replace(/\D/g, '');
-  return d.length >= 4 ? '•••• ' + d.slice(-4) : '';
-}
-
-function notifyNewRecord_(f, slipUrl) {
+function notifyNewRecord_(f, stamp) {
   try {
     const t = getTelegram_();
     if (!t.enabled || !t.botToken || !t.chatId) return;
-    const money = function (n) {
-      return n === '' || n == null ? '-' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
-    };
     const line = function (k, v) { return '<b>' + k + ':</b> ' + escHtml_(v === '' || v == null ? '-' : v); };
     const lines = [
       '🧾 <b>มีรายการบันทึกใหม่</b>',
-      line('เวลา', Utilities.formatDate(new Date(), 'GMT+7', 'dd/MM/yyyy HH:mm')),
+      line('ประทับเวลา', stamp),
       line('สาขา', f.location),
-      line('โครงการ', f.project),
-      line('ลูกค้า', (f.firstName + ' ' + f.lastName).trim()),
-      line('เบอร์', f.phone),
-      line('สินค้า', f.product),
-      line('IMEI', f.imei),
-      line('ราคา', money(f.price)) + '  ' + line('ส่วนลด', money(f.discount)),
-      line('เลขที่บิล', f.billNo),
-      line('ธนาคาร', f.bank) + '  ' + line('ผ่อน', f.installmentMonths)
+      line('ชื่อโครงการ', f.project),
+      line('รายละเอียดสินค้า', f.product),
+      line('ชื่อ - สกุล', (f.firstName + ' ' + f.lastName).trim()),
+      line('เบอร์โทรศัพท์', f.phone),
+      line('จำนวนเดือนที่ผ่อน', f.installmentMonths)
     ];
-    const card = maskCard_(f.cardNumber);
-    if (card) lines.push(line('บัตร', card));
-    if (/^https:\/\//.test(slipUrl)) {
-      lines.push('<a href="' + escHtml_(slipUrl).replace(/"/g, '&quot;') + '">ดูรูปสลิป</a>');
-    }
     sendTelegram_(t.botToken, t.chatId, lines.join('\n'));
   } catch (e) {
     console.error('Telegram notify failed: ' + (e && e.message ? e.message : e));
