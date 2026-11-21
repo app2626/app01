@@ -360,7 +360,7 @@ function looksLikePasswordHash_(value) {
 
 // action ที่ "อ่านอย่างเดียว" — ไม่ต้องล้างแคช Dashboard; action อื่นทั้งหมด (บันทึก/ลบ/จอง/แก้/อัปโหลด/เคลียร์แคช) ล้างแคชก่อนและหลังทำงาน
 // (ล้างหลังด้วย กันผู้อ่านที่ยิงเข้ามาระหว่างเขียนแล้วเขียนค่าเก่ากลับลงแคช) — เพิ่ม action อ่านใหม่ต้องมาเพิ่มที่นี่ ไม่งั้นแค่ล้างแคชเกินจำเป็น (ปลอดภัย)
-var DASH_READ_ACTIONS_ = ['LOGIN', 'GET_ADVANCED_DASHBOARD', 'GET_TABLE', 'GET_ALL_DATA', 'GET_SETTINGS_LIST', 'NEWS_LIST', 'GET_CUSTOMER_BY_PHONE', 'GET_INVOICES', 'TRACK_ORDER', 'PUBLIC_TRACK_ORDER', 'VALIDATE_COUPON'];
+var DASH_READ_ACTIONS_ = ['LOGIN', 'GET_ADVANCED_DASHBOARD', 'GET_TABLE', 'GET_ALL_DATA', 'GET_SETTINGS_LIST', 'NEWS_LIST', 'GET_CUSTOMER_BY_PHONE', 'GET_INVOICES', 'TRACK_ORDER', 'PUBLIC_TRACK_ORDER', 'VALIDATE_COUPON', 'EXPORT_BACKUP'];
 
 // GET_TABLE อ่านได้เฉพาะชีตในรายชื่อนี้ ตาม role ที่ระบุ (ตรวจฝั่ง server เสมอ) — เพิ่มชีตใหม่ที่หน้าเว็บต้องอ่านทาง GET_TABLE ต้องมาเพิ่มที่นี่
 // Orders / InventoryLog: Sales ได้เฉพาะสาขาตัวเอง, Invoices: role อื่นนอกจาก Admin/Manager ได้เฉพาะของตัวเอง (กรองใน case GET_TABLE)
@@ -492,11 +492,35 @@ function apiHandlerInner_(action, payload, userToken) {
       case 'CLEAR_CACHE':
         if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
         return clearAllCaches_(secureUser);
+      case 'EXPORT_BACKUP':
+        return exportBackup_(secureUser, ss);
+      case 'SEND_WEBHOOK_SUMMARY':
+        return sendWebhookSummary_(payload, secureUser, ss);
       default: throw new Error("Invalid API Action");
     }
   } catch (error) {
     return { status: 'error', message: error.toString() };
   }
+}
+
+function exportBackup_(secureUser, ss) {
+  if (!secureUser || secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
+  const sheetsOut = {};
+  const allSheets = ss.getSheets();
+  allSheets.forEach(sh => {
+    const name = sh.getName();
+    if (sh.getLastRow() < 1 || sh.getLastColumn() < 1) { sheetsOut[name] = []; return; }
+    sheetsOut[name] = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getDisplayValues();
+  });
+  logAudit_(secureUser.Username, "EXPORT_BACKUP", "Exported full backup (" + Object.keys(sheetsOut).length + " sheets)");
+  return {
+    status: 'success',
+    backup: {
+      exportedAt: Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm:ss"),
+      by: secureUser.Username,
+      sheets: sheetsOut
+    }
+  };
 }
 
 function doLogin_(username, password, ss) {
@@ -1725,6 +1749,67 @@ function sendCheckoutWebhookNotification_(ss, orderId, channel, branch, payload,
     }),
     muteHttpExceptions: true
   });
+}
+
+function sendWebhookSummary_(payload, secureUser, ss) {
+  if (!secureUser || secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
+  const settings = getKeyValueSettings_(ss);
+  const webhookUrl = (settings.WebhookUrl || settings.LineWebhookUrl || '').toString().trim();
+  if (!webhookUrl || !/^https:\/\//i.test(webhookUrl)) {
+    return { status: 'error', message: 'กรุณาบันทึก Webhook URL (https://...) ก่อนส่งแจ้งเตือน' };
+  }
+  const mode = (payload && payload.mode === 'test') ? 'test' : 'daily';
+  const appName = (settings.SystemName || 'Pre Booking').toString().trim();
+  let msgText = '';
+  let summary = null;
+
+  if (mode === 'test') {
+    msgText = "✅ [" + appName + "] ทดสอบการเชื่อมต่อ Webhook สำเร็จ (" + Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd HH:mm") + ")";
+  } else {
+    const todayKey = Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd");
+    const orders = getTableDataAsJson_(ss.getSheetByName("Orders"), true);
+    const products = getTableDataAsJson_(ss.getSheetByName("Products"), true);
+    const lowThreshold = parseInt(settings.LowStockThreshold || '3', 10) || 3;
+
+    const orderIds = {};
+    let netTotal = 0, qtyTotal = 0;
+    orders.forEach(o => {
+      if ((o['Order Status'] || '').toString().trim() === 'Cancelled') return;
+      const ts = o.Timestamp ? new Date(o.Timestamp) : null;
+      if (!ts || isNaN(ts.getTime())) return;
+      if (Utilities.formatDate(ts, "Asia/Bangkok", "yyyy-MM-dd") !== todayKey) return;
+      if (o.OrderID) orderIds[o.OrderID] = true;
+      netTotal += parseFloat(o['Row Total'] || 0) || 0;
+      const sku = (o.SKU || '').toString().trim();
+      if (sku && sku !== 'DISCOUNT' && (parseFloat(o['Unit Price'] || 0) || 0) > 0) {
+        qtyTotal += parseInt(o.Qty || 0, 10) || 0;
+      }
+    });
+
+    const lowStock = [];
+    products.forEach(p => {
+      if (!statusOn_(p.Status)) return;
+      if ((p.Category || '').toString().includes('ของแถม')) return;
+      const st = parseInt(p.Stock || 0, 10) || 0;
+      if (st <= lowThreshold) lowStock.push((p['Product Name'] || p.SKU) + ' (' + st + ')');
+    });
+
+    const orderCount = Object.keys(orderIds).length;
+    summary = { date: todayKey, orderCount: orderCount, qtyTotal: qtyTotal, netTotal: netTotal, lowStockCount: lowStock.length };
+    msgText = "📊 [" + appName + "] สรุปยอดจองวันที่ " + todayKey +
+      "\n• จำนวนใบจอง: " + orderCount + " ใบ (" + qtyTotal + " ชิ้น)" +
+      "\n• ยอดสุทธิ: ฿" + Math.round(netTotal).toLocaleString() +
+      (lowStock.length > 0 ? "\n⚠️ สต๊อกต่ำกว่าเกณฑ์ (" + lowThreshold + " ชิ้น): " + lowStock.slice(0, 10).join(', ') + (lowStock.length > 10 ? ' และอีก ' + (lowStock.length - 10) + ' รายการ' : '') : "\n✅ สต๊อกทุกรายการปกติ");
+  }
+
+  UrlFetchApp.fetch(webhookUrl, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ text: msgText, content: msgText, summary: summary }),
+    muteHttpExceptions: true
+  });
+  logAudit_(secureUser.Username, "SEND_WEBHOOK_SUMMARY", "Sent " + mode + " webhook notification");
+  return { status: 'success', mode: mode, summary: summary, message: mode === 'test' ? 'ส่งข้อความทดสอบแล้ว' : 'ส่งสรุปยอดวันนี้แล้ว' };
 }
 
 // 4. ระบบค้นหาและติดตามสถานะใบจอง (Order Tracking & Digital Booking Pass)

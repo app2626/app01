@@ -7,8 +7,9 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "node tests/server.test.js && node tests/client.test.js",
+    "test": "node tests/server.test.js && node tests/worker.test.js && node tests/client.test.js",
     "test:server": "node tests/server.test.js",
+    "test:worker": "node tests/worker.test.js",
     "test:client": "node tests/client.test.js",
     "build:css": "node tools/build-css.js",
     "build:cf": "node cloudflare/build.js",

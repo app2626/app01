@@ -836,6 +836,31 @@ t('APPROVE_INVOICE by Sales blocked', () => { let blocked = false; try { const r
 t('APPROVE_INVOICE by admin', () => { const r = api('APPROVE_INVOICE', { invoiceId: invId }, admin); ok(r.status !== 'error', JSON.stringify(r)); });
 t('DELETE_INVOICE', () => { const r = api('DELETE_INVOICE', { invoiceId: invId }, admin); ok(r.status !== 'error', JSON.stringify(r)); });
 t('CLEAR_CACHE admin', () => { const r = api('CLEAR_CACHE', {}, admin); ok(r && r.status !== 'error', JSON.stringify(r)); });
+t('EXPORT_BACKUP admin only and returns all sheets', () => {
+  eq(api('EXPORT_BACKUP', {}, sales).status, 'error');
+  const res = unwrap(api('EXPORT_BACKUP', {}, admin));
+  ok(res.backup && res.backup.exportedAt && res.backup.sheets, 'backup object present');
+  ['Products', 'Orders', 'Members', 'Settings', 'Target'].forEach(n => ok(Array.isArray(res.backup.sheets[n]), 'sheet ' + n));
+});
+t('SEND_WEBHOOK_SUMMARY admin only and sends test/daily summary', () => {
+  eq(api('SEND_WEBHOOK_SUMMARY', { mode: 'test' }, sales).status, 'error');
+  unwrap(api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { WebhookUrl: '' } }, admin));
+  eq(api('SEND_WEBHOOK_SUMMARY', { mode: 'test' }, admin).status, 'error');
+  const prevFetch = ctx.UrlFetchApp && ctx.UrlFetchApp.fetch;
+  if (!ctx.UrlFetchApp) ctx.UrlFetchApp = {};
+  ctx.UrlFetchApp.fetch = () => ({ getResponseCode: () => 200, getContentText: () => '{}' });
+  try {
+    unwrap(api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { WebhookUrl: 'https://hooks.example.test/webhook' } }, admin));
+    const tRes = unwrap(api('SEND_WEBHOOK_SUMMARY', { mode: 'test' }, admin));
+    eq(tRes.mode, 'test');
+    const dRes = unwrap(api('SEND_WEBHOOK_SUMMARY', { mode: 'daily' }, admin));
+    eq(dRes.mode, 'daily');
+    ok(dRes.summary && typeof dRes.summary.orderCount === 'number' && typeof dRes.summary.lowStockCount === 'number');
+  } finally {
+    if (prevFetch) ctx.UrlFetchApp.fetch = prevFetch; else delete ctx.UrlFetchApp.fetch;
+    unwrap(api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { WebhookUrl: '' } }, admin));
+  }
+});
 t('BULK_UPDATE_PRODUCTS applies the exact payload the quick-edit modal sends (SKU/Price/Stock Qty) and the API-style keys', () => {
   const ph = sheets.Products.rows[0], row = sheets.Products.rows[1], sku = row[ph.indexOf('SKU')], si = ph.indexOf('Stock'), pi = ph.indexOf('Price'), oldStock = row[si], oldPrice = row[pi];
   try {

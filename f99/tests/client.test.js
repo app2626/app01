@@ -1052,7 +1052,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await ev("window.app.systemSettings.openTab('ss_docs');true"); await sleep(900);
     eq(await ev(vis), 'policies,company', 'documents tab cards'); ok(await ev("!!document.getElementById('policyBookingInput') && document.getElementById('policyBookingInput').offsetParent !== null"), 'policy editor not visible');
     await ev("window.app.systemSettings.openTab('autosetup');true"); await sleep(900);
-    eq(await ev(vis), 'notify,cache,drive,setup', 'system tab cards');
+    eq(await ev(vis), 'notify,cache,backup,drive,setup', 'system tab cards');
     await ev("window.app.systemSettings.openTab('bookingsettings');true"); await sleep(900);
     eq(await ev("document.querySelectorAll('#ssTabContent [data-sec]').length"), 0, 'booking tab has its own form');
     // unsaved edit -> switching asks first; declining keeps the tab and the typed value

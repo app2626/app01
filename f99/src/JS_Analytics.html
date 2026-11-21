@@ -2,23 +2,40 @@
 // Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
 window.app.analytics = {
     chart: null,
+    rawOrders: [],
+    campaign: 'ALL',
     init: async function() {
       const content = document.getElementById('page-content');
       const tmpl = document.getElementById('tmpl-analytics');
       if(content && tmpl) content.innerHTML = tmpl.innerHTML;
+      this.campaign = 'ALL';
       
       window.app.showLoading('กำลังโหลดข้อมูล...');
       try {
         const res = await window.app.api('GET_TABLE', { tableName: 'Orders' });
         Swal.close();
         if(res && res.status === 'success') {
-           this.render(res.data);
+           this.rawOrders = res.data || [];
+           this.populateCampaigns();
+           this.render(this.rawOrders);
         } else {
            this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูลยอดขายได้');
         }
       } catch(e) {
         Swal.close(); this.renderLoadError(e.message);
       }
+    },
+    populateCampaigns: function() {
+      const wrap = document.getElementById('anCampWrap'), sel = document.getElementById('anCampaign');
+      if (!wrap || !sel) return;
+      const camps = [...new Set((this.rawOrders || []).map(o => (o.Campaign || '').toString().trim()).filter(Boolean))];
+      wrap.classList.toggle('hidden', camps.length === 0);
+      sel.innerHTML = '<option value="ALL">ทุกแคมเปญ</option>' + camps.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      sel.value = camps.includes(this.campaign) ? this.campaign : 'ALL';
+    },
+    onCampaignChange: function(val) {
+      this.campaign = val || 'ALL';
+      this.render(this.rawOrders);
     },
     renderLoadError: function(msg) {
       const content = document.getElementById('analytics-content');
@@ -66,7 +83,8 @@ window.app.analytics = {
       let currentDays = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
       if (now > endDate) currentDays = totalDays;
       
-      const validOrders = orders.filter(o => !window.app.isOrderCancelled(o) && o.Timestamp);
+      const validOrders = orders.filter(o => !window.app.isOrderCancelled(o) && o.Timestamp
+        && (this.campaign === 'ALL' || (o.Campaign || '').toString().trim() === this.campaign));
       let totalMobile = 0;
       let totalAcc = 0;
       

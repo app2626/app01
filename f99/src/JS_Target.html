@@ -1,10 +1,14 @@
 <script>
 // Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
 window.app.target = {
+    rawTargets: [],
+    rawOrders: [],
+    campaign: 'ALL',
     init: async function() {
       const content = document.getElementById('page-content');
       const tmpl = document.getElementById('tmpl-target');
       if(content && tmpl) content.innerHTML = tmpl.innerHTML;
+      this.campaign = 'ALL';
       const adminAct = document.getElementById('targetAdminActions');
       if (adminAct) adminAct.classList.toggle('hidden', !(window.app.user && window.app.user.Role === 'Admin'));
       
@@ -14,13 +18,28 @@ window.app.target = {
         const resTarget = await window.app.api('GET_TABLE', { tableName: 'Target' });
         Swal.close();
         if(resOrders && resOrders.status === 'success' && resTarget && resTarget.status === 'success') {
-           this.render(resTarget.data, resOrders.data);
+           this.rawTargets = resTarget.data || [];
+           this.rawOrders = resOrders.data || [];
+           this.populateCampaigns();
+           this.render(this.rawTargets, this.rawOrders);
         } else {
            this.renderLoadError('ไม่พบข้อมูล กรุณาตรวจสอบว่ามีชีต "Target" แล้วหรือไม่');
         }
       } catch(e) {
         Swal.close(); this.renderLoadError(e.message);
       }
+    },
+    populateCampaigns: function() {
+      const wrap = document.getElementById('targetCampWrap'), sel = document.getElementById('targetCampaign');
+      if (!wrap || !sel) return;
+      const camps = [...new Set((this.rawOrders || []).map(o => (o.Campaign || '').toString().trim()).filter(Boolean))];
+      wrap.classList.toggle('hidden', camps.length === 0);
+      sel.innerHTML = '<option value="ALL">ทุกแคมเปญ</option>' + camps.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      sel.value = camps.includes(this.campaign) ? this.campaign : 'ALL';
+    },
+    onCampaignChange: function(val) {
+      this.campaign = val || 'ALL';
+      this.render(this.rawTargets, this.rawOrders);
     },
     renderLoadError: function(msg) {
       const tbody = document.getElementById('targetTableBody');
@@ -74,6 +93,7 @@ window.app.target = {
 
       const validOrders = orders.filter(o => {
           if (window.app.isOrderCancelled(o) || !o.Timestamp) return false;
+          if (this.campaign !== 'ALL' && (o.Campaign || '').toString().trim() !== this.campaign) return false;
           // นอกช่วงเวลาการจอง (ReserveStart/ReserveEnd) — ตัดออก ไม่งั้นยอดจองรวมออเดอร์เก่าข้ามแคมเปญทั้งหมด (Orders sheet ไม่เคยถูกล้าง)
           const tsObj = new Date(o.Timestamp);
           if (isNaN(tsObj)) return false;

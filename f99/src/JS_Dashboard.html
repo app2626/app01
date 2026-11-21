@@ -54,6 +54,7 @@ window.app.dashboard = {
           const toLocalKey = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
           if(dStart) dStart.value = toLocalKey(new Date(now.getFullYear(), now.getMonth(), 1));
           if(dEnd) dEnd.value = toLocalKey(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+          this.populateCampaigns();
           this.applyFilters(); this.startAutoRefresh();
         } else {
           this.renderLoadError(res ? res.message : 'ไม่สามารถโหลดข้อมูล Dashboard ได้');
@@ -91,6 +92,7 @@ window.app.dashboard = {
              return o;
           });
           this.lastBuiltAt = res.data.builtAt || Date.now();
+          this.populateCampaigns();
           this.applyFilters();
           ok = true;
         }
@@ -119,8 +121,17 @@ window.app.dashboard = {
         this.reloadData(false);
       }, 30000);
     },
+    populateCampaigns: function() {
+      const wrap = document.getElementById('dashCampWrap'), sel = document.getElementById('dashCampaign');
+      if (!wrap || !sel) return;
+      const cur = sel.value || 'ALL';
+      const camps = [...new Set((this.rawOrders || []).map(o => (o.Campaign || '').toString().trim()).filter(Boolean))];
+      wrap.classList.toggle('hidden', camps.length === 0);
+      sel.innerHTML = '<option value="ALL">ทุกแคมเปญ</option>' + camps.map(c => '<option value="' + window.app.esc(c) + '">' + window.app.esc(c) + '</option>').join('');
+      sel.value = camps.includes(cur) ? cur : 'ALL';
+    },
     resetFilters: function() { 
-      ['dashStartDate','dashEndDate','dashBranch','dashSales'].forEach(id=>{
+      ['dashStartDate','dashEndDate','dashBranch','dashSales','dashCampaign'].forEach(id=>{
         const el = document.getElementById(id);
         if(el) el.value = id.includes('Date') ? '' : 'ALL';
       });
@@ -129,14 +140,17 @@ window.app.dashboard = {
     applyFilters: function() {
       const elSD = document.getElementById('dashStartDate'); const elED = document.getElementById('dashEndDate');
       const elB = document.getElementById('dashBranch'); const elS = document.getElementById('dashSales');
+      const elC = document.getElementById('dashCampaign');
       const sD = elSD ? elSD.value : ''; const eD = elED ? elED.value : '';
       const b = elB ? elB.value : 'ALL'; const s = elS ? elS.value : 'ALL';
+      const c = elC ? elC.value : 'ALL';
 
       this.filteredOrders = this.rawOrders.filter(o => {
         if (sD && new Date(o.Timestamp) < new Date(sD + "T00:00:00")) return false;
         if (eD && new Date(o.Timestamp) > new Date(eD + "T23:59:59")) return false;
         if (b !== 'ALL' && o['Branch Code'] !== b) return false;
         if (s !== 'ALL' && o['Staff'] !== s) return false;
+        if (c !== 'ALL' && (o.Campaign || '').toString().trim() !== c) return false;
         return true;
       });
       // ช่วง/ตัวกรองที่เลือกไม่มีออเดอร์ — แสดง empty state มาตรฐาน (5A.4) เหนือ KPI (KPI ยังแสดงค่า 0 ตามจริง)
