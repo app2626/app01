@@ -1,0 +1,9 @@
+name = "f9-booking"
+pages_build_output_dir = "pages-dist"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "f9-db"
+database_id = "21b24080-c8a1-4c10-b09c-0a15bdd9d5d8"

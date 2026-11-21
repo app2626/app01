@@ -1,0 +1,20 @@
+{
+  "name": "f9",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "node tests/server.test.js && node tests/client.test.js",
+    "test:server": "node tests/server.test.js",
+    "test:client": "node tests/client.test.js",
+    "build:css": "node tools/build-css.js",
+    "build:cf": "node cloudflare/build.js",
+    "deploy:cf": "node cloudflare/build.js && cd cloudflare && npx wrangler pages deploy pages-dist --project-name=f9-booking --commit-dirty=true"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}

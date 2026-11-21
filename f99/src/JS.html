@@ -1,0 +1,2203 @@
+<script>
+window.app = {
+  // ภาพแทนเมื่อไม่มีรูปสินค้า — SVG ในตัว ไม่พึ่งบริการภายนอก (via.placeholder.com ไม่เสถียร) และไม่มีข้อความภาษาอังกฤษ
+  NO_IMG: "data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20200%20200%27%3E%3Cdefs%3E%3ClinearGradient%20id=%27g%27%20x1=%270%27%20y1=%270%27%20x2=%271%27%20y2=%271%27%3E%3Cstop%20offset=%270%27%20stop-color=%27%23f1f5f9%27/%3E%3Cstop%20offset=%271%27%20stop-color=%27%23dce7f0%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width=%27200%27%20height=%27200%27%20rx=%2728%27%20fill=%27url%28%23g%29%27/%3E%3Crect%20x=%2770%27%20y=%2734%27%20width=%2760%27%20height=%27132%27%20rx=%2713%27%20fill=%27none%27%20stroke=%27%2385abc9%27%20stroke-width=%275%27/%3E%3Crect%20x=%2791%27%20y=%2745%27%20width=%2718%27%20height=%274%27%20rx=%272%27%20fill=%27%2385abc9%27/%3E%3Ccircle%20cx=%27100%27%20cy=%27150%27%20r=%274.5%27%20fill=%27%2385abc9%27/%3E%3C/svg%3E",
+
+  user: null,
+  globalData: { products: [], promotions: [], branches: [], channels: [], interests: [], heroBanners: [], gridBanners: [], popupBanners: [], giftMappings: [] },
+  cart: [],
+  currentRoute: '',
+
+  // label = ชื่อไทย (บรรทัดบน) · sub = ชื่ออังกฤษ (บรรทัดล่าง) — สิทธิ์/route ผูกกับ id เท่านั้น เปลี่ยนชื่อได้อิสระ
+  menuConfig: [
+      { label: 'เมนูหลัก', sub: 'Main Menu', isCategory: true, roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'แดชบอร์ด', sub: 'Dashboard', roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'pos', icon: 'fa-shopping-cart', label: 'สั่งจองสินค้า', sub: 'Pre Booking', roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'orders', icon: 'fa-file-invoice-dollar', label: 'รายการใบจอง', sub: 'Orders', roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'invoice', icon: 'fa-file-invoice', label: 'ใบเสนอราคา/แจ้งหนี้', sub: 'Quotation & Invoice', roles: ['Admin', 'Manager', 'Sales'] },
+      { label: 'วิเคราะห์/รายงาน', sub: 'Reports', isCategory: true, roles: ['Admin', 'Manager', 'Sales'] },
+      { id: 'analytics', icon: 'fa-chart-pie', label: 'วิเคราะห์ยอดขาย', sub: 'Sales Analytics', roles: ['Admin', 'Manager'] },
+      { id: 'target', icon: 'fa-crosshairs', label: 'เป้าหมายและพยากรณ์', sub: 'Target & Forecast', roles: ['Admin', 'Manager'] },
+      { id: 'bookingsummary', icon: 'fa-table', label: 'สรุปยอดจองรายวัน', sub: 'Daily Bookings', roles: ['Admin', 'Manager'] },
+      { id: 'salessummary', icon: 'fa-layer-group', label: 'สรุปรุ่น/แอเรีย/ช่องทาง', sub: 'Model · Area · Channel', roles: ['Admin', 'Manager'] },
+      { id: 'branchbookingsummary', icon: 'fa-store-alt', label: 'สรุปยอดจองตามสาขา', sub: 'Branch Bookings', roles: ['Admin', 'Manager'] },
+      { id: 'allbookingsummary', icon: 'fa-boxes-stacked', label: 'สรุปข้อมูลจองทั้งหมด', sub: 'All Bookings', roles: ['Admin', 'Manager'] },
+      { label: 'หลังร้าน', sub: 'Back Office', isCategory: true, roles: ['Admin', 'Manager'] },
+      { id: 'setupguide', icon: 'fa-list-check', label: 'เริ่มต้นใช้งาน', sub: 'Setup Guide', roles: ['Admin'] },
+      {
+        // กลุ่มย่อยเรียงตามงาน: สินค้า / ร้านและสาขา / โปรโมชั่น / เนื้อหาและระบบ — id ของทุกเมนูคงเดิม (สิทธิ์ Accessible Menus และ route ผูกกับ id)
+        id: 'admin_settings', icon: 'fa-cogs', label: 'จัดการร้าน', sub: 'Store Admin', roles: ['Admin', 'Manager'],
+        isParent: true,
+        children: [
+          { label: 'สินค้า', sub: 'Products', isCategory: true, roles: ['Admin'] },
+          { id: 'products', icon: 'fa-box-open', label: 'สินค้า', sub: 'Products', roles: ['Admin'] },
+          { id: 'inventorylog', icon: 'fa-boxes', label: 'ประวัติสต็อก', sub: 'Stock History', roles: ['Admin'] },
+          { label: 'ร้านและสาขา', sub: 'Store & Branches', isCategory: true, roles: ['Admin'] },
+          { id: 'channels', icon: 'fa-network-wired', label: 'ช่องทางขาย', sub: 'Channels', roles: ['Admin'] },
+          { id: 'branches', icon: 'fa-store-alt', label: 'สาขา', sub: 'Branches', roles: ['Admin'] },
+          { id: 'members', icon: 'fa-users', label: 'ผู้ใช้งาน', sub: 'Members', roles: ['Admin'] },
+          { id: 'interests', icon: 'fa-heart', label: 'ตัวเลือกความสนใจลูกค้า', sub: 'Booking Form Options', roles: ['Admin'] },
+          { label: 'โปรโมชั่น', sub: 'Promotions', isCategory: true, roles: ['Admin', 'Manager'] },
+          { id: 'giftmappings', icon: 'fa-project-diagram', label: 'ชุดของแถม', sub: 'Gift Sets', roles: ['Admin', 'Manager'] },
+          { id: 'autopromotions', icon: 'fa-magic', label: 'ส่วนลดซื้อคู่อัตโนมัติ', sub: 'Auto Promotions', roles: ['Admin', 'Manager'] },
+          { id: 'promotions', icon: 'fa-tags', label: 'ส่วนลดตอนจอง', sub: 'Checkout Discounts', roles: ['Admin'] },
+          { id: 'coupons', icon: 'fa-ticket-alt', label: 'โค้ดส่วนลด', sub: 'Coupons', roles: ['Admin'] },
+          { label: 'เนื้อหาและระบบ', sub: 'Content & System', isCategory: true, roles: ['Admin'] },
+          { id: 'banners', icon: 'fa-images', label: 'แบนเนอร์', sub: 'Banners', roles: ['Admin'] },
+          { id: 'news', icon: 'fa-newspaper', label: 'ข่าวสาร', sub: 'News', roles: ['Admin'] },
+          { id: 'newscats', icon: 'fa-tags', label: 'หมวดหมู่ข่าว', sub: 'News Categories', roles: ['Admin'] },
+          { id: 'systemsettings', icon: 'fa-sliders-h', label: 'ตั้งค่าระบบ', sub: 'System Settings', roles: ['Admin'] },
+          { id: 'auditlog', icon: 'fa-history', label: 'บันทึกการใช้งาน', sub: 'Audit Log', roles: ['Admin'] }
+        ]
+      }
+  ],
+
+  // Escape ข้อความก่อนแทรกลง innerHTML ทุกครั้งที่ข้อมูลมาจากชีต/ผู้ใช้ — ป้องกัน XSS
+  esc: function(v) {
+    return String(v === null || v === undefined ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  },
+
+  // สำหรับค่าที่ฝังเป็น string literal ใน onclick="fn('...')" — escape เป็น JS string ก่อน แล้วค่อย escape HTML
+  // ข้อความจากชีตที่อนุญาตให้จัดรูปแบบได้นิดหน่อย (เช่น Message Suggest/Apply ของ AutoPromotions — Admin/Manager แก้ได้):
+  // escape ทั้งหมดก่อน แล้วคืนเฉพาะแท็ก b/strong/em/i/u/br (class ได้แค่ตัวอักษรปลอดภัย) — ห้ามมี attribute อื่น/สคริปต์หลุดผ่าน
+  safeRichText: function(v) {
+    return window.app.esc(v).replace(/&lt;(\/?)(b|strong|em|i|u|br)(?:\s+class=(?:&quot;|&#39;)([A-Za-z0-9 _:\-]{0,80})(?:&quot;|&#39;))?\s*\/?&gt;/gi,
+      function(m, close, tag, cls) { tag = tag.toLowerCase(); return close ? '</' + tag + '>' : '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>'; });
+  },
+
+  // ชื่อสินค้าในชีตมักพิมพ์ตัวใหญ่ทั้งหมด (SAMSUNG GALAXY Z FOLD 8 12/512GB GRAPHITE) — หน้าร้านแสดงเป็นตัวใหญ่เฉพาะตัวแรกของคำ
+  // แปลงเฉพาะตอนแสดงผล: ห้ามใช้กับค่าที่ส่งกลับ server หรือใช้จับคู่ (value ของของแถม, data-name, SKU, Model ใน onclick) เพราะกติกาของแถม/ค้นหาเทียบกับค่าในชีต
+  // กติกา (owner 2026-11-15): ตัวแรกของทุกคำใหญ่ ที่เหลือเล็ก ยกเว้น
+  //   KEEP = คำย่อ/หน่วยที่ต้องใหญ่ทั้งคำ (GB, TB, 5G, 4G, LTE, AI, NFC, USB-C, AMOLED, OLED, OIS, IP68, SE, FE, GT, RAM, ROM, SSD, 4K, W ...)
+  //   SPECIAL = คำที่มีรูปตัวพิมพ์เฉพาะ (Wi-Fi, eSIM, mAh, iOS, iPadOS, macOS, tg, iPhone ...) — key เป็นตัวเล็กทั้งคำ
+  //   หน่วยติดตัวเลข (512GB, 25W, 10000mAh, 120Hz) ใช้ UNITS ; ตัวเลข+G/K (5G, 4K) และ IP+ตัวเลข (IP68) ใหญ่ทั้งคำ
+  // เพิ่มคำย่อ/รูปเฉพาะใหม่ที่ KEEP / SPECIAL ; ข้อความไทยไม่ถูกแตะ
+  titleCaseName: function(text) {
+    var UNITS = { gb: 'GB', tb: 'TB', mb: 'MB', g: 'G', k: 'K', w: 'W', mah: 'mAh', hz: 'Hz', mp: 'MP', mm: 'mm' };
+    var KEEP = ['GB', 'TB', 'MB', 'LTE', 'AI', 'NFC', 'USB', 'AMOLED', 'OLED', 'QLED', 'LED', 'OIS', 'SE', 'FE', 'GT', 'RAM', 'ROM', 'SSD', 'W',
+                'TV', 'UHD', 'II', 'III'];
+    var SPECIAL = { 'wi-fi': 'Wi-Fi', 'usb-c': 'USB-C', esim: 'eSIM', mah: 'mAh', ios: 'iOS', ipados: 'iPadOS', macos: 'macOS', tg: 'tg', '16e': '16e',
+                    iphone: 'iPhone', ipad: 'iPad', airpods: 'AirPods', macbook: 'MacBook' };
+    return String(text === undefined || text === null ? '' : text)
+      .toLowerCase()
+      .replace(/(^|[^a-z0-9])([a-z])/g, function(m, before, ch) { return before + ch.toUpperCase(); })
+      .replace(/(\d)(gb|tb|mb|mah|hz|mp|mm|g|k|w)(?![a-z0-9])/gi, function(m, digit, unit) { return digit + UNITS[unit.toLowerCase()]; })
+      // คำ (ตัวอักษร/ตัวเลข ต่อด้วยขีดได้ เช่น Wi-Fi, USB-C) — รูปเฉพาะทั้งคำก่อน แล้วค่อยดูทีละส่วนรอบขีด
+      .replace(/[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/g, function(word) {
+        if (SPECIAL[word.toLowerCase()]) return SPECIAL[word.toLowerCase()];
+        return word.split('-').map(function(part) {
+          var low = part.toLowerCase(), up = part.toUpperCase();
+          if (SPECIAL[low]) return SPECIAL[low];
+          if (KEEP.indexOf(up) !== -1 || /^\d+[gk]$/i.test(part) || /^ip\d{2}$/i.test(part)) return up;
+          // รหัสรุ่นที่ลงท้ายด้วยตัวอักษรหลังตัวเลข: S24U, X200T, A56FE, 15T, 13C — ใหญ่ทั้งคำ (รูปเฉพาะอย่าง 16e อยู่ใน SPECIAL)
+          if (/^[a-z]{0,3}\d+[a-z]{1,2}$/i.test(part) && !/^\d+(hz|mm)$/i.test(part)) return up;
+          return part;
+        }).join('-');
+      });
+  },
+  // ชื่อสินค้าสำหรับแทรกลง HTML ของหน้าร้าน = titleCaseName แล้ว escape
+  pn: function(v) { return window.app.esc(window.app.titleCaseName(v)); },
+
+  escAttrJs: function(v) {
+    return window.app.esc(String(v === null || v === undefined ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+  },
+
+  // ทุกหน้าที่นับ/รวมยอดจองจาก Orders ต้องข้ามแถวที่ถูกยกเลิกด้วยฟังก์ชันนี้ — เดิมแต่ละหน้าเช็คเอง ('Cancelled' บ้าง, 'Cancelled'+'ยกเลิก' บ้าง)
+  // ไม่สม่ำเสมอกัน ทำให้ถ้าแถวไหนถูกตั้ง Order Status เป็น 'ยกเลิก' (เช่น แก้ตรงชีตเอง) บางหน้าจะยังนับรวมอยู่ — รวมเป็นจุดเดียวกันแทน
+  // หมวดที่นับเป็น "โมบาย" ในแดชบอร์ด/วิเคราะห์ยอดขาย/เป้าหมาย — แท็บเล็ตนับรวมกับโมบาย (owner request 2026-11-10)
+  // ใช้เฉพาะการนับยอดในรายงาน ไม่เกี่ยวกับกฎจำกัดโมบาย 1 เครื่องต่อออเดอร์ (ยังใช้เฉพาะหมวด โมบาย)
+  isMobileCat: function(cat) { const c = (cat === undefined || cat === null ? '' : cat).toString().trim(); return c === 'โมบาย' || c === 'แท็บเล็ต'; },
+  isOrderCancelled: function(o) {
+    const s = (o && o['Order Status'] !== undefined && o['Order Status'] !== null ? o['Order Status'] : '').toString().trim();
+    return s === 'Cancelled' || s === 'ยกเลิก';
+  },
+
+  // flow สถานะออเดอร์ปัจจุบัน (ไม่รวม Cancelled) — อ่านจากชีต OrderStatus ตามลำดับแถวถ้ามี ≥2 แถว ไม่งั้น fallback มาตรฐาน
+  // เดิมมี 3 จุดคัดลอกลอจิกนี้ซ้ำกัน (Orders grid select, grid filter, orderTimelineHtml) เสี่ยงแก้จุดเดียวแล้วหลุดไม่ตรงกัน — รวมมาไว้ที่เดียว
+  getOrderStatusFlow: function() {
+    const stList = (window.app.globalData.orderStatuses || []).filter(s => s && (s['Status Name'] || '').toString().trim() !== '');
+    return stList.length >= 2
+      ? stList.map(s => s['Status Name'].toString().trim()).filter(n => n.toLowerCase() !== 'cancelled')
+      : ['Pending', 'Confirmed', 'Paid', 'Delivered'];
+  },
+
+  // ประวัติการเปลี่ยนสถานะ (จากชีต OrderStatusLog) — แสดงเป็นไทม์ไลน์แนวตั้ง เก่า→ใหม่ ; showBy เฉพาะหน้าพนักงาน (หน้า public ไม่มีชื่อพนักงาน)
+  statusHistoryHtml: function(history, showBy) {
+    if (!history || !history.length) return '';
+    const esc = window.app.esc;
+    const rows = history.map((h, i) => {
+      const last = i === history.length - 1;
+      return '<li class="flex gap-2.5 items-start">'
+        + '<span class="mt-1 w-2.5 h-2.5 shrink-0 rounded-full ' + (last ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-slate-300') + '"></span>'
+        + '<span class="text-[11px] leading-snug"><strong class="' + (last ? 'text-emerald-700' : 'text-slate-700') + '">' + esc(h.to || '-') + '</strong>'
+        + (h.from ? ' <span class="text-slate-400">(จาก ' + esc(h.from) + ')</span>' : '')
+        + '<br><span class="text-slate-400 font-semibold">' + esc(h.time) + (showBy && h.by ? ' · ' + esc(h.by) : '') + '</span></span></li>';
+    }).join('');
+    return '<div class="status-history px-4 py-3 border-b border-slate-100"><div class="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">ประวัติการดำเนินการ</div><ul class="space-y-2.5">' + rows + '</ul></div>';
+  },
+
+  // 5B.1 — esc ข้อความแล้ว highlight คำค้น: หา match บน raw text, esc ทีละ segment แล้วครอบ <mark>
+  // (ปลอดภัยกว่า replace หลัง esc ทั้งก้อน เพราะคำค้นจะไม่มีวัน match เข้าไปใน entity เช่น &amp;)
+  highlightEsc: function(raw, term) {
+    const s = String(raw === null || raw === undefined ? '' : raw);
+    term = (term || '').toString().trim();
+    if (!term) return window.app.esc(s);
+    const lower = s.toLowerCase();
+    const t = term.toLowerCase();
+    let out = '', i = 0;
+    while (true) {
+      const idx = lower.indexOf(t, i);
+      if (idx === -1) { out += window.app.esc(s.slice(i)); break; }
+      out += window.app.esc(s.slice(i, idx));
+      out += '<mark class="bg-amber-100 text-inherit rounded px-0.5">' + window.app.esc(s.slice(idx, idx + t.length)) + '</mark>';
+      i = idx + t.length;
+    }
+    return out;
+  },
+
+  // 5B.5 — ปุ่ม submit ต้อง disabled + spinner ระหว่างรอ API กัน double-submit
+  // คืนฟังก์ชัน restore — ผู้เรียกต้องเรียกใน finally เสมอ; ถ้าปุ่ม disabled อยู่แล้วคืน no-op (บอกว่ามีงานค้าง)
+  buttonBusy: function(btn, text) {
+    if (!btn || btn.tagName !== 'BUTTON' || btn.disabled) return null;
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i>' + window.app.esc(text || 'กำลังบันทึก...');
+    return function() { btn.disabled = false; btn.innerHTML = orig; };
+  },
+
+  // เหมือน buttonBusy แต่สำหรับปุ่มไอคอนเล็ก (26px) — สลับเฉพาะไอคอนเป็น spinner ห้ามใส่ข้อความ ไม่งั้นล้นปุ่ม
+  iconBtnBusy: function(btn) {
+    if (!btn || btn.tagName !== 'BUTTON' || btn.disabled) return null;
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    return function() { btn.disabled = false; btn.innerHTML = orig; };
+  },
+
+  // ย่อรูปฝั่ง client ก่อนอัป — ด้านยาวสุดเหลือ 1200px, jpeg คุณภาพ 0.85 (png คงเป็น png กันพื้นหลังโปร่งใสเพี้ยน)
+  resizeImageFile: function(file, onDone, onError) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        let w = img.width, h = img.height;
+        const maxDim = 1200;
+        if (w > maxDim || h > maxDim) {
+          if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const isPng = file.type === 'image/png';
+        const outMime = isPng ? 'image/png' : 'image/jpeg';
+        const dataUrl = canvas.toDataURL(outMime, 0.85);
+        const ext = isPng ? '.png' : '.jpg';
+        const baseName = (file.name || 'image').replace(/\.[^.]+$/, '');
+        onDone(dataUrl, outMime, baseName + ext);
+      };
+      img.onerror = function() { onError('ไฟล์รูปเสียหายหรือไม่รองรับ'); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { onError('ไม่สามารถอ่านไฟล์ได้'); };
+    reader.readAsDataURL(file);
+  },
+
+  // เก็บไฟล์รูปที่เลือกไว้แต่ยังไม่อัปโหลด คีย์ตามจุดที่ใช้ (gridImage / loginBg / banner-<rowIndex> / newBanner)
+  // — อัปจริงตอนกด "บันทึกข้อมูล" ครั้งเดียว ไม่ใช่ทันทีที่เลือกไฟล์
+  pendingImageUploads: {},
+
+  // เลือกไฟล์รูป: validate + เก็บไว้ใน pendingImageUploads + โชว์พรีวิวจากไฟล์ในเครื่อง (ยังไม่ขึ้น Drive)
+  selectImageForUpload: function(inputEl, stateKey, onLocalPreview) {
+    const file = inputEl.files && inputEl.files[0];
+    inputEl.value = '';
+    if (!file) return;
+    if (file.type.indexOf('image/') !== 0) {
+      return Swal.fire('ผิดพลาด', 'กรุณาเลือกไฟล์รูปภาพเท่านั้น (png, jpg, webp, gif)', 'error');
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      return Swal.fire('ผิดพลาด', 'ไฟล์รูปใหญ่เกินไป (จำกัดไม่เกิน 8MB ก่อนย่อขนาด)', 'error');
+    }
+    window.app.pendingImageUploads[stateKey] = file;
+    if (onLocalPreview) onLocalPreview(URL.createObjectURL(file));
+  },
+
+  // เรียกตอนกด "บันทึกข้อมูล" — ถ้ามีไฟล์ค้างสำหรับ stateKey นี้ ย่อ+อัปโหลดขึ้น Drive จริง แล้วคืน URL (null ถ้าไม่มีไฟล์ค้าง)
+  flushImageUpload: function(stateKey) {
+    const file = window.app.pendingImageUploads[stateKey];
+    if (!file) return Promise.resolve(null);
+    return new Promise((resolve, reject) => {
+      window.app.resizeImageFile(file, function(dataUrl, mimeType, fileName) {
+        const base64Data = dataUrl.split(',')[1];
+        window.app.api('UPLOAD_IMAGE', { fileName: fileName, mimeType: mimeType, base64Data: base64Data }).then(function(res) {
+          if (res && res.status === 'success') {
+            delete window.app.pendingImageUploads[stateKey];
+            resolve(res.url);
+          } else {
+            reject(new Error(res ? res.message : 'อัปโหลดรูปไม่สำเร็จ'));
+          }
+        }).catch(reject);
+      }, function(err) { reject(new Error(err || 'ไม่สามารถประมวลผลรูปภาพได้')); });
+    });
+  },
+
+  // Empty/error state มาตรฐานเดียวทั้งระบบ (5A.4) — คืน HTML string
+  // opts.onclick ต้องเป็นโค้ดที่เราเขียนเองเท่านั้น (ห้ามมีข้อมูลผู้ใช้) เพราะฝังลง attribute ตรงๆ
+  // สินค้าแสดงในช่องทางนี้ไหม — เว้นว่าง/'*'/'ALL'/'ทั้งหมด' = ทุกช่องทาง (ก่อนหน้านี้ 'ALL' ถูกมองเป็นชื่อช่องทางจริงแล้วสินค้าหายหมด)
+  channelOk: function(prodChannel, current) {
+    const pc = (prodChannel == null ? '' : String(prodChannel)).trim();
+    const cur = (current == null ? '' : String(current)).trim();
+    if (!cur || !pc) return true;
+    const toks = pc.split(/[,;|]/).map(t => t.trim().toLowerCase()).filter(Boolean);
+    if (toks.some(t => t === '*' || t === 'all' || t === 'ทั้งหมด')) return true;
+    return pc.includes(cur);
+  },
+
+  emptyState: function(opts) {
+    opts = opts || {};
+    const icon = opts.icon || 'fa-inbox';
+    const actionBtn = opts.actionLabel
+      ? '<button type="button" class="mt-1 px-5 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-sm hover:bg-indigo-700 transition-colors" onclick="' + opts.onclick + '">' + window.app.esc(opts.actionLabel) + '</button>'
+      : '';
+    return '<div class="flex flex-col items-center justify-center text-center py-10 px-6">'
+      + '<div class="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center mb-4"><i class="fas ' + icon + ' text-2xl"></i></div>'
+      + '<p class="font-bold text-slate-700 text-sm mb-1">' + window.app.esc(opts.title || 'ไม่มีข้อมูล') + '</p>'
+      + (opts.subtitle ? '<p class="text-xs text-slate-400 mb-4 max-w-sm leading-relaxed">' + window.app.esc(opts.subtitle) + '</p>' : '')
+      + actionBtn
+      + '</div>';
+  },
+
+  showLoading: function(text) {
+    Swal.fire({ 
+      toast: true, 
+      position: 'bottom-end', 
+      showConfirmButton: false, 
+      width: 'auto',
+      padding: '0',
+      html: '<div class="flex items-center space-x-2.5 px-4 h-full w-full"><svg class="animate-spin h-4 w-4 text-indigo-600 shrink-0" xmlns="http:\/\/www.w3.org\/2000\/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-[13px] font-black text-indigo-900 tracking-wide whitespace-nowrap">' + (text || 'กำลังโหลดข้อมูล...') + '</span></div>',
+      customClass: { 
+        popup: '!bg-white !shadow-[0_5px_20px_rgba(0,0,0,0.15)] !rounded-lg !border !border-slate-200 !h-[38px] !min-h-[38px] !max-h-[38px] !p-0 !flex !items-center !justify-center !mb-5 !mr-5',
+        htmlContainer: '!m-0 !p-0 !h-full !flex !items-center'
+      } 
+    }); 
+  },
+  hideLoading: function() { Swal.close(); },
+
+  // ข้อความแจ้งเตือนสั้นๆ แบบเดียวทั้งระบบ — หน้าร้าน (html.sf-site) ขึ้นมุมขวาบนใต้ตะกร้า (มุมล่างมีแถบตะกร้ามือถือ/แถบเปรียบเทียบอยู่), หลังร้านขึ้นมุมขวาล่าง
+  toast: function(title, icon = 'success') {
+    Swal.fire({
+      toast: true, position: document.documentElement.classList.contains('sf-site') ? 'top-end' : 'bottom-end', showConfirmButton: false, timer: 3000,
+      timerProgressBar: true, icon: icon, title: title,
+      customClass: { popup: '!rounded-xl shadow-lg border border-slate-100', title: '!text-sm !font-bold !text-slate-800' }
+    });
+  },
+
+  formatPhone: function(el) {
+    let val = el.value.replace(/\D/g, '');
+    if (val.length > 3 && val.length <= 6) val = val.slice(0, 3) + '-' + val.slice(3);
+    else if (val.length > 6) val = val.slice(0, 3) + '-' + val.slice(3, 6) + '-' + val.slice(6, 10);
+    el.value = val;
+    if (val.replace(/-/g,'').length === 10) { el.classList.remove('border-slate-200','border-rose-500'); el.classList.add('border-emerald-500','ring-emerald-200'); }
+    else { el.classList.remove('border-emerald-500','ring-emerald-200'); el.classList.add('border-slate-200'); }
+  },
+
+  // ตรวจเลขบัตรประชาชน / Passport — กติกาเดียวกับ normalizeIdCard_ ใน Code.js (server เป็นตัวบังคับจริง)
+  // คืน { ok, value, type: 'thai'|'passport', msg }
+  validateIdCard: function(raw) {
+    const v = String(raw == null ? '' : raw).replace(/[\s-]/g, '').toUpperCase();
+    if (!v) return { ok: false, msg: 'กรุณากรอกเลขบัตรประชาชน / Passport' };
+    if (/^\d+$/.test(v)) {
+      if (v.length === 13) {
+        let sum = 0; for (let i = 0; i < 12; i++) sum += parseInt(v.charAt(i), 10) * (13 - i);
+        if ((11 - (sum % 11)) % 10 !== parseInt(v.charAt(12), 10)) return { ok: false, msg: 'เลขบัตรประชาชนไม่ถูกต้อง (ตรวจเลขหลักสุดท้ายไม่ผ่าน)' };
+        return { ok: true, value: v, type: 'thai' };
+      }
+      if (v.length >= 6 && v.length <= 9) return { ok: true, value: v, type: 'passport' };
+      return { ok: false, msg: 'เลขบัตรประชาชนต้องมี 13 หลัก หรือ Passport 6-9 ตัวอักษร' };
+    }
+    if (/^[A-Z0-9]{6,9}$/.test(v)) return { ok: true, value: v, type: 'passport' };
+    return { ok: false, msg: 'เลข Passport ต้องเป็นตัวอักษรอังกฤษ/ตัวเลข 6-9 ตัว' };
+  },
+
+  // จัดรูปแบบช่องบัตรประชาชน/Passport ระหว่างพิมพ์: มีตัวอักษร = โหมด Passport (ตัวพิมพ์ใหญ่ ไม่เกิน 9 ตัว) · ตัวเลขล้วน = จัดขีดแบบบัตรประชาชน 13 หลัก
+  formatIdCard: function(el) {
+    const raw = String(el.value || '').toUpperCase();
+    const hasLetter = /[A-Z]/.test(raw);
+    let res;
+    if (hasLetter) {
+      res = raw.replace(/[^A-Z0-9]/g, '').slice(0, 9);
+    } else {
+      const val = raw.replace(/\D/g, '').slice(0, 13);
+      res = '';
+      if (val.length > 0) res += val.substring(0,1);
+      if (val.length > 1) res += '-' + val.substring(1,5);
+      if (val.length > 5) res += '-' + val.substring(5,10);
+      if (val.length > 10) res += '-' + val.substring(10,12);
+      if (val.length > 12) res += '-' + val.substring(12,13);
+    }
+    el.value = res;
+    const r = window.app.validateIdCard(res);
+    el.classList.remove('border-emerald-500', 'ring-emerald-200', 'border-rose-500', 'border-slate-200');
+    if (r.ok) el.classList.add('border-emerald-500', 'ring-emerald-200');
+    else el.classList.add(res.replace(/[^A-Za-z0-9]/g, '').length >= 6 ? 'border-rose-500' : 'border-slate-200');
+    el.title = r.ok ? (r.type === 'thai' ? 'บัตรประชาชนไทย' : 'Passport') : (r.msg || '');
+  },
+
+  formatImageUrl: function(url, size='w500') {
+    if (!url || url.trim() === '-' || url.trim() === '') return window.app.NO_IMG;
+    if (url.includes(',')) url = url.split(',')[0].trim();
+    const driveRegex = /(?:drive\.google\.com\/.*[?&]id=|drive\.google\.com\/file\/d\/)([^/?&]+)/;
+    const match = url.match(driveRegex);
+    if (match && match[1]) return 'https:\/\/drive.google.com/thumbnail?id=' + match[1] + '&sz=' + size;
+    return url;
+  },
+  parseImageUrls: function(urlsStr) {
+    if (!urlsStr || urlsStr.trim() === '-' || urlsStr.trim() === '') return [window.app.NO_IMG];
+    return urlsStr.split(',').map(u => {
+        let trimmed = u.trim();
+        if (!trimmed) return null;
+        const match = trimmed.match(/(?:drive\.google\.com\/.*[?&]id=|drive\.google\.com\/file\/d\/)([^/?&]+)/);
+        return (match && match[1]) ? 'https:\/\/drive.google.com/thumbnail?id=' + match[1] + '&sz=w1000' : trimmed;
+    }).filter(u => u);
+  },
+  // แทนที่ไอคอนโลโก้เริ่มต้น (fa-layer-group) ด้วยรูปโลโก้เว็บแอปที่ตั้งค่าไว้ (Settings key "LogoUrl") — ไม่ตั้งค่า = ปล่อยไอคอนเดิมไว้เฉยๆ ไม่ยุ่ง
+  // เรียกซ้ำได้หลายครั้งอย่างปลอดภัย (renderLayout เรียกทุกครั้งที่เปลี่ยนหน้า) — เช็คว่ามี <img> อยู่แล้วก่อนสร้างใหม่ กัน element ซ้ำ
+  applyLogo: function(boxId, iconId, url) {
+    const trimmed = (url || '').toString().trim();
+    if (!trimmed) return;
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const icon = document.getElementById(iconId);
+    if (icon) icon.style.display = 'none';
+    // กล่องไอคอนเริ่มต้นทำสีพื้นทึบไว้ (bg-[#8a6428]) — โลโก้จริงมักเป็น PNG พื้นหลังโปร่งใส ถ้าไม่ลบสีพื้นเดิมออก
+    // จะเห็นสีทองน้ำตาลโผล่รอบ/หลังโลโก้เพราะ object-contain ไม่เต็มกรอบสี่เหลี่ยมพอดี ดูเหมือนภาพซ้อนกัน — override ด้วย inline style ให้ชนะ class เดิม
+    box.style.backgroundColor = '#ffffff';
+    let img = box.querySelector('img.app-logo-img');
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'app-logo-img w-full h-full object-contain p-0.5';
+      box.appendChild(img);
+    }
+    // รูปโหลดไม่ได้ (ลิงก์เสีย/Drive ไม่ให้สิทธิ์) = กลับไปใช้ไอคอนเริ่มต้น ไม่ทิ้งกรอบรูปแตกไว้
+    img.onerror = function() { img.remove(); if (icon) icon.style.display = ''; box.style.backgroundColor = ''; };
+    const src = window.app.formatImageUrl(trimmed);
+    if (img.getAttribute('src') !== src) img.src = src;
+  },
+  // โลโก้ร้านทุกจุดของ layout หลัก (แถบเมนู / แถบบนมือถือ / ท้ายหน้า) — เรียกทุกครั้งที่ได้ข้อมูลตั้งค่าใหม่
+  // ตอนเพิ่งวาด layout ข้อมูลตั้งค่ายังไม่มา จึงใช้ลิงก์ที่จำไว้จากครั้งก่อน (localStorage) ไปก่อน แล้วอัปเดตเมื่อข้อมูลจริงมาถึง
+  applyAppLogos: function() {
+    const st = window.app.globalData && window.app.globalData.settings;
+    let url = '';
+    if (st) {
+      url = String(st.LogoUrl == null ? '' : st.LogoUrl).replace(/^'+/, '').trim();
+      try { if (url) localStorage.setItem('f9_logo_url', url); else localStorage.removeItem('f9_logo_url'); } catch (e) {}
+    } else {
+      try { url = localStorage.getItem('f9_logo_url') || ''; } catch (e) {}
+    }
+    [['sidebarLogoBox', 'sidebarLogoIcon'], ['mobileLogoBox', 'mobileLogoIcon'], ['footerLogoBox', 'footerLogoIcon']].forEach(function(p) {
+      if (url) return window.app.applyLogo(p[0], p[1], url);
+      // ไม่มีโลโก้ (ลบออกจากตั้งค่าแล้ว) = คืนไอคอนเริ่มต้น
+      const box = document.getElementById(p[0]); if (!box) return;
+      const old = box.querySelector('img.app-logo-img'); if (old) old.remove();
+      const ic = document.getElementById(p[1]); if (ic) ic.style.display = '';
+      box.style.backgroundColor = '';
+    });
+  },
+
+  // ===== Export กราฟ Chart.js เป็นภาพ (ดาวน์โหลด + คัดลอกคลิปบอร์ด) =====
+  // ใช้ Chart.getChart(canvasId) ของ Chart.js เอง แทนการเก็บ registry ซ้ำ — หา instance ปัจจุบันได้เสมอไม่ว่าใครสร้าง/เก็บไว้ที่ไหน (dashboard.charts, analytics.chart, ฯลฯ)
+  // เรียกครั้งเดียวหลังสร้างกราฟแต่ละอัน — เช็ค class ป้องกันแทรกปุ่มซ้ำตอน re-render (เช่น Live refresh ของ dashboard)
+  chartExportButtons: function(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const wrapper = canvas ? canvas.parentElement : null;
+    if (!wrapper || wrapper.querySelector('.chart-export-btns')) return;
+    const box = document.createElement('div');
+    box.className = 'chart-export-btns no-print';
+    box.innerHTML =
+      '<button type="button" class="chart-export-btn" title="ดาวน์โหลดภาพกราฟ" aria-label="ดาวน์โหลดภาพกราฟ (PNG)" onclick="window.app.downloadChartImage(\'' + canvasId + '\', event)"><i class="fas fa-download"></i></button>' +
+      '<button type="button" class="chart-export-btn" title="คัดลอกภาพกราฟ" aria-label="คัดลอกภาพกราฟไปยังคลิปบอร์ด" onclick="window.app.copyChartImage(\'' + canvasId + '\', event)"><i class="fas fa-copy"></i></button>';
+    wrapper.appendChild(box);
+  },
+  // หาชื่อกราฟจาก h6 ของการ์ดที่ห่อ canvas อยู่ — ใช้ตั้งชื่อไฟล์ตอนดาวน์โหลด (fallback เป็น canvasId ถ้าไม่พบ)
+  chartTitleOf: function(canvas) {
+    // เดินขึ้น ancestor ไม่กี่ชั้นหา h6 แรกที่เจอ — ไม่ผูกกับ class ".chart-card" ตายตัว
+    // เพราะบางหน้า (เช่น Sales Analytics) การ์ดกราฟใช้ wrapper class อื่น โครงสร้างไม่เหมือน Dashboard
+    let h6 = null;
+    let node = canvas.parentElement;
+    for (let i = 0; i < 4 && node && !h6; i++) {
+      h6 = node.querySelector('h6');
+      node = node.parentElement;
+    }
+    const raw = (h6 ? h6.textContent : canvas.id).trim().replace(/\s+/g, ' ');
+    return raw.replace(/[\\/:*?"<>|]/g, '').slice(0, 60) || canvas.id;
+  },
+  downloadChartImage: function(canvasId, e) {
+    if (e) e.stopPropagation();
+    const chart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvasId) : null;
+    if (!chart) return Swal.fire('ผิดพลาด', 'ไม่พบกราฟ กรุณาลองใหม่', 'error');
+    const d = new Date();
+    const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const a = document.createElement('a');
+    a.href = chart.toBase64Image('image/png', 1);
+    a.download = window.app.chartTitleOf(chart.canvas) + '_' + dateStr + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  },
+  copyChartImage: async function(canvasId, e) {
+    if (e) e.stopPropagation();
+    const chart = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvasId) : null;
+    if (!chart) return Swal.fire('ผิดพลาด', 'ไม่พบกราฟ กรุณาลองใหม่', 'error');
+    try {
+      if (!navigator.clipboard || typeof ClipboardItem === 'undefined') throw new Error('เบราว์เซอร์นี้ไม่รองรับการคัดลอกรูปภาพ');
+      const blob = await new Promise(resolve => chart.canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('สร้างภาพจากกราฟไม่สำเร็จ');
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      window.app.toast('คัดลอกภาพกราฟแล้ว — วางได้เลย (Ctrl+V)');
+    } catch (err) {
+      window.app.alertError('คัดลอกไม่สำเร็จ', (err && err.message ? err.message : 'ไม่ทราบสาเหตุ') + ' — ลองใช้ปุ่มดาวน์โหลดแทน', 'warning');
+    }
+  },
+
+  // ===== Export ตารางสรุป (Target/สรุปยอดจองรายวัน/สรุปยอดรุ่น-แอเรีย-ช่องทาง/สรุปข้อมูลจองทั้งหมด) เป็นภาพ =====
+  // ตารางเหล่านี้ไม่ใช่ canvas เหมือนกราฟ — ใช้ html2canvas แคป DOM แทน
+  // เรียกครั้งเดียวหลัง render การ์ดแต่ละใบ (เหมือน chartExportButtons) — เช็ค class ป้องกันแทรกซ้ำ
+  tableExportButtons: function(cardEl) {
+    if (!cardEl) return;
+    const headerBar = cardEl.firstElementChild;
+    if (!headerBar || headerBar.querySelector('.chart-export-btns')) return;
+    headerBar.classList.add('flex', 'items-center', 'justify-between', 'gap-3');
+    const box = document.createElement('div');
+    box.className = 'table-export-btns no-print';
+    box.innerHTML =
+      '<button type="button" class="chart-export-btn" title="ดาวน์โหลดภาพตาราง" aria-label="ดาวน์โหลดภาพตาราง (PNG)" onclick="window.app.downloadTableImage(this)"><i class="fas fa-download"></i></button>' +
+      '<button type="button" class="chart-export-btn" title="คัดลอกภาพตาราง" aria-label="คัดลอกภาพตารางไปยังคลิปบอร์ด" onclick="window.app.copyTableImage(this)"><i class="fas fa-copy"></i></button>';
+    headerBar.appendChild(box);
+  },
+  // โคลนกล่อง scroll ของตารางออกไปนอกหน้าจอก่อนแคป — กัน html2canvas เพี้ยนกับ position:sticky
+  // (thead + คอลัมน์แรกของทุกตารางสรุปใช้ sticky ทำ frozen header/column) และกัน max-height ตัดภาพให้เห็นแค่ส่วนที่ scroll เข้ามา
+  renderTableToCanvas: async function(scrollWrap) {
+    const clone = scrollWrap.cloneNode(true);
+    clone.querySelectorAll('.sticky').forEach(el => { el.classList.remove('sticky'); el.style.position = 'static'; });
+    clone.style.maxHeight = 'none';
+    clone.style.overflow = 'visible';
+    clone.style.position = 'absolute';
+    clone.style.top = '-99999px';
+    clone.style.left = '0';
+    clone.style.marginLeft = '0';
+    clone.style.marginRight = '0';
+    clone.style.width = scrollWrap.scrollWidth + 'px';
+    clone.style.background = '#ffffff';
+    document.body.appendChild(clone);
+    try {
+      return await html2canvas(clone, { backgroundColor: '#ffffff', scale: 2 });
+    } finally {
+      document.body.removeChild(clone);
+    }
+  },
+  findTableScrollWrap: function(btn) {
+    const card = btn.closest('.chart-card');
+    return card ? card.querySelector('.overflow-x-auto') : null;
+  },
+  downloadTableImage: async function(btn) {
+    const scrollWrap = window.app.findTableScrollWrap(btn);
+    if (!scrollWrap) return Swal.fire('ผิดพลาด', 'ไม่พบตาราง กรุณาลองใหม่', 'error');
+    if (typeof html2canvas === 'undefined') return Swal.fire('ผิดพลาด', 'ไม่พบไลบรารีสร้างภาพ กรุณาลองรีเฟรชหน้า', 'error');
+    const restore = window.app.iconBtnBusy(btn) || function(){};
+    try {
+      const canvas = await window.app.renderTableToCanvas(scrollWrap);
+      const d = new Date();
+      const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = window.app.chartTitleOf(scrollWrap) + '_' + dateStr + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      window.app.alertError('ผิดพลาด', 'สร้างภาพตารางไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+    } finally {
+      restore();
+    }
+  },
+  copyTableImage: async function(btn) {
+    const scrollWrap = window.app.findTableScrollWrap(btn);
+    if (!scrollWrap) return Swal.fire('ผิดพลาด', 'ไม่พบตาราง กรุณาลองใหม่', 'error');
+    if (typeof html2canvas === 'undefined') return Swal.fire('ผิดพลาด', 'ไม่พบไลบรารีสร้างภาพ กรุณาลองรีเฟรชหน้า', 'error');
+    const restore = window.app.iconBtnBusy(btn) || function(){};
+    try {
+      if (!navigator.clipboard || typeof ClipboardItem === 'undefined') throw new Error('เบราว์เซอร์นี้ไม่รองรับการคัดลอกรูปภาพ');
+      const canvas = await window.app.renderTableToCanvas(scrollWrap);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('สร้างภาพตารางไม่สำเร็จ');
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      window.app.toast('คัดลอกภาพตารางแล้ว — วางได้เลย (Ctrl+V)');
+    } catch (err) {
+      window.app.alertError('คัดลอกไม่สำเร็จ', (err && err.message ? err.message : 'ไม่ทราบสาเหตุ') + ' — ลองใช้ปุ่มดาวน์โหลดแทน', 'warning');
+    } finally {
+      restore();
+    }
+  },
+
+  printReceipt: async function(orderId, pay) {
+     const d = new Date();
+     const dateStr = d.toLocaleDateString('th-TH') + ' ' + d.toLocaleTimeString('th-TH');
+
+     // รองรับทั้งชื่อ field จาก checkout payload (cart/customerName/contactPhone) และชื่อเดิม
+     const esc = window.app.esc;
+     const items = pay.items || pay.cart || [];
+     const customer = esc(pay.customer || pay.customerName || '-');
+     const phone = esc(pay.phone || pay.contactPhone || '-');
+
+     let subTotal = 0;
+     let itemsHtml = '';
+     items.forEach(item => {
+        let p = parseFloat((item.Price||'0').toString().replace(/[^\d.\-]/g,''));
+        let t = p * item.qty;
+        subTotal += t;
+        // reprintOrder (grid.js) ใช้ isGiftLine เมื่อสร้าง cart จากแถวของแถมที่คีนอยู่ในชีตแยกแถว (ไม่มีความสัมพันธ์กับสินค้าหลักในข้อมูล)
+        // ต่างจาก checkout ปกติที่ของแถมมากับ item.brandGifts/channelGifts — flag นี้แค่เปลี่ยนป้ายราคาเป็น "ฟรี" ไม่กระทบ subTotal (ราคาแถวของแถมเป็น 0 อยู่แล้ว)
+        const isFreeLine = !!item.isGiftLine;
+        itemsHtml += `
+          <tr style="border-bottom: 1px dashed #cbd5e1;">
+            <td style="padding: 10px 0; text-align: left;">
+              <div style="font-weight: bold; font-size: 14px;">${window.app.pn(item['Product Name'])}${isFreeLine ? ' <span style="font-size:11px;color:#059669;font-weight:normal;">(ของแถม)</span>' : ''}</div>
+              <div style="font-size: 12px; color: #64748b;">SKU: ${esc(item.SKU)}</div>
+            </td>
+            <td style="padding: 10px 0; text-align: center;">${item.qty}</td>
+            <td style="padding: 10px 0; text-align: right;">${isFreeLine ? '-' : p.toLocaleString()}</td>
+            <td style="padding: 10px 0; text-align: right; font-weight: bold;">${isFreeLine ? 'ฟรี' : t.toLocaleString()}</td>
+          </tr>
+        `;
+        // 7.2 — พิมพ์ของแถมของสินค้าชิ้นนี้ใต้สินค้าหลัก (แสดง "ฟรี" — ห้ามบวกเข้า subTotal ยอดเงินมาจากสินค้าหลัก+ส่วนลดเท่านั้น)
+        const gifts = [].concat(item.brandGifts || [], item.channelGifts || []);
+        gifts.forEach(g => {
+           if (!g || !g.name) return;
+           const gQty = parseInt(g.qty, 10) || 1;
+           itemsHtml += `
+          <tr style="border-bottom: 1px dashed #e2e8f0;">
+            <td colspan="2" style="padding: 4px 0 4px 14px; text-align: left; font-size: 12px; color: #64748b;">— ของแถม: ${window.app.pn(g.name)} x${gQty}</td>
+            <td style="padding: 4px 0; text-align: right; font-size: 12px; color: #64748b;"></td>
+            <td style="padding: 4px 0; text-align: right; font-size: 12px; color: #64748b; font-weight: bold;">ฟรี</td>
+          </tr>
+           `;
+        });
+     });
+
+     const discountVal = parseFloat(pay.discount || 0);
+     const grandTotal = Math.max(0, subTotal - discountVal);
+     let discountsHtml = '';
+     if (pay.discounts && pay.discounts.length > 0) {
+        pay.discounts.forEach(dc => {
+           discountsHtml += `<div>${esc(dc.name)}: -${parseFloat(dc.value||0).toLocaleString()} ฿</div>`;
+        });
+     } else if (discountVal > 0) {
+        discountsHtml = `<div>ส่วนลดโปรโมชั่น: -${discountVal.toLocaleString()} ฿</div>`;
+     }
+     
+     // แยก style/เนื้อหาใบจองออกจาก wrapper เอกสารเต็ม — ใช้ร่วมกันทั้ง 2 เส้นทางด้านล่าง (popup+print บนจอใหญ่, สร้างไฟล์ PDF บนมือถือ/แท็บเลต)
+     const styleBlock = `
+         @import url('https:\/\/fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
+         body { font-family: Roboto, 'Helvetica Neue', Helvetica, Tahoma, Arial, sans-serif; margin: 0; padding: 20px; color: #1e293b; background: #fff; }
+         .receipt-container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e293b; padding-bottom: 15px; }
+         .header h1 { margin: 0; font-size: 22px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; }
+         .header p { margin: 5px 0 0 0; font-size: 14px; color: #64748b; }
+         .info-section { display: flex; justify-content: space-between; margin-bottom: 25px; font-size: 13px; line-height: 1.6; }
+         .info-section div { flex: 1; }
+         .info-section strong { color: #0f172a; display: block; margin-bottom: 4px; font-size: 14px; }
+         table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+         th { border-bottom: 2px solid #1e293b; padding: 10px 0; font-size: 13px; color: #0f172a; }
+         .totals { text-align: right; font-size: 14px; border-top: 2px solid #1e293b; padding-top: 15px; line-height: 1.8; color: #334155; }
+         .totals .grand-total { font-size: 18px; font-weight: bold; margin-top: 10px; color: #0f172a; }
+         .footer { text-align: center; margin-top: 40px; font-size: 12px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 20px; }
+         .badge { display: inline-block; padding: 4px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: bold; margin-bottom: 15px; font-size: 13px; }
+         @media print {
+           body { padding: 0; background: #fff; }
+           .receipt-container { border: none; padding: 0; max-width: 100%; }
+           @page { size: A4; margin: 10mm; }
+         }
+     `;
+     const receiptInnerHtml = `
+       <div class="receipt-container">
+         <div class="header">
+           <h1>ใบจองสินค้า</h1>
+           <p>Booking Receipt</p>
+         </div>
+
+         <div class="info-section">
+           <div>
+             <strong>ข้อมูลลูกค้า (Customer)</strong>
+             ชื่อ-สกุล: ${customer}<br>
+             เบอร์โทร: ${phone}<br>
+             อีเมล: ${esc(pay.email || '-')}<br>
+             เลขบัตรปชช./พาสปอร์ต: ${esc(pay.idCard || '-')}
+           </div>
+           <div style="text-align: right;">
+             <strong>ข้อมูลการจอง (Booking)</strong>
+             Order ID: <span style="font-size: 15px; font-weight: bold; color: #0f172a;">${esc(orderId)}</span><br>
+             วันที่ทำรายการ: ${dateStr}<br>
+             สาขา: ${esc(pay.branch)}<br>
+             พนักงานผู้รับจอง: ${esc(pay.bkStaffName)}<br>
+             เลขที่ใบเสร็จรับเงิน: ${esc(pay.receiptNo || '-')}
+           </div>
+         </div>
+
+         <table>
+           <thead>
+             <tr>
+               <th style="text-align: left;">รายการสินค้า (Item)</th>
+               <th style="text-align: center; width: 60px;">จำนวน</th>
+               <th style="text-align: right; width: 100px;">ราคา/หน่วย</th>
+               <th style="text-align: right; width: 100px;">จำนวนเงิน</th>
+             </tr>
+           </thead>
+           <tbody>
+             ${itemsHtml}
+           </tbody>
+         </table>
+
+         <div class="totals">
+           <div>รวมเป็นเงิน (Sub Total): ${subTotal.toLocaleString()} ฿</div>
+           ${discountsHtml}
+           <div class="grand-total">ยอดสุทธิ (Grand Total): ${grandTotal.toLocaleString()} ฿</div>
+           ${(parseFloat(pay.depositAmount)||0) > 0 ? `
+           <div style="margin-top: 8px; color: #059669; font-weight: bold;">เงินมัดจำรับแล้ว (Deposit Paid): ${parseFloat(pay.depositAmount).toLocaleString()} ฿</div>
+           <div style="font-weight: bold;">ยอดคงเหลือชำระวันรับสินค้า (Balance Due): ${Math.max(0, grandTotal - parseFloat(pay.depositAmount)).toLocaleString()} ฿</div>` : ''}
+         </div>
+
+         <div class="footer">
+           <p>ขอบคุณที่ใช้บริการ / Thank you for your pre-booking</p>
+           <p>เอกสารฉบับนี้ใช้เป็นหลักฐานในการรับสินค้า กรุณานำมาแสดงในวันรับสินค้า</p>
+         </div>
+       </div>
+     `;
+
+     // จอใหญ่ (desktop/notebook): popup window + print dialog เดิม — ใช้งานได้ปกติ ไม่แตะ
+     if (window.innerWidth > 1024) {
+       const printWindow = window.open('', '_blank');
+       if (!printWindow) {
+          Swal.fire('ข้อผิดพลาด', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์ใบจอง', 'error');
+          return;
+       }
+       const html = `
+       <!DOCTYPE html>
+       <html lang="th">
+       <head>
+         <meta charset="UTF-8">
+         <title>ใบจองสินค้า (Booking Receipt)</title>
+         <style>${styleBlock}</style>
+       </head>
+       <body>
+         ${receiptInnerHtml}
+         <script>
+           window.onload = function() {
+             window.print();
+           }
+         <\/script>
+       </body>
+       </html>
+       `;
+       printWindow.document.open();
+       printWindow.document.write(html);
+       printWindow.document.close();
+       return;
+     }
+
+     // มือถือ/แท็บเลต: สร้างไฟล์ PDF ดาวน์โหลดตรงๆ แทน popup+print dialog เดิม — popup มักถูก block และ print dialog ในเบราว์เซอร์มือถือทำงานไม่เสถียร (owner request 2026-09-19)
+     window.app.showLoading('กำลังสร้างไฟล์ PDF...');
+     const holder = document.createElement('div');
+     holder.style.cssText = 'position:fixed; left:-9999px; top:0; width:600px; background:#fff;';
+     holder.innerHTML = '<style>' + styleBlock + '</style>' + receiptInnerHtml;
+     document.body.appendChild(holder);
+     try {
+       await new Promise(r => setTimeout(r, 150)); // เผื่อเวลาเลย์เอาต์/ฟอนต์นิ่งก่อน capture
+       const canvas = await html2canvas(holder, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+       const imgData = canvas.toDataURL('image/png');
+       const { jsPDF } = window.jspdf;
+       const pdf = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] });
+       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+       pdf.save('ใบจอง-' + orderId + '.pdf');
+     } catch (e) {
+       window.app.alertError('ผิดพลาด', 'สร้างไฟล์ PDF ไม่สำเร็จ: ' + (e && e.message ? e.message : e));
+     } finally {
+       document.body.removeChild(holder);
+       window.app.hideLoading();
+     }
+  },
+
+
+  // ===== โครงร่างระหว่างโหลด (skeleton) =====
+  // การ์ดสินค้าสีเทา n ใบ — ใช้ทั้งในกริดหน้าร้าน (pos.renderProducts) และโครงร่างตอนเปิดหน้า
+  skelCardsHtml: function(n) {
+    let h = '<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 pb-4">';
+    for (let k = 0; k < n; k++) { h += '<div class="pm-skel" aria-hidden="true"><div class="skeleton mb-3" style="aspect-ratio:1/1; width:100%; border-radius:12px;"></div><div class="skeleton mb-2" style="height:10px; width:30%;"></div><div class="skeleton mb-3" style="height:14px; width:80%;"></div><div class="skeleton mb-2" style="height:18px; width:45%;"></div><div class="skeleton" style="height:10px; width:65%;"></div></div>'; }
+    return h + '</div>';
+  },
+  // โครงร่างทั้งหน้าร้าน: header (โลโก้ / ค้นหา / ไอคอน) + แถวเมนูหมวด + แบนเนอร์ 3:1 + การ์ด
+  bootSkeletonHtml: function() {
+    const s = (cls) => '<span class="skeleton ' + cls + '"></span>';
+    return '<div class="sk-boot" role="status" aria-label="กำลังโหลดหน้าร้าน">'
+      + '<div class="sk-hdr">' + s('sk-logo') + s('sk-search') + s('sk-ic') + s('sk-ic') + s('sk-ic') + '</div>'
+      + '<div class="sk-nav">' + s('sk-navi') + s('sk-navi') + s('sk-navi') + s('sk-navi') + s('sk-navi') + s('sk-sel') + s('sk-sel') + '</div>'
+      + '<div class="skeleton sk-hero"></div>'
+      + window.app.skelCardsHtml(10)
+      + '</div>';
+  },
+  // เรียกจาก renderLayout ก่อนรอ GET_ALL_DATA — แสดงเฉพาะเมื่อหน้าที่กำลังจะเปิดคือหน้าร้าน (#pos) และผู้ใช้มีสิทธิ์
+  // route() จะวาดหน้าจริงทับ และตั้ง/ถอด sf-site เองอีกครั้งหลังข้อมูลมา
+  showBootSkeleton: function() {
+    try {
+      const target = window.location.hash.substring(1) || (window.__DEEP_MODEL ? 'pos' : (window.app.savedRoute_() || window.app.homeRoute_()));
+      if (target !== 'pos') return;
+      const m = window.app.menuConfig.flatMap(x => x.children || [x]).find(x => x.id === 'pos');
+      if (!m || !window.app.checkMenuAccess('pos', m.roles)) return;
+      const c = document.getElementById('page-content');
+      if (!c) return;
+      document.documentElement.classList.add('sf-site');
+      c.innerHTML = window.app.bootSkeletonHtml();
+    } catch (e) { console.warn('boot skeleton:', e); }
+  },
+
+  // รายชื่อช่องทางขายชุดเดียวที่ทุกฟอร์มใช้ร่วมกัน: ค่า Channel ที่สาขาใช้อยู่จริง (หน้าร้านอ่านจากตรงนี้) + ชื่อในหน้า "ช่องทางขาย"
+  // ตัดซ้ำแบบไม่สนตัวพิมพ์เล็ก/ใหญ่ เก็บตัวสะกดแรกที่เจอ — ฟอร์มสาขาและฟอร์มโปรโมชั่น/ชุดของแถมเลือกจากรายการนี้ จึงสะกดไม่ตรงกันไม่ได้
+  // ตัวเลือกสาขาของฟอร์มผู้ใช้งาน: ว่าง (ให้เลือกเอง) / ALL / หนึ่งรายการต่อ Branch Code (ชีตมีได้หลายแถวต่อรหัส — หนึ่งแถวต่อช่องทาง)
+  branchOptions: function() {
+    const seen = {}, out = [{ value: '', label: '- เลือกสาขา -' }, { value: 'ALL', label: 'ทุกสาขา (ALL)' }];
+    ((window.app.globalData || {}).branches || []).forEach(b => {
+      const code = String(b['Branch Code'] === undefined || b['Branch Code'] === null ? '' : b['Branch Code']).trim();
+      if (!code || code === 'ALL' || seen[code]) return;
+      seen[code] = true;
+      const name = String(b['Branch Name'] || '').trim();
+      out.push({ value: code, label: name ? code + ' - ' + name : code });
+    });
+    return out;
+  },
+
+  channelNames: function() {
+    const g = window.app.globalData || {}, seen = {}, out = [];
+    (g.branches || []).map(b => b.Channel).concat((g.channels || []).map(c => c['Channel Name'])).forEach(v => {
+      const t = (v === null || v === undefined ? '' : v).toString().trim();
+      if (!t || seen[t.toLowerCase()]) return;
+      seen[t.toLowerCase()] = true; out.push(t);
+    });
+    return out;
+  },
+
+  refreshGlobalData: async function() {
+    try {
+      const res = await window.app.api('GET_ALL_DATA', {});
+      if (res && res.status === 'success') {
+        window.app.globalData = res;
+        window.app.applyAppLogos();
+        window.app.preloadBanners();
+      }
+    } catch(e) {
+      console.error("Failed to refresh global data:", e);
+    }
+  },
+
+  // พรีโหลดรูป Banner ทันทีหลังได้ข้อมูล — browser จะ cache ไว้ก่อนถึงหน้า Dashboard
+  preloadBanners: function() {
+    const g = window.app.globalData || {};
+    (g.heroBanners || []).forEach(b => { const im = new Image(); im.src = window.app.formatImageUrl(b.url, 'w1200'); }); // ต้องเป็นขนาดเดียวกับที่ pos.renderPosHeroAndVouchers ขอ ไม่งั้นพรีโหลดไม่ถูกใช้
+    (g.gridBanners || []).forEach(b => { const im = new Image(); im.src = window.app.formatImageUrl(b.url, 'w1000'); });
+    (g.popupBanners || []).forEach(b => { const im = new Image(); im.src = window.app.formatImageUrl(b.url); });
+  },
+  
+  showModal: function(modalId) {
+    const el = document.getElementById(modalId);
+    if(el) {
+        el.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+  },
+  
+  hideModal: function(modalId) {
+    const el = document.getElementById(modalId);
+    if(el) {
+        el.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+    // ปิดหน้าต่างสินค้า = ถอด ?p= ออกจาก URL (ลิงก์ที่แชร์ได้ผูกกับ modal ที่เปิดอยู่เท่านั้น)
+    if (modalId === 'addToCartModal' && window.app.pos && window.app.pos.setSharedModel) window.app.pos.setSharedModel('');
+  },
+
+  // เงื่อนไขการจอง / นโยบายความเป็นส่วนตัว: Admin แก้ได้ที่ ตั้งค่าระบบ (Settings: PolicyBooking / PolicyPrivacy) — เว้นว่างใช้ข้อความมาตรฐานด้านล่าง
+  // หน้าช่วยเหลือ "วิธีการจอง" / "คำถามที่พบบ่อย" ใช้กลไกเดียวกัน (Settings: HelpHowTo / HelpFaq) — เปิดจาก footer ด้วย openPolicy('howto' | 'faq')
+  POLICY_TITLES: { booking: 'เงื่อนไขการจอง', privacy: 'นโยบายความเป็นส่วนตัว', howto: 'วิธีการจอง', faq: 'คำถามที่พบบ่อย' },
+  POLICY_KEYS: { booking: 'PolicyBooking', privacy: 'PolicyPrivacy', howto: 'HelpHowTo', faq: 'HelpFaq' },
+  POLICY_DEFAULTS: {
+    howto: [
+      '<b>1. เลือกสินค้า</b>',
+      'เลือกรุ่น สี และความจุที่ต้องการ เลือกของแถมที่มีสิทธิ์ แล้วกดเพิ่มลงตะกร้า',
+      '',
+      '<b>2. แจ้งข้อมูลการจอง</b>',
+      'แจ้งชื่อ เบอร์โทรศัพท์ อีเมล และเลขบัตรประชาชนหรือหนังสือเดินทางของผู้จอง พนักงานจะบันทึกใบจองให้',
+      '',
+      '<b>3. รับเลขที่ใบจอง</b>',
+      'เก็บเลขที่ใบจองไว้ ใช้ตรวจสอบสถานะได้จากเมนู "เช็คสถานะใบจอง" และใช้แสดงในวันรับสินค้า'
+    ].join('\n'),
+    faq: [
+      '<b>ตรวจสอบสถานะใบจองได้อย่างไร</b>',
+      'กดเมนู "เช็คสถานะใบจอง" ท้ายหน้าเว็บ แล้วกรอกเลขที่ใบจอง',
+      '',
+      '<b>วันรับสินค้าต้องเตรียมอะไร</b>',
+      'เลขที่ใบจอง และบัตรประชาชนหรือหนังสือเดินทางที่ใช้จอง',
+      '',
+      '<b>ยกเลิกการจองหรือขอคืนเงินมัดจำได้ไหม</b>',
+      'เป็นไปตามเงื่อนไขที่สาขาแจ้ง กรุณาสอบถามสาขาที่จองก่อนชำระเงิน',
+      '',
+      '<b>ต้องการเปลี่ยนสีหรือรุ่นหลังจองแล้ว</b>',
+      'ติดต่อสาขาที่จอง พร้อมแจ้งเลขที่ใบจอง'
+    ].join('\n'),
+    booking: [
+      '1. การจองจะสมบูรณ์เมื่อร้านบันทึกใบจองและแจ้งเลขที่ใบจองให้ลูกค้าแล้ว',
+      '2. ราคา ของแถม และสิทธิพิเศษ เป็นไปตามที่ระบุในใบจอง ณ วันที่จอง',
+      '3. เงินมัดจำ (ถ้ามี) จะนำไปหักจากราคาสินค้าในวันรับสินค้า เงื่อนไขการคืนเงินมัดจำและการยกเลิกการจองเป็นไปตามที่สาขาแจ้ง กรุณาสอบถามสาขาก่อนชำระเงิน',
+      '4. กรุณารับสินค้าตามรอบวันที่ที่ร้านแจ้ง พร้อมแสดงเลขที่ใบจอง และบัตรประชาชนหรือหนังสือเดินทางที่ใช้จอง',
+      '5. สินค้าและของแถมมีจำนวนจำกัด หากรายการใดไม่สามารถจัดหาได้ ร้านจะติดต่อลูกค้าเพื่อแจ้งทางเลือก',
+      '6. หากมีข้อสงสัย ติดต่อร้านได้ตามช่องทางที่แสดงท้ายหน้าเว็บ'
+    ].join('\n'),
+    privacy: [
+      '<b>ข้อมูลที่ร้านเก็บ</b>',
+      'ชื่อ-นามสกุล เบอร์โทรศัพท์ อีเมล เลขบัตรประชาชนหรือหนังสือเดินทาง และรายการสินค้าที่จอง',
+      '',
+      '<b>วัตถุประสงค์</b>',
+      'เพื่อยืนยันตัวตนผู้จอง จัดทำใบจองและเอกสารที่เกี่ยวข้อง ติดต่อแจ้งสถานะการจอง และนัดรับสินค้า',
+      '',
+      '<b>การเปิดเผยข้อมูล</b>',
+      'ร้านใช้ข้อมูลเพื่อการจองนี้ และเปิดเผยเฉพาะแก่พนักงานและผู้ให้บริการที่เกี่ยวข้องกับการจอง หรือเมื่อกฎหมายกำหนด',
+      '',
+      '<b>ระยะเวลาเก็บข้อมูล</b>',
+      'เก็บไว้เท่าที่จำเป็นต่อการให้บริการและตามที่กฎหมายกำหนด',
+      '',
+      '<b>สิทธิของเจ้าของข้อมูล</b>',
+      'ลูกค้าขอเข้าถึง แก้ไข ลบข้อมูล หรือถอนความยินยอมได้ โดยติดต่อร้านตามช่องทางที่แสดงท้ายหน้าเว็บ'
+    ].join('\n')
+  },
+  policyText: function(kind) {
+    const st = (window.app.globalData && window.app.globalData.settings) || {};
+    const v = String(st[window.app.POLICY_KEYS[kind]] == null ? '' : st[window.app.POLICY_KEYS[kind]]).replace(/^'+/, '').trim();
+    return v || window.app.POLICY_DEFAULTS[kind] || '';
+  },
+  // text = ข้อความที่จะแสดงแทนค่าที่บันทึกไว้ (ใช้ดูตัวอย่างจากหน้าตั้งค่าก่อนบันทึก)
+  openPolicy: function(kind, text) {
+    if (!window.app.POLICY_TITLES[kind]) return;
+    const body = (typeof text === 'string' && text.trim()) ? text.trim() : window.app.policyText(kind);
+    Swal.fire({
+      title: window.app.esc(window.app.POLICY_TITLES[kind]),
+      html: '<div class="pol-body" id="policyBody">' + window.app.safeRichText(body).replace(/\r?\n/g, '<br>') + '</div>',
+      width: 640, confirmButtonText: 'ปิด', confirmButtonColor: '#0f2a43'
+    });
+  },
+  // "สาขาของเรา" จากชีต Branches (globalData.branches) — จัดกลุ่มตามจังหวัด แสดงชื่อสาขา + ห้าง/พื้นที่; ผู้ใช้ Sales เห็นเฉพาะสาขาที่ server ส่งมาให้
+  openBranches: function() {
+    const esc = window.app.esc, clean = (v) => String(v == null ? '' : v).replace(/^'+/, '').trim();
+    const seen = {}, groups = {}, order = [];
+    ((window.app.globalData && window.app.globalData.branches) || []).forEach(b => {
+      const name = clean(b['Branch Name']) || clean(b['Branch Code']); if (!name) return;
+      const key = clean(b['Branch Code']) || name; if (seen[key]) return; seen[key] = true; // สาขาเดียวกันอาจมีหลายแถว (แถวละช่องทาง)
+      const prov = clean(b.Province) || 'สาขา';
+      if (!groups[prov]) { groups[prov] = []; order.push(prov); }
+      groups[prov].push({ name: name, sub: [clean(b.Mall), clean(b.Area)].filter((v, i, a) => v && v !== '-' && v !== name && a.indexOf(v) === i).join(' · ') });
+    });
+    order.sort((a, b) => a.localeCompare(b, 'th'));
+    const html = order.length
+      ? order.map(p => '<section class="br-grp"><h4>' + esc(p) + '</h4><ul>' + groups[p].map(x => '<li><i class="fas fa-store" aria-hidden="true"></i><div><b>' + esc(x.name) + '</b>' + (x.sub ? '<span>' + esc(x.sub) + '</span>' : '') + '</div></li>').join('') + '</ul></section>').join('')
+      : '<p class="br-none">ยังไม่มีข้อมูลสาขา</p>';
+    Swal.fire({ title: 'สาขาของเรา', html: '<div class="pol-body br-body" id="branchBody">' + html + '</div>', width: 640, confirmButtonText: 'ปิด', confirmButtonColor: '#0f2a43' });
+  },
+
+  // ข้อมูลติดต่อร้านใน footer (ตั้งค่าที่ ตั้งค่าระบบ › ข้อมูลติดต่อร้าน: ContactPhone / ContactLine / ContactHours)
+  // footer: ลิงก์หมวดสินค้า (เหมือนเมนูหมวดใน header) — กดจากหน้าไหนก็ได้ พาไปหน้าร้านพร้อมกรองหมวดนั้น
+  renderFooterCategories: function() {
+    const nav = document.getElementById('footerCatLinks'); if (!nav || !window.app.pos || !window.app.pos.storeCategories) return;
+    const cats = window.app.pos.storeCategories().filter(c => !c.includes('ของแถม')).slice(0, 8);
+    const esc = window.app.esc, escJs = window.app.escAttrJs;
+    nav.innerHTML = cats.map(c => '<button type="button" onclick="window.app.goCategory(\'' + escJs(c) + '\')"><i class="fas ' + window.app.pos.catIcon(c) + '"></i>' + esc(c) + '</button>').join('');
+    const col = document.getElementById('footerCatCol');
+    if (col) col.classList.toggle('hidden', cats.length === 0);
+  },
+  goCategory: function(cat) {
+    const pos = window.app.pos;
+    if (window.app.currentRoute === 'pos') { pos.setStoreCategory(cat); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    // ยังไม่อยู่หน้าร้าน: ตั้งตัวกรองในหน่วยความจำไว้ก่อน — pos.init วาดตาม storeFilters ปัจจุบัน
+    pos.storeFilters = pos.emptyStoreFilters();
+    pos.storeFilters.category = cat;
+    pos.storePage = 1;
+    window.location.hash = '#pos';
+  },
+  renderFooterContact: function() {
+    const box = document.getElementById('footerContact'); if (!box) return;
+    const st = (window.app.globalData && window.app.globalData.settings) || {};
+    const clean = (v) => String(v == null ? '' : v).replace(/^'+/, '').trim(); // ค่าที่ขึ้นต้น + = - @ ถูกกัน formula โดยเติม ' ไว้หน้า
+    const phone = clean(st.ContactPhone), line = clean(st.ContactLine), hours = clean(st.ContactHours);
+    const parts = [];
+    if (phone) {
+      const digits = phone.replace(/[^0-9+]/g, '');
+      parts.push('<a href="tel:' + window.app.esc(digits) + '" class="hover:text-[#FF6B00] transition-colors"><i class="fas fa-phone mr-1.5 text-slate-400"></i>' + window.app.esc(phone) + '</a>');
+    }
+    if (line) {
+      const href = /^https?:\/\//i.test(line) ? line : 'https://line.me/R/ti/p/' + encodeURIComponent(line.charAt(0) === '@' ? line : '@' + line);
+      const shown = /^https?:\/\//i.test(line) ? 'LINE' : (line.charAt(0) === '@' ? line : '@' + line);
+      parts.push('<a href="' + window.app.esc(href) + '" target="_blank" rel="noopener noreferrer" class="hover:text-[#FF6B00] transition-colors"><i class="fab fa-line mr-1.5 text-emerald-500"></i>' + window.app.esc(shown) + '</a>');
+    }
+    if (hours) parts.push('<span><i class="far fa-clock mr-1.5 text-slate-400"></i>' + window.app.esc(hours) + '</span>');
+    box.innerHTML = parts.join('');
+    box.classList.toggle('hidden', parts.length === 0);
+    const col = document.getElementById('footerContactCol');
+    if (col) col.classList.toggle('hidden', parts.length === 0);
+  },
+
+  // =========================================================================
+  // ระบบติดตามสถานะใบจอง & บัตรรับเครื่องดิจิทัลสำหรับลูกค้า (Public Booking Pass)
+  // =========================================================================
+  openPublicTrackModal: function(defaultOrderId) {
+    this.showModal('publicOrderTrackModal');
+    const oidInp = document.getElementById('publicTrackOrderIdInput');
+    const phInp = document.getElementById('publicTrackPhoneInput');
+    if (oidInp) {
+      if (defaultOrderId) {
+        oidInp.value = defaultOrderId.toString().trim();
+        if (phInp) phInp.focus();
+        this.searchPublicOrderTrack();
+      } else {
+        oidInp.focus();
+      }
+    }
+  },
+
+  searchPublicOrderTrack: async function() {
+    const oidInp = document.getElementById('publicTrackOrderIdInput');
+    const phInp = document.getElementById('publicTrackPhoneInput');
+    const container = document.getElementById('publicTrackResultsContainer');
+    if (!oidInp || !container) return;
+
+    const oid = (oidInp.value || '').trim();
+    const phone = (phInp ? phInp.value : '').trim();
+
+    if (!oid) {
+      return Swal.fire('แจ้งเตือน', 'กรุณากรอกเลขที่ใบจอง (Order ID เช่น ORD-...)', 'warning');
+    }
+
+    container.innerHTML = '<div class="py-12 text-center text-slate-500 text-xs font-bold"><i class="fas fa-spinner fa-spin mr-2 text-indigo-600 text-lg block mb-2"></i>กำลังค้นหาข้อมูลใบจองและตรวจสอบสิทธิ์...</div>';
+
+    try {
+      const res = await this.api('PUBLIC_TRACK_ORDER', { orderId: oid, phone: phone });
+      if (!res) {
+        container.innerHTML = '<div class="p-6 text-center text-rose-600 text-xs font-bold">ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง</div>';
+        return;
+      }
+
+      if (res.status === 'require_phone') {
+        container.innerHTML = `
+          <div class="p-6 bg-amber-50 border border-amber-200 rounded-2xl text-center space-y-3">
+             <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto text-base">
+               <i class="fas fa-user-shield"></i>
+             </div>
+             <div>
+               <h4 class="text-xs font-black text-amber-900 mb-1">ยืนยันสิทธิ์ความเป็นเจ้าของใบจอง</h4>
+               <p class="text-[11px] text-amber-700 font-semibold">${this.esc(res.message || 'กรุณาระบุเบอร์โทรศัพท์ 4 ตัวท้ายที่ใช้สั่งจอง')}</p>
+             </div>
+          </div>
+        `;
+        if (phInp) {
+          phInp.focus();
+          phInp.classList.add('ring-2', 'ring-amber-400');
+          setTimeout(() => phInp.classList.remove('ring-2', 'ring-amber-400'), 2500);
+        }
+        return;
+      }
+
+      if (res.status !== 'success' || !res.order) {
+        container.innerHTML = `
+          <div class="p-8 text-center bg-white rounded-2xl border border-rose-200 text-rose-600 text-xs font-bold space-y-2">
+             <i class="fas fa-exclamation-circle text-2xl text-rose-500 mb-1 block"></i>
+             <div>${this.esc(res.message || 'ไม่พบข้อมูลใบจองที่ระบุ')}</div>
+             <p class="text-[10px] text-slate-400 font-normal">หากท่านมั่นใจว่าข้อมูลถูกต้อง กรุณาติดต่อสาขาที่ทำการจอง</p>
+          </div>
+        `;
+        return;
+      }
+
+      const o = res.order;
+      const esc = this.esc, escJs = this.escAttrJs;
+      const st = (o.status || 'Pending').toString();
+      const stLower = st.toLowerCase();
+      const isComplete = stLower.includes('complete') || stLower.includes('deliver') || stLower.includes('สำเร็จ') || stLower.includes('รับเครื่องแล้ว');
+      const isReady = stLower.includes('ready') || stLower.includes('พร้อมรับ');
+      const isConfirmed = stLower.includes('confirm') || stLower.includes('paid') || stLower.includes('ยืนยัน') || o.deposit > 0;
+      const stepIdx = isComplete ? 4 : isReady ? 3 : isConfirmed ? 2 : 1;
+      const steps = ['รับคำสั่งจอง', 'ล็อกสิทธิ์/มัดจำ', 'พร้อมรับที่สาขา', 'ส่งมอบสำเร็จ'];
+
+      const qrPayload = encodeURIComponent(o.orderId + '|' + o.branch + '|NET:' + o.netTotal);
+      const qrUrl = 'https:\/\/quickchart.io/qr?size=180&margin=1&text=' + qrPayload;
+
+      container.innerHTML = `
+        <div id="publicPrintablePass" class="bg-white border-2 border-slate-900 rounded-3xl overflow-hidden shadow-lg animate-fade-in-up">
+          <div class="bg-[#141416] text-white p-5 border-b-4 border-[#FF6B00]">
+             <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                   <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF6B00] text-white text-[10px] font-black uppercase tracking-wider mb-1">
+                     <i class="fas fa-bolt text-[#E11D48]"></i> DIGITAL BOOKING PASS
+                   </div>
+                   <h2 class="text-lg font-black text-white font-mono tracking-wide">${esc(o.orderId)}</h2>
+                   <p class="text-[11px] text-slate-300">วันที่ทำการจอง: ${esc(o.timestamp || '-')}</p>
+                </div>
+                <div class="text-right">
+                   <span class="inline-block px-3 py-1 rounded-full text-xs font-black shadow-xs ${
+                     isComplete ? 'bg-emerald-500 text-white' :
+                     isReady ? 'bg-sky-500 text-white' :
+                     isConfirmed ? 'bg-amber-400 text-slate-900' : 'bg-slate-700 text-slate-200'
+                   }">
+                     <i class="fas ${isComplete ? 'fa-check-circle' : isReady ? 'fa-box-open' : 'fa-clock'} mr-1"></i>สถานะ: ${esc(st)}
+                   </span>
+                </div>
+             </div>
+          </div>
+
+          <div class="p-4 border-b border-slate-100 bg-slate-50/70">
+             <div class="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2">ขั้นตอนการส่งมอบสินค้า</div>
+             <div class="grid grid-cols-4 gap-2">
+                ${steps.map((label, idx) => {
+                  const done = (idx + 1) <= stepIdx;
+                  return `
+                    <div class="text-center">
+                       <div class="h-2 rounded-full mb-1.5 transition-all ${done ? 'bg-emerald-500' : 'bg-slate-200'}"></div>
+                       <div class="text-[10px] font-extrabold ${done ? 'text-emerald-700' : 'text-slate-400'}">
+                         ${done ? '<i class="fas fa-check-circle mr-0.5"></i>' : ''}${esc(label)}
+                       </div>
+                    </div>
+                  `;
+                }).join('')}
+             </div>
+          </div>
+          ${this.statusHistoryHtml(o.history, false)}
+
+          <div class="p-5 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-5">
+             <div class="md:col-span-7 space-y-4">
+                <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1.5 text-xs">
+                   <div class="flex justify-between">
+                     <span class="text-slate-500 font-bold">ลูกค้า:</span>
+                     <span class="text-slate-900 font-black">${esc(o.customerName)} (${esc(o.maskedPhone)})</span>
+                   </div>
+                   <div class="flex justify-between">
+                     <span class="text-slate-500 font-bold">สาขารับเครื่อง:</span>
+                     <span class="text-slate-900 font-black">${esc(o.branch)} (${esc(o.channel)})</span>
+                   </div>
+                   ${o.pickupDate ? `
+                     <div class="flex justify-between">
+                       <span class="text-slate-500 font-bold">วันที่นัดรับเครื่อง:</span>
+                       <span class="text-indigo-700 font-black">${esc(o.pickupDate)}</span>
+                     </div>
+                   ` : ''}
+                </div>
+
+                <div>
+                   <div class="text-[11px] font-black text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                     <i class="fas fa-mobile-alt text-indigo-600"></i> รายการสินค้า
+                   </div>
+                   <div class="space-y-2">
+                      ${o.items.map(it => `
+                        <div class="p-2.5 rounded-xl bg-white border border-slate-200 flex justify-between items-center text-xs">
+                           <div>
+                              <div class="font-black text-slate-900">${esc(it.name)} <span class="text-slate-500 font-bold">x${it.qty}</span></div>
+                              <div class="text-[10px] text-slate-400 font-mono">SKU: ${esc(it.sku)}</div>
+                           </div>
+                           <div class="text-right font-black text-[#E11D48] tabular-nums">฿${it.net.toLocaleString()}</div>
+                        </div>
+                      `).join('')}
+                   </div>
+                </div>
+
+                ${o.gifts && o.gifts.length > 0 ? `
+                  <div class="p-3 bg-emerald-50/70 border border-emerald-200/90 rounded-2xl">
+                     <div class="text-[11px] font-black text-emerald-800 mb-1.5 flex items-center gap-1.5">
+                       <i class="fas fa-gifts text-[#E11D48]"></i> รายการของแถมฟรี (${o.gifts.length} รายการ)
+                     </div>
+                     <div class="flex flex-wrap gap-1">
+                        ${o.gifts.map(g => `
+                          <span class="px-2.5 py-1 rounded-lg bg-white border border-emerald-200 text-[10px] font-bold text-slate-800 shadow-2xs">
+                            🎁 ${esc(g.name)}${g.qty > 1 ? ' (x' + g.qty + ')' : ''}
+                          </span>
+                        `).join('')}
+                     </div>
+                  </div>
+                ` : ''}
+
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
+                   <div class="flex justify-between text-slate-600 font-bold">
+                     <span>ยอดสุทธิรวม</span>
+                     <span class="font-black text-slate-900 tabular-nums">฿${o.netTotal.toLocaleString()}</span>
+                   </div>
+                   <div class="flex justify-between text-emerald-700 font-bold">
+                     <span>ชำระเงินมัดจำแล้ว</span>
+                     <span class="font-black tabular-nums">-฿${(o.deposit || 0).toLocaleString()}</span>
+                   </div>
+                   <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                     <span class="text-xs font-black text-slate-900 uppercase">ยอดคงเหลือชำระหน้าร้าน</span>
+                     <span class="text-lg font-black text-[#E11D48] tabular-nums">฿${(o.balanceDue || 0).toLocaleString()}</span>
+                   </div>
+                </div>
+             </div>
+
+             <div class="md:col-span-5 flex flex-col items-center justify-between bg-amber-50/70 border-2 border-amber-200 rounded-3xl p-5 text-center">
+                <div class="w-full">
+                   <div class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white border border-amber-300 text-[10px] font-black text-slate-800 uppercase mb-3 shadow-2xs">
+                     <i class="fas fa-qrcode text-[#E11D48]"></i> บัตรรับเครื่องดิจิทัล
+                   </div>
+                   <div class="bg-white p-2 rounded-2xl border-2 border-slate-900 shadow-sm inline-block">
+                     <img src="${qrUrl}" alt="Booking Pass QR" class="w-36 h-36 rounded-xl object-contain">
+                   </div>
+                   <div class="mt-2 text-xs font-mono font-black text-slate-900 tracking-wider">${esc(o.orderId)}</div>
+                   <p class="text-[11px] text-slate-600 font-bold mt-2 leading-relaxed">
+                     โปรดยื่น QR Code หรือเลขที่ใบจองนี้แก่พนักงานที่สาขา <strong class="text-slate-900">${esc(o.branch)}</strong> เพื่อสแกนรับสินค้า
+                   </p>
+                </div>
+
+                <div class="w-full space-y-2 mt-4 pt-4 border-t border-amber-200/80">
+                   <button type="button" onclick="window.app.printPublicBookingPass()" class="w-full py-2.5 bg-[#141416] hover:bg-slate-800 text-[#FF6B00] text-xs font-black rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all">
+                     <i class="fas fa-print"></i> พิมพ์ / บันทึกบัตรรับเครื่อง
+                   </button>
+                   <button type="button" onclick="window.app.copyPublicTrackLink('${escJs(o.orderId)}')" class="w-full py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-black rounded-xl shadow-2xs flex items-center justify-center gap-2 transition-all">
+                     <i class="fas fa-share-alt text-indigo-600"></i> คัดลอกลิงก์ตรวจสอบสถานะ
+                   </button>
+                </div>
+             </div>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      container.innerHTML = `<div class="p-6 text-center text-rose-600 text-xs font-bold">${this.esc(err.message || 'เกิดข้อผิดพลาดในการตรวจสอบ')}</div>`;
+    }
+  },
+
+  printPublicBookingPass: function() {
+    const card = document.getElementById('publicPrintablePass');
+    if (!card) return;
+    const win = window.open('', '_blank', 'width=800,height=750');
+    if (!win) return Swal.fire('แจ้งเตือน', 'กรุณาอนุญาต Pop-up เพื่อพิมพ์บัตรรับเครื่อง', 'info');
+    const html = '<html><head><title>บัตรรับเครื่องดิจิทัล (Digital Booking Pass)</title><link href=\"https:\/\/fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap\" rel=\"stylesheet\"><script src=\"https:\/\/cdn.tailwindcss.com\"><\/script><style>body{font-family:Roboto,Helvetica Neue,Helvetica,Tahoma,Arial,sans-serif;padding:24px;background:#f8fafc;}</style></head><body>' + card.outerHTML + '<script>setTimeout(function(){window.print();},600);<\/script></body></html>';
+    win.document.write(html);
+    win.document.close();
+  },
+
+  copyPublicTrackLink: function(orderId) {
+    // ใน GAS หน้าเว็บอยู่ใน iframe — window.location คือโดเมน googleusercontent ไม่ใช่ลิงก์ /exec ที่ลูกค้าเปิดได้ จึงต้องใช้ __APP_URL ที่ doGet ส่งมา
+    const base = window.__APP_URL || window.location.href.split('?')[0];
+    const url = base + (base.indexOf('?') === -1 ? '?' : '&') + 'track=' + encodeURIComponent(orderId);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        this.toast('คัดลอกลิงก์สถานะใบจองแล้ว สามารถส่งต่อให้ลูกค้าทาง LINE / Chat ได้ทันที!');
+      });
+    } else {
+      prompt('คัดลอกลิงก์สถานะใบจอง:', url);
+    }
+  },
+
+  // จำหน้าล่าสุดต่อแท็บ (sessionStorage — อยู่รอดตอนรีเฟรช/ปัดจอลง ไม่ข้ามไปวันอื่น); อ่านแล้วต้องผ่านการเช็คสิทธิ์ใน route() อีกครั้งเสมอ
+  saveRoute_: function(hash) { try { if (/^[A-Za-z0-9_-]{1,40}$/.test(hash)) sessionStorage.setItem('f9_last_route', hash); } catch (e) {} },
+  savedRoute_: function() { try { const r = sessionStorage.getItem('f9_last_route'); return r && /^[A-Za-z0-9_-]{1,40}$/.test(r) ? r : ''; } catch (e) { return ''; } },
+  // หน้าแรกหลัง login (ไม่มี hash / ไม่มีหน้าที่จำไว้): Sales เข้าหน้าสั่งจองสินค้า (pos) ทันที, Role อื่นเข้า dashboard
+  homeRoute_: function() { return (window.app.user && window.app.user.Role === 'Sales') ? 'pos' : 'dashboard'; },
+  clearSavedRoute_: function() { try { sessionStorage.removeItem('f9_last_route'); } catch (e) {} },
+
+  // สถานะ เปิด/ปิด ของ AutoPromotions (ค่าเก่า Active ยังนับเป็นเปิด)
+  statusOn: function(v) { const t = (v === null || v === undefined ? '' : String(v)).trim().toLowerCase(); return t === 'เปิด' || t === 'active'; },
+
+  showPopupBanner: function() {
+    if(!this.globalData.popupBanners || this.globalData.popupBanners.length === 0) return;
+    if(sessionStorage.getItem('tg_popup_shown')) return;
+    
+    const modal = document.getElementById('popupBannerModal');
+    const content = document.getElementById('popupBannerContent');
+    
+    if(modal && content) {
+        let html = '';
+        this.globalData.popupBanners.forEach(item => {
+            const hasCard = !!(item.title || item.details || item.buttonText);
+            if (!hasCard) {
+                // ไม่มีหัวข้อ/คำอธิบาย/ปุ่ม CTA เลย — พฤติกรรมเดิม 100% (รูปเปล่าคลิกได้) กันแบนเนอร์ที่เคยตั้งค่าไว้ก่อนหน้าเปลี่ยนหน้าตาไปโดยไม่ได้ตั้งใจ
+                let img = this.esc(this.formatImageUrl(item.url));
+                let linkTag = item.link ? `<a href="${this.esc(item.link)}" target="_blank" class="pp-link">` : '';
+                let endLinkTag = item.link ? `</a>` : '';
+                html += `<div class="popup-slide">${linkTag}<img src="${img}" alt="" class="pp-img">${endLinkTag}</div>`;
+                return;
+            }
+            // มีหัวข้อ/คำอธิบาย/ปุ่ม CTA อย่างน้อย 1 อย่าง — แสดงเป็นการ์ด (จอกว้าง: รูปเต็มไม่ครอป ข้อความซ้าย ปุ่มขวา; มือถือ: เรียงลงมา) หน้าตาอยู่ที่บล็อก POPUP v2 ใน CSS.html
+            const img = this.esc(this.formatImageUrl(item.url));
+            const ctaHtml = (item.buttonText && item.link)
+                ? `<a href="${this.esc(item.link)}" target="_blank" class="pp-cta">${this.esc(item.buttonText)}<i class="fas fa-arrow-right"></i></a>`
+                : `<button type="button" onclick="window.app.closePopupBanner()" class="pp-dismiss">ปิดหน้าต่างนี้</button>`;
+            html += `
+              <div class="popup-slide"><div class="pp-card">
+                <img src="${img}" alt="" class="pp-card-img">
+                <div class="pp-body">
+                  <div class="pp-copy"><span class="pp-rule"></span>
+                  ${item.title ? `<h2 class="pp-title">${this.esc(item.title)}</h2>` : ''}
+                  ${item.details ? `<p class="pp-text">${this.esc(item.details)}</p>` : ''}</div>
+                  <div class="pp-actions">${ctaHtml}</div>
+                </div>
+              </div></div>
+            `;
+        });
+        content.innerHTML = html;
+        this.popupInitCarousel_();
+        modal.classList.remove('hidden');
+        this.popupSync_();
+        document.body.style.overflow = 'hidden';
+        sessionStorage.setItem('tg_popup_shown', 'true');
+    }
+  },
+
+  // Popup หลายหน้า = สไลด์ไปด้านข้าง (CSS scroll-snap แนวนอน + ลูกศร + จุดบอกตำแหน่ง); มีหน้าเดียวซ่อนตัวควบคุมทั้งหมด
+  popupInitCarousel_: function() {
+    const track = document.getElementById('popupBannerContent');
+    const dots = document.getElementById('popupBannerDots');
+    if (!track || !dots) return;
+    const n = track.children.length;
+    this.popupIdx = 0;
+    track.style.transform = 'translateX(0)';
+    dots.innerHTML = Array.from({length: n}, (_, i) => `<button type="button" class="popup-dot" aria-label="หน้า ${i + 1}" onclick="window.app.popupGo(${i})"></button>`).join('');
+    document.getElementById('popupBannerModal').classList.toggle('popup-multi', n > 1);
+    if (!track._popupBound) {
+      track._popupBound = true;
+      let x0 = null;
+      track.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; window.app.popupStop_(); }, {passive: true});
+      track.addEventListener('touchend', e => {
+        if (x0 === null) return;
+        const dx = e.changedTouches[0].clientX - x0; x0 = null;
+        if (Math.abs(dx) > 40) window.app.popupSlide(dx < 0 ? 1 : -1);
+        window.app.popupAuto_();
+      }, {passive: true});
+      const car = track.closest('.popup-carousel') || track.parentNode;
+      car.addEventListener('mouseenter', () => window.app.popupStop_());
+      car.addEventListener('mouseleave', () => window.app.popupAuto_());
+    }
+    this.popupAuto_();
+  },
+  // .popup-running บน modal = แถบของหน้าปัจจุบันวิ่งเต็มใน 5 วิ (ตรงกับ timer); หยุด timer = แถบเต็มค้างไว้
+  popupStop_: function() {
+    if (this.popupTimer) { clearInterval(this.popupTimer); this.popupTimer = null; }
+    const modal = document.getElementById('popupBannerModal');
+    if (modal) modal.classList.remove('popup-running');
+  },
+  popupAuto_: function() {
+    this.popupStop_();
+    const track = document.getElementById('popupBannerContent');
+    if (track && track.children.length > 1) {
+      this.popupTimer = setInterval(() => this.popupSlide(1), 5000);
+      const modal = document.getElementById('popupBannerModal');
+      if (modal) { void modal.offsetWidth; modal.classList.add('popup-running'); }
+    }
+  },
+  popupSync_: function() {
+    const dots = document.querySelectorAll('#popupBannerDots .popup-dot');
+    dots.forEach((d, k) => { d.classList.toggle('active', k === this.popupIdx); d.classList.toggle('done', k < this.popupIdx); });
+    const count = document.getElementById('popupCount');
+    if (count) count.textContent = dots.length > 1 ? ((this.popupIdx || 0) + 1) + ' / ' + dots.length : '';
+  },
+  popupGo: function(i) {
+    const track = document.getElementById('popupBannerContent');
+    if (!track) return;
+    const n = track.children.length;
+    if (!n) return;
+    this.popupIdx = ((i % n) + n) % n;
+    track.style.transform = 'translateX(-' + (this.popupIdx * 100) + '%)';
+    this.popupSync_();
+    // กดเปลี่ยนหน้าเองระหว่างที่ timer เดินอยู่ = เริ่มนับ 5 วิใหม่ ให้แถบกับ timer ตรงกันเสมอ
+    if (this.popupTimer) this.popupAuto_();
+  },
+  popupSlide: function(dir) { this.popupGo((this.popupIdx || 0) + dir); },
+
+  closePopupBanner: function() {
+    const modal = document.getElementById('popupBannerModal');
+    if(modal) {
+        this.popupStop_();
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+  },
+
+  // === Dark Mode ===
+  // Boot script ใน Index.html <head> ตั้ง class 'dark' บน <html> ไว้ก่อน paint แรกแล้ว (อ่านจาก localStorage 'tg_theme'
+  // หรือ prefers-color-scheme ถ้ายังไม่เคยตั้ง) กัน flash สีตอนโหลดหน้า — ฟังก์ชันกลุ่มนี้แค่ sync ปุ่ม/Chart.js ให้ตรงกับ class ปัจจุบัน
+  chartTheme: function() {
+    const dark = document.documentElement.classList.contains('dark');
+    return dark
+      ? { text: '#94a3b8', grid: 'rgba(148, 163, 184, 0.15)', datalabel: '#e2e8f0' }
+      : { text: '#64748b', grid: 'rgba(226, 232, 240, 0.4)', datalabel: '#334155' };
+  },
+
+  // เมนูผู้ใช้มุมล่างซ้าย (โหมดมืด/เปลี่ยนรหัสผ่าน/ออกจากระบบ)
+  toggleUserMenu: function(ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const pop = document.getElementById('userMenuPop'), btn = document.getElementById('userMenuBtn');
+    if (!pop) return;
+    const open = pop.classList.toggle('hidden') === false;
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+  closeUserMenu: function() {
+    const pop = document.getElementById('userMenuPop'), btn = document.getElementById('userMenuBtn');
+    if (pop) pop.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  },
+
+  // ===== หน้าร้านแบบเว็บไซต์มาตรฐาน (html.sf-site เฉพาะ #pos) — header ร้าน: โลโก้ / เบอร์ติดต่อ / เมนูบัญชี =====
+  // เมนูบัญชีแทน sidebar แอดมินที่ถูกซ่อนบนหน้าร้าน: ลิงก์ไประบบหลังร้านตามสิทธิ์ (checkMenuAccess เดียวกับ sidebar) + ธีม/รหัสผ่าน/ออกจากระบบ
+  renderSiteHeader: function() {
+    const esc = window.app.esc;
+    window.app.applyLogo('sfLogoBox', 'sfLogoIcon', (window.app.globalData.settings || {}).LogoUrl);
+    const nm = document.getElementById('sfAcctName');
+    if (nm && window.app.user) nm.textContent = window.app.user.Name || 'บัญชี';
+    const ph = document.getElementById('sfTopbarPhone');
+    if (ph) {
+      const phone = String(((window.app.globalData.settings || {}).ContactPhone) || '').replace(/^'+/, '').trim();
+      ph.innerHTML = phone ? '<a href="tel:' + esc(phone.replace(/[^0-9+]/g, '')) + '"><i class="fas fa-phone"></i> ' + esc(phone) + '</a>' : '';
+      ph.classList.toggle('hidden', !phone);
+    }
+    const pop = document.getElementById('sfAcctPop');
+    if (!pop || !window.app.user) return;
+    const links = [];
+    this.menuConfig.forEach(m => {
+      if (m.isCategory || m.id === 'pos') return;
+      if (m.isParent) {
+        const first = (m.children || []).find(c => !c.isCategory && this.checkMenuAccess(c.id, c.roles));
+        if (first) links.push({ id: first.id, icon: m.icon, label: m.label });
+      } else if (this.checkMenuAccess(m.id, m.roles)) {
+        links.push({ id: m.id, icon: m.icon, label: m.label });
+      }
+    });
+    let h = '<div class="sf-acct-head"><span class="sf-acct-av"><i class="fas fa-user"></i></span><span class="min-w-0"><strong>' + esc(window.app.user.Name || '') + '</strong><small>' + esc(window.app.user.Role || '') + '</small></span></div>';
+    if (links.length) {
+      h += '<div class="sf-acct-sec">ระบบหลังร้าน</div>';
+      h += links.map(l => '<a role="menuitem" href="#' + esc(l.id) + '" onclick="window.app.closeSfAccount()"><i class="fas ' + esc(l.icon) + '"></i>' + esc(l.label) + '</a>').join('');
+    }
+    h += '<div class="sf-acct-div"></div>'
+      + '<button type="button" role="menuitem" class="sf-acct-mob" onclick="window.app.closeSfAccount(); window.app.pos.openWishlistDrawer()"><i class="fas fa-heart"></i>รายการโปรด</button>'
+      + '<button type="button" role="menuitem" class="sf-acct-mob" onclick="window.app.closeSfAccount(); window.app.pos.openOrderTrackModal()"><i class="fas fa-qrcode"></i>เช็คสถานะใบจอง</button>'
+      + '<button type="button" role="menuitem" onclick="window.app.toggleTheme()"><i class="fas fa-moon theme-toggle-icon"></i><span class="theme-toggle-label">โหมดมืด</span></button>'
+      + '<button type="button" role="menuitem" onclick="window.app.closeSfAccount(); window.app.openChangePassword()"><i class="fas fa-key"></i>เปลี่ยนรหัสผ่าน</button>'
+      + '<button type="button" role="menuitem" class="sf-acct-out" onclick="window.app.closeSfAccount(); window.app.logout()"><i class="fas fa-sign-out-alt"></i>ออกจากระบบ</button>';
+    pop.innerHTML = h;
+    window.app.updateThemeToggleUI();
+  },
+  toggleSfAccount: function(ev) {
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const pop = document.getElementById('sfAcctPop'), btn = document.getElementById('sfAcctBtn');
+    if (!pop) return;
+    const open = pop.classList.toggle('hidden') === false;
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  },
+  closeSfAccount: function() {
+    const pop = document.getElementById('sfAcctPop'), btn = document.getElementById('sfAcctBtn');
+    if (pop) pop.classList.add('hidden');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  },
+
+  updateThemeToggleUI: function() {
+    const isDark = document.documentElement.classList.contains('dark');
+    document.querySelectorAll('.theme-toggle-icon').forEach(icon => {
+      icon.classList.toggle('fa-moon', !isDark);
+      icon.classList.toggle('fa-sun', isDark);
+    });
+    document.querySelectorAll('.theme-toggle-label').forEach(lbl => {
+      lbl.innerText = isDark ? 'โหมดสว่าง' : 'โหมดมืด';
+    });
+  },
+
+  applyTheme: function(theme) {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    try { localStorage.setItem('tg_theme', theme); } catch(e) {}
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', theme === 'dark' ? '#0f172a' : '#254d71');
+    if (typeof Chart !== 'undefined') {
+      const ct = window.app.chartTheme();
+      Chart.defaults.color = ct.text;
+      Chart.defaults.borderColor = ct.grid;
+    }
+    window.app.updateThemeToggleUI();
+  },
+
+  toggleTheme: function() {
+    const next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+    window.app.applyTheme(next);
+    // Chart.js วาดสีลง <canvas> ไม่ใช่ CSS — ต้อง re-render หน้าปัจจุบันใหม่ให้กราฟ/ตารางเปลี่ยนสีตามธีม
+    if (window.app.user) window.app.route();
+  },
+
+  toggleMobileMenu: function() {
+    const panel = document.getElementById('mobileMenuPanel');
+    const backdrop = document.getElementById('mobileMenuBackdrop');
+    if (!panel) return;
+    const willOpen = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    if (backdrop) backdrop.classList.toggle('hidden', !willOpen);
+  },
+
+  toggleSidebarRail: function() {
+    const isRail = document.documentElement.classList.toggle('sb-rail');
+    try { localStorage.setItem('f9_sidebar_rail', isRail ? '1' : '0'); } catch (e) {}
+    const icon = document.getElementById('sidebarToggleIcon');
+    if (icon) {
+      icon.classList.toggle('fa-chevron-right', isRail);
+      icon.classList.toggle('fa-chevron-left', !isRail);
+    }
+  },
+  
+  // ซ่อน/แสดงเมนูด้านข้าง (เดสก์ท็อป) — hide=true คือ "โหมดเต็มจอ" ; persist=true จำค่าไว้ในเครื่องผู้ใช้ (เปิดครั้งหน้ายังเป็นโหมดเดิม)
+  setSidebarHidden: function(hide, persist) {
+    const sidebar = document.getElementById('desktopSidebar');
+    const showBtn = document.getElementById('desktopShowSidebarBtn');
+    const mainWrapper = document.getElementById('mainContentWrapper');
+    if (!sidebar) return;
+    const isHidden = sidebar.classList.contains('lg:hidden');
+    if (hide && !isHidden) {
+       sidebar.classList.remove('lg:flex');
+       sidebar.classList.add('lg:hidden');
+       if(showBtn) showBtn.style.display = 'flex';
+       if(mainWrapper) {
+          mainWrapper.classList.remove('lg:w-[calc(100%-260px)]');
+          mainWrapper.classList.add('lg:w-full');
+       }
+    } else if (!hide && isHidden) {
+       sidebar.classList.remove('lg:hidden');
+       sidebar.classList.add('lg:flex');
+       if(showBtn) showBtn.style.display = 'none';
+       if(mainWrapper) {
+          mainWrapper.classList.remove('lg:w-full');
+          mainWrapper.classList.add('lg:w-[calc(100%-260px)]');
+       }
+    }
+    if (persist) { try { localStorage.setItem('f9_sidebar_hidden', hide ? '1' : '0'); } catch (e) {} }
+    this.syncSidebarButtons();
+  },
+  toggleSidebar: function() {
+    const sidebar = document.getElementById('desktopSidebar');
+    if (!sidebar) return;
+    this.setSidebarHidden(!sidebar.classList.contains('lg:hidden'), true);
+  },
+  // เรียกตอนเข้าแอป: คืนค่าโหมดเต็มจอที่ผู้ใช้เคยเลือกไว้
+  applySidebarPref: function() {
+    let pref = null;
+    try { pref = localStorage.getItem('f9_sidebar_hidden'); } catch (e) {}
+    if (pref === '1') this.setSidebarHidden(true, false); else this.syncSidebarButtons();
+    try {
+      if (localStorage.getItem('f9_sidebar_rail') === '1') {
+        document.documentElement.classList.add('sb-rail');
+        const icon = document.getElementById('sidebarToggleIcon');
+        if (icon) { icon.classList.remove('fa-chevron-left'); icon.classList.add('fa-chevron-right'); }
+      }
+    } catch (e) {}
+  },
+  // อัปเดตไอคอน/ข้อความของปุ่ม "เต็มจอ" บนหน้าร้านให้ตรงกับสถานะจริงของ sidebar
+  syncSidebarButtons: function() {
+    const sidebar = document.getElementById('desktopSidebar');
+    const btn = document.getElementById('posFullscreenBtn');
+    if (!sidebar || !btn) return;
+    const hidden = sidebar.classList.contains('lg:hidden');
+    const ico = btn.querySelector('i');
+    if (ico) ico.className = 'fas ' + (hidden ? 'fa-compress' : 'fa-expand');
+    btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    btn.title = hidden ? 'ออกจากโหมดเต็มจอ (แสดงเมนูด้านข้าง)' : 'โหมดเต็มจอ (ซ่อนเมนูด้านข้าง)';
+    const lbl = btn.querySelector('.pos-fs-lbl');
+    if (lbl) lbl.textContent = hidden ? 'ย่อ' : 'เต็มจอ';
+  },
+  
+  closeMobileMenu: function() {
+    const panel = document.getElementById('mobileMenuPanel');
+    const backdrop = document.getElementById('mobileMenuBackdrop');
+    if(panel && !panel.classList.contains('hidden')) panel.classList.add('hidden');
+    if(backdrop && !backdrop.classList.contains('hidden')) backdrop.classList.add('hidden');
+  },
+  
+  init: function() {
+    window.app.applyTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+
+    setInterval(() => {
+      const d = new Date();
+      const clk = document.getElementById('clock');
+      if(clk) clk.innerText = d.toLocaleString('th-TH');
+    }, 1000);
+
+    // กันหลุดระบบ (2026-07-10): ย้าย session ไป localStorage ให้อยู่รอดข้ามการปิดเบราว์เซอร์
+    // (token ฝั่ง server อายุ 30 วัน — verifyToken ยังตรวจ exp ทุก call เหมือนเดิม logout จริงเมื่อ token หมดอายุ)
+    // อ่าน sessionStorage เผื่อ session เก่าที่ค้างจากเวอร์ชันก่อน แล้ว migrate ให้อัตโนมัติ
+    let storedUser = null;
+    try {
+      storedUser = localStorage.getItem('tg_pos_user') || sessionStorage.getItem('tg_pos_user');
+    } catch (e) {
+      console.warn('storage is unavailable:', e);
+    }
+
+    if (storedUser && storedUser !== 'undefined' && storedUser !== 'null') {
+      try {
+        window.app.user = JSON.parse(storedUser);
+        try { localStorage.setItem('tg_pos_user', storedUser); sessionStorage.removeItem('tg_pos_user'); } catch(e2){}
+        window.app.renderLayout();
+      } catch (e) {
+        console.error('Failed to parse stored user:', e);
+        try { localStorage.removeItem('tg_pos_user'); sessionStorage.removeItem('tg_pos_user'); } catch(e2){}
+        window.app.renderLogin();
+      }
+    } else {
+      window.app.renderLogin();
+    }
+    try {
+      // ใน GAS ลิงก์ ?track= อยู่ที่ URL ชั้นนอก iframe มองไม่เห็นผ่าน window.location — server ส่งค่ามาให้ใน window.__TRACK_PARAM
+      const urlParams = new URLSearchParams(window.location.search);
+      const trackParam = window.__TRACK_PARAM || urlParams.get('track') || urlParams.get('orderId');
+      if (trackParam) {
+        setTimeout(() => {
+          window.app.openPublicTrackModal(trackParam);
+        }, 500);
+      }
+    } catch(eParam) {}
+
+    window.addEventListener('hashchange', () => window.app.route());
+    document.addEventListener('click', (e) => {
+      // ทุกลิงก์ #หน้า ในแอป (sidebar, เมนูบัญชีบนหน้าร้าน, ลิงก์แบนเนอร์ ฯลฯ) ต้องเปลี่ยน hash เอง:
+      // หน้าเว็บจริงอยู่ใน iframe ของ GAS ที่มี <base target="_top"> — ปล่อยให้เบราว์เซอร์จัดการ ลิงก์จะไปเปลี่ยนหน้าต่างนอกและไม่เกิดอะไรขึ้น
+      // (เดิมดักเฉพาะ a.nav-link ทำให้เมนู "บัญชีผู้ใช้ / ระบบหลังร้าน" กดแล้วไม่ไปไหนบนเว็บจริง)
+      const link = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+      if (!link || e.defaultPrevented) return;
+      const href = link.getAttribute('href') || '';
+      if (!/^#[A-Za-z0-9_-]+$/.test(href)) return;
+      e.preventDefault();
+      if (window.location.hash === href) window.app.route(); else window.location.hash = href;
+    });
+  },
+
+  initDB: async function() {
+    Swal.fire({
+       title: 'กำลังตรวจสอบและสร้างฐานข้อมูล...',
+       html: 'กรุณารอสักครู่ ระบบกำลังตั้งค่าแผ่นงานและข้อมูลทดสอบ',
+       allowOutsideClick: false,
+       didOpen: () => { Swal.showLoading(); }
+    });
+    try {
+      const res = await new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).setupDatabase(window.app.user);
+      });
+       const adminText = res && res.initialAdmin
+         ? 'บัญชีเริ่มต้น: ' + window.app.esc(res.initialAdmin.username) + ' / ' + window.app.esc(res.initialAdmin.password) + ' — กรุณาเปลี่ยนรหัสผ่านทันที'
+         : 'ฐานข้อมูลพร้อมใช้งานแล้ว';
+       Swal.fire({ icon: 'success', title: 'สร้างฐานข้อมูลสำเร็จ!', html: adminText, confirmButtonColor: '#254d71' });
+    } catch(e) {
+      window.app.alertError('ข้อผิดพลาด', e.toString());
+    }
+  },
+
+  renderLogin: function() {
+    document.documentElement.classList.remove('sf-site');
+    const el = document.getElementById('app');
+    const tmpl = document.getElementById('tmpl-login');
+    if(el && tmpl) {
+        el.innerHTML = tmpl.innerHTML;
+        window.app.updateThemeToggleUI();
+        window.app.loadRememberedLogin();
+        google.script.run.withSuccessHandler(cfg => {
+            const bgEl = document.getElementById('loginBg');
+            if(bgEl && cfg && cfg.loginBg) {
+                bgEl.style.backgroundImage = `url('${window.app.formatImageUrl(cfg.loginBg)}')`;
+                bgEl.classList.add('has-img');
+            }
+            window.app.applyLogo('loginLogoBox', 'loginLogoIcon', cfg && cfg.logoUrl);
+        }).getPublicConfig();
+    }
+  },
+
+  // หน้า Login: ปุ่มตาแสดง/ซ่อนรหัสผ่าน + เตือน Caps Lock (event null = ซ่อนคำเตือน)
+  toggleLoginPw: function() {
+    const inp = document.getElementById('loginPassword'), btn = document.getElementById('loginPwToggle');
+    if (!inp || !btn) return;
+    const show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    btn.setAttribute('aria-label', show ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน');
+    btn.innerHTML = '<i class="fas ' + (show ? 'fa-eye-slash' : 'fa-eye') + '"></i>';
+    inp.focus();
+  },
+  loginCapsHint: function(e) {
+    const el = document.getElementById('loginCaps'); if (!el) return;
+    const on = !!(e && e.getModifierState && e.getModifierState('CapsLock'));
+    el.classList.toggle('hidden', !on);
+  },
+
+  renderLayout: async function() {
+    const el = document.getElementById('app');
+    const tmpl = document.getElementById('tmpl-main');
+    if(el && tmpl) el.innerHTML = tmpl.innerHTML;
+    
+    if(document.getElementById('headerUserName')) document.getElementById('headerUserName').innerText = window.app.user.Name;
+    if(document.getElementById('headerRole')) document.getElementById('headerRole').innerText = window.app.user.Role;
+    if(document.getElementById('mobileUserName')) document.getElementById('mobileUserName').innerText = window.app.user.Name;
+    if(document.getElementById('mobileRole')) document.getElementById('mobileRole').innerText = window.app.user.Role;
+
+    window.app.applyAppLogos();
+    window.app.renderFooterContact();
+    window.app.applySidebarPref();
+    // footer ปีปัจจุบัน + ปุ่มกลับขึ้นบน (อยู่ใน <template> จึงใส่สคริปต์ inline ไม่ได้ — ต้องผูกที่นี่หลัง clone)
+    try { const fy = document.getElementById('footerYear'); if (fy) fy.textContent = new Date().getFullYear(); } catch (e) {}
+    if (!window.__userMenuBound) {
+      window.__userMenuBound = true;
+      document.addEventListener('click', function (e) {
+        const wrap = document.getElementById('userMenuWrap');
+        if (wrap && !wrap.contains(e.target)) window.app.closeUserMenu();
+        const sfw = document.getElementById('sfAcctWrap');
+        if (sfw && !sfw.contains(e.target)) window.app.closeSfAccount();
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { window.app.closeUserMenu(); window.app.closeSfAccount(); } });
+    }
+    if (!window.__backToTopBound) {
+      window.__backToTopBound = true;
+      window.addEventListener('scroll', function () {
+        const b = document.getElementById('backToTopBtn'); if (!b) return;
+        const show = (window.pageYOffset || document.documentElement.scrollTop) > 600;
+        b.classList.toggle('hidden', !show); b.classList.toggle('flex', show);
+      }, { passive: true });
+    }
+    
+    window.app.buildMenu();
+    window.app.updateThemeToggleUI();
+    window.app.showBootSkeleton();
+    window.app.showLoading('กำลังเข้าสู่ระบบ...');
+
+    try {
+      const res = await window.app.api('GET_ALL_DATA', {});
+      Swal.close();
+      if(res && res.status === 'success') {
+         window.app.globalData = res;
+         window.app.applyAppLogos();
+         window.app.preloadBanners();
+         window.app.renderFooterCategories();
+         // ลิงก์สินค้าที่แชร์ (?p=) ไม่มี hash → พาไปหน้าสั่งจอง (pos) แทน dashboard
+         // ปัดจอลงเพื่อรีเฟรช (มือถือ) = โหลด iframe ใหม่ hash หาย → กลับหน้าที่เปิดค้างไว้ (จำไว้ใน sessionStorage) แทนการเริ่มที่ dashboard
+         // ลิงก์สินค้าที่แชร์ (?p=) ยังมาก่อนเสมอ
+         if(!window.location.hash) window.location.hash = window.__DEEP_MODEL ? '#pos' : ('#' + (window.app.savedRoute_() || window.app.homeRoute_()));
+         window.app.route();
+
+         setTimeout(() => { window.app.showPopupBanner(); }, 500);
+         
+      } else {
+         // logout เฉพาะเมื่อ token ใช้ไม่ได้จริง — error อื่น (ชีตพัง ฯลฯ) ให้ลองใหม่ได้โดยไม่เสีย session (กันหลุดระบบ 2026-07-10)
+         const msg = (res && res.message) || 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้';
+         if (/token|login/i.test(msg)) {
+            Swal.fire('Session หมดอายุ', 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง', 'error');
+            window.app.logout();
+         } else {
+            const r = await Swal.fire({ icon: 'error', title: 'โหลดข้อมูลไม่สำเร็จ', text: msg, confirmButtonText: 'ลองใหม่', showCancelButton: true, cancelButtonText: 'ออกจากระบบ' });
+            if (r.isConfirmed) window.app.renderLayout(); else window.app.logout();
+         }
+      }
+    } catch(err) {
+      Swal.close();
+      // เดิม: error อะไรก็ตาม (รวมเน็ตช้าเกิน 45 วิ) ถูกตีความว่า "Session หมดอายุ" แล้วเตะออกทั้งที่ token ยังดี —
+      // ตอนนี้ logout เฉพาะ token ผิด/หมดอายุจริง นอกนั้นให้ปุ่มลองใหม่ (กันหลุดระบบ 2026-07-10)
+      if (/token|login/i.test(err.message || '')) {
+        Swal.fire('Session หมดอายุ', 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง', 'error');
+        window.app.logout();
+      } else {
+        const r = await Swal.fire({ icon: 'error', title: 'เชื่อมต่อไม่สำเร็จ', text: err.isTimeout ? 'การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่' : (err.message || 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้'), confirmButtonText: 'ลองใหม่', showCancelButton: true, cancelButtonText: 'ออกจากระบบ' });
+        if (r.isConfirmed) window.app.renderLayout(); else window.app.logout();
+      }
+    }
+  },
+
+  checkMenuAccess: function(menuId, defaultRoles) {
+      if(!window.app.user) return false;
+      const uRole = window.app.user.Role;
+      if (uRole === 'Admin') return true; 
+      
+      // หน้าเริ่มต้นใช้งานเป็นของ Admin เท่านั้น (ทุกลิงก์ในหน้าพาไปหน้าที่ Admin แก้ได้คนเดียว) — สิทธิ์เมนู * ของบทบาทอื่นไม่นับ
+      if (menuId === 'setupguide') return false;
+      const allowed = window.app.user['Accessible Menus'];
+      if (allowed && allowed.trim() !== '') {
+          if (allowed.trim() === '*' || allowed.trim().toUpperCase() === 'ALL') return true;
+          // เทียบรายเมนูแบบตรงตัว — การใช้ substring includes เคยทำให้สิทธิ์ 'autopromotions' เปิดเมนู 'promotions' ได้
+          const list = allowed.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+          if (list.includes(menuId.toLowerCase())) return true;
+          // รอบ 9 — สมาชิกเก่าอาจระบุ id หน้า settings เดิม (เช่น 'bookingsettings') ไว้ใน Accessible Menus:
+          // ให้นับเป็นสิทธิ์เข้าหน้า systemsettings ที่ยุบรวมแล้วด้วย
+          if (menuId === 'systemsettings') return window.app.systemSettings.tabs.some(t => list.includes(t.id));
+          // สิทธิ์เมนูแบนเนอร์เก่า (herobanners/promogrids/popupbanners) นับเป็นสิทธิ์หน้า banners ใหม่
+          if (menuId === 'banners') return ['herobanners', 'promogrids', 'popupbanners'].some(id => list.includes(id));
+          return false;
+      }
+      return defaultRoles.includes(uRole); 
+  },
+
+  // แถวเมนูสองบรรทัด: ไทย (บน) + อังกฤษ (ล่าง) — ตัดด้วย … ให้บรรทัดเดียว ความสูงแต่ละรายการเท่ากัน, title แสดงชื่อเต็ม
+  navLabelHtml: function(m, big) {
+    const th = this.esc(m.label), en = m.sub ? this.esc(m.sub) : '';
+    return `<span class="min-w-0 flex-1"><span class="nav-th block truncate leading-tight">${th}</span>${en ? `<span class="nav-sub block truncate leading-tight ${big ? 'text-[11px]' : 'text-[10px]'} font-semibold opacity-60">${en}</span>` : ''}</span>`;
+  },
+  navCategoryHtml: function(m, cls) {
+    return `<div class="${cls} truncate whitespace-nowrap">${this.esc(m.label)}${m.sub ? ` <span class="normal-case tracking-normal font-semibold opacity-60">· ${this.esc(m.sub)}</span>` : ''}</div>`;
+  },
+
+  buildMenu: function() {
+    const deskNav = document.getElementById('desktopMenu');
+    const mobNav = document.getElementById('mobileMenu');
+    if(!deskNav || !mobNav) return;
+    
+    let deskHtmlStr = '';
+    let mobHtmlStr = '';
+    
+    this.menuConfig.forEach(m => {
+      if(m.isCategory) {
+          if (this.checkMenuAccess('category', m.roles)) {
+              deskHtmlStr += this.navCategoryHtml(m, 'px-4 pt-4 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1');
+              mobHtmlStr += this.navCategoryHtml(m, 'px-4 pt-4 pb-2 text-[11px] font-black text-slate-400 uppercase tracking-widest mt-1');
+          }
+      } else if(m.isParent) {
+          let childDeskHtml = '';
+          let childMobHtml = '';
+          let hasChildAccess = false;
+          
+          m.children.forEach(child => {
+             if(child.isCategory) {
+                 if(this.checkMenuAccess('category', child.roles)) {
+                    childDeskHtml += this.navCategoryHtml(child, 'px-3 pt-3 pb-1 text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1');
+                    childMobHtml += this.navCategoryHtml(child, 'px-4 pt-3 pb-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1');
+                 }
+             } else if(this.checkMenuAccess(child.id, child.roles)) {
+                childDeskHtml += `<a href="#${child.id}" class="nav-link flex items-center px-3 py-2 rounded-xl text-[13px] font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-desk-${child.id}" title="${this.esc(child.label)}${child.sub ? ' — ' + this.esc(child.sub) : ''}"><i class="fas ${child.icon} mr-2 w-4 text-center opacity-50 text-[11px]"></i>${this.navLabelHtml(child)}</a>`;
+                childMobHtml += `<a href="#${child.id}" class="nav-link flex items-center px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-mob-${child.id}" onclick="window.app.closeMobileMenu()"><i class="fas ${child.icon} mr-2 w-4 text-center opacity-50 text-[11px]"></i>${this.navLabelHtml(child)}</a>`;
+                hasChildAccess = true;
+             }
+          });
+
+          if(hasChildAccess) { 
+             deskHtmlStr += `<div>
+                <button onclick="var s=document.getElementById('desk-sub-${m.id}'); s.classList.toggle('hidden'); this.classList.toggle('is-open', !s.classList.contains('hidden'));" class="w-full text-left px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-desk-${m.id}" title="${this.esc(m.label)}">
+                  <span class="flex items-center min-w-0 flex-1"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m)}</span>
+                  <i class="fas fa-chevron-down text-[10px] opacity-50 transition-transform duration-200"></i>
+                </button>
+                <div id="desk-sub-${m.id}" class="hidden pl-8 pr-2 py-1 space-y-0.5 bg-slate-50/50 rounded-xl mt-1">
+                   ${childDeskHtml}
+                </div>
+             </div>`;
+
+             mobHtmlStr += `<div>
+               <button onclick="document.getElementById('sub-${m.id}').classList.toggle('hidden')" class="w-full text-left px-4 py-3 rounded-xl text-base font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-mob-${m.id}">
+                 <span class="flex items-center min-w-0 flex-1"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m, true)}</span>
+                 <i class="fas fa-chevron-down text-sm"></i>
+               </button>
+               <div id="sub-${m.id}" class="hidden pl-6 pr-2 py-2 space-y-1 bg-slate-50/50 rounded-xl mt-1 border border-slate-100/50">
+                  ${childMobHtml}
+               </div>
+             </div>`;
+          }
+      } else {
+          if(this.checkMenuAccess(m.id, m.roles)) {
+             deskHtmlStr += `<a href="#${m.id}" class="nav-link flex items-center px-3 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all w-full" id="nav-desk-${m.id}" title="${this.esc(m.label)}${m.sub ? ' — ' + this.esc(m.sub) : ''}"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m)}</a>`;
+             mobHtmlStr += `<a href="#${m.id}" class="nav-link flex items-center px-4 py-2.5 rounded-xl text-base font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all" id="nav-mob-${m.id}" onclick="window.app.closeMobileMenu()"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70 text-sm"></i>${this.navLabelHtml(m, true)}</a>`;
+          }
+      }
+    });
+    
+    deskNav.innerHTML = deskHtmlStr;
+    mobNav.innerHTML = mobHtmlStr;
+  },
+
+  route: function() {
+    if (window.app.pos && window.app.pos.countdownInterval) {
+      clearInterval(window.app.pos.countdownInterval);
+      window.app.pos.countdownInterval = null;
+    }
+    if(!window.app.user) return window.app.renderLogin();
+    const hash = window.location.hash.substring(1) || window.app.homeRoute_();
+    window.app.currentRoute = hash;
+
+    // รอบ 9 — hash เก่าของ 6 หน้า settings ที่ยุบรวมเป็น systemsettings: redirect แล้วเปิด tab เดิม (bookmark เก่าต้องไม่เจอหน้าตาย)
+    // ใช้ location.replace เพื่อไม่ทิ้ง history entry ของ hash เก่า (กดย้อนกลับแล้วไม่วนredirect)
+    // แท็บแบนเนอร์เก่า (Hero/Promo Grid/Popup) ถูกตัดออกแล้ว — bookmark เก่าส่งไปหน้า จัดการแบนเนอร์ ใหม่
+    if (['herobanners', 'promogrids', 'popupbanners'].includes(hash)) {
+      window.location.replace('#banners');
+      return;
+    }
+    if (window.app.systemSettings.tabs.some(t => t.id === hash)) {
+      window.app.systemSettings.pendingTab = hash;
+      window.location.replace('#systemsettings');
+      return;
+    }
+
+    const targetMenu = this.menuConfig.flatMap(x => x.children || [x]).find(x => x.id === hash);
+    if (!targetMenu || !this.checkMenuAccess(hash, targetMenu.roles)) {
+       Swal.fire('ปฏิเสธการเข้าถึง', 'คุณไม่มีสิทธิ์เข้าถึงข้อมูลในส่วนนี้', 'warning');
+       window.location.hash = '#' + window.app.homeRoute_();
+       return;
+    }
+    
+    window.app.saveRoute_(hash); // ผ่านการเช็คสิทธิ์แล้วเท่านั้น — จำหน้าปัจจุบันไว้ใช้ตอนรีเฟรช
+    // หน้าร้าน (#pos) แสดงแบบเว็บไซต์มาตรฐาน: ซ่อน sidebar/แถบบนของระบบหลังร้าน ใช้ header ร้านค้าแทน (CSS html.sf-site)
+    document.documentElement.classList.toggle('sf-site', hash === 'pos');
+    document.querySelectorAll('.nav-link').forEach(el => {
+       el.classList.remove('bg-indigo-600', 'text-white', 'hover:bg-indigo-700', 'bg-indigo-50', 'text-indigo-600', 'active-link');
+       if(el.id.startsWith('nav-desk-')) el.classList.add('text-slate-500', 'hover:bg-indigo-50', 'hover:text-indigo-600');
+       if(el.id.startsWith('nav-mob-')) el.classList.add('text-slate-600', 'hover:bg-indigo-50', 'hover:text-indigo-600');
+    });
+    
+    const deskActive = document.getElementById('nav-desk-' + hash);
+    const mobActive = document.getElementById('nav-mob-' + hash);
+    
+    if(deskActive) {
+      deskActive.classList.remove('text-slate-500', 'hover:bg-indigo-50');
+      deskActive.classList.add('bg-indigo-600', 'text-white', 'hover:bg-indigo-700', 'active-link');
+      const subWrap = deskActive.closest('[id^="desk-sub-"]');
+      if (subWrap) {
+        subWrap.classList.remove('hidden');
+        const parentBtn = document.getElementById('nav-desk-' + subWrap.id.replace('desk-sub-', ''));
+        if (parentBtn) parentBtn.classList.add('is-open');
+      }
+      if(document.getElementById('pageTitle')) { const th = deskActive.querySelector('.nav-th'); document.getElementById('pageTitle').innerText = th ? th.textContent : deskActive.innerText; }
+      const bcEl = document.getElementById('pageBreadcrumbGroup');
+      if (bcEl) bcEl.innerText = subWrap ? 'จัดการร้าน' : 'ระบบหลังร้าน';
+      const qsEl = document.getElementById('nav-desk-quick-settings');
+      if (qsEl) {
+        qsEl.classList.toggle('hidden', !this.checkMenuAccess('systemsettings', ['Admin']));
+        qsEl.classList.toggle('active-link', hash === 'systemsettings');
+      }
+    }
+    if(mobActive) {
+      mobActive.classList.remove('text-slate-600', 'hover:bg-indigo-50');
+      mobActive.classList.add('bg-indigo-50', 'text-indigo-600', 'active-link');
+    }
+
+    const content = document.getElementById('page-content');
+    if(!content) return;
+    
+    try {
+      switch(hash) {
+        case 'dashboard': 
+          const dbTmpl = document.getElementById('tmpl-dashboard');
+          if(dbTmpl) content.innerHTML = dbTmpl.innerHTML; 
+          window.app.dashboard.init(); 
+          break;
+        case 'analytics':
+          window.app.analytics.init();
+          break;
+        case 'target':
+          window.app.target.init();
+          break;
+        case 'bookingsummary':
+          window.app.bookingSummary.init();
+          break;
+        case 'salessummary':
+          window.app.salesSummary.init();
+          break;
+        case 'branchbookingsummary':
+          window.app.branchBookingSummary.init();
+          break;
+        case 'allbookingsummary':
+          window.app.allBookingSummary.init();
+          break;
+        case 'pos': 
+          const posTmpl = document.getElementById('tmpl-pos');
+          if(posTmpl) content.innerHTML = posTmpl.innerHTML; 
+          window.app.pos.init(); 
+          break;
+        case 'systemsettings':
+          window.app.systemSettings.init();
+          break;
+        case 'setupguide':
+          window.app.setupGuide.init();
+          break;
+        case 'banners': case 'news': case 'newscats':
+          window.app.cms.open(hash);
+          break;
+        case 'products': 
+          window.app.grid.init('Products', 'SKU', [
+            { key: 'SKU', label: 'SKU', type: 'text' }, 
+            { key: 'Product Name', label: 'ชื่อสินค้า', type: 'text' },
+            { key: 'Model', label: 'รุ่น (Model)', type: 'text' },
+            { key: 'Marketing Model', label: 'ชื่อรุ่นทางการตลาด', type: 'text' },
+            { key: 'Product Group', label: 'กลุ่มสินค้า', type: 'text' },
+            { key: 'Capacity', label: 'ความจุ', type: 'text' }, 
+            { key: 'Color', label: 'สี', type: 'text' },
+            { key: 'Image URL', label: 'รูปสินค้า', type: 'text' }, 
+            { key: 'Price', label: 'ราคา', type: 'number' },
+            { key: 'Original Price', label: 'ราคาเดิม (เว้นว่างถ้าไม่ลดราคา)', type: 'number' },
+            { key: 'Stock', label: 'สต็อก', type: 'number' },
+            { key: 'Unit', label: 'หน่วย', type: 'text' },
+            { key: 'Category', label: 'หมวดหมู่', type: 'select', options: ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'] },
+            { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] },
+            { key: 'Channel', label: 'ช่องทางที่ขาย', type: 'multi_select_channel' },
+            { key: 'Display', label: 'หน้าจอ (Display)', type: 'text' },
+            { key: 'Processor', label: 'ชิปประมวลผล (Processor)', type: 'text' },
+            { key: 'RAM', label: 'หน่วยความจำ (RAM)', type: 'text' },
+            { key: 'Rear Camera', label: 'กล้องหลัง (Rear Camera)', type: 'text' },
+            { key: 'Front Camera', label: 'กล้องหน้า (Front Camera)', type: 'text' },
+            { key: 'Battery', label: 'แบตเตอรี่ (Battery)', type: 'text' },
+            { key: 'OS', label: 'ระบบปฏิบัติการ (OS)', type: 'text' },
+            { key: 'Connectivity', label: 'การเชื่อมต่อ (Connectivity)', type: 'text' },
+            { key: 'Warranty', label: 'การรับประกัน (Warranty)', type: 'text' },
+            { key: 'Launch Date', label: 'วันเปิดตัว (Launch Date)', type: 'text' }
+          ]); break;
+        case 'autopromotions':
+          // ดรอปดาวน์หมวดหมู่: รวมหมวดที่รู้จัก (ตรงกับ Category ของ Products) + หมวดเดิมที่เคยบันทึกไว้ในชีตนี้อยู่แล้ว (เผื่อพิมพ์ค่าอื่นไว้ก่อนหน้า)
+          // กันปัญหา select เด้งไปเลือกตัวเลือกแรกเงียบๆ ตอนเปิดฟอร์มแก้ไขแถวที่มีค่าไม่ตรงกับลิสต์ที่รู้จัก
+          var apKnownCats = ['โมบาย', 'แท็บเล็ต', 'อุปกรณ์เสริม', 'สมาร์ทวอทช์', 'หูฟัง', 'ของแถมแบรนด์', 'ของแถมช่องทาง'];
+          var apExisting = window.app.globalData.autoPromotions || [];
+          var apCatOptions = Array.from(new Set([
+            ...apKnownCats,
+            ...apExisting.map(r => (r['Buy Category'] || '').toString().trim()),
+            ...apExisting.map(r => (r['Get Discount Category'] || '').toString().trim())
+          ].filter(Boolean)));
+          // idField ต้องเป็น Rule ID (ไม่ซ้ำ) — เดิมใช้ Buy Category ซึ่งหลายกติกาซ้ำกันได้ ทำให้แก้/ลบโดนแถวแรกที่ตรงแทนแถวที่เลือก
+          window.app.grid.init('AutoPromotions', 'Rule ID', [
+            { key: 'Rule ID', label: 'รหัสกติกา (สร้างอัตโนมัติ เช่น AP-001)', type: 'text' },
+            { key: 'Buy Category', label: 'หมวดหมู่สินค้าที่ซื้อ', type: 'select', options: apCatOptions },
+            { key: 'Get Discount Category', label: 'หมวดหมู่สินค้าที่ได้ส่วนลด', type: 'select', options: apCatOptions },
+            { key: 'Discount Percent', label: 'เปอร์เซ็นต์ส่วนลด (%)', type: 'number' },
+            { key: 'Message Suggest', label: 'ข้อความเชียร์ขาย (แสดงก่อนลูกค้าได้ส่วนลด)', type: 'text', hint: 'พิมพ์ข้อความธรรมดาได้เลย ต้องการตัวหนาให้ครอบด้วย <b>...</b>' },
+            { key: 'Message Apply', label: 'ข้อความเมื่อได้รับส่วนลดแล้ว', type: 'text', hint: 'พิมพ์ข้อความธรรมดาได้เลย ต้องการตัวหนาให้ครอบด้วย <b>...</b>' },
+            { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] },
+            { key: 'Channel', label: 'ช่องทางที่ร่วมรายการ (เว้นว่าง = ทุกช่องทาง)', type: 'multi_select_channel' }
+          ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
+        case 'giftmappings': 
+          window.app.grid.init('GiftMappings', 'Mapping ID', [
+            { key: 'Mapping ID', label: 'รหัสเงื่อนไข (สร้างอัตโนมัติ เช่น GM-001)', type: 'text' },
+            { key: 'Target Mobile (SKU or Group)', label: 'ใช้กับสินค้า (รุ่น / กลุ่มสินค้า / SKU หรือ * = ทุกรุ่น)', type: 'text' }, 
+            { key: 'Channel', label: 'ช่องทางการขาย', type: 'multi_select_channel' }, 
+            { key: 'Brand Gifts', label: 'ของแถมแบรนด์', type: 'multi_select_brand_gifts' }, 
+            { key: 'Channel Gifts', label: 'ของแถมช่องทาง ชุดที่ 1', type: 'multi_select_channel_gifts' },
+            { key: 'Channel Gifts 2', label: 'ของแถมช่องทาง ชุดที่ 2 (ลูกค้าเลือกรับได้ชุดเดียว)', type: 'multi_select_channel_gifts' },
+            { key: 'Channel Gifts 3', label: 'ของแถมช่องทาง ชุดที่ 3', type: 'multi_select_channel_gifts' },
+            { key: 'Status', label: 'สถานะการใช้', type: 'select', options: ['เปิด', 'ปิด'] }
+        ], window.app.user.Role === 'Manager'); break; // Manager: อ่านได้ แก้ไม่ได้ (backend เป็น Admin-only)
+        case 'interests': window.app.grid.init('Interests', 'Interest Name', [{ key: 'Interest Name', label: 'ความสนใจ', type: 'text' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
+        case 'branches': window.app.grid.init('Branches', 'Branch Code', [{ key: 'Channel', label: 'ช่องทางขาย (เพิ่มช่องทางใหม่ได้ที่เมนู ช่องทางขาย)', type: 'select', options: [''].concat(window.app.channelNames()) }, { key: 'Branch Code', label: 'รหัสสาขา', type: 'text' }, { key: 'Branch Name', label: 'ชื่อสาขา', type: 'text' }, { key: 'Area', label: 'แอเรีย (Area)', type: 'suggest' }, { key: 'Mall', label: 'ห้าง (Mall)', type: 'suggest' }, { key: 'Region', label: 'ภาค (Region)', type: 'suggest' }, { key: 'Province', label: 'จังหวัด', type: 'suggest' }, { key: 'Type Name', label: 'ประเภทสาขา', type: 'suggest' }]); break;
+        case 'channels': window.app.grid.init('Channels', 'Channel ID', [{ key: 'Channel ID', label: 'รหัสช่องทาง (สร้างอัตโนมัติ เช่น CH-01)', type: 'text' }, { key: 'Channel Name', label: 'ชื่อช่องทาง', type: 'text' }, { key: 'Description', label: 'คำอธิบาย', type: 'text' }]); break;
+        case 'members': window.app.grid.init('Members', 'Username', [
+            { key: 'Username', label: 'ชื่อผู้ใช้ (Username)', type: 'text' }, 
+            { key: 'Password', label: 'รหัสผ่าน (เว้นว่างถ้าไม่เปลี่ยน · ตั้งใหม่อย่างน้อย 8 ตัวอักษร)', type: 'password' }, 
+            { key: 'Role', label: 'บทบาท', type: 'select', options: [{ value: 'Sales', label: 'Sales - พนักงานขาย (เห็นเฉพาะสาขาตัวเอง)' }, { value: 'Manager', label: 'Manager - ผู้จัดการ (เห็นทุกสาขา ดูรายงานได้)' }, { value: 'Admin', label: 'Admin - ผู้ดูแลระบบ (ทำได้ทุกอย่าง)' }] }, 
+            { key: 'Name', label: 'ชื่อ-สกุล', type: 'text' }, 
+            { key: 'Branch Code', label: 'สาขา', type: 'select', options: window.app.branchOptions() },
+            { key: 'Accessible Menus', label: 'เมนูที่เข้าได้ (ไม่ติ๊กเลย = ตามบทบาท)', type: 'multi_select_menu' }
+        ]); break;
+        case 'promotions': window.app.grid.init('Promotions', 'Promo ID', [{ key: 'Promo ID', label: 'รหัสโปรโมชัน (สร้างอัตโนมัติ เช่น P-001)', type: 'text' }, { key: 'Promo Name', label: 'ชื่อโปรโมชัน', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: [{ value: 'Fixed', label: 'ลดเป็นบาท' }, { value: 'Percent', label: 'ลดเป็นเปอร์เซ็นต์ (%)' }] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
+        case 'coupons': window.app.grid.init('Coupons', 'Code', [{ key: 'Code', label: 'โค้ดคูปอง (เช่น NEWYEAR500)', type: 'text' }, { key: 'Description', label: 'รายละเอียด', type: 'text' }, { key: 'Discount Type', label: 'ประเภทส่วนลด', type: 'select', options: [{ value: 'Fixed', label: 'ลดเป็นบาท' }, { value: 'Percent', label: 'ลดเป็นเปอร์เซ็นต์ (%)' }] }, { key: 'Value', label: 'มูลค่า (บาท หรือ %)', type: 'number' }, { key: 'Min Spend', label: 'ยอดซื้อขั้นต่ำ', type: 'number' }, { key: 'Max Uses', label: 'ใช้ได้สูงสุด (0 = ไม่จำกัด)', type: 'number' }, { key: 'Used Count', label: 'ใช้ไปแล้ว', type: 'number' }, { key: 'Start Date', label: 'วันเริ่มใช้ (เว้นว่าง = ใช้ได้ทันที)', type: 'date' }, { key: 'Expiry Date', label: 'วันหมดอายุ (เว้นว่าง = ไม่หมดอายุ)', type: 'date' }, { key: 'Show On Store', label: 'แสดงโค้ดหน้าร้าน (หน้าโปรโมชั่นทั้งหมด)', type: 'select', options: ['ปิด', 'เปิด'] }, { key: 'Status', label: 'สถานะ', type: 'select', options: ['เปิด', 'ปิด'] }]); break;
+        case 'inventorylog': window.app.grid.init('InventoryLog', 'Log ID', [{ key: 'Log ID', label: 'รหัสบันทึก', type: 'readonly' }, { key: 'Timestamp', label: 'วันเวลา', type: 'readonly' }, { key: 'SKU', label: 'SKU', type: 'readonly' }, { key: 'Action', label: 'การทำรายการ', type: 'readonly' }, { key: 'Qty', label: 'จำนวน', type: 'readonly' }, { key: 'Branch', label: 'สาขา', type: 'readonly' }, { key: 'User', label: 'ผู้ใช้', type: 'readonly' }], true); break;
+        case 'auditlog': window.app.grid.init('AuditLog', 'Log ID', [{ key: 'Log ID', label: 'รหัสบันทึก', type: 'readonly' }, { key: 'Timestamp', label: 'วันเวลา', type: 'readonly' }, { key: 'User', label: 'ผู้ใช้', type: 'readonly' }, { key: 'Action', label: 'การทำรายการ', type: 'readonly' }, { key: 'Details', label: 'รายละเอียด', type: 'readonly' }], true); break;
+        case 'invoice': 
+            const tInv = document.getElementById('tmpl-invoice');
+            if(tInv) {
+               content.innerHTML = tInv.innerHTML;
+               window.app.invoice.init();
+            }
+            break;
+        case 'orders': window.app.orders.init(); break; // มุมมองหนึ่งใบจองต่อแถว (JS_Orders.html); ตารางละเอียดเดิมเปิดจากปุ่มในหน้านั้น -> ordersTableInit
+      }
+    } catch(err) {
+      console.error(err);
+      window.app.alertError('ข้อผิดพลาดระบบ', err.message);
+    }
+  },
+
+  // ตารางละเอียดของ Orders (ทุกคอลัมน์ ทุกแถว — แก้รายละเอียด / ลบ / ส่งออก CSV) เรียกจาก window.app.orders.showTable
+  ordersTableInit: function() {
+          let isSalesRole = (window.app.user.Role === 'Sales');
+          // resp: ซ่อน/แสดงคอลัมน์ตามขนาดจอ (owner request 2026-08-09 — ตาราง Orders 22 คอลัมน์ไม่มีทางพอดีจอเดียวกันหมด
+          // ไม่ใส่ resp = แสดงทุกขนาดจอเสมอ (คอลัมน์หลักที่ต้องเห็นทันที) — ต้อง sync กับ th/td rendering ที่ grid.init/grid.renderTable
+          // owner request 2026-09-19: ทุกอุปกรณ์เห็นทุกคอลัมน์เหมือน PC — ตัด resp (responsive hidden) ออกทั้งหมด
+          // ตารางเลื่อนแนวนอนได้อยู่แล้ว (tbleed-body overflow-x-auto, Index.html) จอเล็กจึงยังใช้งานได้ แค่ต้องเลื่อนดู ไม่ตัดคอลัมน์ทิ้ง
+          window.app.grid.init('Orders', 'OrderID', [
+            { key: '_rowIndex', type: 'hidden' },
+            { key: 'OrderID', label: 'เลขที่บิล', type: 'readonly' },
+            { key: 'Timestamp', label: 'วันที่', type: 'readonly' },
+            { key: 'Channel', label: 'Channel', type: 'readonly' },
+            { key: 'Branch Code', label: 'Branch Code', type: 'readonly' },
+            { key: 'Customer Name', label: 'ชื่อ-สกุล', type: 'datalist', listId: 'customerList' },
+            { key: 'Contact Number', label: 'เบอร์โทร', type: 'text' },
+            { key: 'Email', label: 'Email', type: 'text' },
+            { key: 'ID Card_Passport', label: 'เลขที่บัตรประชาชน', type: 'text' },
+            { key: 'Pre Order No', label: 'เลขที่ Pre Booking', type: 'text' },
+            { key: 'Code Handraiser', label: 'Code Handraiser', type: 'text' },
+            { key: 'Pickup Date', label: 'รอบรับเครื่องลูกค้าวันที่', type: 'text' },
+            { key: 'SKU', label: 'SKU', type: 'readonly' },
+            { key: 'Product Name', label: 'สินค้า', type: 'product_select' },
+            { key: 'Qty', label: 'จำนวน', type: 'number', onchange: 'window.app.grid.calcOrderTotal()' },
+            { key: 'Unit Price', label: 'ราคาต่อหน่วย', type: 'number', onchange: 'window.app.grid.calcOrderTotal()' },
+            { key: 'Promo', label: 'Promo', type: 'text' },
+            { key: 'Reservation Status', label: 'ประเภทการจอง', type: 'select', options: ['จอง T (มีการจอง)', 'จอง F (สวมสิทธิ์การจอง)'] },
+            { key: 'Staff', label: 'Staff', type: 'text' },
+            { key: 'Booking Phone', label: 'Booking Phone', type: 'text' },
+            { key: 'Customer Interests', label: 'Customer Interests', type: 'text' },
+            { key: 'Remark', label: 'Remark', type: 'text' },
+            { key: 'Row Total', label: 'ยอดรวม', type: 'readonly' },
+            // ตัวเลือกต้องตรงกับ flow ที่ orderTimelineHtml ใช้จริง (ชีต OrderStatus ถ้ามี ≥2 แถว ไม่งั้น fallback Pending/Confirmed/Paid/Delivered) — เดิม hardcode ['Pending','Completed','Cancelled'] ทำให้เลือกสถานะกลางไม่ได้เลย
+            { key: 'Order Status', label: 'สถานะออเดอร์', type: 'select', options: window.app.getOrderStatusFlow().concat(['Cancelled']) },
+            { key: 'Receipt No', label: 'เลขที่ใบเสร็จ', type: 'text' },
+            { key: 'Deposit', label: 'เงินมัดจำ', type: 'number' }
+          ], isSalesRole);
+  },
+
+  // ข้อความที่ไม่ได้เขียนเองในโค้ด (error จาก server, e.message, ค่าจากชีต) ต้องแสดงผ่านตัวนี้เสมอ:
+  // อาร์กิวเมนต์ตัวที่ 2 ของ Swal.fire(title, x, icon) คือ HTML — ข้อความ error บางอันมีชื่อสินค้า/SKU/ค่าที่ผู้ใช้พิมพ์ ปนมาได้
+  // ตัวนี้ส่งเป็น text จึงไม่ถูกตีความเป็นแท็ก (title ยังเป็น HTML — ใส่เฉพาะข้อความคงที่)
+  alertError: function(title, msg, icon) {
+    return Swal.fire({ title: title, text: (msg === null || msg === undefined) ? '' : String(msg), icon: icon || 'error' });
+  },
+
+  // token ใช้ไม่ได้แล้ว (หมดอายุ 30 วัน, เปลี่ยนหรือรีเซ็ตรหัสผ่าน, หมุนคีย์ลับ, บัญชีถูกลบ) = พากลับหน้า login พร้อมบอกเหตุผล
+  // เดิมไม่มีจุดนี้ ผู้ใช้จะเห็นแต่ข้อความ error ทุกหน้าจนกว่าจะกดออกจากระบบเอง — หน้าที่เปิดค้างไว้ (saved route) ยังจำไว้ให้หลัง login ใหม่
+  SESSION_ERR_RE: /Invalid or Expired Token|Invalid User Session|Unauthorized Access: No Token/,
+  checkSession_: function(action, res, sentUser) {
+    if (!res || res.status !== 'error' || action === 'LOGIN' || action === 'PUBLIC_TRACK_ORDER') return;
+    if (!window.app.SESSION_ERR_RE.test(String(res.message || ''))) return;
+    if (!sentUser || window.app.user !== sentUser) return; // ออกจากระบบไปแล้ว หรือ login ใหม่แล้วระหว่างรอคำตอบ
+    window.app.user = null;
+    try { localStorage.removeItem('tg_pos_user'); sessionStorage.removeItem('tg_pos_user'); } catch (e) {}
+    window.app.renderLogin();
+    setTimeout(() => { Swal.fire({ icon: 'info', title: 'กรุณาเข้าสู่ระบบใหม่', text: 'การเข้าสู่ระบบครั้งก่อนใช้ไม่ได้แล้ว (หมดอายุ หรือมีการเปลี่ยนรหัสผ่าน)', confirmButtonText: 'ตกลง' }); }, 300);
+  },
+
+  api: function(action, payload) {
+    // google.script.run ไม่มี timeout ในตัว — ถ้า handler ไม่ถูกเรียกกลับ Promise จะค้างตลอดกาล
+    const sentUser = window.app.user;
+    const call = new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).apiHandler(action, payload, sentUser);
+    }).then(res => { window.app.checkSession_(action, res, sentUser); return res; });
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => {
+        const err = new Error('การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่');
+        err.isTimeout = true; // ให้ผู้เรียก (เช่น CHECKOUT) แสดงข้อความเฉพาะทางได้
+        reject(err);
+      }, 45000);
+    });
+    return Promise.race([call, timeout]);
+  },
+
+  // จำ Username และรหัสผ่านไว้เติมฟอร์ม login ครั้งถัดไป (เจ้าของร้านเลือกเอง 2026-11-15 — ก่อนหน้านี้จำแค่ Username)
+  // เก็บใน localStorage ของเบราว์เซอร์เครื่องนั้นแบบอ่านได้ และเฉพาะเมื่อติ๊กช่อง "จดจำ" ; ไม่ติ๊กตอน login = ลบทิ้งทั้งคู่
+  // ห้ามส่งค่านี้ไปที่อื่น ห้าม log และห้ามใส่ลงใน globalData
+  loadRememberedLogin: function() {
+    try {
+      const raw = localStorage.getItem('tg_pos_remember');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      const uEl = document.getElementById('loginUsername');
+      const cEl = document.getElementById('loginRemember');
+      if (uEl && saved.u) uEl.value = saved.u;
+      const pEl = document.getElementById('loginPassword');
+      if (pEl && typeof saved.p === 'string' && saved.p) pEl.value = saved.p;
+      if (cEl) cEl.checked = true;
+    } catch (e) { /* localStorage บล็อก/ข้อมูลเสีย — ปล่อยฟอร์มว่างเฉยๆ ไม่ต้อง throw */ }
+  },
+
+  handleLogin: async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnLogin');
+    if (!btn.dataset.label) btn.dataset.label = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>กำลังเข้าสู่ระบบ...</span>';
+    try {
+      const uVal = document.getElementById('loginUsername').value;
+      const pVal = document.getElementById('loginPassword').value;
+      const res = await this.api('LOGIN', { username: uVal, password: pVal });
+      if(res && res.status === 'success') {
+        // บันทึก/ลบ Username + รหัสผ่านที่จำไว้เฉพาะตอน login สำเร็จเท่านั้น (รหัสที่ผิดจึงไม่ถูกจำ)
+        const remember = document.getElementById('loginRemember');
+        if (remember && remember.checked) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: uVal, p: pVal }));
+        else localStorage.removeItem('tg_pos_remember');
+        window.app.user = res.user; localStorage.setItem('tg_pos_user', JSON.stringify(window.app.user));
+        Swal.fire({icon: 'success', title: 'Welcome', text: res.user.Name, timer: 1500, showConfirmButton: false});
+        window.app.renderLayout();
+      } else {
+        window.app.alertError('Error', res ? res.message : 'Unknown Error');
+        btn.disabled = false; btn.innerHTML = btn.dataset.label || 'เข้าสู่ระบบ';
+      }
+    } catch (err) {
+      window.app.alertError('Error', err && err.message ? err.message : 'เชื่อมต่อระบบไม่สำเร็จ');
+      btn.disabled = false; btn.innerHTML = btn.dataset.label || 'เข้าสู่ระบบ';
+    }
+  },
+
+  logout: function() {
+    if(window.app.dashboard.refreshTimer) clearInterval(window.app.dashboard.refreshTimer);
+    if(window.app.pos && window.app.pos.countdownInterval) clearInterval(window.app.pos.countdownInterval);
+    window.app.user = null; window.app.clearSavedRoute_(); localStorage.removeItem('tg_pos_user'); sessionStorage.removeItem('tg_pos_user'); window.location.hash = ''; window.app.renderLogin();
+    sessionStorage.removeItem('tg_popup_shown');
+    // เครื่องหน้าร้านใช้ร่วมกันหลายคน — ตะกร้าและชื่อ/เบอร์พนักงานที่จำไว้ต้องไม่ติดไปถึงผู้ใช้คนถัดไป
+    localStorage.removeItem('tg_cart');
+    sessionStorage.removeItem('tg_bk_staff');
+    sessionStorage.removeItem('tg_bk_phone');
+    if (window.app.pos) window.app.pos.cartData = [];
+  },
+
+  openChangePassword: function() {
+    Swal.fire({
+      title: 'เปลี่ยนรหัสผ่าน',
+      html: `
+        <div class="space-y-4 text-left px-2">
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-1">รหัสผ่านเดิม</label>
+            <input type="password" id="cp-old" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="รหัสผ่านเดิม">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-1">รหัสผ่านใหม่</label>
+            <input type="password" id="cp-new" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="อย่างน้อย 8 ตัวอักษร">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-1">ยืนยันรหัสผ่านใหม่</label>
+            <input type="password" id="cp-confirm" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง">
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'บันทึก',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#254d71',
+      preConfirm: () => {
+        const oldPassword = document.getElementById('cp-old').value;
+        const newPassword = document.getElementById('cp-new').value;
+        const confirmPassword = document.getElementById('cp-confirm').value;
+        if (!oldPassword || !newPassword || !confirmPassword) {
+          Swal.showValidationMessage('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+          return false;
+        }
+        if (newPassword.length < 8) {
+          Swal.showValidationMessage('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร');
+          return false;
+        }
+        if (newPassword !== confirmPassword) {
+          Swal.showValidationMessage('รหัสผ่านใหม่และการยืนยันไม่ตรงกัน');
+          return false;
+        }
+        return { oldPassword, newPassword };
+      }
+    }).then(async (result) => {
+      if (!result.isConfirmed) return;
+      window.app.showLoading('กำลังบันทึกข้อมูล...');
+      try {
+        const res = await window.app.api('CHANGE_PASSWORD', { oldPassword: result.value.oldPassword, newPassword: result.value.newPassword });
+        Swal.close();
+        if (res && res.status === 'success') {
+          // token เดิมหมดสภาพทันทีที่เปลี่ยนรหัส — server ส่งใบใหม่มาให้หน้านี้ใช้ต่อ (เครื่องอื่นของผู้ใช้นี้ต้อง login ใหม่)
+          if (res.token && window.app.user) {
+            window.app.user = Object.assign({}, window.app.user, { Token: res.token });
+            try { localStorage.setItem('tg_pos_user', JSON.stringify(window.app.user)); } catch (e) {}
+            // รหัสที่ "จำไว้" ในเครื่องนี้ต้องตามรหัสใหม่ ไม่งั้นครั้งหน้าช่องรหัสผ่านจะเติมรหัสเก่า
+            try {
+              const rem = JSON.parse(localStorage.getItem('tg_pos_remember') || 'null');
+              if (rem && rem.u === window.app.user.Username) localStorage.setItem('tg_pos_remember', JSON.stringify({ u: rem.u, p: result.value.newPassword }));
+            } catch (e) {}
+          }
+          Swal.fire({ icon: 'success', title: 'เปลี่ยนรหัสผ่านสำเร็จ', showConfirmButton: false, timer: 1500 });
+        } else {
+          window.app.alertError('ผิดพลาด', res ? res.message : 'Error');
+        }
+      } catch (e) {
+        Swal.close();
+        window.app.alertError('ผิดพลาด', e.message || 'Error');
+      }
+    });
+  },
+};
+</script>
