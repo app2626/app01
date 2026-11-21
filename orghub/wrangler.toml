@@ -1,0 +1,8 @@
+name = "orghub"
+compatibility_date = "2026-11-01"
+pages_build_output_dir = "./site"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "orghub-db"
+database_id = "6da5dc27-4fba-494f-befc-4b0ed076856a"

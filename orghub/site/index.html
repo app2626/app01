@@ -1,0 +1,113 @@
+﻿<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Org Hub</title>
+<link rel="icon" id="fav" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="logo" href="#/"><img class="logo-img" id="logoImg" src="logo.svg" alt="logo"><span id="orgName"></span></a>
+  <div class="menu" id="menu"></div>
+  <a class="btn" href="admin.html">แอดมิน</a>
+</div></nav>
+
+<header class="hero" id="hero"><div class="wrap">
+  <span class="tag" id="tagline"></span>
+  <h1 id="heroTitle"></h1>
+  <p id="heroDesc"></p>
+  <div class="search"><input id="q" type="search" placeholder="ค้นหา..."></div>
+</div></header>
+
+<div id="page"></div>
+<footer id="contact"><div class="wrap">
+  <span>© <span id="year"></span> <span id="orgName2"></span></span>
+  <a id="email"></a>
+</div></footer>
+
+<script src="data.js"></script>
+<script>
+(async () => {
+let D = await loadData();
+const filt = {};
+let q = '';
+const $ = id => document.getElementById(id);
+const s = D.settings;
+let secs = [];
+document.title = s.orgName + ' — ' + s.tagline;
+if (s.logoUrl) { const u = safeImg(s.logoUrl); $('logoImg').src = $('fav').href = u; }
+$('orgName').textContent = $('orgName2').textContent = s.orgName;
+$('tagline').textContent = s.tagline;
+$('heroTitle').textContent = s.heroTitle;
+$('heroDesc').textContent = s.heroDesc;
+$('email').textContent = s.email; $('email').href = 'mailto:' + s.email;
+$('year').textContent = new Date().getFullYear();
+function setup() {
+  secs = D.sections.filter(x => x.items.length || x.locked);
+  $('menu').innerHTML = secs.map(x => `<a href="#/${esc(x.id)}" data-id="${esc(x.id)}">${x.locked ? '🔒 ' : ''}${esc(x.title)}</a>`).join('');
+}
+setup();
+
+function card(i) {
+  const tags = (i.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+  return `<a class="card" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">
+    ${i.badge ? `<div class="chips"><span class="chip st">${esc(i.badge)}</span></div>` : ''}
+    <h3>${esc(i.title)}</h3><p>${esc(i.desc)}</p>
+    ${tags.length ? `<div class="chips">${tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}
+  </a>`;
+}
+const hit = i => [i.title, i.desc, i.badge, i.tags].join(' ').toLowerCase().includes(q);
+
+function render() {
+  const id = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+  const sec = secs.find(x => x.id === id);
+  document.querySelectorAll('#menu a').forEach(a => a.classList.toggle('on', a.dataset.id === id));
+  $('hero').hidden = !!sec;
+  let h = '';
+  if (sec) {
+    if (sec.locked) {
+      h = `<section><div class="wrap"><a class="back" href="#/">← หน้าแรก</a><h2>🔒 ${esc(sec.title)}</h2><p class="sub">หัวข้อนี้ต้องใช้รหัสเข้าถึง</p>
+        <form class="form unlock" id="uf"><input id="code" type="password" placeholder="ใส่รหัสเข้าถึง" autocomplete="off"><button class="btn pri">ปลดล็อก</button><small id="uerr" style="color:#dc2626"></small></form></div></section>`;
+      $('page').innerHTML = h; return;
+    }
+    const f = filt[sec.id] || 'ทั้งหมด';
+    const cats = [...new Set(sec.items.map(i => i.badge).filter(Boolean))];
+    const items = sec.items.filter(i => f === 'ทั้งหมด' || i.badge === f);
+    h = `<section><div class="wrap"><a class="back" href="#/">← หน้าแรก</a>
+      <h2>${esc(sec.title)}</h2><p class="sub">${esc(sec.subtitle)}</p>
+      ${cats.length > 1 ? `<div class="filters">${['ทั้งหมด', ...cats].map(c => `<button class="btn ${c === f ? 'on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>` : ''}
+      <div class="grid">${items.map(card).join('')}</div></div></section>`;
+    document.title = sec.title + ' — ' + s.orgName;
+  } else if (q) {
+    const r = secs.map(x => ({ x, items: x.items.filter(hit) })).filter(r => r.items.length);
+    h = `<section><div class="wrap">${r.map(({ x, items }) => `<h2>${esc(x.title)}</h2><div class="grid" style="margin:12px 0 32px">${items.map(card).join('')}</div>`).join('') || '<div class="empty">ไม่พบข้อมูล</div>'}</div></section>`;
+  } else {
+    h = `<section><div class="wrap"><div class="grid">${secs.map(x => `<a class="card tile" href="#/${esc(x.id)}">
+      <h3>${x.locked ? '🔒 ' : ''}${esc(x.title)}</h3><p>${esc(x.subtitle)}</p><div class="chips"><span class="chip st">${x.locked ? 'ต้องใช้รหัส' : x.items.length + ' รายการ'}</span></div></a>`).join('') || '<div class="empty">ยังไม่มีข้อมูล</div>'}</div></div></section>`;
+    document.title = s.orgName + ' — ' + s.tagline;
+  }
+  $('page').innerHTML = h;
+}
+$('page').onclick = e => { const b = e.target.closest('[data-c]'); if (b) { const id = decodeURIComponent(location.hash.replace(/^#\/?/, '')); filt[id] = b.dataset.c; render(); } };
+$('page').addEventListener('submit', async e => {
+  if (e.target.id !== 'uf') return; e.preventDefault();
+  const id = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+  const codes = JSON.parse(sessionStorage.getItem('codes') || '{}'); codes[id] = $('code').value;
+  sessionStorage.setItem('codes', JSON.stringify(codes));
+  D = await loadData(); setup();
+  if (secs.find(x => x.id === id)?.locked) { delete codes[id]; sessionStorage.setItem('codes', JSON.stringify(codes)); render(); $('uerr').textContent = 'รหัสไม่ถูกต้อง'; } else render();
+});
+$('q').oninput = e => { q = e.target.value.toLowerCase(); render(); };
+window.addEventListener('hashchange', () => { render(); scrollTo(0, 0); });
+render();})();
+</script>
+</body>
+</html>
+
+
+
+

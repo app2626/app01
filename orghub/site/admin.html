@@ -1,0 +1,162 @@
+﻿<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>แอดมิน</title>
+<link rel="icon" id="fav" href="logo.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="loginView" class="login">
+  <h2>เข้าสู่ระบบแอดมิน</h2>
+  <input id="pw" type="password" placeholder="รหัสผ่าน">
+  <button class="btn pri" id="loginBtn">เข้าสู่ระบบ</button>
+  <small id="err" style="color:#dc2626"></small>
+  <a href="index.html" class="sub">← กลับหน้าเว็บ</a>
+</div>
+
+<div id="app" hidden>
+<nav><div class="wrap">
+  <a class="logo" href="index.html"><img class="logo-img" id="logoImg" src="logo.svg" alt="logo">จัดการเนื้อหา</a>
+  <div><a class="btn" href="index.html">ดูหน้าเว็บ</a> <button class="btn" id="logout">ออกจากระบบ</button></div>
+</div></nav>
+<div class="wrap admin">
+  <div class="side" id="side"></div>
+  <main id="main"></main>
+</div>
+</div>
+<div class="toast" id="toast">บันทึกแล้ว</div>
+
+<script src="data.js"></script>
+<script>
+let D = null, tab = null, editing = null, toastTimer = null;
+const $ = id => document.getElementById(id);
+const toast = m => { clearTimeout(toastTimer); $('toast').textContent = '✓ ' + (m || 'บันทึกสำเร็จ'); $('toast').classList.add('show'); toastTimer = setTimeout(() => $('toast').classList.remove('show'), 1800); };
+const persist = async m => { try { await saveData(D); toast(m); } catch (e) { alert(e.message === 'unauthorized' ? 'รหัสผ่านไม่ถูกต้องหรือหมดอายุ กรุณาเข้าสู่ระบบใหม่' : 'บันทึกไม่สำเร็จ'); } };
+
+// Auth: password is verified server-side (ADMIN_PASSWORD secret)
+const show = async on => { $('loginView').hidden = on; $('app').hidden = !on; if (on) { D = await loadData(); if (D.settings.logoUrl) $('logoImg').src = $('fav').href = safeImg(D.settings.logoUrl); tab = D.sections[0]?.id || 'settings'; render(); } };
+$('loginBtn').onclick = async () => { const p = $('pw').value; if (await checkLogin(p)) { sessionStorage.setItem('pw', p); show(true); } else $('err').textContent = 'รหัสผ่านไม่ถูกต้อง'; };
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
+$('logout').onclick = () => { sessionStorage.removeItem('pw'); show(false); };
+
+const field = (label, name, v, type = 'input') => type === 'textarea'
+  ? `<label>${label}<textarea name="${name}" rows="3">${esc(v)}</textarea></label>`
+  : `<label>${label}<input name="${name}" value="${esc(v)}"></label>`;
+const itemFields = [['ชื่อรายการ', 'title'], ['รายละเอียด', 'desc', 'textarea'], ['ป้ายกำกับ / หมวดหมู่ (ใช้กรองในหน้าเว็บ)', 'badge'], ['แท็ก (คั่นด้วย ,)', 'tags'], ['URL (https://, mailto:, tel:)', 'url']];
+
+function renderSide() {
+  $('side').innerHTML = D.sections.map(s => `<button class="btn ${tab === s.id ? 'on' : ''}" data-t="${s.id}">${s.accessCode ? '🔒 ' : ''}${esc(s.title)}</button>`).join('')
+    + `<button class="btn pri" data-t="__new">+ เพิ่มหัวข้อ</button><hr style="border:0;border-top:1px solid var(--line)">`
+    + `<button class="btn ${tab === 'settings' ? 'on' : ''}" data-t="settings">ตั้งค่าเว็บไซต์</button>`
+    + `<button class="btn ${tab === 'backup' ? 'on' : ''}" data-t="backup">สำรอง/นำเข้าข้อมูล</button>`;
+}
+$('side').onclick = e => {
+  const t = e.target.dataset.t; if (!t) return;
+  if (t === '__new') { const sec = { id: uid(), title: 'หัวข้อใหม่', subtitle: '', items: [] }; D.sections.push(sec); tab = sec.id; persist('เพิ่มหัวข้อแล้ว'); }
+  else tab = t;
+  editing = null; render();
+};
+
+function render() {
+  renderSide();
+  const m = $('main');
+  if (tab === 'settings') {
+    const s = D.settings;
+    m.innerHTML = `<h2>ตั้งค่าเว็บไซต์</h2><br><form class="form" id="sf">
+      ${field('ชื่อองค์กร', 'orgName', s.orgName)}${field('สโลแกน', 'tagline', s.tagline)}
+      ${field('หัวข้อหลัก (Hero)', 'heroTitle', s.heroTitle)}${field('คำอธิบาย Hero', 'heroDesc', s.heroDesc, 'textarea')}
+      ${field('อีเมลติดต่อ (ส่วนท้ายเว็บ)', 'email', s.email)}
+      <label>โลโก้เว็บไซต์ (URL หรืออัปโหลดรูป)<input name="logoUrl" id="logoIn" value="${esc(s.logoUrl || '')}" placeholder="https://... หรืออัปโหลดด้านล่าง (เว้นว่าง = ใช้โลโก้เริ่มต้น)"></label>
+      <div class="logo-row">
+        <img class="logo-prev" id="logoPrev" src="${esc(safeImg(s.logoUrl))}" alt="preview">
+        <label class="btn">อัปโหลดรูปโลโก้<input type="file" id="logoFile" accept="image/*" hidden></label>
+        <button type="button" class="btn" id="logoClr">ใช้โลโก้เริ่มต้น</button>
+      </div>
+      <button class="btn pri">บันทึก</button></form>`;
+    $('logoIn').oninput = e => { $('logoPrev').src = safeImg(e.target.value.trim()); };
+    $('logoClr').onclick = () => { $('logoIn').value = ''; $('logoPrev').src = 'logo.svg'; };
+    $('logoFile').onchange = e => {
+      const f = e.target.files[0]; if (!f) return;
+      const img = new Image();
+      img.onload = () => {
+        const sc = Math.min(1, 256 / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.width * sc));
+        cv.height = Math.max(1, Math.round(img.height * sc));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        const dataUrl = cv.toDataURL('image/png');
+        $('logoIn').value = dataUrl; $('logoPrev').src = dataUrl;
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(f);
+    };
+    $('sf').onsubmit = e => {
+      e.preventDefault();
+      Object.assign(D.settings, Object.fromEntries(new FormData(e.target)));
+      const u = safeImg(D.settings.logoUrl);
+      $('logoImg').src = $('fav').href = u;
+      persist();
+    };
+    return;
+  }
+  if (tab === 'backup') {
+    m.innerHTML = `<h2>สำรอง / นำเข้าข้อมูล</h2><br><div class="form">
+      <p class="sub">ข้อมูลเก็บบนเซิร์ฟเวอร์ (Cloudflare D1) แนะนำให้ส่งออกไว้เป็นไฟล์สำรอง</p>
+      <div class="acts"><button class="btn pri" id="ex">ส่งออก JSON</button>
+      <label class="btn">นำเข้า JSON<input type="file" id="im" accept=".json" hidden></label>
+      <button class="btn danger" id="rs">รีเซ็ตเป็นค่าเริ่มต้น</button></div></div>`;
+    $('ex').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(D, null, 2)], { type: 'application/json' })); a.download = 'orghub-data.json'; a.click(); };
+    $('im').onchange = async e => { try { const d = normalize(JSON.parse(await e.target.files[0].text())); if (!d.sections.length && !confirm('ไฟล์ไม่มีหัวข้อ ต้องการนำเข้าต่อ?')) return; D = d; tab = D.sections[0]?.id || 'settings'; await persist('นำเข้าแล้ว'); render(); } catch { alert('ไฟล์ไม่ถูกต้อง'); } };
+    $('rs').onclick = async () => { if (confirm('รีเซ็ตข้อมูลทั้งหมด?')) { D = structuredClone(DEFAULTS); tab = D.sections[0].id; await persist('รีเซ็ตแล้ว'); render(); } };
+    return;
+  }
+  const si = D.sections.findIndex(s => s.id === tab);
+  if (si < 0) { m.innerHTML = '<div class="empty">ยังไม่มีหัวข้อ กด "+ เพิ่มหัวข้อ"</div>'; return; }
+  const sec = D.sections[si];
+  const cur = editing ? (editing === 'new' ? { title: '', desc: '', badge: '', tags: '', url: '' } : sec.items.find(i => i.id === editing)) : null;
+  m.innerHTML = `
+    <form class="form" id="secf"><h3>ตั้งค่าหัวข้อ</h3>
+      <div class="row2">${field('ชื่อหัวข้อ', 'title', sec.title)}${field('คำอธิบายหัวข้อ', 'subtitle', sec.subtitle)}</div>
+      ${field('🔒 รหัสเข้าถึงหัวข้อนี้ (เว้นว่าง = ทุกคนเข้าได้)', 'accessCode', sec.accessCode || '')}
+      <div class="acts"><button class="btn pri">บันทึกหัวข้อ</button>
+        <button type="button" class="btn" id="su">← เลื่อนขึ้น</button><button type="button" class="btn" id="sd">เลื่อนลง →</button>
+        <button type="button" class="btn danger" id="sx">ลบหัวข้อ</button></div></form>
+    <div class="item" style="margin-bottom:18px;background:none;border:0;padding:0"><h2>รายการ (${sec.items.length})</h2>
+      <button class="btn pri" id="add">+ เพิ่มรายการ</button></div>
+    ${cur ? `<form class="form" id="ef">${itemFields.map(([l, n, t]) => field(l, n, cur[n], t)).join('')}
+      <div class="acts"><button class="btn pri">${editing === 'new' ? 'เพิ่ม' : 'บันทึก'}</button><button type="button" class="btn" id="cn">ยกเลิก</button></div></form>` : ''}
+    <div class="list">${sec.items.map((i, ix) => `<div class="item"><div><b>${esc(i.title)}</b><small>${esc(i.badge)} · ${esc(i.url)}</small></div>
+      <div class="acts"><button class="btn" data-a="up" data-i="${ix}">↑</button><button class="btn" data-a="dn" data-i="${ix}">↓</button>
+      <button class="btn" data-a="ed" data-id="${i.id}">แก้ไข</button><button class="btn danger" data-a="del" data-id="${i.id}">ลบ</button></div></div>`).join('') || '<div class="empty">ยังไม่มีรายการ</div>'}</div>`;
+
+  $('secf').onsubmit = e => { e.preventDefault(); Object.assign(sec, Object.fromEntries(new FormData(e.target))); persist('บันทึกหัวข้อแล้ว'); renderSide(); };
+  const moveSec = d => { const j = si + d; if (j < 0 || j >= D.sections.length) return; [D.sections[si], D.sections[j]] = [D.sections[j], D.sections[si]]; persist('จัดเรียงแล้ว'); render(); };
+  $('su').onclick = () => moveSec(-1); $('sd').onclick = () => moveSec(1);
+  $('sx').onclick = () => { if (!confirm(`ลบหัวข้อ "${sec.title}" พร้อมรายการทั้งหมด?`)) return; D.sections.splice(si, 1); tab = D.sections[0]?.id || 'settings'; persist('ลบหัวข้อแล้ว'); render(); };
+  $('add').onclick = () => { editing = 'new'; render(); };
+  if (cur) {
+    $('cn').onclick = () => { editing = null; render(); };
+    $('ef').onsubmit = e => {
+      e.preventDefault(); const v = Object.fromEntries(new FormData(e.target));
+      const isNew = editing === 'new';
+      if (isNew) sec.items.push({ id: uid(), ...v }); else Object.assign(cur, v);
+      editing = null; persist(isNew ? 'เพิ่มรายการสำเร็จ' : 'แก้ไขรายการสำเร็จ'); render();
+    };
+  }
+  m.querySelector('.list').onclick = e => {
+    const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a, arr = sec.items;
+    if (a === 'ed') editing = b.dataset.id;
+    else if (a === 'del') { if (!confirm('ลบรายการนี้?')) return; sec.items = arr.filter(i => i.id !== b.dataset.id); persist('ลบแล้ว'); }
+    else { const i = +b.dataset.i, j = a === 'up' ? i - 1 : i + 1; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; persist('จัดเรียงแล้ว'); }
+    render();
+  };
+}
+show(!!sessionStorage.getItem('pw'));
+</script>
+</body>
+</html>
+
+
