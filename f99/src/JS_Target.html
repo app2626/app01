@@ -5,6 +5,8 @@ window.app.target = {
       const content = document.getElementById('page-content');
       const tmpl = document.getElementById('tmpl-target');
       if(content && tmpl) content.innerHTML = tmpl.innerHTML;
+      const adminAct = document.getElementById('targetAdminActions');
+      if (adminAct) adminAct.classList.toggle('hidden', !(window.app.user && window.app.user.Role === 'Admin'));
       
       window.app.showLoading('กำลังโหลดข้อมูลเป้าหมาย...');
       try {

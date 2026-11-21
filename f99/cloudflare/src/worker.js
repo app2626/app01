@@ -25,7 +25,7 @@ const SECURITY_HEADERS = {
 function sheetsForAction(action, payload) {
   switch (action) {
     case 'LOGIN':
-      return ['Members', 'AuditLog'];
+      return ['Members', 'Branches', 'AuditLog'];
     case 'PUBLIC_TRACK_ORDER':
       return ['Orders', 'OrderStatusLog', 'Settings'];
     case 'VALIDATE_COUPON':

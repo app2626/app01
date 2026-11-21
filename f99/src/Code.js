@@ -2060,7 +2060,8 @@ var IMPORT_RECORD_TABLES_ = {
   Branches: { idField: 'Branch Code', textCols: ['Branch Code'], free: ['Channel', 'Branch Name', 'Area', 'Mall', 'Region', 'Province', 'Type Name'], cache: 'TABLE_Branches' },
   Channels: { idField: 'Channel ID', textCols: ['Channel ID'], free: ['Channel Name', 'Description'], autoId: { prefix: 'CH-', pad: 2 }, cache: 'TABLE_Channels' },
   Members: { idField: 'Username', textCols: ['Username'], free: ['Name'], ciId: true, cache: 'TABLE_Members' },
-  GiftMappings: { idField: 'Mapping ID', textCols: ['Mapping ID'], free: ['Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3'], autoId: { prefix: 'GM-', pad: 3 }, cache: 'TABLE_GiftMappings' }
+  GiftMappings: { idField: 'Mapping ID', textCols: ['Mapping ID'], free: ['Target Mobile (SKU or Group)', 'Channel', 'Brand Gifts', 'Channel Gifts', 'Channel Gifts 2', 'Channel Gifts 3'], autoId: { prefix: 'GM-', pad: 3 }, cache: 'TABLE_GiftMappings' },
+  Target: { idField: 'Area', textCols: ['Area'], free: [], ciId: true, cache: 'TABLE_Target', allowReplace: true }
 };
 var IMPORT_MEMBER_ROLES_ = ['Admin', 'Manager', 'Sales'];
 
@@ -2084,6 +2085,7 @@ function importRecords_(payload, secureUser, ss) {
     if (rowsIn.length === 0) throw new Error("ไม่พบข้อมูลในไฟล์");
     if (rowsIn.length > PRODUCT_IMPORT_MAX_ROWS_) throw new Error("นำเข้าได้ครั้งละไม่เกิน " + PRODUCT_IMPORT_MAX_ROWS_ + " แถว (ไฟล์มี " + rowsIn.length + " แถว)");
     const dryRun = payload.dryRun === true;
+    const replace = !!(spec.allowReplace && payload.replace === true);
 
     if (table === 'GiftMappings') ensureGiftSetColumns_(ss);
     const sheet = ss.getSheetByName(table);
@@ -2139,7 +2141,7 @@ function importRecords_(payload, secureUser, ss) {
       }
       const key = needsAutoId ? '' : idKey(id);
       if (!needsAutoId && seen[key]) { skippedCount = note(skipped, skippedCount, { line: line, sku: id, reason: spec.idField + ' ซ้ำกันในไฟล์' }); return; }
-      if (!needsAutoId && existing[key]) { skippedCount = note(skipped, skippedCount, { line: line, sku: id, reason: 'มี ' + spec.idField + ' นี้ในระบบแล้ว' + (spec.ciId ? ' (ไม่สนตัวพิมพ์เล็ก/ใหญ่)' : '') }); return; }
+      if (!needsAutoId && !replace && existing[key]) { skippedCount = note(skipped, skippedCount, { line: line, sku: id, reason: 'มี ' + spec.idField + ' นี้ในระบบแล้ว' + (spec.ciId ? ' (ไม่สนตัวพิมพ์เล็ก/ใหญ่)' : '') }); return; }
 
       const obj = {};
       spec.free.forEach(f => { obj[f] = sanitizeSheetText_(get(f)); });
@@ -2189,6 +2191,12 @@ function importRecords_(payload, secureUser, ss) {
         } else {
           obj['Password'] = dryRun ? '' : hashPassword_(pw);
         }
+      } else if (table === 'Target') {
+        const rawTarget = get('เป้า').replace(/,/g, '');
+        if (!rawTarget) return fail('ไม่มี เป้า');
+        const num = Number(rawTarget);
+        if (!isFinite(num) || num < 0) return fail('เป้า ต้องเป็นตัวเลขที่มากกว่าหรือเท่ากับ 0');
+        obj['เป้า'] = num;
       }
       if (needsAutoId) {
         id = spec.autoId.prefix + String(++maxAuto).padStart(spec.autoId.pad, '0');
@@ -2200,14 +2208,17 @@ function importRecords_(payload, secureUser, ss) {
     });
 
     if (!dryRun && outRows.length > 0) {
+      if (replace) {
+        for (let r = sheet.getLastRow(); r >= 2; r--) sheet.deleteRow(r);
+      }
       const startRow = sheet.getLastRow() + 1;
       spec.textCols.forEach(c => { const ci = headers.indexOf(c); if (ci > -1) sheet.getRange(startRow, ci + 1, outRows.length, 1).setNumberFormat('@'); });
       skuAsText_(sheet, outRows, startRow, headers.indexOf('SKU'));
       sheet.getRange(startRow, 1, outRows.length, headers.length).setValues(outRows);
       CacheService.getScriptCache().remove(spec.cache);
-      logAudit_(secureUser.Username, "IMPORT_" + table.toUpperCase(), "Imported " + outRows.length + " " + table + " row(s) from CSV (skipped " + skippedCount + ", rejected " + errorCount + ")");
+      logAudit_(secureUser.Username, "IMPORT_" + table.toUpperCase(), "Imported " + outRows.length + " " + table + " row(s) from CSV" + (replace ? " (replaced existing)" : "") + " (skipped " + skippedCount + ", rejected " + errorCount + ")");
     }
-    const res = { status: 'success', table: table, dryRun: dryRun, total: rowsIn.length, created: outRows.length, skippedCount: skippedCount, errorCount: errorCount, warningCount: warningCount, skipped: skipped, errors: errors, warnings: warnings, generatedCount: generatedCount };
+    const res = { status: 'success', table: table, dryRun: dryRun, replace: replace, total: rowsIn.length, created: outRows.length, skippedCount: skippedCount, errorCount: errorCount, warningCount: warningCount, skipped: skipped, errors: errors, warnings: warnings, generatedCount: generatedCount };
     if (!dryRun && generated.length > 0) res.generatedPasswords = generated; // แสดงครั้งเดียวหลังนำเข้า — ไม่เก็บไว้ที่ใด
     return res;
   } catch (e) {

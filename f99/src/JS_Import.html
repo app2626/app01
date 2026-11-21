@@ -54,6 +54,17 @@
           '<b>Accessible Menus</b> เว้นว่าง = สิทธิ์ตามบทบาท, * = ทุกเมนู หรือรหัสเมนูคั่นด้วยจุลภาค',
           'Username ที่ซ้ำ (ไม่สนตัวพิมพ์เล็ก/ใหญ่) จะถูกข้าม — ไม่แก้ไขผู้ใช้เดิม'
         ]
+      },
+      Target: {
+        label: 'เป้าหมาย (Target)',
+        requiredHeader: 'Area',
+        headers: ['Area', 'เป้า'],
+        example: ['ALL', '500'],
+        allowReplace: true,
+        notes: [
+          'ต้องมี <b>Area</b> (เช่น ALL, ชื่อ Area, รหัสสาขา หรือ Username) และ <b>เป้า</b> (ตัวเลข &ge; 0)',
+          'เลือก <b>แทนที่ข้อมูลเป้าหมายเดิมทั้งหมด</b> ด้านล่างได้ หากต้องการล้างเป้าแคมเปญเก่าแล้วนำเข้าชุดใหม่'
+        ]
       }
     },
 
@@ -98,15 +109,19 @@
           + c.notes.map(n => '<li>' + n + '</li>').join('')
           + '<li>ครั้งละไม่เกิน ' + this.MAX_ROWS + ' แถว และจะแสดงตัวอย่างผลให้ตรวจก่อนบันทึกจริง</li>'
           + '<li>ถ้าเปิดไฟล์ใน Excel แล้วตัวเลขยาวกลายเป็น 8.65E+13 ข้อมูลเสียถาวร — ตั้งคอลัมน์เป็นข้อความ (Text) ก่อนวาง หรือ <a href="#" class="underline font-bold text-indigo-600" onclick="window.app.importer.downloadTemplate(\'' + table + '\',\'xls\');return false;">ดาวน์โหลดไฟล์ Excel ที่ตั้งเป็นข้อความไว้แล้ว</a></li>'
-          + '</ul></div>',
+          + '</ul>'
+          + (c.allowReplace ? '<label class="flex items-center gap-2 mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 cursor-pointer"><input type="checkbox" id="impReplaceAll" class="rounded"> <span class="text-xs font-bold text-amber-900">แทนที่ข้อมูลเป้าหมายเดิมทั้งหมด (ล้างเป้าเดิมก่อนนำเข้า)</span></label>' : '')
+          + '</div>',
         showCancelButton: true, showDenyButton: true,
-        confirmButtonText: 'เลือกไฟล์ CSV', denyButtonText: 'ดาวน์โหลดไฟล์ตัวอย่าง', cancelButtonText: 'ยกเลิก'
+        confirmButtonText: 'เลือกไฟล์ CSV', denyButtonText: 'ดาวน์โหลดไฟล์ตัวอย่าง', cancelButtonText: 'ยกเลิก',
+        preConfirm: () => ({ replace: !!(c.allowReplace && document.getElementById('impReplaceAll') && document.getElementById('impReplaceAll').checked) })
       });
       if (r.isDenied) return this.downloadTemplate(table, 'csv');
       if (!r.isConfirmed) return;
+      const opts = r.value || {};
       const input = document.createElement('input');
       input.type = 'file'; input.accept = '.csv,text/csv';
-      input.onchange = () => { if (input.files && input.files[0]) this.handleFile(table, input.files[0]); };
+      input.onchange = () => { if (input.files && input.files[0]) this.handleFile(table, input.files[0], opts); };
       input.click();
     },
 
@@ -131,23 +146,25 @@
       return rows;
     },
 
-    handleFile: async function(table, file) {
+    handleFile: async function(table, file, opts) {
       const esc = window.app.esc;
+      const replace = !!(opts && opts.replace);
       try {
         const rows = await this.readRows(table, file);
         window.app.showLoading('กำลังตรวจไฟล์ ' + rows.length + ' แถว...');
         let res;
-        try { res = await window.app.api('IMPORT_RECORDS', { table: table, rows: rows, dryRun: true }); } finally { window.app.hideLoading(); }
+        try { res = await window.app.api('IMPORT_RECORDS', { table: table, rows: rows, dryRun: true, replace: replace }); } finally { window.app.hideLoading(); }
         if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'ตรวจไฟล์ไม่สำเร็จ');
-        await this.showPreview(table, res, rows, file.name);
+        await this.showPreview(table, res, rows, file.name, opts);
       } catch (e) {
         Swal.fire('นำเข้าไม่ได้', esc(e.message || String(e)), 'error');
       }
     },
 
-    showPreview: async function(table, res, rows, fileName) {
+    showPreview: async function(table, res, rows, fileName, opts) {
       const esc = window.app.esc;
       const c = this.cfg(table);
+      const replace = !!(opts && opts.replace);
       const block = (title, cls, items, total) => {
         if (!total) return '';
         const shown = items.slice(0, 8).map(it => '<li>แถว ' + esc(it.line) + (it.sku ? ' · <b>' + esc(it.sku) + '</b>' : '') + ' — ' + esc(it.reason) + '</li>').join('');
@@ -155,7 +172,8 @@
         return '<div class="mt-3 text-left"><div class="font-bold ' + cls + '">' + esc(title) + ' ' + total + ' รายการ</div><ul class="list-disc pl-5 text-xs leading-relaxed">' + shown + more + '</ul></div>';
       };
       const html = '<div class="text-sm text-left">ไฟล์ <b>' + esc(fileName) + '</b> · ทั้งหมด ' + res.total + ' แถว</div>'
-        + '<div class="mt-2 text-left text-base font-extrabold text-emerald-700">เพิ่ม' + esc(c.label) + 'ใหม่ ' + res.created + ' รายการ</div>'
+        + '<div class="mt-2 text-left text-base font-extrabold text-emerald-700">' + (res.replace ? 'นำเข้า' : 'เพิ่ม') + esc(c.label) + (res.replace ? ' (แทนที่ข้อมูลเดิม) ' : 'ใหม่ ') + res.created + ' รายการ</div>'
+        + (res.replace ? '<div class="mt-1 text-left text-xs font-bold text-amber-700">โหมดแทนที่: ข้อมูลเป้าหมายเดิมทั้งหมดจะถูกล้างและแทนที่ด้วยชุดนี้</div>' : '')
         + (table === 'Members' && res.generatedCount ? '<div class="mt-1 text-left text-xs font-bold text-amber-700">ระบบจะสุ่มรหัสผ่านให้ ' + res.generatedCount + ' คน (แสดงครั้งเดียวหลังนำเข้า)</div>' : '')
         + block('ข้าม (มีอยู่แล้ว/ซ้ำในไฟล์)', 'text-amber-700', res.skipped || [], res.skippedCount)
         + block('ข้อมูลไม่ถูกต้อง (ไม่นำเข้า)', 'text-rose-700', res.errors || [], res.errorCount)
@@ -165,11 +183,12 @@
       if (!cf.isConfirmed) return;
       window.app.showLoading('กำลังนำเข้า' + c.label + '...');
       try {
-        const fin = await window.app.api('IMPORT_RECORDS', { table: table, rows: rows, dryRun: false });
+        const fin = await window.app.api('IMPORT_RECORDS', { table: table, rows: rows, dryRun: false, replace: replace });
         window.app.hideLoading();
         if (!fin || fin.status !== 'success') throw new Error(fin && fin.message ? fin.message : 'นำเข้าไม่สำเร็จ');
         await window.app.refreshGlobalData();
         if (window.app.grid && window.app.grid.tableName === table) await window.app.grid.loadData();
+        if (table === 'Target' && window.app.target && document.getElementById('targetTableBody')) await window.app.target.init();
         await this.showDone(table, fin);
       } catch (e) {
         window.app.hideLoading();

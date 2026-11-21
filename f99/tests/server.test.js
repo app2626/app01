@@ -492,6 +492,32 @@ t('import records: Admin only, unknown/forbidden tables rejected (Orders/Product
   eq(imp('Branches', [{ 'Branch Code': 'X1', 'Branch Name': 'x', Channel: 'c' }], true, sales).status, 'error');
   ['Orders', 'Products', 'AuditLog', 'Settings', '__proto__', 'constructor', '', undefined].forEach(tb => eq(imp(tb, [{ a: 1 }], true).status, 'error', 'table ' + tb));
 });
+t('import target: append skips existing Area (case-insensitive); validates numeric >=0; replace:true replaces all rows', () => {
+  const restore = importSnap(['Target']); const before = sheets.Target.rows.length;
+  const exArea = sheets.Target.rows[1] && sheets.Target.rows[1][0];
+  const rows = [
+    { Area: exArea || 'ALL', 'เป้า': '999' },
+    { Area: 'BKK', 'เป้า': '1,200' },
+    { Area: 'bkk', 'เป้า': '300' },
+    { Area: 'NEG', 'เป้า': '-5' },
+    { Area: 'BAD', 'เป้า': 'abc' },
+    { Area: '=cmd', 'เป้า': '10' }
+  ];
+  try {
+    const exp = exArea ? [1, 2, 3] : [2, 1, 3];
+    const dry = unwrap(imp('Target', rows, true));
+    eq([dry.created, dry.skippedCount, dry.errorCount], exp, JSON.stringify(dry.errors));
+    eq(sheets.Target.rows.length, before, 'dryRun must not write');
+    const real = unwrap(imp('Target', rows, false));
+    eq([real.created, real.skippedCount, real.errorCount], exp);
+    eq(sheets.Target.rows.length, before + exp[0]);
+    const rep = unwrap(api('IMPORT_RECORDS', { table: 'Target', rows: [{ Area: 'ALL', 'เป้า': '500' }, { Area: 'NORTH', 'เป้า': '250' }], dryRun: false, replace: true }, admin));
+    eq([rep.created, rep.skippedCount, rep.errorCount, rep.replace], [2, 0, 0, true]);
+    eq(sheets.Target.rows.length, 3, 'header + 2 replaced rows');
+    eq(sheets.Target.rows[1], ['ALL', 500]);
+    eq(sheets.Target.rows[2], ['NORTH', 250]);
+  } finally { restore(); }
+});
 t('import branches: adds new codes only; Channel/Name required; dup + in-file dup skipped; sci-notation/formula codes rejected; code stored as text', () => {
   const restore = importSnap(['Branches']); const bh = sheets.Branches.rows[0], before = sheets.Branches.rows.length;
   const exCode = sheets.Branches.rows[1][bh.indexOf('Branch Code')], exChannel = sheets.Branches.rows[1][bh.indexOf('Channel')];
