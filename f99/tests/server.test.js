@@ -122,6 +122,16 @@ const cartFor = (qty, sku) => [{ SKU: sku || 'SKU-S24U', 'Product Name': 'Samsun
 const co = (over) => Object.assign({ cart: cartFor(1), branch: 'B01', channel: 'Retail', customerName: 'ลูกค้าทดสอบ', contactPhone: '0812345678', email: 'a@b.c', idCard: '1234567890121', resStatus: FSTAT, clientRequestId: 'REQ-' + Math.random(), discount: 0 }, over || {});
 const stockOf = sku => Number(tbl('Products').find(x => x.SKU === sku).Stock);
 t('CHECKOUT happy path decrements stock', () => { const b = stockOf('SKU-S24U'); const r = api('CHECKOUT', co(), sales); eq(r.status, 'success', JSON.stringify(r)); eq(stockOf('SKU-S24U'), b - 1); });
+t('CHECKOUT stamps Campaign from Settings.CampaignName onto Orders rows', () => {
+  unwrap(api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { CampaignName: 'S27 Series' } }, admin));
+  const r = unwrap(api('CHECKOUT', co(), sales));
+  const ordRows = sheets.Orders.rows;
+  const campIdx = ordRows[0].indexOf('Campaign');
+  ok(campIdx > -1, 'Orders has Campaign column');
+  const saved = ordRows.filter(row => row[0] === r.orderId);
+  ok(saved.length > 0 && saved.every(row => row[campIdx] === 'S27 Series'), 'Campaign stamped on order rows');
+  unwrap(api('SAVE_SETTINGS_ITEM', { type: 'bookingsettings', settings: { CampaignName: '' } }, admin));
+});
 t('CHECKOUT rows have exact header width', () => { const rows = sheets.Orders.rows; ok(rows.length >= 2); rows.slice(1).forEach((r, i) => eq(r.length, ctx.ORDERS_HEADERS_.length, 'row ' + (i + 2))); });
 t('CHECKOUT writes InventoryLog SALE row', () => ok(sheets.InventoryLog.rows.some(r => r[3] === 'SALE' && r[2] === 'SKU-S24U')));
 t('CHECKOUT idempotent (same clientRequestId)', () => { const p = co({ clientRequestId: 'SAME-1' }); api('CHECKOUT', p, sales); const n = sheets.Orders.rows.length, s = stockOf('SKU-S24U'); api('CHECKOUT', p, sales); eq(sheets.Orders.rows.length, n, 'dup rows'); eq(stockOf('SKU-S24U'), s, 'double stock deduction'); });

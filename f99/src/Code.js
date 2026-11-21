@@ -1339,9 +1339,9 @@ function processCheckout_(payload, secureUser, ss) {
     let priceIdx = headers.indexOf("Price");
     let catIdx = headers.indexOf("Category");
     
-    // ตรวจสอบว่าชีต Orders มีคอลัมน์ Receipt No / Deposit / Pre Order No / Pickup Date แล้วหรือยัง — ถ้ายังให้เพิ่มต่อท้ายอัตโนมัติ
+    // ตรวจสอบว่าชีต Orders มีคอลัมน์ Receipt No / Deposit / Pre Order No / Pickup Date / Campaign แล้วหรือยัง — ถ้ายังให้เพิ่มต่อท้ายอัตโนมัติ
     let orderHeaders = orderSheet.getRange(1, 1, 1, orderSheet.getLastColumn()).getValues()[0].map(h => h.toString().trim());
-    ["Receipt No", "Deposit", "Client Request ID", "Pre Order No", "Pickup Date"].forEach(col => {
+    ["Receipt No", "Deposit", "Client Request ID", "Pre Order No", "Pickup Date", "Campaign"].forEach(col => {
       if (orderHeaders.indexOf(col) === -1) {
         orderSheet.getRange(1, orderHeaders.length + 1).setValue(col);
         orderHeaders.push(col);
@@ -1356,6 +1356,7 @@ function processCheckout_(payload, secureUser, ss) {
     }
 
     let isFirstRow = true;
+    const activeCampaign = sanitizeSheetText_((bookSettings.CampaignName || "").toString().trim());
     let orderRows = [];
     let invRows = [];
     let totalMobileQty = 0;
@@ -1448,7 +1449,7 @@ function processCheckout_(payload, secureUser, ss) {
         fEmail, fIdCard, fCodeHand,
         item.SKU, itemName, qty, itemPrice,
         fPromo, fResStatus, fBkStaff, fBkPhone,
-        fInterests, fRemark, rowTotal, "Pending", fReceiptNo, fDeposit, fReqId, fPreOrderNo, fPickupDate
+        fInterests, fRemark, rowTotal, "Pending", fReceiptNo, fDeposit, fReqId, fPreOrderNo, fPickupDate, activeCampaign
       ]);
       
       isFirstRow = false; 
@@ -1512,7 +1513,7 @@ function processCheckout_(payload, secureUser, ss) {
             "", "", "",
             giftSku, giftName, gQty, 0,
             "", "", "", "",
-            "", (giftHasStock ? "" : "รอสต๊อกของแถม"), 0, "Pending", "", "", "", "", ""
+            "", (giftHasStock ? "" : "รอสต๊อกของแถม"), 0, "Pending", "", "", "", "", "", activeCampaign
           ]);
         }
       };
@@ -1604,7 +1605,7 @@ function processCheckout_(payload, secureUser, ss) {
           "", "", "",
           "DISCOUNT", sanitizeSheetText_(dName), 1, -val,
           "", "", "", "",
-          "", "", -val, "Pending", "", "", "", "", ""
+          "", "", -val, "Pending", "", "", "", "", "", activeCampaign
         ]);
       });
     }
@@ -3248,6 +3249,7 @@ var SETTING_RULES_ = {
   ReserveStart:          { label: 'วันเริ่มจอง', type: 'datetime', required: true },
   ReserveEnd:            { label: 'วันสิ้นสุดการจอง', type: 'datetime', required: true },
   FlashCampaignTitle:    { label: 'ชื่อแคมเปญ', max: 120 },
+  CampaignName:          { label: 'รหัส/ชื่อแคมเปญปัจจุบัน', max: 80 },
   LowStockThreshold:     { label: 'เกณฑ์เตือนสต๊อกต่ำ', type: 'int', required: true, min: 0, max: 9999 },
   WebhookUrl:            { label: 'Webhook URL', type: 'https', max: 500 },
   LineWebhookUrl:        { label: 'LINE Webhook URL', type: 'https', max: 500 },
@@ -3603,7 +3605,7 @@ function getOrderStatusHistory_(ss, orderId, includeBy) {
 var ORDERS_HEADERS_ = [
   "OrderID", "Timestamp", "Channel", "Branch Code", "Customer Name", "Contact Number", "Email", "ID Card_Passport", "Code Handraiser",
   "SKU", "Product Name", "Qty", "Unit Price", "Promo", "Reservation Status", "Staff", "Booking Phone",
-  "Customer Interests", "Remark", "Row Total", "Order Status", "Receipt No", "Deposit", "Client Request ID", "Pre Order No", "Pickup Date"
+  "Customer Interests", "Remark", "Row Total", "Order Status", "Receipt No", "Deposit", "Client Request ID", "Pre Order No", "Pickup Date", "Campaign"
 ];
 
 var INVOICES_HEADERS_ = [
