@@ -19,7 +19,11 @@ function loadWorkerEsm() {
     .replace("'./gas-d1.js'", "'./gas-d1.mjs'")
     .replace("'../dist/backend.js'", "'./backend.mjs'")
     .replace("'../dist/assets.js'", "'./assets.mjs'"));
-  return { url: pathToFileURL(path.join(dir, 'worker.mjs')).href, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+  return {
+    url: pathToFileURL(path.join(dir, 'worker.mjs')).href,
+    gasD1Url: pathToFileURL(path.join(dir, 'gas-d1.mjs')).href,
+    cleanup: () => fs.rmSync(dir, { recursive: true, force: true })
+  };
 }
 
 // In-memory D1 mock matching cloudflare/src/gas-d1.js & worker.js SQL queries
@@ -74,9 +78,28 @@ function createD1Mock() {
       }
       return { results: [] };
     }
+    if (s.startsWith('DELETE FROM kv_store WHERE key = ? AND value = ?')) {
+      const [key, val] = params;
+      const cur = kvStore.get(key);
+      if (cur && cur.value === val) kvStore.delete(key);
+      return { results: [] };
+    }
     if (s.startsWith('DELETE FROM kv_store WHERE key = ?')) {
       kvStore.delete(params[0]);
       return { results: [] };
+    }
+    if (s.startsWith('INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE')) {
+      const [key, value, expires_at, now] = params;
+      const cur = kvStore.get(key);
+      if (!cur || (cur.expires_at !== null && cur.expires_at <= now)) {
+        kvStore.set(key, { value, expires_at });
+      }
+      return { results: [] };
+    }
+    if (s.startsWith('SELECT value FROM kv_store WHERE key = ?')) {
+      const cur = kvStore.get(params[0]);
+      const results = cur ? [{ value: cur.value }] : [];
+      return { results, first: results[0] || null };
     }
     if (s.startsWith('INSERT OR REPLACE INTO kv_store')) {
       const [key, value, expires_at] = params.length === 3 ? params : [params[0], params[1], null];
@@ -91,6 +114,15 @@ function createD1Mock() {
     if (s.startsWith('SELECT mime_type, data_base64 FROM uploaded_images WHERE id = ?')) {
       const row = images.get(params[0]) || null;
       return { results: row ? [row] : [], first: row };
+    }
+    if (s.startsWith('SELECT id, created_at FROM uploaded_images')) {
+      const results = [];
+      for (const [id, row] of images.entries()) results.push({ id, created_at: row.created_at });
+      return { results };
+    }
+    if (s.startsWith('DELETE FROM uploaded_images WHERE id = ?')) {
+      images.delete(params[0]);
+      return { results: [] };
     }
     throw new Error('Unhandled SQL in D1 mock: ' + s);
   }
@@ -220,6 +252,112 @@ function t(name, fn) { tests.push({ name, fn }); }
       const r = await api(act, pay, tok);
       assert.strictEqual(r.status, 'success', act + ' failed: ' + JSON.stringify(r));
     }
+  });
+
+  t('D1 distributed lock blocks concurrent writers, takes over expired lock, and releases on finish', async () => {
+    const { acquireD1Lock, releaseD1Lock } = await import(loaded.gasD1Url);
+    // 1. Expired lock is taken over immediately
+    await db.prepare('INSERT OR REPLACE INTO kv_store (key, value, expires_at) VALUES (?, ?, ?)').bind('lock:global', 'stale-owner', Date.now() - 1000).run();
+    const tok1 = await acquireD1Lock(db, 5000, 300);
+    assert.ok(tok1, 'expired lock should be acquired');
+
+    // 2. Active lock blocks another acquirer until timeout
+    const tok2 = await acquireD1Lock(db, 5000, 150);
+    assert.strictEqual(tok2, null, 'active lock should block second acquirer');
+
+    // 3. Releasing with wrong token does not release
+    await releaseD1Lock(db, 'wrong-token');
+    const stillLocked = await db.prepare('SELECT value FROM kv_store WHERE key = ?').bind('lock:global').first();
+    assert.strictEqual(stillLocked.value, tok1);
+
+    // 4. Releasing with owner token frees the lock
+    await releaseD1Lock(db, tok1);
+    const afterFree = await db.prepare('SELECT value FROM kv_store WHERE key = ?').bind('lock:global').first();
+    assert.strictEqual(afterFree, null);
+  });
+
+  t('UPLOAD_IMAGE rejects images exceeding D1 900KB base64 limit with clear message', async () => {
+    // Valid PNG magic header padded beyond 900KB base64 (~700KB binary)
+    const bigBuf = Buffer.alloc(700 * 1024, 0);
+    bigBuf[0] = 0x89; bigBuf[1] = 0x50; bigBuf[2] = 0x4e; bigBuf[3] = 0x47;
+    bigBuf[4] = 0x0d; bigBuf[5] = 0x0a; bigBuf[6] = 0x1a; bigBuf[7] = 0x0a;
+    const res = await api('UPLOAD_IMAGE', {
+      fileName: 'huge.png',
+      mimeType: 'image/png',
+      base64Data: bigBuf.toString('base64')
+    }, adminToken);
+    assert.strictEqual(res.status, 'error');
+    assert.ok(String(res.message).includes('900KB'), 'unexpected error: ' + res.message);
+  });
+
+  t('sheetsForAction write actions (settings, checkout) work with scoped sheet loading', async () => {
+    const prodRes = await api('GET_TABLE', { tableName: 'Products' }, adminToken);
+    assert.strictEqual(prodRes.status, 'success');
+    const sellable = prodRes.data.find(p => Number(p.Stock) > 0 && !String(p.Category || '').includes('ของแถม'));
+    assert.ok(sellable, 'seeded sellable product exists');
+
+    const saveSet = await api('SAVE_SETTINGS_ITEM', {
+      type: 'bookingsettings',
+      settings: {
+        CampaignName: 'CF Test Campaign',
+        ReserveStart: '2020-01-01T00:00',
+        ReserveEnd: '2030-12-31T23:59'
+      }
+    }, adminToken);
+    assert.strictEqual(saveSet.status, 'success', JSON.stringify(saveSet));
+
+    const co = await api('CHECKOUT', {
+      customerName: 'ลูกค้าทดสอบ',
+      contactPhone: '0812345678',
+      idCard: '1234567890121',
+      resStatus: 'จอง F (สวมสิทธิ์การจอง)',
+      cart: [{ SKU: sellable.SKU, 'Product Name': sellable['Product Name'], qty: 1, Price: Number(sellable.Price), brandGifts: [], channelGifts: [] }],
+      clientRequestId: 'cf-worker-test-1'
+    }, salesToken);
+    assert.strictEqual(co.status, 'success', JSON.stringify(co));
+    assert.ok(co.orderId, 'orderId returned');
+  });
+
+  t('EXPORT_BACKUP + IMPORT_BACKUP round-trip works on Cloudflare D1', async () => {
+    const exp = await api('EXPORT_BACKUP', {}, adminToken);
+    assert.strictEqual(exp.status, 'success');
+    const origInterests = exp.backup.sheets.Interests;
+    const res = await api('IMPORT_BACKUP', {
+      backup: {
+        exportedAt: exp.backup.exportedAt,
+        sheets: { Interests: [['Interest ID', 'Interest Name'], ['INT-99', 'D1 Restored']] }
+      },
+      dryRun: false
+    }, adminToken);
+    assert.strictEqual(res.status, 'success', JSON.stringify(res));
+    assert.strictEqual(res.restored, 1);
+    const tblRes = await api('GET_TABLE', { tableName: 'Interests' }, adminToken);
+    assert.ok(tblRes.data.some(x => x['Interest ID'] === 'INT-99'));
+    // restore original
+    await api('IMPORT_BACKUP', { backup: { sheets: { Interests: origInterests } }, dryRun: false }, adminToken);
+  });
+
+  t('CLEANUP_IMAGES removes old unreferenced D1 images while keeping referenced and recent ones', async () => {
+    const oldMs = Date.now() - 3600 * 1000;
+    const nowMs = Date.now();
+    await db.prepare('INSERT OR REPLACE INTO uploaded_images (id, file_name, mime_type, data_base64, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind('imgused1', 'used.png', 'image/png', 'AAAA', oldMs).run();
+    await db.prepare('INSERT OR REPLACE INTO uploaded_images (id, file_name, mime_type, data_base64, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind('imgold1', 'old.png', 'image/png', 'AAAA', oldMs).run();
+    await db.prepare('INSERT OR REPLACE INTO uploaded_images (id, file_name, mime_type, data_base64, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind('imgnew1', 'new.png', 'image/png', 'AAAA', nowMs).run();
+
+    await api('SAVE_SETTINGS_ITEM', {
+      type: 'bookingsettings',
+      settings: { LogoUrl: 'https://f9-booking.test/api/images/imgused1' }
+    }, adminToken);
+
+    const res = await api('CLEANUP_IMAGES', {}, adminToken);
+    assert.strictEqual(res.status, 'success', JSON.stringify(res));
+    assert.strictEqual(res.deleted, 1);
+    assert.ok(await db.prepare('SELECT mime_type, data_base64 FROM uploaded_images WHERE id = ?').bind('imgused1').first(), 'referenced image kept');
+    assert.ok(await db.prepare('SELECT mime_type, data_base64 FROM uploaded_images WHERE id = ?').bind('imgnew1').first(), 'recent image kept');
+    assert.strictEqual(await db.prepare('SELECT mime_type, data_base64 FROM uploaded_images WHERE id = ?').bind('imgold1').first(), null, 'old orphan deleted');
   });
 
   for (const tc of tests) {

@@ -26,6 +26,7 @@ class Sheet {
   getDataRange() { return new Range(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); }
   appendRow(a) { this.rows.push(a.slice()); }
   deleteRow(i) { this.rows.splice(i - 1, 1); }
+  clearContents() { this.rows = []; }
   deleteColumn(c) { this.rows.forEach(r => r.splice(c - 1, 1)); }
   insertColumnAfter(c) { this.rows.forEach(r => { while (r.length < c) r.push(''); r.splice(c, 0, ''); }); }
   // moveColumns(range, destinationIndex): destinationIndex is in pre-move coordinates (the block lands before the column currently there)

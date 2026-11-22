@@ -1101,5 +1101,32 @@ t('only the allowed functions are callable from the page (every other top-level 
 });
 t('token / secret / dashboard helpers are not reachable under their old public names', () => ['generateToken', 'getSecretKey', 'verifyToken', 'hashPassword', 'getAdvancedDashboard', 'logAudit', 'saveRecord', 'processCheckout', 'healthCheck', 'migrateDeobfuscatePII'].forEach(n => eq(typeof ctx[n], 'undefined', n)));
 
+t('EXPORT_BACKUP + IMPORT_BACKUP: Admin only, dryRun previews without writing, restore round-trips and skips unknown sheets', () => {
+  eq(api('IMPORT_BACKUP', { backup: { sheets: { Channels: [['Channel ID', 'Channel Name']] } } }, sales).status, 'error');
+  const exp = unwrap(api('EXPORT_BACKUP', {}, admin));
+  ok(exp.backup && exp.backup.sheets && Array.isArray(exp.backup.sheets.Channels));
+  const origChannels = exp.backup.sheets.Channels.map(r => r.slice());
+  const modified = { exportedAt: exp.backup.exportedAt, by: 'test', sheets: { Channels: [['Channel ID', 'Channel Name'], ['CH-99', 'Restored Channel']], UnknownSheet: [['x']] } };
+  const dry = unwrap(api('IMPORT_BACKUP', { backup: modified, dryRun: true }, admin));
+  eq(dry.dryRun, true); eq(dry.summary.sheets[0].name, 'Channels'); eq(dry.summary.skipped, ['UnknownSheet']);
+  ok(!tbl('Channels').some(c => c['Channel ID'] === 'CH-99'), 'dryRun must not write');
+  const real = unwrap(api('IMPORT_BACKUP', { backup: modified, dryRun: false }, admin));
+  eq(real.restored, 1); eq(real.skipped, ['UnknownSheet']);
+  ok(tbl('Channels').some(c => c['Channel ID'] === 'CH-99'), 'restored row present');
+  ok(!ss.getSheetByName('UnknownSheet'), 'unknown sheet not created');
+  // restore original Channels
+  unwrap(api('IMPORT_BACKUP', { backup: { sheets: { Channels: origChannels } }, dryRun: false }, admin));
+});
+
+t('Target SAVE_RECORD + DELETE_RECORD: Admin adds/edits/deletes Target, validates goal >= 0, sanitizes Area', () => {
+  eq(api('SAVE_RECORD', { tableName: 'Target', idField: 'Area', data: { Area: '', 'เป้า': 10 } }, admin).status, 'error');
+  eq(api('SAVE_RECORD', { tableName: 'Target', idField: 'Area', data: { Area: 'NORTH', 'เป้า': -5 } }, admin).status, 'error');
+  const ins = unwrap(api('SAVE_RECORD', { tableName: 'Target', idField: 'Area', data: { Area: '=CMD|calc', 'เป้า': 25 } }, admin));
+  const row = tbl('Target').find(r => String(r.Area).includes('CMD|calc'));
+  ok(row && String(row.Area).startsWith("'="), 'formula sanitized on Target.Area');
+  unwrap(api('DELETE_RECORD', { tableName: 'Target', idField: 'Area', idValue: row.Area }, admin));
+  ok(!tbl('Target').some(r => r.Area === row.Area), 'Target row deleted');
+});
+
 console.log('\n==== ' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log('\nFAILURES:'); fails.forEach(f => console.log(' - ' + f)); }

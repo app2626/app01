@@ -1,4 +1,4 @@
-import { D1GasEnv } from './gas-d1.js';
+import { D1GasEnv, acquireD1Lock, releaseD1Lock } from './gas-d1.js';
 import { createGasBackend } from '../dist/backend.js';
 import { INDEX_TEMPLATE } from '../dist/assets.js';
 
@@ -21,6 +21,12 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   'X-Frame-Options': 'SAMEORIGIN'
 };
+
+const READ_ONLY_ACTIONS = new Set([
+  'GET_ADVANCED_DASHBOARD', 'GET_TABLE', 'GET_ALL_DATA', 'GET_SETTINGS_LIST',
+  'NEWS_LIST', 'GET_CUSTOMER_BY_PHONE', 'GET_INVOICES', 'TRACK_ORDER',
+  'PUBLIC_TRACK_ORDER', 'VALIDATE_COUPON', 'EXPORT_BACKUP'
+]);
 
 function sheetsForAction(action, payload) {
   switch (action) {
@@ -48,6 +54,40 @@ function sheetsForAction(action, payload) {
         'Interests', 'GiftMappings', 'AutoPromotions', 'Settings',
         'UI_Banners', 'Coupons', 'News', 'NewsCategories', 'Orders'
       ];
+    case 'CHECKOUT':
+      return [
+        'Members', 'Products', 'Branches', 'Orders', 'InventoryLog',
+        'Promotions', 'AutoPromotions', 'GiftMappings', 'Coupons', 'Settings', 'AuditLog'
+      ];
+    case 'SET_ORDER_STATUS':
+    case 'UPDATE_FULL_ORDER':
+      return ['Members', 'Orders', 'OrderStatusLog', 'Products', 'InventoryLog', 'AuditLog'];
+    case 'UPLOAD_IMAGE':
+      return ['Members', 'Settings', 'AuditLog'];
+    case 'CHANGE_PASSWORD':
+      return ['Members', 'AuditLog'];
+    case 'SEND_WEBHOOK_SUMMARY':
+      return ['Members', 'Settings', 'Orders', 'Products', 'AuditLog'];
+    case 'SAVE_SETTINGS_ITEM':
+    case 'DELETE_SETTINGS_ITEM':
+      return ['Members', 'Settings', 'UI_Banners', 'AuditLog'];
+    case 'NEWS_SAVE':
+    case 'NEWS_DELETE':
+    case 'NEWS_SET_SEQ':
+    case 'NEWS_CAT_SAVE':
+    case 'NEWS_CAT_DELETE':
+      return ['Members', 'News', 'NewsCategories', 'AuditLog'];
+    case 'SAVE_INVOICE':
+    case 'APPROVE_INVOICE':
+    case 'DELETE_INVOICE':
+      return ['Members', 'Invoices', 'AuditLog'];
+    case 'SAVE_PRODUCT_GROUP':
+    case 'UPDATE_PRODUCT_GROUP':
+    case 'BULK_UPDATE_PRODUCTS':
+    case 'IMPORT_PRODUCTS':
+      return ['Members', 'Products', 'InventoryLog', 'AuditLog'];
+    case 'CLEANUP_IMAGES':
+      return ['Members', 'Products', 'UI_Banners', 'News', 'Settings', 'AuditLog'];
     default:
       return null;
   }
@@ -127,25 +167,56 @@ export default {
       }
 
       if (request.method === 'POST' && pathname === '/api/setup') {
-        await gasEnv.load();
-        const backend = createGasBackend(gasEnv.createGasGlobals());
-        const body = await request.json().catch(() => ({}));
-        const res = backend.setupDatabase(body.userToken || null);
-        await gasEnv.flush();
-        return jsonResponse(res);
+        const lockToken = await acquireD1Lock(env.DB);
+        if (!lockToken) {
+          return jsonResponse({ status: 'error', message: 'ระบบกำลังประมวลผลรายการอื่นอยู่ กรุณาลองใหม่อีกครั้ง' }, 503);
+        }
+        try {
+          await gasEnv.load();
+          const backend = createGasBackend(gasEnv.createGasGlobals());
+          const body = await request.json().catch(() => ({}));
+          const res = backend.setupDatabase(body.userToken || null);
+          await gasEnv.flush();
+          return jsonResponse(res);
+        } finally {
+          await releaseD1Lock(env.DB, lockToken);
+        }
       }
 
       if (request.method === 'POST' && pathname === '/api') {
         const body = await request.json().catch(() => ({}));
-        await gasEnv.load(sheetsForAction(body.action, body.payload));
-        const backend = createGasBackend(gasEnv.createGasGlobals());
-        const res = backend.apiHandler(body.action, body.payload || {}, body.userToken || null);
-        if (body.action === 'UPLOAD_IMAGE' && res && res.status === 'success' && typeof res.url === 'string') {
-          const m = res.url.match(/[?&]id=([A-Za-z0-9_-]+)/);
-          if (m) res.url = url.origin + '/api/images/' + m[1];
+        const needsLock = !READ_ONLY_ACTIONS.has(body.action);
+        const lockToken = needsLock ? await acquireD1Lock(env.DB) : null;
+        if (needsLock && !lockToken) {
+          return jsonResponse({ status: 'error', message: 'ระบบกำลังประมวลผลรายการอื่นอยู่ กรุณาลองใหม่อีกครั้ง' }, 503);
         }
-        await gasEnv.flush();
-        return jsonResponse(res);
+        try {
+          await gasEnv.load(sheetsForAction(body.action, body.payload));
+          const backend = createGasBackend(gasEnv.createGasGlobals());
+          const res = backend.apiHandler(body.action, body.payload || {}, body.userToken || null);
+          if (body.action === 'UPLOAD_IMAGE' && res && res.status === 'success' && typeof res.url === 'string') {
+            const m = res.url.match(/[?&]id=([A-Za-z0-9_-]+)/);
+            if (m) res.url = url.origin + '/api/images/' + m[1];
+          }
+          if (body.action === 'CLEANUP_IMAGES' && res && res.status === 'success' && Array.isArray(res.referencedIds)) {
+            const refSet = new Set(res.referencedIds);
+            const cutoff = Date.now() - 600000;
+            const imgRows = await env.DB.prepare('SELECT id, created_at FROM uploaded_images').all();
+            const allRows = (imgRows && imgRows.results) ? imgRows.results : [];
+            const toDelete = allRows.filter(r => !refSet.has(r.id) && Number(r.created_at || 0) < cutoff).map(r => r.id);
+            for (let i = 0; i < toDelete.length; i += 50) {
+              const stmts = toDelete.slice(i, i + 50).map(id => env.DB.prepare('DELETE FROM uploaded_images WHERE id = ?').bind(id));
+              await env.DB.batch(stmts);
+            }
+            res.deleted = toDelete.length;
+            res.kept = allRows.length - toDelete.length;
+            delete res.referencedIds;
+          }
+          await gasEnv.flush();
+          return jsonResponse(res);
+        } finally {
+          if (lockToken) await releaseD1Lock(env.DB, lockToken);
+        }
       }
 
       if (request.method === 'GET') {

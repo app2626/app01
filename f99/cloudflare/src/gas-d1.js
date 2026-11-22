@@ -85,6 +85,10 @@ class Sheet {
     this.rows.splice(i - 1, 1);
     this._markDirty();
   }
+  clearContents() {
+    this.rows = [];
+    this._markDirty();
+  }
   deleteColumn(c) {
     this.rows.forEach(r => r.splice(c - 1, 1));
     this._markDirty();
@@ -127,6 +131,36 @@ function formatInTimezone(date, tz, fmt) {
     .replace('HH', p(shifted.getUTCHours()))
     .replace('mm', p(shifted.getUTCMinutes()))
     .replace('ss', p(shifted.getUTCSeconds()));
+}
+
+const LOCK_KEY = 'lock:global';
+const LOCK_TTL_MS = 30000;
+const LOCK_WAIT_MS = 10000;
+
+export async function acquireD1Lock(db, ttlMs = LOCK_TTL_MS, waitMs = LOCK_WAIT_MS) {
+  const token = crypto.randomUUID();
+  const deadline = Date.now() + waitMs;
+  while (true) {
+    const now = Date.now();
+    const exp = now + ttlMs;
+    const [, selRes] = await db.batch([
+      db.prepare(
+        'INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at WHERE kv_store.expires_at IS NOT NULL AND kv_store.expires_at <= ?'
+      ).bind(LOCK_KEY, token, exp, now),
+      db.prepare('SELECT value FROM kv_store WHERE key = ?').bind(LOCK_KEY)
+    ]);
+    const row = selRes && selRes.results && selRes.results[0];
+    if (row && row.value === token) return token;
+    if (Date.now() >= deadline) return null;
+    await new Promise(r => setTimeout(r, 60 + Math.floor(Math.random() * 60)));
+  }
+}
+
+export async function releaseD1Lock(db, token) {
+  if (!token) return;
+  try {
+    await db.prepare('DELETE FROM kv_store WHERE key = ? AND value = ?').bind(LOCK_KEY, token).run();
+  } catch (e) {}
 }
 
 export class D1GasEnv {
@@ -364,6 +398,9 @@ export class D1GasEnv {
         const id = crypto.randomUUID().replace(/-/g, '');
         const bytes = blob.getBytes();
         const dataBase64 = fromSignedBytes(bytes).toString('base64');
+        if (dataBase64.length > 900 * 1024) {
+          throw new Error('ไฟล์รูปภาพหลังบีบอัดใหญ่เกินขีดจำกัดฐานข้อมูล (เกิน 900KB) กรุณาลดขนาดรูปหรือใช้ไฟล์ JPG/WebP');
+        }
         self.pendingImages.push({
           id,
           fileName: blob.getName(),

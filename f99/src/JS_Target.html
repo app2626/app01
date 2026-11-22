@@ -150,8 +150,18 @@ window.app.target = {
       });
       
       let html = '';
+      const isAdmin = !!(window.app.user && window.app.user.Role === 'Admin');
+      const adminColHead = document.getElementById('targetAdminColHead');
+      if (adminColHead) adminColHead.classList.toggle('hidden', !isAdmin);
+      const colCount = isAdmin ? 6 : 5;
       if(!targets || targets.length === 0) {
-          html = '<tr><td colspan="5" class="text-center py-8 text-slate-500">ไม่มีข้อมูลในชีต Target</td></tr>';
+          html = '<tr><td colspan="' + colCount + '">' + window.app.emptyState({
+            icon: 'fa-crosshairs',
+            title: 'ยังไม่มีข้อมูลเป้าหมาย',
+            subtitle: isAdmin ? 'กด "เพิ่มเป้าหมาย" หรือ "นำเข้า CSV" เพื่อเริ่มต้นตั้งเป้ายอดจอง' : 'ยังไม่มีข้อมูลในชีต Target',
+            actionLabel: isAdmin ? 'เพิ่มเป้าหมาย' : '',
+            onclick: isAdmin ? 'window.app.target.openForm()' : ''
+          }) + '</td></tr>';
       } else {
           let actualKeys = Object.keys(targets[0]).filter(k => k !== '_rowIndex');
           
@@ -210,6 +220,7 @@ window.app.target = {
                  <td class="py-4 px-4 text-center font-bold text-indigo-600">${actualVal.toLocaleString()}</td>
                  <td class="py-4 px-4 text-center"><span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${diffClass}">${diffIcon}${diffVal > 0 ? '+' : ''}${diffVal.toLocaleString()}</span></td>
                  <td class="py-4 px-4 text-center font-bold text-amber-500">${forecastVal.toLocaleString()}</td>
+                 ${isAdmin ? `<td class="py-4 px-4 text-center whitespace-nowrap"><button type="button" class="cms-ico" title="แก้ไข" onclick="window.app.target.openForm(${Number(t._rowIndex || 0)})"><i class="fas fa-pen"></i></button><button type="button" class="cms-ico cms-ico-red ml-1" title="ลบ" onclick="window.app.target.deleteRow('${window.app.escAttrJs(name)}')"><i class="fas fa-trash"></i></button></td>` : ''}
               </tr>
               `;
           });
@@ -224,6 +235,7 @@ window.app.target = {
                  <td class="py-4 px-4 text-center font-black text-indigo-700">${totalActualSum.toLocaleString()}</td>
                  <td class="py-4 px-4 text-center font-black ${tDiffClass}">${tDiffIcon}${tDiff > 0 ? '+' : ''}${tDiff.toLocaleString()}</td>
                  <td class="py-4 px-4 text-center font-black text-amber-600">${totalForecastSum.toLocaleString()}</td>
+                 ${isAdmin ? '<td></td>' : ''}
               </tr>
           `;
       }
@@ -231,6 +243,101 @@ window.app.target = {
       targetBodyEl.innerHTML = html;
       const targetCard = targetBodyEl.closest('.chart-card');
       if (targetCard) window.app.tableExportButtons(targetCard);
+    },
+    keys_: function() {
+      const rows = this.rawTargets || [];
+      if (!rows.length) return { nameKey: 'Area', targetKey: 'เป้า' };
+      const keys = Object.keys(rows[0]).filter(k => k !== '_rowIndex');
+      const nameKey = keys.find(k => k.toLowerCase() === 'area' || k.includes('Area') || k.includes('สาขา') || k.includes('พนักงาน') || k.includes('ชื่อ') || k.includes('รับเป้า')) || keys[0] || 'Area';
+      const targetKey = keys.find(k => k !== nameKey && (k === 'เป้า' || k.includes('เป้า') || k.toLowerCase().includes('target'))) || keys.find(k => k !== nameKey) || 'เป้า';
+      return { nameKey, targetKey };
+    },
+    openForm: async function(rowIndex) {
+      if (!(window.app.user && window.app.user.Role === 'Admin')) return;
+      const { nameKey, targetKey } = this.keys_();
+      const existing = rowIndex ? (this.rawTargets || []).find(r => Number(r._rowIndex) === Number(rowIndex)) : null;
+      const initArea = existing ? String(existing[nameKey] || '').trim() : '';
+      const initGoal = existing ? String(existing[targetKey] || '').replace(/,/g, '').trim() : '';
+      const esc = window.app.esc;
+
+      const suggestions = new Set(['ALL BRANCHES']);
+      (window.app.globalData.branches || []).forEach(b => {
+        const aKey = Object.keys(b).find(k => k.toLowerCase().trim() === 'area') || 'Area';
+        if (b[aKey]) suggestions.add(String(b[aKey]).trim());
+        if (b['Branch Code']) suggestions.add(String(b['Branch Code']).trim());
+      });
+      (window.app.globalData.members || []).forEach(m => {
+        if (m.Username) suggestions.add(String(m.Username).trim());
+      });
+      const datalistHtml = '<datalist id="targetAreaSuggestions">' + [...suggestions].map(s => '<option value="' + esc(s) + '">').join('') + '</datalist>';
+
+      const res = await Swal.fire({
+        title: existing ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมายใหม่',
+        html: datalistHtml +
+          '<div class="text-left space-y-3 mt-2">' +
+            '<div>' +
+              '<label class="block text-xs font-bold text-slate-700 mb-1" for="swalTargetArea">' + esc(nameKey) + ' (Area / รหัสสาขา / ชื่อผู้ใช้ / ALL BRANCHES)</label>' +
+              '<input id="swalTargetArea" list="targetAreaSuggestions" type="text" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" value="' + esc(initArea) + '" placeholder="เช่น BKK-1, B01, ALL BRANCHES">' +
+            '</div>' +
+            '<div>' +
+              '<label class="block text-xs font-bold text-slate-700 mb-1" for="swalTargetGoal">' + esc(targetKey) + ' (จำนวนเครื่อง)</label>' +
+              '<input id="swalTargetGoal" type="number" min="0" step="1" class="w-full px-3 py-2.5 border border-slate-300 rounded-xl text-sm" value="' + esc(initGoal) + '" placeholder="เช่น 50">' +
+            '</div>' +
+          '</div>',
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        focusConfirm: false,
+        preConfirm: () => {
+          const areaVal = (document.getElementById('swalTargetArea').value || '').trim();
+          const goalRaw = (document.getElementById('swalTargetGoal').value || '').trim();
+          const goalNum = Number(goalRaw);
+          if (!areaVal) { Swal.showValidationMessage('กรุณาระบุ ' + nameKey); return false; }
+          if (goalRaw === '' || isNaN(goalNum) || goalNum < 0) { Swal.showValidationMessage(targetKey + ' ต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป'); return false; }
+          return { areaVal, goalNum };
+        }
+      });
+      if (!res.isConfirmed || !res.value) return;
+
+      const dataObj = {};
+      if (existing && existing._rowIndex) dataObj._rowIndex = existing._rowIndex;
+      dataObj[nameKey] = res.value.areaVal;
+      dataObj[targetKey] = res.value.goalNum;
+
+      window.app.showLoading('กำลังบันทึกเป้าหมาย...');
+      try {
+        const apiRes = await window.app.api('SAVE_RECORD', { tableName: 'Target', idField: nameKey, data: dataObj });
+        if (!apiRes || apiRes.status !== 'success') throw new Error(apiRes && apiRes.message ? apiRes.message : 'บันทึกไม่สำเร็จ');
+        window.app.toast(existing ? 'แก้ไขเป้าหมายแล้ว' : 'เพิ่มเป้าหมายแล้ว', 'success');
+        await this.init();
+      } catch (e) {
+        window.app.hideLoading();
+        window.app.alertError('บันทึกเป้าหมายไม่สำเร็จ', e.message || String(e));
+      }
+    },
+    deleteRow: async function(name) {
+      if (!(window.app.user && window.app.user.Role === 'Admin') || !name) return;
+      const { nameKey } = this.keys_();
+      const conf = await Swal.fire({
+        title: 'ยืนยันลบเป้าหมาย?',
+        text: 'ต้องการลบเป้าหมายของ "' + name + '" ใช่หรือไม่',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ลบรายการ',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc2626'
+      });
+      if (!conf.isConfirmed) return;
+      window.app.showLoading('กำลังลบข้อมูล...');
+      try {
+        const res = await window.app.api('DELETE_RECORD', { tableName: 'Target', idField: nameKey, idValue: name });
+        if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'ลบไม่สำเร็จ');
+        window.app.toast('ลบเป้าหมายแล้ว', 'success');
+        await this.init();
+      } catch (e) {
+        window.app.hideLoading();
+        window.app.alertError('ลบเป้าหมายไม่สำเร็จ', e.message || String(e));
+      }
     }
   };
 </script>

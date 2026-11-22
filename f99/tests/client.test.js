@@ -1159,6 +1159,15 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     await P("window.app.globalData.popupBanners=[{url:'https://x.test/1.png'}];sessionStorage.removeItem('tg_popup_shown');window.app.showPopupBanner();true"); await sleep(150);
     m = await st(); ok(m.vis && m.slides === 1 && !m.multi && !m.timer && m.navShown === 'none', 'single popup has no controls/timer: ' + JSON.stringify(m));
     await P("window.app.closePopupBanner();window.app.globalData.popupBanners=window.app.globalData.__popBak;sessionStorage.setItem('tg_popup_shown','true');true");
+
+    // News Popup (openNewsPopup reuses #popupBannerModal for news items)
+    await P("window.app.globalData.__newsBak=window.app.globalData.news;window.app.globalData.news=[{id:'NP1',title:'ข่าวป๊อปอัป 1',category:'โปรโมชั่น',detail:'รายละเอียดข่าว',imageUrl:'https://x.test/n1.png',link:'#pos'},{id:'NP2',title:'ข่าวป๊อปอัป 2',category:'ประกาศ',detail:'ข่าวสอง',link:'javascript:alert(1)'}];window.app.openNewsPopup('NP1');true");
+    await sleep(120);
+    m = await st();
+    ok(m.vis && m.slides === 2 && m.multi && !m.timer, 'news popup opens as multi-slide without auto-advance: ' + JSON.stringify(m));
+    const npCheck = await P("JSON.stringify({cat:document.querySelector('#popupBannerContent .pp-cat').textContent,title:document.querySelector('#popupBannerContent .pp-title').textContent,ctaCount:document.querySelectorAll('#popupBannerContent .pp-cta').length,badLinkCount:document.querySelectorAll('#popupBannerContent a[href^=\"javascript:\"]').length})").then(JSON.parse);
+    eq(npCheck.cat, 'โปรโมชั่น'); eq(npCheck.title, 'ข่าวป๊อปอัป 1'); eq(npCheck.ctaCount, 1); eq(npCheck.badLinkCount, 0);
+    await P("window.app.closePopupBanner();window.app.globalData.news=window.app.globalData.__newsBak;true");
   });
   await T('grid look + bulk delete UI: banner-style page chrome, checkboxes, select-all, count on the red button, delete selected removes only those rows', async () => {
     const A = (a, pl) => P(`window.app.api(${JSON.stringify(a)},${JSON.stringify(pl)})`);
@@ -1443,6 +1452,10 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(/รวมทั้งหมด: 15 3 /.test(both), 'with areas -> ' + both);
     const only = await total([{ Area: 'ALL BRANCHES', 'เป้า': 1000 }]);
     ok(/รวมทั้งหมด: 1,000 3 /.test(only), 'ALL only -> ' + only);
+    const uiCheck = await ev("(()=>{ const addVis=!document.getElementById('targetAdminActions').classList.contains('hidden'); window.app.target.openForm(); const modalOk=Swal.isVisible()&&!!document.getElementById('swalTargetArea')&&!!document.getElementById('swalTargetGoal'); Swal.close(); return JSON.stringify({addVis, modalOk}); })()");
+    const p = JSON.parse(uiCheck);
+    eq(p.addVis, true, 'Admin sees target add/import buttons');
+    eq(p.modalOk, true, 'target.openForm opens add/edit modal');
   });
   await T('dashboard KPIs: tablet orders are counted together with mobile, not dropped', async () => {
     await ev("window.location.hash='#dashboard';true"); await sleep(1500);

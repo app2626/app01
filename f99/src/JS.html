@@ -189,13 +189,39 @@ window.app = {
           else { w = Math.round(w * maxDim / h); h = maxDim; }
         }
         const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
+        const renderAt = function(cw, ch, mime, q) {
+          canvas.width = cw; canvas.height = ch;
+          canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          return canvas.toDataURL(mime, q);
+        };
         const isPng = file.type === 'image/png';
-        const outMime = isPng ? 'image/png' : 'image/jpeg';
-        const dataUrl = canvas.toDataURL(outMime, 0.85);
-        const ext = isPng ? '.png' : '.jpg';
+        let outMime = isPng ? 'image/png' : 'image/jpeg';
+        let dataUrl = renderAt(w, h, outMime, 0.85);
+        // ถ้าไฟล์ใหญ่เกิน ~880KB (base64) ให้ลดขนาด/แปลงเป็น WebP (รองรับพื้นหลังใส) หรือ JPEG เพื่อไม่ให้เกินขีดจำกัด 1MB ของ D1
+        const MAX_DATA_URL_LEN = 880000;
+        if (dataUrl.length > MAX_DATA_URL_LEN) {
+          if (isPng) {
+            const webpUrl = renderAt(w, h, 'image/webp', 0.85);
+            if (webpUrl.indexOf('data:image/webp') === 0 && webpUrl.length < dataUrl.length) {
+              outMime = 'image/webp';
+              dataUrl = webpUrl;
+            }
+          }
+          const tryMime = outMime === 'image/png' ? 'image/jpeg' : outMime;
+          const steps = [
+            [w, h, 0.72],
+            [Math.round(w * 0.75), Math.round(h * 0.75), 0.72],
+            [Math.round(w * 0.55), Math.round(h * 0.55), 0.68]
+          ];
+          for (let i = 0; i < steps.length && dataUrl.length > MAX_DATA_URL_LEN; i++) {
+            const cand = renderAt(steps[i][0], steps[i][1], tryMime, steps[i][2]);
+            if (cand.length < dataUrl.length) {
+              outMime = tryMime;
+              dataUrl = cand;
+            }
+          }
+        }
+        const ext = outMime === 'image/png' ? '.png' : (outMime === 'image/webp' ? '.webp' : '.jpg');
         const baseName = (file.name || 'image').replace(/\.[^.]+$/, '');
         onDone(dataUrl, outMime, baseName + ext);
       };
@@ -1210,57 +1236,101 @@ window.app = {
   statusOn: function(v) { const t = (v === null || v === undefined ? '' : String(v)).trim().toLowerCase(); return t === 'เปิด' || t === 'active'; },
 
   showPopupBanner: function() {
-    if(!this.globalData.popupBanners || this.globalData.popupBanners.length === 0) return;
-    if(sessionStorage.getItem('tg_popup_shown')) return;
-    
+    if (!this.globalData.popupBanners || this.globalData.popupBanners.length === 0) return;
+    if (sessionStorage.getItem('tg_popup_shown')) return;
+    this.openPopupModal(this.globalData.popupBanners, { autoSlide: true, rememberSession: true });
+  },
+
+  // ป๊อปอัปกลาง (POPUP v2): ใช้ได้ทั้งแบนเนอร์ป๊อปอัปและข่าวสาร (items: [{ url, title, details, category, buttonText, link }])
+  openPopupModal: function(items, opts) {
+    if (!Array.isArray(items) || items.length === 0) return;
+    opts = opts || {};
     const modal = document.getElementById('popupBannerModal');
     const content = document.getElementById('popupBannerContent');
-    
-    if(modal && content) {
-        let html = '';
-        this.globalData.popupBanners.forEach(item => {
-            const hasCard = !!(item.title || item.details || item.buttonText);
-            if (!hasCard) {
-                // ไม่มีหัวข้อ/คำอธิบาย/ปุ่ม CTA เลย — พฤติกรรมเดิม 100% (รูปเปล่าคลิกได้) กันแบนเนอร์ที่เคยตั้งค่าไว้ก่อนหน้าเปลี่ยนหน้าตาไปโดยไม่ได้ตั้งใจ
-                let img = this.esc(this.formatImageUrl(item.url));
-                let linkTag = item.link ? `<a href="${this.esc(item.link)}" target="_blank" class="pp-link">` : '';
-                let endLinkTag = item.link ? `</a>` : '';
-                html += `<div class="popup-slide">${linkTag}<img src="${img}" alt="" class="pp-img">${endLinkTag}</div>`;
-                return;
-            }
-            // มีหัวข้อ/คำอธิบาย/ปุ่ม CTA อย่างน้อย 1 อย่าง — แสดงเป็นการ์ด (จอกว้าง: รูปเต็มไม่ครอป ข้อความซ้าย ปุ่มขวา; มือถือ: เรียงลงมา) หน้าตาอยู่ที่บล็อก POPUP v2 ใน CSS.html
-            const img = this.esc(this.formatImageUrl(item.url));
-            const ctaHtml = (item.buttonText && item.link)
-                ? `<a href="${this.esc(item.link)}" target="_blank" class="pp-cta">${this.esc(item.buttonText)}<i class="fas fa-arrow-right"></i></a>`
-                : `<button type="button" onclick="window.app.closePopupBanner()" class="pp-dismiss">ปิดหน้าต่างนี้</button>`;
-            html += `
-              <div class="popup-slide"><div class="pp-card">
-                <img src="${img}" alt="" class="pp-card-img">
-                <div class="pp-body">
-                  <div class="pp-copy"><span class="pp-rule"></span>
-                  ${item.title ? `<h2 class="pp-title">${this.esc(item.title)}</h2>` : ''}
-                  ${item.details ? `<p class="pp-text">${this.esc(item.details)}</p>` : ''}</div>
-                  <div class="pp-actions">${ctaHtml}</div>
-                </div>
-              </div></div>
-            `;
-        });
-        content.innerHTML = html;
-        this.popupInitCarousel_();
-        modal.classList.remove('hidden');
-        this.popupSync_();
-        document.body.style.overflow = 'hidden';
-        sessionStorage.setItem('tg_popup_shown', 'true');
+    if (!modal || !content) return;
+
+    let html = '';
+    items.forEach(item => {
+      if (!item) return;
+      const rawLink = String(item.link || '').trim();
+      const isInternal = /^#[A-Za-z0-9_-]{1,40}$/.test(rawLink);
+      const isExternal = /^https?:\/\/[^\s<>"']+$/i.test(rawLink);
+      const hasSafeLink = isInternal || isExternal;
+      const hasCard = !!(item.title || item.details || item.buttonText || item.category);
+      const img = item.url ? this.esc(this.formatImageUrl(item.url)) : '';
+
+      if (!hasCard && img) {
+        // ไม่มีหัวข้อ/คำอธิบาย/ปุ่ม CTA เลย — พฤติกรรมเดิม 100% (รูปเปล่าคลิกได้)
+        let linkTag = isExternal ? `<a href="${this.esc(rawLink)}" target="_blank" rel="noopener" class="pp-link">` : (isInternal ? `<a href="${this.esc(rawLink)}" onclick="window.app.closePopupBanner()" class="pp-link">` : '');
+        let endLinkTag = linkTag ? `</a>` : '';
+        html += `<div class="popup-slide">${linkTag}<img src="${img}" alt="" class="pp-img">${endLinkTag}</div>`;
+        return;
+      }
+
+      const btnLabel = item.buttonText || (hasSafeLink ? 'ดูเพิ่มเติม' : '');
+      let ctaHtml = `<button type="button" onclick="window.app.closePopupBanner()" class="pp-dismiss">ปิดหน้าต่างนี้</button>`;
+      if (btnLabel && isInternal) {
+        ctaHtml = `<button type="button" class="pp-cta" onclick="window.app.closePopupBanner();window.location.hash='${this.escAttrJs(rawLink)}'">${this.esc(btnLabel)}<i class="fas fa-arrow-right"></i></button>`;
+      } else if (btnLabel && isExternal) {
+        ctaHtml = `<a href="${this.esc(rawLink)}" target="_blank" rel="noopener" class="pp-cta">${this.esc(btnLabel)}<i class="fas fa-arrow-right"></i></a>`;
+      }
+
+      html += `
+        <div class="popup-slide"><div class="pp-card">
+          ${img ? `<img src="${img}" alt="" class="pp-card-img" onerror="this.onerror=null;this.style.display='none';">` : ''}
+          <div class="pp-body">
+            <div class="pp-copy"><span class="pp-rule"></span>
+            ${item.category ? `<div class="pp-cat">${this.esc(item.category)}</div>` : ''}
+            ${item.title ? `<h2 class="pp-title">${this.esc(item.title)}</h2>` : ''}
+            ${item.details ? `<p class="pp-text">${this.esc(item.details)}</p>` : ''}</div>
+            <div class="pp-actions">${ctaHtml}</div>
+          </div>
+        </div></div>
+      `;
+    });
+
+    if (!html) return;
+    content.innerHTML = html;
+    this.popupInitCarousel_(opts.autoSlide === true);
+    const startIdx = typeof opts.startIndex === 'number' && opts.startIndex > 0 ? opts.startIndex : 0;
+    if (startIdx > 0) this.popupGo(startIdx);
+    modal.classList.remove('hidden');
+    this.popupSync_();
+    document.body.style.overflow = 'hidden';
+    if (opts.rememberSession) sessionStorage.setItem('tg_popup_shown', 'true');
+  },
+
+  // เปิดข่าวสารในรูปแบบ Popup v2 (เลื่อนอ่านข่าวถัดไป/ก่อนหน้าได้)
+  openNewsPopup: function(idOrIndex, customList) {
+    const src = Array.isArray(customList) ? customList : ((this.globalData && Array.isArray(this.globalData.news)) ? this.globalData.news : []);
+    const list = src.filter(n => n && n.title);
+    if (!list.length) return;
+    let startIndex = 0;
+    if (typeof idOrIndex === 'number') {
+      startIndex = Math.max(0, Math.min(idOrIndex, list.length - 1));
+    } else if (idOrIndex) {
+      const idx = list.findIndex(n => String(n.id || n.key || '') === String(idOrIndex));
+      if (idx >= 0) startIndex = idx;
     }
+    const slides = list.map(n => ({
+      url: n.imageUrl || '',
+      category: n.category || '',
+      title: n.title || '',
+      details: n.detail || '',
+      buttonText: n.link ? 'ดูเพิ่มเติม' : '',
+      link: n.link || ''
+    }));
+    this.openPopupModal(slides, { startIndex: startIndex, autoSlide: false, rememberSession: false });
   },
 
   // Popup หลายหน้า = สไลด์ไปด้านข้าง (CSS scroll-snap แนวนอน + ลูกศร + จุดบอกตำแหน่ง); มีหน้าเดียวซ่อนตัวควบคุมทั้งหมด
-  popupInitCarousel_: function() {
+  popupInitCarousel_: function(autoSlide) {
     const track = document.getElementById('popupBannerContent');
     const dots = document.getElementById('popupBannerDots');
     if (!track || !dots) return;
     const n = track.children.length;
     this.popupIdx = 0;
+    this._popupAutoEnabled = autoSlide !== false;
     track.style.transform = 'translateX(0)';
     dots.innerHTML = Array.from({length: n}, (_, i) => `<button type="button" class="popup-dot" aria-label="หน้า ${i + 1}" onclick="window.app.popupGo(${i})"></button>`).join('');
     document.getElementById('popupBannerModal').classList.toggle('popup-multi', n > 1);
@@ -1272,13 +1342,14 @@ window.app = {
         if (x0 === null) return;
         const dx = e.changedTouches[0].clientX - x0; x0 = null;
         if (Math.abs(dx) > 40) window.app.popupSlide(dx < 0 ? 1 : -1);
-        window.app.popupAuto_();
+        if (window.app._popupAutoEnabled) window.app.popupAuto_();
       }, {passive: true});
       const car = track.closest('.popup-carousel') || track.parentNode;
       car.addEventListener('mouseenter', () => window.app.popupStop_());
-      car.addEventListener('mouseleave', () => window.app.popupAuto_());
+      car.addEventListener('mouseleave', () => { if (window.app._popupAutoEnabled) window.app.popupAuto_(); });
     }
-    this.popupAuto_();
+    if (this._popupAutoEnabled) this.popupAuto_();
+    else this.popupStop_();
   },
   // .popup-running บน modal = แถบของหน้าปัจจุบันวิ่งเต็มใน 5 วิ (ตรงกับ timer); หยุด timer = แถบเต็มค้างไว้
   popupStop_: function() {

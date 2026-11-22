@@ -240,7 +240,10 @@ window.app.settingsManager = {
               <p class="text-xs text-slate-500 mt-1">ใช้หลังแก้ข้อมูลตรงๆ ใน Google Sheets เพื่อให้หน้าร้านเห็นข้อมูลล่าสุดทันที (ปกติแคชค้างได้ถึง 6 ชั่วโมง) การแก้ผ่านหน้าจอของระบบไม่ต้องล้างแคช</p>
             </div>
             <div class="ss-body p-8 space-y-4">
-              <div><button type="button" onclick="window.app.settingsManager.clearCache()" class="cms-btn cms-btn-line"><i class="fas fa-sync-alt"></i> ล้างแคชตอนนี้</button></div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button type="button" onclick="window.app.settingsManager.clearCache()" class="cms-btn cms-btn-line"><i class="fas fa-sync-alt"></i> ล้างแคชตอนนี้</button>
+                <button type="button" onclick="window.app.settingsManager.cleanupImages(this)" class="cms-btn cms-btn-line"><i class="fas fa-images"></i> ลบรูปภาพค้างในระบบ</button>
+              </div>
             </div>
           </div>
 
@@ -250,7 +253,11 @@ window.app.settingsManager = {
               <p class="text-xs text-slate-500 mt-1">ดาวน์โหลดข้อมูลทุกตารางในระบบ (สินค้า, สาขา, สมาชิก, ใบจอง, เป้าหมาย, ตั้งค่า ฯลฯ) เป็นไฟล์ JSON แนะนำให้สำรองเก็บไว้ก่อนเริ่มแคมเปญใหม่ทุกครั้ง</p>
             </div>
             <div class="ss-body p-8 space-y-4">
-              <div><button type="button" onclick="window.app.settingsManager.downloadBackup(this)" class="cms-btn cms-btn-line"><i class="fas fa-file-export"></i> ดาวน์โหลดไฟล์สำรองข้อมูล (.json)</button></div>
+              <div class="flex flex-wrap gap-3 items-center">
+                <button type="button" onclick="window.app.settingsManager.downloadBackup(this)" class="cms-btn cms-btn-line"><i class="fas fa-file-export"></i> ดาวน์โหลดไฟล์สำรองข้อมูล (.json)</button>
+                <label class="cms-btn cms-btn-line cursor-pointer"><i class="fas fa-file-import"></i> กู้คืนข้อมูลจากไฟล์ (.json)<input type="file" id="restoreBackupFileInput" accept=".json,application/json" class="hidden" onchange="window.app.settingsManager.restoreBackupFile(this)"></label>
+              </div>
+              <p class="text-xs text-slate-400">การกู้คืนจะเขียนทับข้อมูลในตารางที่มีอยู่ในไฟล์สำรอง แนะนำให้ดาวน์โหลดไฟล์สำรองปัจจุบันเก็บไว้ก่อนกู้คืนทุกครั้ง</p>
             </div>
           </div>
 
@@ -500,6 +507,29 @@ window.app.settingsManager = {
         Swal.fire('ระบบขัดข้อง', 'ล้างแคชไม่สำเร็จ กรุณาลองใหม่', 'error');
       }
     },
+    cleanupImages: async function(btn) {
+      const conf = await Swal.fire({
+        title: 'ลบรูปภาพที่ไม่ได้ใช้งาน?',
+        text: 'ระบบจะตรวจสอบรูปอัปโหลดที่ไม่ได้ถูกอ้างอิงในสินค้า แบนเนอร์ ข่าวสาร และการตั้งค่า (ยกเว้นรูปที่เพิ่งอัปโหลดใน 10 นาทีล่าสุด) เพื่อประหยัดพื้นที่ฐานข้อมูล',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'ดำเนินการลบ',
+        cancelButtonText: 'ยกเลิก'
+      });
+      if (!conf.isConfirmed) return;
+      const restoreBtn = window.app.buttonBusy ? (window.app.buttonBusy(btn) || function(){}) : function(){};
+      window.app.showLoading('กำลังตรวจสอบและลบรูปค้าง...');
+      try {
+        const res = await window.app.api('CLEANUP_IMAGES', {});
+        if (!res || res.status !== 'success') throw new Error(res && res.message ? res.message : 'ลบรูปค้างไม่สำเร็จ');
+        window.app.toast('ลบรูปที่ไม่ได้ใช้งานแล้ว ' + (res.deleted || 0) + ' รูป', 'success');
+      } catch (e) {
+        window.app.alertError('ลบรูปค้างไม่สำเร็จ', e.message || String(e));
+      } finally {
+        window.app.hideLoading();
+        restoreBtn();
+      }
+    },
     downloadBackup: async function(btn) {
       const restoreBtn = window.app.buttonBusy ? (window.app.buttonBusy(btn) || function(){}) : function(){};
       window.app.showLoading('กำลังเตรียมไฟล์สำรองข้อมูล...');
@@ -523,6 +553,55 @@ window.app.settingsManager = {
         window.app.hideLoading();
         restoreBtn();
       }
+    },
+    restoreBackupFile: function(inputEl) {
+      const file = inputEl && inputEl.files && inputEl.files[0];
+      if (inputEl) inputEl.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        let parsed;
+        try {
+          parsed = JSON.parse(String(reader.result || ''));
+        } catch (e) {
+          return Swal.fire('ไฟล์ไม่ถูกต้อง', 'ไม่สามารถอ่านไฟล์ JSON ได้ กรุณาเลือกไฟล์สำรองข้อมูลที่ระบบสร้างขึ้น', 'error');
+        }
+        window.app.showLoading('กำลังตรวจสอบไฟล์สำรองข้อมูล...');
+        try {
+          const prev = await window.app.api('IMPORT_BACKUP', { backup: parsed, dryRun: true });
+          window.app.hideLoading();
+          if (!prev || prev.status !== 'success' || !prev.summary) {
+            throw new Error(prev && prev.message ? prev.message : 'ตรวจสอบไฟล์ไม่สำเร็จ');
+          }
+          const esc = window.app.esc;
+          const s = prev.summary;
+          const listHtml = (s.sheets || []).map(x => '<li><b>' + esc(x.name) + '</b>: ' + Number(x.rows || 0).toLocaleString() + ' แถว</li>').join('');
+          const skipHtml = (s.skipped && s.skipped.length) ? '<p class="text-xs text-amber-600 mt-2">ข้ามตารางที่ไม่รองรับ: ' + esc(s.skipped.join(', ')) + '</p>' : '';
+          const metaHtml = s.exportedAt ? '<p class="text-xs text-slate-500 mb-2">สำรองเมื่อ: ' + esc(s.exportedAt) + (s.by ? ' โดย ' + esc(s.by) : '') + '</p>' : '';
+          const conf = await Swal.fire({
+            title: 'ยืนยันการกู้คืนข้อมูล?',
+            icon: 'warning',
+            html: metaHtml + '<p class="text-sm text-slate-700 mb-2">ข้อมูลในตารางต่อไปนี้จะถูกเขียนทับทั้งหมด:</p><ul class="text-left text-xs bg-slate-50 p-3 rounded-xl max-h-48 overflow-y-auto space-y-1 border border-slate-200">' + listHtml + '</ul>' + skipHtml,
+            showCancelButton: true,
+            confirmButtonText: 'ยืนยันกู้คืนข้อมูล',
+            cancelButtonText: 'ยกเลิก',
+            confirmButtonColor: '#dc2626'
+          });
+          if (!conf.isConfirmed) return;
+          window.app.showLoading('กำลังกู้คืนข้อมูล...');
+          const res = await window.app.api('IMPORT_BACKUP', { backup: parsed, dryRun: false });
+          if (!res || res.status !== 'success') {
+            throw new Error(res && res.message ? res.message : 'กู้คืนข้อมูลไม่สำเร็จ');
+          }
+          window.app.toast('กู้คืนข้อมูลสำเร็จ (' + res.restored + ' ตาราง)', 'success');
+          await this.load();
+        } catch (err) {
+          window.app.hideLoading();
+          window.app.alertError('กู้คืนข้อมูลไม่สำเร็จ', err.message || String(err));
+        }
+      };
+      reader.onerror = () => Swal.fire('ผิดพลาด', 'ไม่สามารถอ่านไฟล์ได้', 'error');
+      reader.readAsText(file);
     },
     saveBookingSettings: async function() {
       const start = document.getElementById('reserveStartInput').value;

@@ -494,6 +494,10 @@ function apiHandlerInner_(action, payload, userToken) {
         return clearAllCaches_(secureUser);
       case 'EXPORT_BACKUP':
         return exportBackup_(secureUser, ss);
+      case 'IMPORT_BACKUP':
+        return importBackup_(payload, secureUser, ss);
+      case 'CLEANUP_IMAGES':
+        return cleanupImages_(secureUser, ss);
       case 'SEND_WEBHOOK_SUMMARY':
         return sendWebhookSummary_(payload, secureUser, ss);
       default: throw new Error("Invalid API Action");
@@ -521,6 +525,115 @@ function exportBackup_(secureUser, ss) {
       sheets: sheetsOut
     }
   };
+}
+
+var BACKUP_ALLOWED_SHEETS_ = [
+  'Products', 'Branches', 'Channels', 'Promotions', 'Interests',
+  'GiftMappings', 'AutoPromotions', 'Members', 'Orders', 'OrderStatus',
+  'OrderStatusLog', 'InventoryLog', 'Settings', 'UI_Banners', 'Target',
+  'Coupons', 'Invoices', 'News', 'NewsCategories', 'AuditLog'
+];
+
+function importBackup_(payload, secureUser, ss) {
+  if (!secureUser || secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
+  const backup = payload && payload.backup;
+  if (!backup || typeof backup !== 'object' || !backup.sheets || typeof backup.sheets !== 'object' || Array.isArray(backup.sheets)) {
+    throw new Error("รูปแบบไฟล์สำรองข้อมูลไม่ถูกต้อง (ไม่พบข้อมูล sheets)");
+  }
+  const dryRun = !!(payload && payload.dryRun);
+  const sheetNames = Object.keys(backup.sheets);
+  if (sheetNames.length === 0) throw new Error("ไฟล์สำรองข้อมูลไม่มีตารางใดๆ");
+
+  const validSheets = [];
+  const skipped = [];
+  sheetNames.forEach(name => {
+    if (BACKUP_ALLOWED_SHEETS_.indexOf(name) === -1) {
+      skipped.push(name);
+      return;
+    }
+    const rows = backup.sheets[name];
+    if (!Array.isArray(rows)) throw new Error("ข้อมูลตาราง " + name + " ไม่ถูกต้อง (ต้องเป็น array)");
+    for (let r = 0; r < rows.length; r++) {
+      if (!Array.isArray(rows[r])) throw new Error("ข้อมูลแถวที่ " + (r + 1) + " ในตาราง " + name + " ไม่ถูกต้อง");
+    }
+    validSheets.push({ name: name, rows: rows });
+  });
+
+  if (validSheets.length === 0) throw new Error("ไม่พบตารางที่ระบบรองรับในไฟล์สำรองข้อมูล");
+
+  const summary = {
+    exportedAt: (backup.exportedAt || '').toString().slice(0, 40),
+    by: (backup.by || '').toString().slice(0, 60),
+    sheets: validSheets.map(s => ({ name: s.name, rows: s.rows.length })),
+    skipped: skipped
+  };
+  if (dryRun) return { status: 'success', dryRun: true, summary: summary };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    validSheets.forEach(item => {
+      let sh = ss.getSheetByName(item.name);
+      if (!sh) sh = ss.insertSheet(item.name);
+      if (typeof sh.clearContents === 'function') {
+        sh.clearContents();
+      } else {
+        while (sh.getLastRow() > 0) sh.deleteRow(sh.getLastRow());
+      }
+      if (item.rows.length === 0) return;
+
+      const width = item.rows.reduce((m, r) => Math.max(m, r.length), 0);
+      if (width === 0) return;
+      const normRows = item.rows.map(r => {
+        const out = [];
+        for (let c = 0; c < width; c++) {
+          const v = c < r.length ? r[c] : '';
+          out.push(v === null || v === undefined ? '' : v);
+        }
+        return out;
+      });
+      const header = normRows[0].map(h => String(h || '').trim());
+      const skuCol = header.indexOf('SKU');
+      if (skuCol > -1) {
+        skuAsText_(sh, normRows, 1, skuCol);
+      }
+      sh.getRange(1, 1, normRows.length, width).setValues(normRows);
+    });
+
+    const cache = CacheService.getScriptCache();
+    ['Products', 'Branches', 'Channels', 'Promotions', 'Interests', 'GiftMappings', 'AutoPromotions'].forEach(t => {
+      try { cache.remove('TABLE_' + t); } catch (e) {}
+    });
+    try { cache.remove('POPULAR_MODELS_V1'); } catch (e) {}
+    logAudit_(secureUser.Username, "IMPORT_BACKUP", "Restored " + validSheets.length + " sheets" + (skipped.length ? " (skipped " + skipped.length + ")" : ""));
+  } finally {
+    lock.releaseLock();
+  }
+
+  return { status: 'success', restored: validSheets.length, skipped: skipped, summary: summary };
+}
+
+function cleanupImages_(secureUser, ss) {
+  if (!secureUser || secureUser.Role !== 'Admin') return { status: 'error', message: 'Permission Denied: Admin only' };
+  const refSet = {};
+  const re = /\/api\/images\/([A-Za-z0-9_-]+)/g;
+  ['Products', 'UI_Banners', 'News', 'Settings'].forEach(name => {
+    const sh = ss.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 1 || sh.getLastColumn() < 1) return;
+    const vals = sh.getDataRange().getDisplayValues();
+    for (let r = 0; r < vals.length; r++) {
+      for (let c = 0; c < vals[r].length; c++) {
+        const s = String(vals[r][c] || '');
+        if (s.indexOf('/api/images/') === -1) continue;
+        let m;
+        re.lastIndex = 0;
+        while ((m = re.exec(s)) !== null) refSet[m[1]] = true;
+      }
+    }
+  });
+  const referencedIds = Object.keys(refSet);
+  logAudit_(secureUser.Username, "CLEANUP_IMAGES", "Scanned image references (" + referencedIds.length + " in use)");
+  return { status: 'success', referencedIds: referencedIds, deleted: 0 };
 }
 
 function doLogin_(username, password, ss) {
@@ -2698,6 +2811,10 @@ function saveRecord_(tableName, dataObj, idField, secureUser, ss) {
     if (tableName === 'Products') ensureProductSpecColumns_(ss);
     if (tableName === 'Coupons') ensureCouponsSheet_(ss);
     if (tableName === 'GiftMappings') ensureGiftSetColumns_(ss);
+    if (tableName === 'Target' && !ss.getSheetByName('Target')) {
+      const tSh = ss.insertSheet('Target');
+      tSh.getRange(1, 1, 1, 2).setValues([['Area', 'เป้า']]);
+    }
     const sheet = ss.getSheetByName(tableName); const data = sheet.getDataRange().getDisplayValues(); const headers = data[0].map(h => h.toString().trim()); let idIndex = headers.indexOf(idField); let rowIndex = -1;
     // แก้ไข: ใช้ _rowIndex ที่ client ส่งมา (มาจากแถวจริงที่โหลดไว้ตอนเปิดฟอร์มแก้ไข) เป็นตัวชี้แถวหลัก แม่นยำกว่าไล่เทียบค่า ID เฉยๆ
     // สร้างใหม่ (ไม่มี _rowIndex ส่งมา): ถ้า ID ที่พิมพ์ตรงกับแถวที่มีอยู่แล้ว ต้อง "บล็อก" ไม่ใช่อัปเดตทับเงียบๆ — เดิมมีแค่เช็คฝั่ง client (saveForm, JS.html) ซึ่งข้ามได้ผ่านการยิง API ตรงๆ
@@ -2783,8 +2900,17 @@ function saveRecord_(tableName, dataObj, idField, secureUser, ss) {
       "GiftMappings": ["Target Mobile (SKU or Group)", "Brand Gifts", "Channel Gifts", "Channel Gifts 2", "Channel Gifts 3"],
       "AutoPromotions": ["Message Suggest", "Message Apply"],
       "Coupons": ["Code", "Description"],
-      "Members": ["Name"]
+      "Members": ["Name"],
+      "Target": ["Area"]
     };
+    if (tableName === 'Target') {
+      const targetKey = headers.find(k => k !== idField && (k === 'เป้า' || k.indexOf('เป้า') > -1 || k.toLowerCase().indexOf('target') > -1)) || headers[1] || 'เป้า';
+      const areaVal = (dataObj[idField] || '').toString().trim();
+      if (!areaVal) throw new Error("กรุณาระบุ Area / สาขา / พนักงาน");
+      const rawGoal = (dataObj[targetKey] === undefined || dataObj[targetKey] === null ? '' : String(dataObj[targetKey])).replace(/,/g, '').trim();
+      const numGoal = Number(rawGoal);
+      if (rawGoal === '' || isNaN(numGoal) || numGoal < 0) throw new Error("เป้าต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป");
+    }
     const freeTextCols = SAVE_RECORD_FREE_TEXT_COLS_[tableName] || [];
     let rowData = headers.map(h => dataObj[h] !== undefined ? (freeTextCols.includes(h) ? sanitizeSheetText_(dataObj[h]) : dataObj[h]) : "");
     const skuCi = headers.indexOf('SKU');
