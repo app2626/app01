@@ -1167,6 +1167,10 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(m.vis && m.slides === 2 && m.multi && !m.timer, 'news popup opens as multi-slide without auto-advance: ' + JSON.stringify(m));
     const npCheck = await P("JSON.stringify({cat:document.querySelector('#popupBannerContent .pp-cat').textContent,title:document.querySelector('#popupBannerContent .pp-title').textContent,ctaCount:document.querySelectorAll('#popupBannerContent .pp-cta').length,badLinkCount:document.querySelectorAll('#popupBannerContent a[href^=\"javascript:\"]').length})").then(JSON.parse);
     eq(npCheck.cat, 'โปรโมชั่น'); eq(npCheck.title, 'ข่าวป๊อปอัป 1'); eq(npCheck.ctaCount, 1); eq(npCheck.badLinkCount, 0);
+    await P("window.app.closePopupBanner();window.app.pos.openPromoHub();true");
+    await sleep(100);
+    const hubNewsOk = await P("(()=>{ const c=document.querySelector('#promoHubNews .sf-news-card[data-news-id=\"NP2\"]'); if(!c) return false; c.click(); const titles=[...document.querySelectorAll('#popupBannerContent .pp-title')].map(e=>e.textContent); return !document.getElementById('popupBannerModal').classList.contains('hidden') && window.app.popupIdx===1 && titles[1]==='ข่าวป๊อปอัป 2'; })()");
+    ok(hubNewsOk, 'promoHub shows news section and clicking a news card opens news popup');
     await P("window.app.closePopupBanner();window.app.globalData.news=window.app.globalData.__newsBak;true");
   });
   await T('grid look + bulk delete UI: banner-style page chrome, checkboxes, select-all, count on the red button, delete selected removes only those rows', async () => {

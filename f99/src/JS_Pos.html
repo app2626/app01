@@ -1786,6 +1786,19 @@ window.app.pos = {
           + '<span class="pm-v-btn shrink-0">ดูสินค้า</span></div>';
       });
       html += '</div></section>';
+      // 4) ข่าวสารโปรโมชั่น (globalData.news) — กดเพื่อเปิดอ่านในรูปแบบ Popup (openNewsPopup)
+      const newsList = (g.news || []).filter(n => n && n.id && n.title).slice(0, 12);
+      if (newsList.length) {
+        html += '<section id="promoHubNews"><div class="pm-sec-head"><h3 class="pm-sec-title">ข่าวสารโปรโมชั่น</h3><span class="pm-sec-sub">' + newsList.length + ' รายการ</span><button type="button" class="sf-btn-2 ml-auto text-xs" onclick="window.app.hideModal(\'promoHubModal\');window.app.openNewsPopup(0)"><i class="fas fa-window-restore"></i> เปิดดูแบบป๊อปอัป</button></div><div class="sf-news-row custom-scrollbar">';
+        newsList.forEach(n => {
+          const img = n.imageUrl ? '<img src="' + esc(window.app.formatImageUrl(n.imageUrl)) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.display=\'none\';">' : '<span class="sf-news-noimg"><i class="fas fa-newspaper"></i></span>';
+          html += '<button type="button" class="sf-news-card" data-news-id="' + esc(n.id) + '" onclick="window.app.hideModal(\'promoHubModal\');window.app.openNewsPopup(this.getAttribute(\'data-news-id\'))">'
+            + '<span class="sf-news-img">' + img + '</span>'
+            + (n.category ? '<span class="sf-news-cat">' + esc(n.category) + '</span>' : '')
+            + '<span class="sf-news-title">' + esc(n.title) + '</span></button>';
+        });
+        html += '</div></section>';
+      }
       body.innerHTML = html;
       window.app.showModal('promoHubModal');
     },
