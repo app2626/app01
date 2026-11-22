@@ -3292,6 +3292,12 @@ window.app.pos = {
       }
       const sum = document.getElementById('doneSummary'); if (sum) sum.innerHTML = summaryHtml || '';
       window.app.showModal('orderDoneModal');
+      Swal.fire({
+        icon: 'success',
+        title: 'จองสินค้าสำเร็จ',
+        text: orderId ? ('เลขที่ใบจอง: ' + orderId) : 'บันทึกข้อมูลการจองเรียบร้อยแล้ว',
+        confirmButtonText: 'ตกลง'
+      });
     },
     printLastOrder: function() { if (this.lastOrder) window.app.printReceipt(this.lastOrder.orderId, this.lastOrder.pay); },
     copyLastOrderLink: function() { if (this.lastOrder) window.app.copyPublicTrackLink(this.lastOrder.orderId); },
