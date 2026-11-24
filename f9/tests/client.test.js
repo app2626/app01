@@ -372,10 +372,12 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     ok(/Auto Bundle/.test(disc[nameI]), disc[nameI]); ok(Math.abs(Number(disc[upI]) + 9999.9) < 0.02, 'discount value=' + disc[upI]);
     eq(stock('T3-0'), s1 - 1, 'main stock'); eq(stock('CASE-T3'), s2 - 1, 'companion stock');
     await sleep(600);
-    // success = confirmation PAGE with the order number + summary (no success popup); checkout page closed, form cleared
-    const done = JSON.parse(await P("(()=>{const d=document.getElementById('orderDoneModal');return JSON.stringify({open:!d.classList.contains('hidden'),id:document.getElementById('doneOrderId').textContent,items:d.querySelectorAll('#doneSummary .co-items li').length,meta:document.getElementById('doneMeta').textContent,co:document.getElementById('checkoutModal').classList.contains('hidden'),swal:Swal.isVisible()&&!!Swal.getConfirmButton()&&Swal.getConfirmButton().offsetParent!==null,name:document.getElementById('coCustomer').value,link:!!window.app.pos.lastOrder})})()"));
+    // success = confirmation PAGE with the order number + summary, plus a "บันทึกการจองสำเร็จ" popup on top; checkout page closed, form cleared
+    const done = JSON.parse(await P("(()=>{const d=document.getElementById('orderDoneModal');return JSON.stringify({open:!d.classList.contains('hidden'),id:document.getElementById('doneOrderId').textContent,items:d.querySelectorAll('#doneSummary .co-items li').length,meta:document.getElementById('doneMeta').textContent,co:document.getElementById('checkoutModal').classList.contains('hidden'),swal:Swal.isVisible()?((Swal.getTitle()||{}).textContent+'|'+(Swal.getHtmlContainer()||{}).textContent):'',name:document.getElementById('coCustomer').value,link:!!window.app.pos.lastOrder})})()"));
     const oidI = sheets.Orders.rows[0].indexOf('OrderID');
-    ok(done.open && done.co, 'confirmation page not shown / checkout still open ' + JSON.stringify(done)); eq(done.id, String(rows[0][oidI]), 'order number on the confirmation page'); eq(done.items, 2); ok(/ลูกค้า ซื้อคู่/.test(done.meta), done.meta); ok(!done.swal, 'old success popup still shown'); eq(done.name, '', 'form not cleared');
+    ok(done.open && done.co, 'confirmation page not shown / checkout still open ' + JSON.stringify(done)); eq(done.id, String(rows[0][oidI]), 'order number on the confirmation page'); eq(done.items, 2); ok(/ลูกค้า ซื้อคู่/.test(done.meta), done.meta); eq(done.name, '', 'form not cleared');
+    ok(/^บันทึกการจองสำเร็จ\|/.test(done.swal) && done.swal.indexOf(String(rows[0][oidI])) > 0, 'success popup missing / no order number: ' + done.swal);
+    await P("Swal.close();true"); // ปิด popup ก่อนทดสอบต่อ (ไม่งั้น Escape ของ promo hub ไปปิด Swal แทน)
     await shot('pos-order-done');
     await P("window.app.hideModal('orderDoneModal');window.Swal&&Swal.close();true"); await sleep(200);
     eq(await P("window.app.pos.cartData.length"), 0, 'cart not cleared'); ok(await P("document.getElementById('cartCompanions').classList.contains('hidden')"), 'panel stale after checkout');

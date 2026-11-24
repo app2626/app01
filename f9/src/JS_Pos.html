@@ -3279,6 +3279,12 @@ window.app.pos = {
       }
       const sum = document.getElementById('doneSummary'); if (sum) sum.innerHTML = summaryHtml || '';
       window.app.showModal('orderDoneModal');
+      // popup แจ้งผลชัดๆ ทับหน้ายืนยัน — ข้อความ/เลขที่ส่งเป็น text (ไม่ใช่ HTML) ปิดเองใน 2.5 วิ หรือกดตกลง
+      Swal.fire({
+        icon: 'success', title: 'บันทึกการจองสำเร็จ',
+        text: orderId ? ('เลขที่ใบจอง ' + orderId) : '',
+        confirmButtonText: 'ตกลง', timer: 2500, timerProgressBar: true
+      });
     },
     printLastOrder: function() { if (this.lastOrder) window.app.printReceipt(this.lastOrder.orderId, this.lastOrder.pay); },
     copyLastOrderLink: function() { if (this.lastOrder) window.app.copyPublicTrackLink(this.lastOrder.orderId); },
