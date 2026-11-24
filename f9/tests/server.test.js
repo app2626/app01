@@ -1088,3 +1088,5 @@ t('token / secret / dashboard helpers are not reachable under their old public n
 
 console.log('\n==== ' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log('\nFAILURES:'); fails.forEach(f => console.log(' - ' + f)); }
+if (fail && process.env.CI) fails.slice(0, 10).forEach(f => console.log('::error::server test: ' + String(f).replace(/\n/g, ' ').slice(0, 500)));
+process.exitCode = fail ? 1 : 0; // npm test / CI must stop on a failed check

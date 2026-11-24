@@ -70,9 +70,11 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
 (async () => {
   await new Promise(r => server.listen(8765, r));
   const udd = fs.mkdtempSync(path.join(os.tmpdir(), 'chr-'));
-  const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9333', '--user-data-dir=' + udd, '--window-size=1366,900', '--no-first-run', '--disable-gpu', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' }); // GitHub's Ubuntu 24.04 runners block Chrome's sandbox
-  let targets; for (let i = 0; i < 50; i++) { try { targets = await (await fetch('http://127.0.0.1:9333/json')).json(); if (targets.length) break; } catch (e) {} await sleep(200); }
-  const tgt = targets.find(x => x.type === 'page');
+  const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9333', '--user-data-dir=' + udd, '--window-size=1366,900', '--no-first-run', '--disable-gpu', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'], { stdio: ['ignore', 'ignore', process.env.CI ? 'inherit' : 'ignore'] }); // GitHub's Ubuntu 24.04 runners block Chrome's sandbox; on CI show Chrome's own errors
+  let chromeExit = null; chrome.on('exit', (c, s) => { chromeExit = 'code ' + c + (s ? ' signal ' + s : ''); });
+  let targets; for (let i = 0; i < 150 && chromeExit === null; i++) { try { targets = await (await fetch('http://127.0.0.1:9333/json')).json(); if (targets.length) break; } catch (e) {} await sleep(200); }
+  const tgt = (targets || []).find(x => x.type === 'page');
+  if (!tgt) throw new Error('Chrome did not open a debuggable page (' + CHROME + (chromeExit ? ', exited with ' + chromeExit : ', no answer on port 9333 in 30s') + ')');
   ws = new WebSocket(tgt.webSocketDebuggerUrl);
   await new Promise(r => (ws.onopen = r));
   ws.onmessage = m => {
@@ -1529,5 +1531,6 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
   const real = pageErrors.filter(e => !/favicon|ERR_|Failed to load resource|tailwind|manifest/i.test(e.text));
   console.log('uncaught page errors: ' + real.length); real.slice(0, 15).forEach(e => console.log('  [' + e.phase + '] ' + e.text.slice(0, 300)));
   if (fail) { console.log('\nFAILURES:'); fails.forEach(f => console.log(' - ' + f)); }
-  try { ws.close(); } catch (e) {} chrome.kill(); server.close(); setTimeout(() => process.exit(0), 300);
-})().catch(e => { console.error('HARNESS ERROR', e); process.exit(2); });
+  if (fail && process.env.CI) fails.slice(0, 10).forEach(f => console.log('::error::client test: ' + String(f).replace(/\n/g, ' ').slice(0, 500)));
+  try { ws.close(); } catch (e) {} chrome.kill(); server.close(); setTimeout(() => process.exit(fail ? 1 : 0), 300); // npm test / CI must stop on a failed check
+})().catch(e => { console.error('HARNESS ERROR', e); if (process.env.CI) console.log('::error::client harness: ' + String(e && e.message || e).replace(/\n/g, ' ')); process.exit(2); });
