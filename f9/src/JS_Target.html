@@ -1,11 +1,19 @@
 <script>
 // Split out of JS.html (core). Attaches to window.app; included by Index.html after JS and before JS_Boot.
 window.app.target = {
+    rows: [],       // [{name, target}] ตามลำดับในชีต — ปุ่มแก้ไข/ลบส่ง index เข้ามา (ไม่ฝังข้อความจากชีตใน onclick)
+    MAX_ROWS: 500,  // = TARGET_MAX_IMPORT_ ใน Code.js
+    isAdmin: function() { return !!(window.app.user && window.app.user.Role === 'Admin'); },
+    cols: function() { return this.isAdmin() ? 6 : 5; },
+
     init: async function() {
       const content = document.getElementById('page-content');
       const tmpl = document.getElementById('tmpl-target');
       if(content && tmpl) content.innerHTML = tmpl.innerHTML;
-      
+      const admin = this.isAdmin();
+      ['targetAdminBar', 'targetActTh'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle('hidden', !admin); });
+      this.rows = [];
+
       window.app.showLoading('กำลังโหลดข้อมูลเป้าหมาย...');
       try {
         const resOrders = await window.app.api('GET_TABLE', { tableName: 'Orders' });
@@ -23,7 +31,7 @@ window.app.target = {
     renderLoadError: function(msg) {
       const tbody = document.getElementById('targetTableBody');
       if (!tbody) { window.app.alertError('Error', msg); return; }
-      tbody.innerHTML = '<tr><td colspan="5">' + window.app.emptyState({
+      tbody.innerHTML = '<tr><td colspan="' + this.cols() + '">' + window.app.emptyState({
         icon: 'fa-exclamation-triangle',
         title: 'โหลดข้อมูลไม่สำเร็จ',
         subtitle: msg,
@@ -40,7 +48,7 @@ window.app.target = {
       const endStr = settings.ReserveEnd;
       if(!startStr || !endStr) {
          const canSetup = window.app.user && window.app.user.Role === 'Admin';
-         targetBodyEl.innerHTML = '<tr><td colspan="5">' + window.app.emptyState({
+         targetBodyEl.innerHTML = '<tr><td colspan="' + this.cols() + '">' + window.app.emptyState({
            icon: 'fa-clock',
            title: 'ยังไม่ได้ตั้งค่าช่วงเวลาการจอง',
            subtitle: 'กรุณาตั้งค่า วันเริ่ม-วันสิ้นสุดการจอง ในเมนู "ตั้งเวลารับจองสินค้า" ก่อนใช้งานหน้านี้',
@@ -128,8 +136,16 @@ window.app.target = {
       });
       
       let html = '';
-      if(!targets || targets.length === 0) {
-          html = '<tr><td colspan="5" class="text-center py-8 text-slate-500">ไม่มีข้อมูลในชีต Target</td></tr>';
+      const admin = this.isAdmin();
+      const hasNamed = (targets || []).some(t => Object.keys(t).some(k => k !== '_rowIndex' && String(t[k] || '').trim()));
+      if(!targets || targets.length === 0 || !hasNamed) {
+          html = '<tr><td colspan="' + this.cols() + '">' + window.app.emptyState({
+            icon: 'fa-crosshairs',
+            title: 'ยังไม่มีเป้าหมาย',
+            subtitle: admin ? 'เพิ่มเป้าหมายทีละรายการ หรือนำเข้าจากไฟล์ CSV' : 'ให้ผู้ดูแลระบบเพิ่มเป้าหมายก่อน',
+            actionLabel: admin ? 'เพิ่มเป้าหมาย' : '',
+            onclick: admin ? 'window.app.target.openForm(-1)' : ''
+          }) + '</td></tr>';
       } else {
           let actualKeys = Object.keys(targets[0]).filter(k => k !== '_rowIndex');
           
@@ -180,7 +196,9 @@ window.app.target = {
               
               let diffClass = diffVal >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50';
               let diffIcon = diffVal >= 0 ? '<i class="fas fa-arrow-up mr-1"></i>' : '<i class="fas fa-arrow-down mr-1"></i>';
-              
+              const idx = this.rows.push({ name: name, target: targetVal }) - 1;
+              const actHtml = admin ? `<td class="py-4 px-4 text-center whitespace-nowrap"><button type="button" class="cms-ico" onclick="window.app.target.openForm(${idx})" title="แก้ไข" aria-label="แก้ไขเป้าหมาย"><i class="fas fa-pen"></i></button><button type="button" class="cms-ico cms-ico-red" onclick="window.app.target.remove(${idx})" title="ลบ" aria-label="ลบเป้าหมาย"><i class="fas fa-trash"></i></button></td>` : '';
+
               html += `
               <tr class="hover:bg-slate-50 border-b border-slate-100 transition-colors">
                  <td class="py-4 px-4 font-bold text-slate-800">${nameHtml}</td>
@@ -188,6 +206,7 @@ window.app.target = {
                  <td class="py-4 px-4 text-center font-bold text-indigo-600">${actualVal.toLocaleString()}</td>
                  <td class="py-4 px-4 text-center"><span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${diffClass}">${diffIcon}${diffVal > 0 ? '+' : ''}${diffVal.toLocaleString()}</span></td>
                  <td class="py-4 px-4 text-center font-bold text-amber-500">${forecastVal.toLocaleString()}</td>
+                 ${actHtml}
               </tr>
               `;
           });
@@ -202,13 +221,163 @@ window.app.target = {
                  <td class="py-4 px-4 text-center font-black text-indigo-700">${totalActualSum.toLocaleString()}</td>
                  <td class="py-4 px-4 text-center font-black ${tDiffClass}">${tDiffIcon}${tDiff > 0 ? '+' : ''}${tDiff.toLocaleString()}</td>
                  <td class="py-4 px-4 text-center font-black text-amber-600">${totalForecastSum.toLocaleString()}</td>
+                 ${admin ? '<td></td>' : ''}
               </tr>
           `;
       }
-      
+
       targetBodyEl.innerHTML = html;
       const targetCard = targetBodyEl.closest('.chart-card');
       if (targetCard) window.app.tableExportButtons(targetCard);
+    },
+
+    // ชื่อที่หน้านี้นับยอดให้ได้: ALL BRANCHES / Area / รหัสสาขา / ชื่อสาขา / Username — ใช้เป็นตัวเลือกในช่องชื่อ
+    nameOptions: function() {
+      const g = window.app.globalData || {}, out = [], seen = {};
+      const add = (v, note) => { v = (v || '').toString().trim(); if (!v || seen[v.toUpperCase()]) return; seen[v.toUpperCase()] = 1; out.push({ v: v, note: note }); };
+      add('ALL BRANCHES', 'ยอดรวมทุกสาขา');
+      const br = g.branches || [];
+      const areaKey = br.length ? (Object.keys(br[0]).find(k => k.toLowerCase().trim() === 'area') || 'Area') : 'Area';
+      br.forEach(b => add(b[areaKey], 'Area'));
+      br.forEach(b => add(b['Branch Code'], 'รหัสสาขา ' + (b['Branch Name'] || '')));
+      br.forEach(b => add(b['Branch Name'], 'ชื่อสาขา'));
+      (g.members || []).forEach(m => add(m.Username, 'พนักงาน ' + (m.Name || '')));
+      return out;
+    },
+
+    // เพิ่ม (idx = -1) / แก้ไข (idx = แถวใน this.rows) — ตรวจจริงที่ server (TARGET_SAVE); บันทึกแล้วโหลดหน้าใหม่ก่อนค่อยแจ้งผล (showLoading ของ init ปิด Swal ที่ขึ้นก่อน)
+    openForm: async function(idx) {
+      if (!this.isAdmin()) return;
+      const esc = window.app.esc;
+      const cur = idx > -1 ? this.rows[idx] : null;
+      if (idx > -1 && !cur) return;
+      const opts = this.nameOptions().map(o => '<option value="' + esc(o.v) + '">' + esc(o.note) + '</option>').join('');
+      const r = await Swal.fire({
+        title: cur ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมาย',
+        html: '<div class="text-left space-y-3">'
+          + '<div><label for="tgName" class="block text-sm font-semibold mb-1">ชื่อ (Area / สาขา / พนักงาน)</label>'
+          + '<input id="tgName" class="swal2-input" style="margin:0;width:100%" list="tgNameList" maxlength="100" autocomplete="off" placeholder="เช่น ALL BRANCHES หรือชื่อ Area" value="' + (cur ? esc(cur.name) : '') + '">'
+          + '<datalist id="tgNameList">' + opts + '</datalist>'
+          + '<p class="text-xs text-slate-500 mt-1">ต้องตรงกับ Area, รหัสสาขา, ชื่อสาขา หรือ Username ถึงจะนับยอดจองได้ — ALL BRANCHES = ยอดรวมทุกสาขา</p></div>'
+          + '<div><label for="tgTarget" class="block text-sm font-semibold mb-1">เป้า (เครื่อง)</label>'
+          + '<input id="tgTarget" class="swal2-input" style="margin:0;width:100%" type="number" min="0" step="1" inputmode="numeric" value="' + (cur ? esc(cur.target) : '') + '"></div>'
+          + '</div>',
+        showCancelButton: true, confirmButtonText: 'บันทึก', cancelButtonText: 'ยกเลิก', focusConfirm: false,
+        didOpen: () => { const el = document.getElementById(cur ? 'tgTarget' : 'tgName'); if (el) el.focus(); },
+        preConfirm: async () => {
+          const name = document.getElementById('tgName').value.trim();
+          const target = document.getElementById('tgTarget').value.trim();
+          if (!name) { Swal.showValidationMessage('กรุณาระบุชื่อ'); return false; }
+          if (!/^\d+$/.test(target)) { Swal.showValidationMessage('เป้าต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป'); return false; }
+          try {
+            const res = await window.app.api('TARGET_SAVE', { name: name, target: target, originalName: cur ? cur.name : '' });
+            if (!res || res.status !== 'success') { Swal.showValidationMessage(esc(String((res && res.message) || 'บันทึกไม่สำเร็จ').replace(/^Error:\s*/, ''))); return false; }
+            return res;
+          } catch (e) { Swal.showValidationMessage(esc(e.message || String(e))); return false; }
+        }
+      });
+      if (!r.isConfirmed) return;
+      await this.init();
+      window.app.toast((cur ? 'บันทึกการแก้ไขเป้าหมายแล้ว: ' : 'เพิ่มเป้าหมายแล้ว: ') + r.value.name);
+    },
+
+    remove: async function(idx) {
+      if (!this.isAdmin()) return;
+      const cur = this.rows[idx];
+      if (!cur) return;
+      const c = await Swal.fire({ icon: 'warning', title: 'ลบเป้าหมายนี้?', text: cur.name + ' (เป้า ' + cur.target.toLocaleString() + ')', showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#e11d48' });
+      if (!c.isConfirmed) return;
+      window.app.showLoading('กำลังลบ...');
+      let res;
+      try { res = await window.app.api('TARGET_DELETE', { name: cur.name }); } catch (e) { res = { status: 'error', message: e.message }; }
+      if (!res || res.status !== 'success') { window.app.hideLoading(); window.app.alertError('ลบไม่สำเร็จ', String((res && res.message) || 'Error').replace(/^Error:\s*/, '')); return; }
+      await this.init();
+      window.app.toast('ลบเป้าหมายแล้ว: ' + cur.name);
+    },
+
+    // ----- นำเข้า CSV: คอลัมน์ชื่อ + เป้า, ชื่อใหม่ = เพิ่ม, ชื่อที่มีแล้ว = อัปเดตเป้า; ตรวจก่อน (dryRun) แล้วค่อยบันทึก -----
+    downloadTemplate: function() {
+      const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+      const rows = [['Area', 'เป้า'], ['ALL BRANCHES', '1000']];
+      const firstArea = this.nameOptions().find(o => o.note === 'Area');
+      if (firstArea) rows.push([firstArea.v, '200']);
+      const csv = '﻿' + rows.map(r => r.map(q).join(',')).join('\r\n') + '\r\n';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      a.download = 'target_import_template.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    },
+
+    openImport: async function() {
+      if (!this.isAdmin()) return;
+      const r = await Swal.fire({
+        title: 'นำเข้าเป้าหมายจากไฟล์ CSV',
+        icon: 'info',
+        html: '<div class="text-left text-sm leading-relaxed"><ul class="list-disc pl-5 space-y-1">'
+          + '<li>ไฟล์ CSV (UTF-8) 2 คอลัมน์: <b>Area</b> (ชื่อ Area / รหัสสาขา / ชื่อสาขา / Username / ALL BRANCHES) และ <b>เป้า</b> (ตัวเลข)</li>'
+          + '<li>ชื่อที่ยังไม่มี = <b>เพิ่มใหม่</b> · ชื่อที่มีอยู่แล้ว = <b>อัปเดตเป้า</b> (ไม่สนตัวพิมพ์เล็ก/ใหญ่) · ไม่ลบรายการที่ไม่อยู่ในไฟล์</li>'
+          + '<li>ครั้งละไม่เกิน ' + this.MAX_ROWS + ' แถว และจะแสดงผลให้ตรวจก่อนบันทึกจริง</li>'
+          + '</ul></div>',
+        showCancelButton: true, showDenyButton: true,
+        confirmButtonText: 'เลือกไฟล์ CSV', denyButtonText: 'ดาวน์โหลดไฟล์ตัวอย่าง', cancelButtonText: 'ยกเลิก'
+      });
+      if (r.isDenied) return this.downloadTemplate();
+      if (!r.isConfirmed) return;
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.csv,text/csv';
+      input.onchange = () => { if (input.files && input.files[0]) this.handleFile(input.files[0]); };
+      input.click();
+    },
+
+    // ไฟล์ → [{name, target}] — หัวคอลัมน์ชื่อ/เป้าหาแบบเดียวกับ server (targetSheet_); ข้ามแถวว่างและแถว "รวมทั้งหมด"
+    parseFile: function(text) {
+      const parsed = window.app.productGroup.parseCsv(text);
+      if (!parsed) throw new Error('ไฟล์ CSV ไม่สมบูรณ์ (เครื่องหมายคำพูดไม่ปิด)');
+      const header = (parsed[0] || []).map(h => String(h).trim());
+      let ni = header.findIndex(h => /^(area|name)$/i.test(h) || h.indexOf('Area') > -1 || h.indexOf('สาขา') > -1 || h.indexOf('พนักงาน') > -1 || h.indexOf('ชื่อ') > -1 || h.indexOf('รับเป้า') > -1);
+      let ti = header.findIndex((h, i) => i !== ni && (h.indexOf('เป้า') > -1 || /target/i.test(h)));
+      if (ni === -1 || ti === -1) throw new Error('ไม่พบหัวคอลัมน์ Area และ เป้า ในแถวแรกของไฟล์ — ลองใช้ไฟล์ตัวอย่าง');
+      const rows = [];
+      parsed.slice(1).forEach(cells => {
+        if (!cells.some(x => String(x).trim() !== '')) return;
+        const name = String(cells[ni] === undefined ? '' : cells[ni]).trim();
+        if (/^รวมทั้งหมด:?$/.test(name)) return;
+        rows.push({ name: name, target: String(cells[ti] === undefined ? '' : cells[ti]).trim() });
+      });
+      if (!rows.length) throw new Error('ไม่พบข้อมูลในไฟล์');
+      if (rows.length > this.MAX_ROWS) throw new Error('ไฟล์มี ' + rows.length + ' แถว นำเข้าได้ครั้งละไม่เกิน ' + this.MAX_ROWS + ' แถว');
+      return rows;
+    },
+
+    handleFile: async function(file) {
+      const esc = window.app.esc;
+      try {
+        if (file.size > 2 * 1024 * 1024) throw new Error('ไฟล์ใหญ่เกิน 2 MB');
+        const rows = this.parseFile(await file.text());
+        window.app.showLoading('กำลังตรวจไฟล์ ' + rows.length + ' แถว...');
+        let res;
+        try { res = await window.app.api('TARGET_IMPORT', { rows: rows, dryRun: true }); } finally { window.app.hideLoading(); }
+        if (!res || res.status !== 'success') throw new Error(String((res && res.message) || 'ตรวจไฟล์ไม่สำเร็จ').replace(/^Error:\s*/, ''));
+        const n = res.added.length + res.updated.length;
+        const list = (items, fmt) => '<ul class="list-disc pl-5 text-xs leading-relaxed">' + items.slice(0, 8).map(fmt).join('') + (items.length > 8 ? '<li class="opacity-70">และอีก ' + (items.length - 8) + ' รายการ</li>' : '') + '</ul>';
+        const html = '<div class="text-sm text-left">ไฟล์ <b>' + esc(file.name) + '</b> · ทั้งหมด ' + res.total + ' แถว</div>'
+          + (res.added.length ? '<div class="mt-3 text-left"><div class="font-bold text-emerald-700">เพิ่มใหม่ ' + res.added.length + ' รายการ</div>' + list(res.added, a => '<li><b>' + esc(a.name) + '</b> = ' + esc(a.target.toLocaleString()) + '</li>') + '</div>' : '')
+          + (res.updated.length ? '<div class="mt-3 text-left"><div class="font-bold text-indigo-700">อัปเดตเป้า ' + res.updated.length + ' รายการ</div>' + list(res.updated, u => '<li><b>' + esc(u.name) + '</b> ' + esc(u.from.toLocaleString()) + ' → ' + esc(u.target.toLocaleString()) + '</li>') + '</div>' : '')
+          + (res.unchanged ? '<div class="mt-3 text-left text-slate-600">เป้าเท่าเดิม ' + res.unchanged + ' รายการ (ไม่เปลี่ยน)</div>' : '')
+          + (res.errors.length ? '<div class="mt-3 text-left"><div class="font-bold text-rose-700">ข้อมูลไม่ถูกต้อง ' + res.errors.length + ' แถว (ไม่นำเข้า)</div>' + list(res.errors, x => '<li>แถว ' + esc(x.line) + (x.name ? ' · <b>' + esc(x.name) + '</b>' : '') + ' — ' + esc(x.reason) + '</li>') + '</div>' : '');
+        if (!n) { await Swal.fire({ title: 'ไม่มีอะไรต้องเปลี่ยน', html: html, icon: 'warning' }); return; }
+        const cf = await Swal.fire({ title: 'ตรวจสอบก่อนนำเข้า', html: html, icon: res.errors.length ? 'warning' : 'question', showCancelButton: true, confirmButtonText: 'บันทึก ' + n + ' รายการ', cancelButtonText: 'ยกเลิก' });
+        if (!cf.isConfirmed) return;
+        window.app.showLoading('กำลังบันทึกเป้าหมาย...');
+        let fin;
+        try { fin = await window.app.api('TARGET_IMPORT', { rows: rows, dryRun: false }); } catch (e) { fin = { status: 'error', message: e.message }; }
+        if (!fin || fin.status !== 'success') { window.app.hideLoading(); throw new Error(String((fin && fin.message) || 'นำเข้าไม่สำเร็จ').replace(/^Error:\s*/, '')); }
+        await this.init();
+        await Swal.fire({ icon: 'success', title: 'นำเข้าเป้าหมายแล้ว', text: 'เพิ่มใหม่ ' + fin.added.length + ' · อัปเดต ' + fin.updated.length + (fin.errors.length ? ' · ไม่นำเข้า ' + fin.errors.length + ' แถว' : '') });
+      } catch (e) {
+        window.app.alertError('นำเข้าไม่ได้', e.message || String(e));
+      }
     }
   };
 </script>

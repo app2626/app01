@@ -1025,6 +1025,52 @@ t('member directory: GET_ALL_DATA and the dashboard send only Name/Username/Role
   eq(sDash.length, sAll.length); ok(sAll.some(m => m.Username === sales.Username));
 });
 
+console.log('== TARGET (add / edit / delete / import)');
+{
+  const tgRows = () => sheets.Target.rows.slice(1).map(r => [String(r[0]), Number(String(r[1]).replace(/,/g, ''))]);
+  t('Target: non-Admin cannot save / delete / import', () => {
+    ok(/Admin only/.test(api('TARGET_SAVE', { name: 'X', target: 1 }, sales).message));
+    ok(/Admin only/.test(api('TARGET_DELETE', { name: 'ALL BRANCHES' }, sales).message));
+    ok(/Admin only/.test(api('TARGET_IMPORT', { rows: [{ name: 'X', target: 1 }], dryRun: true }, sales).message));
+  });
+  t('Target: add, reject duplicate (any case), reject bad values', () => {
+    eq(unwrap(api('TARGET_SAVE', { name: 'BKK', target: '1,500' }, admin)).target, 1500);
+    ok(tgRows().some(r => r[0] === 'BKK' && r[1] === 1500), JSON.stringify(tgRows()));
+    ok(/อยู่แล้ว/.test(api('TARGET_SAVE', { name: 'bkk', target: 3 }, admin).message));
+    ok(/ตัวเลข/.test(api('TARGET_SAVE', { name: 'NEW', target: '-5' }, admin).message));
+    ok(/ตัวเลข/.test(api('TARGET_SAVE', { name: 'NEW', target: 'abc' }, admin).message));
+    ok(/ระบุชื่อ/.test(api('TARGET_SAVE', { name: '  ', target: 1 }, admin).message));
+    ok(/ขึ้นต้น/.test(api('TARGET_SAVE', { name: '=HYPERLINK("x")', target: 1 }, admin).message));
+  });
+  t('Target: edit target, rename, cannot rename onto another row', () => {
+    unwrap(api('TARGET_SAVE', { name: 'BKK', target: 1600, originalName: 'BKK' }, admin));
+    unwrap(api('TARGET_SAVE', { name: 'BKK-NORTH', target: 1600, originalName: 'bkk' }, admin));
+    ok(tgRows().some(r => r[0] === 'BKK-NORTH' && r[1] === 1600) && !tgRows().some(r => r[0] === 'BKK'), JSON.stringify(tgRows()));
+    ok(/อยู่แล้ว/.test(api('TARGET_SAVE', { name: 'ALL BRANCHES', target: 1, originalName: 'BKK-NORTH' }, admin).message));
+    ok(/ไม่พบ/.test(api('TARGET_SAVE', { name: 'Z', target: 1, originalName: 'GONE' }, admin).message));
+  });
+  t('Target: delete by name; unknown name answers not found', () => {
+    unwrap(api('TARGET_DELETE', { name: 'bkk-north' }, admin));
+    ok(!tgRows().some(r => r[0] === 'BKK-NORTH'));
+    ok(/ไม่พบ/.test(api('TARGET_DELETE', { name: 'BKK-NORTH' }, admin).message));
+    ok(sheets.AuditLog.rows.some(r => r[3] === 'TARGET_DELETE'));
+  });
+  t('Target import: dryRun writes nothing; real run adds new + updates existing, reports errors and in-file duplicates', () => {
+    const before = JSON.stringify(sheets.Target.rows);
+    const rows = [{ name: 'ALL BRANCHES', target: '2000' }, { name: 'CENTRAL', target: '300' }, { name: 'central', target: '9' }, { name: 'EAST', target: 'x' }, { name: 'NORTH', target: '0' }];
+    const d = unwrap(api('TARGET_IMPORT', { rows: rows, dryRun: true }, admin));
+    eq(JSON.stringify(sheets.Target.rows), before, 'dryRun wrote');
+    eq([d.added.map(a => a.name), d.updated.map(u => u.name + ':' + u.from + '>' + u.target), d.errors.length], [['CENTRAL', 'NORTH'], ['ALL BRANCHES:1000>2000'], 2]);
+    const f = unwrap(api('TARGET_IMPORT', { rows: rows, dryRun: false }, admin));
+    eq([f.added.length, f.updated.length], [2, 1]);
+    const m = Object.fromEntries(tgRows());
+    eq([m['ALL BRANCHES'], m.CENTRAL, m.NORTH], [2000, 300, 0]);
+    const again = unwrap(api('TARGET_IMPORT', { rows: [{ name: 'CENTRAL', target: '300' }], dryRun: true }, admin));
+    eq([again.added.length, again.updated.length, again.unchanged], [0, 0, 1]);
+    ok(/ไม่เกิน/.test(api('TARGET_IMPORT', { rows: Array.from({ length: 501 }, (_, i) => ({ name: 'A' + i, target: 1 })), dryRun: true }, admin).message));
+  });
+}
+
 console.log('== PUBLIC SURFACE');
 // GAS: every top-level function whose name does not end in "_" can be called by anyone with google.script.run (the app is ANYONE_ANONYMOUS).
 const PUBLIC_FUNCTIONS = ['apiHandler', 'doGet', 'getPublicConfig', 'include', 'resetMemberPasswordFromProperties', 'setupDatabase'];

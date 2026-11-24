@@ -1446,6 +1446,38 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
     const only = await total([{ Area: 'ALL BRANCHES', 'เป้า': 1000 }]);
     ok(/รวมทั้งหมด: 1,000 3 /.test(only), 'ALL only -> ' + only);
   });
+  await T('target page (Admin): add, edit and delete a target through the form; toolbar + action column shown', async () => {
+    await ev("window.location.hash='#dashboard';true"); await sleep(600);
+    await ev("window.location.hash='#target';true"); await sleep(1500);
+    const bar = await ev("JSON.stringify([!document.getElementById('targetAdminBar').classList.contains('hidden'),!document.getElementById('targetActTh').classList.contains('hidden'),document.querySelectorAll('#targetTableBody .cms-ico').length])");
+    const [barOn, thOn, icons] = JSON.parse(bar); ok(barOn && thOn && icons >= 2, bar);
+    const rowText = () => ev("[...document.querySelectorAll('#targetTableBody tr')].map(r=>r.innerText.replace(/\\s+/g,' ').trim()).join(' | ')");
+    // add
+    await ev("window.app.target.openForm(-1);true"); await sleep(400);
+    ok(await ev("document.querySelectorAll('#tgNameList option').length>=2"), 'name suggestions missing');
+    await ev("document.getElementById('tgName').value='ZONE-T';document.getElementById('tgTarget').value='77';Swal.clickConfirm();true"); await sleep(2200);
+    ok(/ZONE-T 77/.test(await rowText()), 'added row missing: ' + await rowText());
+    // duplicate is refused inside the form (validation message, dialog stays open)
+    await ev("window.app.target.openForm(-1);true"); await sleep(400);
+    await ev("document.getElementById('tgName').value='zone-t';document.getElementById('tgTarget').value='1';Swal.clickConfirm();true"); await sleep(900);
+    ok(await ev("Swal.isVisible() && /อยู่แล้ว/.test(Swal.getValidationMessage().textContent)"), 'duplicate not refused');
+    await ev("Swal.close();true"); await sleep(300);
+    // edit
+    const idx = await ev("window.app.target.rows.findIndex(r=>r.name==='ZONE-T')");
+    await ev("window.app.target.openForm(" + idx + ");true"); await sleep(400);
+    eq(await ev("document.getElementById('tgName').value+'|'+document.getElementById('tgTarget').value"), 'ZONE-T|77');
+    await ev("document.getElementById('tgTarget').value='88';Swal.clickConfirm();true"); await sleep(2200);
+    ok(/ZONE-T 88/.test(await rowText()), 'edit not saved: ' + await rowText());
+    // delete
+    const idx2 = await ev("window.app.target.rows.findIndex(r=>r.name==='ZONE-T')");
+    await ev("window.app.target.remove(" + idx2 + ");true"); await sleep(400);
+    ok(await ev("/ZONE-T/.test(Swal.getHtmlContainer().textContent)"), 'confirm does not name the row');
+    await ev("Swal.clickConfirm();true"); await sleep(2200);
+    ok(!/ZONE-T/.test(await rowText()), 'row not deleted');
+    // CSV parsing: header detection, comma numbers, skips the exported total row
+    eq(await ev("JSON.stringify(window.app.target.parseFile('\\uFEFFArea,เป้า\\r\\nNORTH,\"1,200\"\\r\\n,\\r\\nรวมทั้งหมด:,9\\r\\n'))"), JSON.stringify([{ name: 'NORTH', target: '1,200' }]));
+    await shot('admin-target-manage');
+  });
   await T('dashboard KPIs: tablet orders are counted together with mobile, not dropped', async () => {
     await ev("window.location.hash='#dashboard';true"); await sleep(1500);
     const r = JSON.parse(await ev("(()=>{const d=window.app.dashboard;const keep=d.filteredOrders;d.filteredOrders=[{OrderID:'K1',Category:'โมบาย',Qty:1,'Row Total':100,'Reservation Status':'จอง T (มีการจอง)','Order Status':'Pending'},{OrderID:'K2',Category:'แท็บเล็ต',Qty:2,'Row Total':200,'Reservation Status':'จอง F (สวมสิทธิ์การจอง)','Order Status':'Pending'}];d.updateKPIs();const g=i=>document.getElementById(i).innerText;const out=[g('dashKpiMobiles'),g('dashKpiAccessories'),g('dashKpiResT'),g('dashKpiResF')];d.filteredOrders=keep;d.updateKPIs();return JSON.stringify(out)})()"));

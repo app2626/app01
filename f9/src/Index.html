@@ -1128,10 +1128,15 @@
   <template id="tmpl-target">
     <div id="target-content" class="space-y-6">
        <!-- Header Section -->
-       <div class="rpt-head flex items-center gap-3">
+       <div class="rpt-head flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
            <div>
              <h2 class="text-xl font-black text-slate-800 tracking-tight leading-tight">เป้าหมายและพยากรณ์</h2>
              <p class="text-xs text-slate-500 font-medium">ติดตามเป้าหมายการขายและคาดการณ์ของแต่ละ Area (เฉพาะยอดโมบาย) <span id="targetDateRange" class="text-amber-600 font-bold ml-1"></span></p>
+           </div>
+           <!-- จัดการเป้าหมาย (Admin เท่านั้น — target.init แสดงแถบนี้) -->
+           <div id="targetAdminBar" class="cms-actions hidden" style="margin:0">
+             <button type="button" class="cms-btn cms-btn-green" id="targetAddBtn" onclick="window.app.target.openForm(-1)"><i class="fas fa-plus"></i> เพิ่มเป้าหมาย</button>
+             <button type="button" class="cms-btn cms-btn-line" id="targetImportBtn" onclick="window.app.target.openImport()"><i class="fas fa-file-import"></i> นำเข้า CSV</button>
            </div>
        </div>
 
@@ -1149,6 +1154,7 @@
                            <th class="py-4 px-4 text-center font-bold text-black uppercase tracking-wider text-[11px]">ยอดจอง</th>
                            <th class="py-4 px-4 text-center font-bold text-black uppercase tracking-wider text-[11px]">ยอด diff</th>
                            <th class="py-4 px-4 text-center font-bold text-black uppercase tracking-wider text-[11px]">ยอดฟอแคช จบรับจอง</th>
+                           <th class="py-4 px-4 text-center font-bold text-black uppercase tracking-wider text-[11px] hidden" id="targetActTh">จัดการ</th>
                        </tr>
                    </thead>
                    <tbody id="targetTableBody" class="divide-y divide-slate-100">

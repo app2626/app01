@@ -488,6 +488,9 @@ function apiHandlerInner_(action, payload, userToken) {
       case 'BULK_UPDATE_PRODUCTS': return bulkUpdateProducts_(payload, secureUser, ss);
       case 'IMPORT_PRODUCTS': return importProducts_(payload, secureUser, ss);
       case 'IMPORT_RECORDS': return importRecords_(payload, secureUser, ss);
+      case 'TARGET_SAVE': return saveTarget_(payload, secureUser, ss);
+      case 'TARGET_DELETE': return deleteTarget_(payload, secureUser, ss);
+      case 'TARGET_IMPORT': return importTargets_(payload, secureUser, ss);
       case 'VALIDATE_COUPON': return validateCouponApi_(payload, ss);
       case 'CLEAR_CACHE':
         if (secureUser.Role !== 'Admin') throw new Error("Permission Denied: Admin only");
@@ -3069,6 +3072,121 @@ function resetMemberPasswordFromProperties() {
     ['MPOS_RESET_ENABLE', 'MPOS_RESET_USERNAME', 'MPOS_RESET_PASSWORD'].forEach(function(k) { props.deleteProperty(k); });
     lock.releaseLock();
   }
+}
+
+// ----- เป้าหมาย (ชีต Target): เพิ่ม / แก้ไข / ลบ / นำเข้า CSV — Admin เท่านั้น -----
+// แถวระบุด้วย "ชื่อ" (Area / รหัสสาขา / ชื่อสาขา / Username / ALL BRANCHES) ไม่สนตัวพิมพ์ ซ้ำไม่ได้ — หาแถวฝั่ง server เสมอ (ไม่รับ _rowIndex จาก client)
+// คอลัมน์หาจากหัวตารางแบบเดียวกับหน้า target.render (ชีตเก่าอาจตั้งชื่อหัวต่างกัน); ไม่มีชีตก็สร้างใหม่หัว Area | เป้า
+var TARGET_MAX_IMPORT_ = 500;
+function targetSheet_(ss, create) {
+  let sh = ss.getSheetByName('Target');
+  if (!sh && create) { sh = ss.insertSheet('Target'); sh.appendRow(['Area', 'เป้า']); }
+  if (!sh) return null;
+  const data = sh.getDataRange().getDisplayValues();
+  const headers = (data[0] || []).map(h => h.toString().trim());
+  if (!headers.some(Boolean)) throw new Error('ชีต Target ไม่มีหัวคอลัมน์');
+  const nameIdx = (() => {
+    let i = headers.findIndex(h => h.toLowerCase() === 'area' || h.indexOf('Area') > -1 || h.indexOf('สาขา') > -1 || h.indexOf('พนักงาน') > -1 || h.indexOf('ชื่อ') > -1 || h.indexOf('รับเป้า') > -1);
+    return i > -1 ? i : 0;
+  })();
+  let targetIdx = headers.findIndex((h, i) => i !== nameIdx && (h === 'เป้า' || h.indexOf('เป้า') > -1 || h.toLowerCase().indexOf('target') > -1));
+  if (targetIdx === -1) targetIdx = headers.findIndex((h, i) => i !== nameIdx);
+  if (targetIdx === -1) throw new Error('ชีต Target ต้องมีอย่างน้อย 2 คอลัมน์ (ชื่อ และ เป้า)');
+  return { sheet: sh, data: data, headers: headers, nameIdx: nameIdx, targetIdx: targetIdx };
+}
+function targetFindRow_(t, name) {
+  const key = name.toUpperCase();
+  for (let i = 1; i < t.data.length; i++) if ((t.data[i][t.nameIdx] || '').toString().trim().toUpperCase() === key) return i + 1;
+  return -1;
+}
+// ตรวจค่าหนึ่งแถว → { name, target } หรือโยน Error ข้อความไทย
+function targetClean_(nameRaw, targetRaw) {
+  const name = (nameRaw === null || nameRaw === undefined ? '' : nameRaw).toString().replace(/[\u0000-\u001F]/g, '').trim();
+  if (!name) throw new Error('กรุณาระบุชื่อ (Area / สาขา / พนักงาน หรือ ALL BRANCHES)');
+  if (name.length > 100) throw new Error('ชื่อยาวเกิน 100 ตัวอักษร');
+  if (/^[=+\-@]/.test(name)) throw new Error('ชื่อห้ามขึ้นต้นด้วย = + - @');
+  const s = (targetRaw === null || targetRaw === undefined ? '' : targetRaw).toString().replace(/,/g, '').trim();
+  if (!/^\d+(\.\d+)?$/.test(s)) throw new Error('เป้าต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
+  const target = Math.round(parseFloat(s));
+  if (target > 1e9) throw new Error('เป้ามากเกินไป');
+  return { name: name, target: target };
+}
+function targetWriteRow_(t, rowIndex, v) {
+  const row = rowIndex > -1 ? t.data[rowIndex - 1].slice() : t.headers.map(() => '');
+  row[t.nameIdx] = v.name; row[t.targetIdx] = v.target;
+  if (rowIndex > -1) t.sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  else { t.sheet.appendRow(row); t.data.push(row.map(String)); }
+  t.sheet.getRange(rowIndex > -1 ? rowIndex : t.sheet.getLastRow(), t.nameIdx + 1).setNumberFormat('@').setValue(v.name);
+}
+function saveTarget_(payload, secureUser, ss) {
+  if (secureUser.Role !== 'Admin') throw new Error('Permission Denied: Admin only');
+  payload = payload || {};
+  const v = targetClean_(payload.name, payload.target);
+  const orig = (payload.originalName === null || payload.originalName === undefined ? '' : payload.originalName).toString().trim();
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const t = targetSheet_(ss, true);
+    const same = targetFindRow_(t, v.name);
+    let rowIndex = -1;
+    if (orig) {
+      rowIndex = targetFindRow_(t, orig);
+      if (rowIndex === -1) throw new Error('ไม่พบเป้าหมาย "' + orig + '" (อาจถูกลบไปแล้ว) — โหลดหน้าใหม่แล้วลองอีกครั้ง');
+      if (same > -1 && same !== rowIndex) throw new Error('มีเป้าหมายของ "' + v.name + '" อยู่แล้ว');
+    } else if (same > -1) {
+      throw new Error('มีเป้าหมายของ "' + v.name + '" อยู่แล้ว — กดแก้ไขที่แถวนั้นแทน');
+    }
+    targetWriteRow_(t, rowIndex, v);
+    logAudit_(secureUser.Username, orig ? 'TARGET_UPDATE' : 'TARGET_ADD', (orig && orig !== v.name ? orig + ' -> ' : '') + v.name + ' = ' + v.target);
+    return { status: 'success', name: v.name, target: v.target };
+  } finally { lock.releaseLock(); }
+}
+function deleteTarget_(payload, secureUser, ss) {
+  if (secureUser.Role !== 'Admin') throw new Error('Permission Denied: Admin only');
+  const name = ((payload || {}).name === null || (payload || {}).name === undefined ? '' : payload.name).toString().trim();
+  if (!name) throw new Error('ไม่ได้ระบุเป้าหมายที่จะลบ');
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const t = targetSheet_(ss, false);
+    const rowIndex = t ? targetFindRow_(t, name) : -1;
+    if (rowIndex === -1) throw new Error('ไม่พบเป้าหมาย "' + name + '" (อาจถูกลบไปแล้ว)');
+    t.sheet.deleteRow(rowIndex);
+    logAudit_(secureUser.Username, 'TARGET_DELETE', name);
+    return { status: 'success' };
+  } finally { lock.releaseLock(); }
+}
+// นำเข้า: ชื่อใหม่ = เพิ่ม, ชื่อที่มีอยู่แล้ว = อัปเดตเป้า (ค่าเท่าเดิม = ไม่เขียน); dryRun = ตรวจอย่างเดียว ไม่เขียนชีต — ตรวจซ้ำทุกครั้ง ไม่เชื่อผล dryRun
+function importTargets_(payload, secureUser, ss) {
+  if (secureUser.Role !== 'Admin') throw new Error('Permission Denied: Admin only');
+  payload = payload || {};
+  const rows = Array.isArray(payload.rows) ? payload.rows : null;
+  if (!rows || !rows.length) throw new Error('ไม่พบข้อมูลในไฟล์');
+  if (rows.length > TARGET_MAX_IMPORT_) throw new Error('นำเข้าได้ครั้งละไม่เกิน ' + TARGET_MAX_IMPORT_ + ' แถว');
+  const dryRun = payload.dryRun !== false;
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const t = targetSheet_(ss, !dryRun) || { data: [[]], nameIdx: 0, targetIdx: 1 };
+    const seen = {}, added = [], updated = [], unchanged = [], errors = [];
+    rows.forEach((r, i) => {
+      const line = i + 2;
+      let v;
+      try { v = targetClean_(r && r.name, r && r.target); } catch (e) { errors.push({ line: line, name: String((r && r.name) || ''), reason: e.message }); return; }
+      const key = v.name.toUpperCase();
+      if (seen[key]) { errors.push({ line: line, name: v.name, reason: 'ชื่อซ้ำกับแถว ' + seen[key] + ' ในไฟล์' }); return; }
+      seen[key] = line;
+      const rowIndex = t.sheet ? targetFindRow_(t, v.name) : -1;
+      if (rowIndex === -1) { added.push({ line: line, name: v.name, target: v.target }); return; }
+      const prev = parseFloat((t.data[rowIndex - 1][t.targetIdx] || '').toString().replace(/,/g, '')) || 0;
+      if (prev === v.target) unchanged.push({ line: line, name: v.name, target: v.target });
+      else updated.push({ line: line, name: v.name, target: v.target, from: prev, rowIndex: rowIndex });
+    });
+    if (!dryRun) {
+      updated.forEach(u => targetWriteRow_(t, u.rowIndex, { name: t.data[u.rowIndex - 1][t.nameIdx].toString().trim(), target: u.target }));
+      added.forEach(a => targetWriteRow_(t, -1, a));
+      if (added.length || updated.length) logAudit_(secureUser.Username, 'TARGET_IMPORT', 'added ' + added.length + ', updated ' + updated.length);
+    }
+    const strip = list => list.map(x => ({ line: x.line, name: x.name, target: x.target, from: x.from }));
+    return { status: 'success', dryRun: dryRun, total: rows.length, added: strip(added), updated: strip(updated), unchanged: unchanged.length, errors: errors };
+  } finally { lock.releaseLock(); }
 }
 
 function deleteRecord_(tableName, idField, idValue, secureUser, ss) {
