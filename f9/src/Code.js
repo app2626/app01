@@ -3111,12 +3111,17 @@ function targetClean_(nameRaw, targetRaw) {
   if (target > 1e9) throw new Error('เป้ามากเกินไป');
   return { name: name, target: target };
 }
+// เขียนเฉพาะเซลล์ชื่อ + เป้า (แถวเดิม) — คอลัมน์อื่นที่ผู้ใช้เพิ่มเองในชีตไม่ถูกเขียนทับด้วยค่าที่แสดงผล (วันที่/ตัวเลขจะกลายเป็นข้อความ)
 function targetWriteRow_(t, rowIndex, v) {
-  const row = rowIndex > -1 ? t.data[rowIndex - 1].slice() : t.headers.map(() => '');
-  row[t.nameIdx] = v.name; row[t.targetIdx] = v.target;
-  if (rowIndex > -1) t.sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-  else { t.sheet.appendRow(row); t.data.push(row.map(String)); }
-  t.sheet.getRange(rowIndex > -1 ? rowIndex : t.sheet.getLastRow(), t.nameIdx + 1).setNumberFormat('@').setValue(v.name);
+  if (rowIndex === -1) {
+    const row = t.headers.map(() => '');
+    row[t.nameIdx] = v.name; row[t.targetIdx] = v.target;
+    t.sheet.appendRow(row); t.data.push(row.map(String));
+    rowIndex = t.sheet.getLastRow();
+  } else {
+    t.sheet.getRange(rowIndex, t.targetIdx + 1).setValue(v.target);
+  }
+  t.sheet.getRange(rowIndex, t.nameIdx + 1).setNumberFormat('@').setValue(v.name);
 }
 function saveTarget_(payload, secureUser, ss) {
   if (secureUser.Role !== 'Admin') throw new Error('Permission Denied: Admin only');

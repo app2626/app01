@@ -1441,7 +1441,7 @@ window.app.pos = {
       if (!n) return;
       const esc = window.app.esc;
       const link = String(n.link || '');
-      const internal = /^#[A-Za-z0-9_-]{1,40}$/.test(link), external = /^https?:\/\/[^\s<>"']+$/i.test(link);
+      const internal = /^#[A-Za-z0-9_-]{1,40}$/.test(link), external = /^https?:\/\/[^\s<>\x22\x27]+$/i.test(link); // \x22\x27 = เครื่องหมายคำพูด — ห้ามเขียนตรงๆ ใน regex (ตัวตัดคอมเมนต์ของ GAS นับคำพูดเพี้ยน)
       const html = (n.imageUrl ? '<img src="' + esc(window.app.formatImageUrl(n.imageUrl)) + '" alt="" style="max-width:100%;max-height:260px;border-radius:12px;margin:0 auto 12px;display:block;object-fit:contain" onerror="this.onerror=null;this.style.display=\'none\';">' : '')
         + (n.category ? '<div style="font-size:11px;font-weight:800;color:#FF6B00;margin-bottom:6px">' + esc(n.category) + '</div>' : '')
         + '<div style="text-align:left;white-space:pre-line;font-size:13px;line-height:1.6">' + esc(n.detail || '') + '</div>';
