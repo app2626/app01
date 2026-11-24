@@ -25,14 +25,12 @@ window.app.systemSettings = {
       this.pendingTab = '';
       // tab bar สไตล์ sub-chips ของ POS (เส้นใต้ตัว active) — icon/label เป็น literal จาก tabs ข้างบน ไม่ใช่ข้อมูลผู้ใช้
       const barHtml = this.tabs.map(t =>
-        `<button type="button" role="tab" id="ssTab-${t.id}" class="px-1 pb-2 text-sm whitespace-nowrap border-b-2 transition-colors border-transparent text-slate-500 hover:text-indigo-600" onclick="window.app.systemSettings.openTab('${t.id}')"><i class="fas ${t.icon} mr-1.5 text-[11px] opacity-70"></i>${t.label}</button>`
+        `<button type="button" role="tab" id="ssTab-${t.id}" class="ss-tab" aria-selected="false" onclick="window.app.systemSettings.openTab('${t.id}')"><i class="fas ${t.icon}" aria-hidden="true"></i>${t.label}</button>`
       ).join('');
       content.innerHTML = `
         <div class="space-y-6 animate-fade-in-up">
           <div class="cms-page"><div class="cms-head" style="margin-bottom:0"><h1>ตั้งค่าระบบ</h1><span class="cms-crumb">จัดการร้าน &gt; ตั้งค่าระบบ</span></div></div>
-          <div class="bg-white border border-slate-200 shadow-sm rounded-3xl px-6 pt-3" style="margin-top:16px">
-            <div class="flex gap-5 overflow-x-auto custom-scrollbar" role="tablist">${barHtml}</div>
-          </div>
+          <div class="ss-tabs" role="tablist" aria-label="หมวดการตั้งค่า">${barHtml}</div>
           <div id="ssTabContent" oninput="window.app.systemSettings.dirty = true" onchange="window.app.systemSettings.dirty = true"></div>
         </div>`;
       this.showTab(startTab);
@@ -56,11 +54,7 @@ window.app.systemSettings = {
         if (!btn) return;
         const active = t.id === tabId;
         btn.setAttribute('aria-selected', active ? 'true' : 'false');
-        btn.classList.toggle('border-indigo-600', active);
-        btn.classList.toggle('text-indigo-600', active);
-        btn.classList.toggle('font-bold', active);
-        btn.classList.toggle('border-transparent', !active);
-        btn.classList.toggle('text-slate-500', !active);
+        btn.classList.toggle('on', active);
       });
       // render เฉพาะ tab ที่เปิด — เรียก logic เดิมของหน้าเดิมลง container ของ tab
       const cur = this.tabs.find(t => t.id === tabId) || this.tabs[0];

@@ -9,6 +9,8 @@ document.addEventListener('keydown', function(e) {
   }
   if (e.key !== 'Escape') return;
   if (window.app.search && window.app.search.isOpen()) { window.app.search.close(); return; }
+  const mnav = document.getElementById('mobileMenuPanel');
+  if (mnav && !mnav.classList.contains('hidden')) { window.app.closeMobileMenu(); return; }
   // 6B — filter popover เป็นชั้นบนสุดของหน้า POS: ปิดก่อนทุก modal
   if (window.app.pos && window.app.pos.openPopover) { window.app.pos.closeFilterPopovers(); return; }
   const popup = document.getElementById('popupBannerModal');

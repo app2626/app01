@@ -1430,9 +1430,23 @@ window.app = {
     if (window.app.user) window.app.route();
   },
 
-  toggleMobileMenu: function() {
+  // เมนูมือถือ = ลิ้นชักเลื่อนจากซ้าย (#mobileMenuPanel) + ฉากหลังมืด (#mobileMenuBackdrop); html.mnav-open ล็อกการเลื่อนหน้า
+  toggleMobileMenu: function(force) {
     const panel = document.getElementById('mobileMenuPanel');
-    if(panel) panel.classList.toggle('hidden');
+    if (!panel) return;
+    const open = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !open);
+    const bd = document.getElementById('mobileMenuBackdrop');
+    if (bd) bd.classList.toggle('hidden', !open);
+    document.documentElement.classList.toggle('mnav-open', open);
+  },
+  // เปิด/ปิดกลุ่มเมนูย่อย (เช่น จัดการร้าน) — ลูกศรหมุนตาม aria-expanded
+  toggleNavGroup: function(subId, btn, force) {
+    const sub = document.getElementById(subId);
+    if (!sub) return;
+    const open = typeof force === 'boolean' ? force : sub.classList.contains('hidden');
+    sub.classList.toggle('hidden', !open);
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   },
   
   // ซ่อน/แสดงเมนูด้านข้าง (เดสก์ท็อป) — hide=true คือ "โหมดเต็มจอ" ; persist=true จำค่าไว้ในเครื่องผู้ใช้ (เปิดครั้งหน้ายังเป็นโหมดเดิม)
@@ -1488,8 +1502,7 @@ window.app = {
   },
   
   closeMobileMenu: function() {
-    const panel = document.getElementById('mobileMenuPanel');
-    if(panel && !panel.classList.contains('hidden')) panel.classList.add('hidden');
+    window.app.toggleMobileMenu(false);
   },
   
   init: function() {
@@ -1751,7 +1764,7 @@ window.app = {
 
           if(hasChildAccess) { 
              deskHtmlStr += `<div>
-                <button onclick="document.getElementById('desk-sub-${m.id}').classList.toggle('hidden')" class="w-full text-left px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-desk-${m.id}">
+                <button type="button" aria-expanded="false" aria-controls="desk-sub-${m.id}" onclick="window.app.toggleNavGroup('desk-sub-${m.id}', this)" class="nav-group w-full text-left px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-desk-${m.id}">
                   <span class="flex items-center min-w-0 flex-1"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m)}</span>
                   <i class="fas fa-chevron-down text-[10px] opacity-50"></i>
                 </button>
@@ -1761,7 +1774,7 @@ window.app = {
              </div>`;
 
              mobHtmlStr += `<div>
-               <button onclick="document.getElementById('sub-${m.id}').classList.toggle('hidden')" class="w-full text-left px-4 py-3 rounded-xl text-base font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-mob-${m.id}">
+               <button type="button" aria-expanded="false" aria-controls="sub-${m.id}" onclick="window.app.toggleNavGroup('sub-${m.id}', this)" class="nav-group w-full text-left px-4 py-3 rounded-xl text-base font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex justify-between items-center" id="nav-mob-${m.id}">
                  <span class="flex items-center min-w-0 flex-1"><i class="fas ${m.icon} mr-3 w-5 text-center opacity-70"></i>${this.navLabelHtml(m, true)}</span>
                  <i class="fas fa-chevron-down text-sm"></i>
                </button>
@@ -1832,6 +1845,15 @@ window.app = {
       mobActive.classList.remove('text-slate-600', 'hover:bg-indigo-50');
       mobActive.classList.add('bg-indigo-50', 'text-indigo-600', 'active-link');
     }
+    // หน้าที่เปิดอยู่ในกลุ่มย่อย (จัดการร้าน) — กางกลุ่มนั้นให้เห็นรายการที่เลือก; หัวกลุ่มได้ .has-active
+    document.querySelectorAll('.nav-group').forEach(b => b.classList.remove('has-active'));
+    [deskActive, mobActive].forEach(a => {
+      const sub = a && a.closest('[id^="desk-sub-"], [id^="sub-"]');
+      if (!sub) return;
+      const btn = sub.previousElementSibling;
+      window.app.toggleNavGroup(sub.id, btn, true);
+      if (btn) btn.classList.add('has-active');
+    });
 
     const content = document.getElementById('page-content');
     if(!content) return;
