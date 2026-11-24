@@ -70,7 +70,7 @@ const shot = async (name) => { const r = await send('Page.captureScreenshot', { 
 (async () => {
   await new Promise(r => server.listen(8765, r));
   const udd = fs.mkdtempSync(path.join(os.tmpdir(), 'chr-'));
-  const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9333', '--user-data-dir=' + udd, '--window-size=1366,900', '--no-first-run', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });
+  const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9333', '--user-data-dir=' + udd, '--window-size=1366,900', '--no-first-run', '--disable-gpu', ...(process.env.CI ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' }); // GitHub's Ubuntu 24.04 runners block Chrome's sandbox
   let targets; for (let i = 0; i < 50; i++) { try { targets = await (await fetch('http://127.0.0.1:9333/json')).json(); if (targets.length) break; } catch (e) {} await sleep(200); }
   const tgt = targets.find(x => x.type === 'page');
   ws = new WebSocket(tgt.webSocketDebuggerUrl);

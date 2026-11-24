@@ -1,0 +1,63 @@
+# f9 (GAS web app): run the local test harness on every push / PR that touches f9.
+# Same gate as `npm test` on the developer machine; it does not deploy anything.
+name: f9 tests
+
+on:
+  push:
+    paths: ['f9/**', '.github/workflows/f9-test.yml']
+  pull_request:
+    paths: ['f9/**', '.github/workflows/f9-test.yml']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: f9
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: f9/package-lock.json
+
+      - run: npm ci
+
+      - name: GAS serve-time hazards (comment stripper)
+        run: npm run check:gas
+
+      - name: Syntax check (server + all client script blocks)
+        run: |
+          node --check src/Code.js
+          node --check src/Coupons.js
+          node -e "const fs=require('fs');const t=fs.readdirSync('src').filter(f=>/^JS(_.*)?\.html$/.test(f)).map(f=>fs.readFileSync('src/'+f,'utf8')).join('\n');fs.writeFileSync('/tmp/f9-client.js',[...t.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n'))"
+          node --check /tmp/f9-client.js
+
+      - name: Tailwind CSS is rebuilt and committed
+        run: |
+          npm run build:css
+          git diff --exit-code -- src/TailwindCSS.html || { echo "::error::src/TailwindCSS.html is out of date - run npm run build:css and commit it"; exit 1; }
+
+      - name: Thai fonts for the browser tests
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-thai-tlwg
+
+      - name: Server tests
+        run: npm run test:server
+
+      - name: Client tests (headless Chrome)
+        run: npm run test:client
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+
+      - name: Keep screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f9-client-screenshots
+          path: f9/tests/out/
+          if-no-files-found: ignore
+          retention-days: 7

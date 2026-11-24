@@ -7,9 +7,11 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "node tests/server.test.js && node tests/client.test.js",
+    "test": "node tools/check-gas-serve.js && node tests/server.test.js && node tests/client.test.js",
     "test:server": "node tests/server.test.js",
     "test:client": "node tests/client.test.js",
+    "check:gas": "node tools/check-gas-serve.js",
+    "check:served": "node tools/check-served.js",
     "build:css": "node tools/build-css.js"
   },
   "devDependencies": {
