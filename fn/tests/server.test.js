@@ -115,7 +115,69 @@ console.log('== GUARDS / SETTINGS');
   t('old unguarded helpers removed', () => ['setRemark', 'updateHeadersNow', 'getDataSheet'].forEach(f => eq(typeof ctx[f], 'undefined', f)));
 }
 
-// @@TASK4@@
+// ===================== Task 4: requests & workflow =====================
+console.log('== REQUESTS / WORKFLOW');
+{
+  const g = fixture(); const { ctx, sheets, driveFiles, mail } = g;
+  const admin = g.tok('admin1'), acc = g.tok('acc1'), staff = g.tok('staff1');
+  const b64 = n => Buffer.alloc(n, 1).toString('base64');
+  const form = (o = {}) => Object.assign({
+    date: '2026-11-25', location: 'สาขา A', emp_id: 'E01', emp_name: 'พนักงานหนึ่ง', emp_phone: '0812345678',
+    id_card_number: '1103700012345', customer_name: 'ลูกค้า ทดสอบ', customer_phone: '0898765432', address: '1/2', road: '3',
+    district: 'ตำบล', amphoe: 'อำเภอ', province: 'จังหวัด', zipcode: '10200', productname: 'Phone X', imei: '356789012345678',
+    premium_combined: 'เคส', guarantee: '', price: '10000', down: '1000', discountais: '0', discountpromotion: '0',
+    discounttradein: '0', discounttradeup: '0', discountbigc: '0', dues: '0', installments: '10', installment_amount: '900',
+    file1Data: { base64: b64(10), mimeType: 'image/jpeg', name: 'slip.jpg' },
+    file2Data: { base64: b64(10), mimeType: 'application/pdf', name: 'c.pdf' },
+  }, o);
+  const C = h => ctx.col_(h) - 1;
+  const rowById = id => sheets.Data.rows.find(r => String(r[0]).replace(/^'/, '') === id);
+  const setStatus = (id, s) => { rowById(id)[C('สถานะ :')] = s; };
+
+  t('saveRequest needs session', () => throws(() => ctx.saveRequest('', form()), /AUTH_REQUIRED/));
+  let id;
+  t('saveRequest computes net price server-side', () => {
+    id = ctx.saveRequest(staff, form({ price: '10000', down: '1000', discountais: '500', dues: '200', netprice: '1' })).id;
+    eq(Number(rowById(id)[C('ราคาสุทธิ :')]), 8700); eq(rowById(id)[C('สถานะ :')], 'รออนุมัติ');
+  });
+  t('row is 46 wide with uploaded file links', () => { const r = rowById(id); eq(r.length, 46); ok(/^https:\/\/lh3\.googleusercontent\.com\/d\//.test(r[C('รูปสลิปเงินโอน :')])); ok(/^https:\/\/drive\.google\.com\/uc\?id=/.test(r[C('ใบเสร็จ :')])); eq(driveFiles.length, 2); });
+  t('barcode stored separately', () => { const i2 = ctx.saveRequest(staff, form({ barcode_ais: 'B1', discountais: '500' })).id; eq(rowById(i2)[C('ส่วนลด เปิดเบอร์ AIS :')], 500); eq(rowById(i2)[C('บาร์โค้ด AIS :')], 'B1'); });
+  t('ids are unique on same millisecond', () => { const realNow = Date.now; Date.now = () => 1700000000000; try { const a = ctx.saveRequest(staff, form()).id, b = ctx.saveRequest(staff, form()).id; ok(a !== b, a + '==' + b); } finally { Date.now = realNow; } });
+  t('invalid id card rejected', () => throws(() => ctx.saveRequest(staff, form({ id_card_number: '123' })), /เลขบัตรประชาชน/));
+  t('invalid phone rejected', () => throws(() => ctx.saveRequest(staff, form({ customer_phone: '12345' })), /เบอร์ติดต่อลูกค้า/));
+  t('missing required field rejected', () => throws(() => ctx.saveRequest(staff, form({ customer_name: ' ' })), /ชื่อตัวและสกุล/));
+  t('negative amount rejected', () => throws(() => ctx.saveRequest(staff, form({ down: '-5' })), /เงินดาวน์/));
+  t('installments out of range rejected', () => throws(() => ctx.saveRequest(staff, form({ installments: '0' })), /จำนวนงวด/));
+  t('pdf mime enforced', () => throws(() => ctx.saveRequest(staff, form({ file2Data: { mimeType: 'image/png', base64: 'AA==', name: 'x' } })), /PDF/));
+  t('slip must be image', () => throws(() => ctx.saveRequest(staff, form({ file1Data: { mimeType: 'text/html', base64: 'AA==', name: 'x' } })), /รูป/));
+  t('missing file rejected', () => throws(() => ctx.saveRequest(staff, form({ file2Data: null })), /PDF/));
+  t('file over 10MB rejected', () => throws(() => ctx.saveRequest(staff, form({ file1Data: { mimeType: 'image/jpeg', base64: 'A'.repeat(14 * 1024 * 1024), name: 'x' } })), /10 MB/));
+  t('new request email sent', () => { ctx.setConfigProperties(admin, { emailTo: 'a@b.c' }); const n = mail.length; ctx.saveRequest(staff, form()); eq(mail.length, n + 1); });
+
+  t('staff cannot updateStatus', () => throws(() => ctx.updateStatus(staff, { record: id, action: 'approve', financeAmount: '1' }), /FORBIDDEN/));
+  t('unknown action rejected', () => throws(() => ctx.updateStatus(acc, { record: id, action: 'hack' }), /INVALID_ACTION/));
+  t('unknown record rejected', () => throws(() => ctx.updateStatus(acc, { record: 'nope', action: 'approve', financeAmount: '1' }), /ไม่พบ/));
+  t('approve requires amount', () => throws(() => ctx.updateStatus(acc, { record: id, action: 'approve', financeAmount: '' }), /ยอดเงินโอน/));
+  t('approve from empty status', () => { setStatus(id, ''); eq(ctx.updateStatus(acc, { record: id, action: 'approve', financeAmount: '8,700', Remark: 'ok' }).status, 'รอเปิด SO'); eq(rowById(id)[C('ยอดเงินโอนที่ได้รับ(การเงิน) :')], '8,700'); });
+  t('double approve rejected', () => throws(() => ctx.updateStatus(acc, { record: id, action: 'approve', financeAmount: '1' }), /ดำเนินการไปแล้ว/));
+  t('log has record id and session actor', () => { const l = sheets.Log.rows[sheets.Log.getLastRow() - 1]; eq(l[1], 'ฝ่ายบัญชี'); eq(l[2], 'รอเปิด SO'); eq(l[3], id); eq(l[4], 'approve'); });
+  t('client-sent name/status ignored', () => { const i4 = ctx.saveRequest(staff, form()).id; ctx.updateStatus(acc, { record: i4, action: 'approve', financeAmount: '1', status: 'เสร็จสมบูรณ์', name: 'hacker' }); eq(rowById(i4)[C('สถานะ :')], 'รอเปิด SO'); eq(sheets.Log.rows[sheets.Log.getLastRow() - 1][1], 'ฝ่ายบัญชี'); });
+  t('cannot skip to AR', () => { const i2 = ctx.saveRequest(staff, form()).id; throws(() => ctx.updateStatus(acc, { record: i2, action: 'updateAR', invoice: 'X' }), /ดำเนินการไปแล้ว/); });
+  t('updateSO requires SO number', () => throws(() => ctx.updateStatus(acc, { record: id, action: 'updateSO', soCreated: '' }), /Sales Order/));
+  t('updateSO from อนุมัติแล้ว', () => { setStatus(id, 'อนุมัติแล้ว'); eq(ctx.updateStatus(admin, { record: id, action: 'updateSO', soCreated: 'SO1' }).status, 'รอเปิด Invoice'); eq(rowById(id)[C('Sales Order created :')], 'SO1'); });
+  t('updateAR completes', () => { eq(ctx.updateStatus(acc, { record: id, action: 'updateAR', invoice: 'INV1' }).status, 'เสร็จสมบูรณ์'); eq(rowById(id)[C('Invoice บัญชี :')], 'INV1'); });
+  t('reject requires remark', () => { const i3 = ctx.saveRequest(staff, form()).id; throws(() => ctx.updateStatus(acc, { record: i3, action: 'reject', Remark: '' }), /หมายเหตุ/); eq(ctx.updateStatus(acc, { record: i3, action: 'reject', Remark: 'เอกสารไม่ครบ' }).status, 'ไม่อนุมัติ'); });
+
+  t('getData needs session', () => throws(() => ctx.getData(''), /AUTH_REQUIRED/));
+  t('staff sees masked id card', () => { const rows = ctx.getData(staff); ok(rows.length > 0); rows.forEach(r => ok(/^X{9}\d{4}$/.test(r[6]), r[6])); });
+  t('accounting sees full id card', () => eq(ctx.getData(acc)[0][6], '1103700012345'));
+  t('getData rows padded to 46', () => ctx.getData(acc).forEach(r => eq(r.length, 46)));
+  t('findRecord masks for staff', () => ok(/^X{9}2345$/.test(ctx.findRecord(staff, id)[6])));
+  t('findRecord unknown id', () => throws(() => ctx.findRecord(acc, 'zzz'), /ไม่พบ/));
+  t('legacy functions removed', () => ['saveDataB64', 'statusRecordWithRemark'].forEach(f => eq(typeof ctx[f], 'undefined', f)));
+}
+
+// @@TASK6@@
 
 process.on('exit', () => {
   console.log(`\n${pass} passed, ${fail} failed`);
