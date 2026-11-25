@@ -86,7 +86,7 @@ function addPremium() {
   let selectHTML = '<select class="form-control premium-select select2" name="premium_dynamic">';
   selectHTML += '<option disabled selected value="">เลือกของแถม</option>';
   premiumOptions.forEach(opt => {
-    selectHTML += `<option value="${opt[0]}">${opt[0]}</option>`;
+    selectHTML += `<option value="${escHtml(opt[0])}">${escHtml(opt[0])}</option>`;
   });
   selectHTML += '</select>';
   
@@ -140,7 +140,7 @@ function addEmailInput(type, value = '') {
   let div = document.createElement('div');
   div.className = "input-group mb-2";
   div.innerHTML = `
-    <input type="email" class="form-control ${className}" placeholder="example@gmail.com" value="${value}">
+    <input type="email" class="form-control ${className}" placeholder="example@gmail.com" value="${escHtml(value)}">
     <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()"><i class="fa-solid fa-minus"></i></button>
   `;
   container.appendChild(div);
@@ -159,7 +159,7 @@ function loadGeneralConfig() {
     let toEmails = config.emailTo ? config.emailTo.split(',') : [''];
     toEmails.forEach((email, index) => {
        if (index === 0) {
-         toContainer.innerHTML = `<input type="email" class="form-control email-to-input mb-2" placeholder="example@gmail.com" value="${email}">`;
+         toContainer.innerHTML = `<input type="email" class="form-control email-to-input mb-2" placeholder="example@gmail.com" value="${escHtml(email)}">`;
        } else {
          addEmailInput('to', email);
        }
@@ -170,7 +170,7 @@ function loadGeneralConfig() {
     let ccEmails = config.emailCc ? config.emailCc.split(',') : [''];
     ccEmails.forEach((email, index) => {
        if (index === 0) {
-         ccContainer.innerHTML = `<input type="email" class="form-control email-cc-input mb-2" placeholder="example@gmail.com" value="${email}">`;
+         ccContainer.innerHTML = `<input type="email" class="form-control email-cc-input mb-2" placeholder="example@gmail.com" value="${escHtml(email)}">`;
        } else {
          addEmailInput('cc', email);
        }
@@ -294,8 +294,8 @@ function initAllSheets() {
         let isDone = r.status.includes('✅');
         return `
           <tr>
-            <td><span class="badge" style="background:${color};font-size:.8rem;">${r.name}</span></td>
-            <td class="${isDone ? 'text-success fw-bold' : 'text-muted'}">${r.status}</td>
+            <td><span class="badge" style="background:${color};font-size:.8rem;">${escHtml(r.name)}</span></td>
+            <td class="${isDone ? 'text-success fw-bold' : 'text-muted'}">${escHtml(r.status)}</td>
           </tr>`;
       }).join('');
 

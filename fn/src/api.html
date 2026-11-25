@@ -7,6 +7,25 @@ var FN_KEYS = { token: 'fnToken', name: 'fnName', role: 'fnRole' };
 var userRole = '';
 var userDisplayName = '';
 
+// ---- Output safety: every sheet value that goes into HTML passes escHtml(); every URL, safeUrl().
+function escHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+var SAFE_URL_PREFIXES = ['https://lh3.googleusercontent.com/', 'https://drive.google.com/'];
+function safeUrl(u) {
+  u = String(u == null ? '' : u).trim();
+  for (var i = 0; i < SAFE_URL_PREFIXES.length; i++) {
+    if (u.indexOf(SAFE_URL_PREFIXES[i]) === 0) return u;
+  }
+  return '';
+}
+
 function storageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function storageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
 function storageRemove(k) { try { localStorage.removeItem(k); } catch (e) { } }

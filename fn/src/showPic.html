@@ -1,14 +1,4 @@
 <script>    
-  // FIX: Helper function ป้องกัน XSS — escape HTML special characters จากข้อมูล Spreadsheet
-  function escHtml(str) {
-    return String(str == null ? '' : str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   function showPic(el){
       loadingStart();
       let tr = $(el).closest('tr');
@@ -130,8 +120,8 @@
             '<th>สถานะ</th>'+'<td>'+statusBadge+'</td>'+
             '</tr>'+
             '<tr>'+
-            '<td colspan="2" style="text-align:center">'+'<img src="'+escHtml(data[30])+'" style="max-width:100%; height:auto;"><br>'+
-            (data[31] ? '<a href="'+escHtml(data[31])+'" target="_blank" class="btn btn-danger btn-sm mt-3"><i class="fa-solid fa-file-pdf"></i> ดูหนังสือสัญญา</a>' : '') +
+            '<td colspan="2" style="text-align:center">'+'<img src="'+escHtml(safeUrl(data[30]))+'" style="max-width:100%; height:auto;"><br>'+
+            (data[31] ? '<a href="'+escHtml(safeUrl(data[31]))+'" target="_blank" class="btn btn-danger btn-sm mt-3"><i class="fa-solid fa-file-pdf"></i> ดูหนังสือสัญญา</a>' : '') +
             '</td>'+
             '</tr>'+
             '</table>',

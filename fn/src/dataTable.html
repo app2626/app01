@@ -50,7 +50,7 @@ function getData(){
                 display: $.fn.dataTable.Responsive.display.modal({
                     header: function (row) {
                         var data = row.data();
-                        return 'รายละเอียดข้อมูล: ' + data[7]; // แสดงชื่อลูกค้าบนหัว popup
+                        return 'รายละเอียดข้อมูล: ' + escHtml(data[7]); // แสดงชื่อลูกค้าบนหัว popup
                     }
                 }),
                 renderer: $.fn.dataTable.Responsive.renderer.tableAll({
@@ -61,6 +61,8 @@ function getData(){
         data: dataArray,
 
     columnDefs:[
+                // plain-text columns: escape sheet values (columns with their own render override this)
+                {targets: '_all', render: $.fn.dataTable.render.text()},
                 
                 (userRole !== "แอดมิน" && userRole !== "บัญชี")?{targets: [32],visible: false}:{targets: [32],visible: true}, 
 
@@ -100,15 +102,18 @@ function getData(){
       { title: "งวดละ :" },
       { title: "รูปสลิปเงินโอน :" ,
       render: function (data) {    
-        data = `<img src="${data}" type='button' height='30px' onclick='showPic(this)'>`;
-        return data;
+        let src = safeUrl(data);
+        if (!src) return '<span class="text-muted">-</span>';
+        return `<img src="${escHtml(src)}" type='button' height='30px' onclick='showPic(this)'>`;
          }
        },
       { title: "ไฟล์หนังสือสัญญา",
         render: function (data) {
           // FIX: เปลี่ยนจาก external HTTP image เป็น Font Awesome icon (ไม่ขึ้นกับ URL ภายนอก)
           if (!data) return '<span class="text-muted">-</span>';
-          return `<a href="${data}" target="_blank" title="ดูหนังสือสัญญา"><i class="fa-solid fa-file-pdf text-danger fa-lg"></i></a>`;
+          let href = safeUrl(data);
+          if (!href) return '<span class="text-muted">-</span>';
+          return `<a href="${escHtml(href)}" target="_blank" title="ดูหนังสือสัญญา"><i class="fa-solid fa-file-pdf text-danger fa-lg"></i></a>`;
          }
        },
        { title: "ปุ่มจัดการ", name: "manage", data: null,
