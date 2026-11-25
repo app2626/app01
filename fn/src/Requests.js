@@ -115,6 +115,9 @@ function saveRequest(token, f) {
   requireSession_(token);
   f = f || {};
   validateForm_(f);
+  var finance = str_(f.finance);
+  if (!finance) throw new Error('กรุณาเลือก ไฟแนนซ์');
+  if (financeList_().indexOf(finance) < 0) throw new Error('ไม่พบไฟแนนซ์ "' + finance + '" ในรายการ กรุณาเลือกใหม่ หรือให้แอดมินเพิ่มในหน้าตั้งค่า');
   var net = calcNetPrice_(f);
   var folder = uploadFolder_();
   var blob1 = toBlob_(f.file1Data), blob2 = toBlob_(f.file2Data);
@@ -144,6 +147,7 @@ function saveRequest(token, f) {
     set('รูปสลิปเงินโอน :', 'https://lh3.googleusercontent.com/d/' + file1Id);
     set('ใบเสร็จ :', 'https://drive.google.com/uc?id=' + file2Id);
     set('สถานะ :', STATUS.WAIT);
+    set('ไฟแนนซ์ :', finance);
     sheet.appendRow(row);
     return newIdValue;
   });
@@ -154,6 +158,7 @@ function saveRequest(token, f) {
   }).join('');
   var msg = 'ขออนุมัติเพื่อการขาย FN+ Consignment'
     + '\nวันที่ขออนุมัติ: ' + str_(f.date)
+    + '\nไฟแนนซ์: ' + finance
     + '\nสาขา: ' + str_(f.location)
     + '\nชื่อตัวและสกุล (ลูกค้า): ' + str_(f.customer_name)
     + '\nเบอร์ติดต่อลูกค้า: ' + str_(f.customer_phone)
@@ -263,7 +268,7 @@ function updateStatus(token, obj) {
       put('AR ใส่หมายเกตุถ้ามี :', orDash_(obj.arRemark));
     }
     var logSheet = SpreadsheetApp.getActive().getSheetByName('Log');
-    if (!logSheet) { ensureSheets_(); logSheet = SpreadsheetApp.getActive().getSheetByName('Log'); }
+    if (!logSheet) logSheet = ensureSheetByName_('Log');
     logSheet.appendRow([new Date(), user.name, step.to, str_(obj.record), obj.action]);
     return sheet.getRange(rowNum, 1, 1, DATA_HEADERS.length).getDisplayValues()[0];
   });
@@ -272,6 +277,7 @@ function updateStatus(token, obj) {
     var r = result, c = function (h) { return r[col_(h) - 1]; };
     var msg = 'ผลการอนุมัติและการดำเนินการ'
       + '\nวันที่ขออนุมัติ: ' + c('วันที่ขออนุมัติ')
+      + '\nไฟแนนซ์: ' + (c('ไฟแนนซ์ :') || 'Ponmai')
       + '\nสาขา: ' + c('สาขา :')
       + '\nชื่อตัวและสกุล (ลูกค้า): ' + c('ชื่อตัวและสกุล (ลูกค้า) :')
       + '\nเบอร์ติดต่อลูกค้า: ' + c('เบอร์ติดต่อลูกค้า :')

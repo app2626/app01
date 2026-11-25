@@ -87,13 +87,25 @@ function getAllDropdownData(token) {
     if (!sheet || sheet.getLastRow() < 2) return [];
     return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().filter(function (r) { return r[0] !== ''; });
   };
-  return { location: list('location'), product: list('Product'), premium: list('Premium'), guarantee: list('guarantee') };
+  return { location: list('location'), product: list('Product'), premium: list('Premium'), guarantee: list('guarantee'),
+    finance: financeList_().map(function (n) { return [n]; }) };
+}
+
+/** Finance company names (trimmed, non-empty). Creates and seeds the Finance sheet on first use. */
+function financeList_() {
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss.getSheetByName('Finance');
+  if (!sheet) sheet = ensureSheetByName_('Finance');
+  if (sheet.getLastRow() < 2) return [];
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues()
+    .map(function (r) { return String(r[0]).trim(); })
+    .filter(function (n) { return n !== ''; });
 }
 
 function settingsSheet_(sheetName) {
   if (SETTINGS_SHEETS.indexOf(sheetName) < 0) throw new Error('INVALID_SHEET');
   var sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
-  if (!sheet) { ensureSheets_(); sheet = SpreadsheetApp.getActive().getSheetByName(sheetName); }
+  if (!sheet) sheet = ensureSheetByName_(sheetName);
   return sheet;
 }
 
@@ -129,6 +141,40 @@ function addSettingData(token, sheetName, rowData) {
   });
 }
 
+var BULK_SHEETS_ = ['location', 'Product', 'Premium'];
+var BULK_MAX_ = 2000;
+
+/**
+ * Public (แอดมิน). Appends many list names at once (file upload). Trims, drops blanks and
+ * duplicates (within the file and against the sheet). Returns { added: string[], skipped: number }.
+ */
+function addSettingDataBulk(token, sheetName, names) {
+  requireSession_(token, [ROLES.ADMIN]);
+  if (BULK_SHEETS_.indexOf(sheetName) < 0) throw new Error('INVALID_SHEET');
+  names = Array.isArray(names) ? names : [];
+  if (names.length > BULK_MAX_) throw new Error('อัปโหลดได้ครั้งละไม่เกิน 2,000 รายการ');
+  var sheet = settingsSheet_(sheetName);
+  return withLock_(function () {
+    var last = sheet.getLastRow();
+    var seen = {};
+    if (last >= 2) sheet.getRange(2, 1, last - 1, 1).getDisplayValues().forEach(function (r) { seen[String(r[0]).trim()] = true; });
+    var added = [];
+    names.forEach(function (v) {
+      var n = String(v == null ? '' : v).trim();
+      if (!n || seen[n]) return;
+      seen[n] = true;
+      added.push(n);
+    });
+    if (added.length) {
+      var start = Math.max(last, 1) + 1;
+      var need = start + added.length - 1 - sheet.getMaxRows();
+      if (need > 0) sheet.insertRowsAfter(sheet.getMaxRows(), need);
+      sheet.getRange(start, 1, added.length, 1).setValues(added.map(function (n) { return [n]; }));
+    }
+    return { added: added, skipped: names.length - added.length };
+  });
+}
+
 /** Public (แอดมิน). Deletes only if column A still holds expectedKey (protects against stale screens). */
 function deleteSettingData(token, sheetName, rowIndex, expectedKey) {
   requireSession_(token, [ROLES.ADMIN]);
@@ -145,6 +191,43 @@ function deleteSettingData(token, sheetName, rowIndex, expectedKey) {
       if (target && target.role === ROLES.ADMIN && admins.length <= 1) throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
     }
     sheet.deleteRow(rowNum);
+    return true;
+  });
+}
+
+/**
+ * Public (แอดมิน). Edits one settings row if column A still holds expectedKey.
+ * List sheets: rowData[0] is the new name. Admin: username and password are kept
+ * (password has its own reset); rowData[2] = display name, rowData[3] = role.
+ * Existing Data rows keep the name they were saved with.
+ */
+function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
+  requireSession_(token, [ROLES.ADMIN]);
+  var sheet = settingsSheet_(sheetName);
+  rowData = (rowData || []).map(function (v) { return String(v == null ? '' : v).trim(); });
+  return withLock_(function () {
+    var rowNum = Number(rowIndex) + 2;
+    var key = String(expectedKey).trim();
+    if (!(rowNum >= 2) || rowNum > sheet.getLastRow() ||
+        String(sheet.getRange(rowNum, 1).getDisplayValue()).trim() !== key) {
+      throw new Error('ข้อมูลมีการเปลี่ยนแปลง กรุณารีเฟรช');
+    }
+    if (sheetName === 'Admin') {
+      var roles = [ROLES.ADMIN, ROLES.ACC, ROLES.STAFF];
+      if (roles.indexOf(rowData[3]) < 0) throw new Error('สิทธิ์ไม่ถูกต้อง');
+      var target = findUser_(key);
+      var admins = readUsers_().filter(function (u) { return u.role === ROLES.ADMIN; });
+      if (target && target.role === ROLES.ADMIN && rowData[3] !== ROLES.ADMIN && admins.length <= 1) {
+        throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
+      }
+      sheet.getRange(rowNum, 3, 1, 2).setValues([[rowData[2] || key, rowData[3]]]);
+      return true;
+    }
+    if (!rowData[0]) throw new Error('กรุณากรอกข้อมูล');
+    var names = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues();
+    var dup = names.some(function (r, i) { return i + 2 !== rowNum && String(r[0]).trim() === rowData[0]; });
+    if (dup) throw new Error('"' + rowData[0] + '" มีอยู่แล้วในรายการ');
+    sheet.getRange(rowNum, 1).setValue(rowData[0]);
     return true;
   });
 }

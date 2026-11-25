@@ -123,5 +123,8 @@ function applyRoleUI(role, name) {
   $('.admin-only').toggle(role === 'แอดมิน');
   $('.dashboard-only').toggle(role === 'แอดมิน' || role === 'บัญชี');
   $('#msg-name').text(userDisplayName + ' (' + userRole + ')');
+  $('#msg-user-name').text(userDisplayName);
+  $('#msg-user-role').text(userRole);
+  $('#msg-avatar').text((userDisplayName || '?').trim().replace(/^[เ-ไ]/, '').charAt(0).toUpperCase() || '?');
 }
 </script>

@@ -16,17 +16,19 @@ class Range {
   setFontWeight() { return this; } setBackground() { return this; } setFontColor() { return this; } setHorizontalAlignment() { return this; }
 }
 class Sheet {
-  constructor(name) { this.name = name; this.rows = []; this.maxCols = 26; }
+  constructor(name) { this.name = name; this.rows = []; this.maxCols = 26; this.maxRows = 1000; }
   _get(r, c) { const row = this.rows[r - 1]; const v = row ? row[c - 1] : undefined; return v === undefined ? '' : v; }
   _set(r, c, v) { while (this.rows.length < r) this.rows.push([]); const row = this.rows[r - 1]; while (row.length < c) row.push(''); row[c - 1] = v; }
   getName() { return this.name; }
   getLastRow() { let n = this.rows.length; while (n > 0 && this.rows[n - 1].every(v => v === '' || v === undefined)) n--; return n; }
   getLastColumn() { return this.rows.reduce((m, r) => Math.max(m, r.length), 0); }
   getMaxColumns() { return this.maxCols; }
+  getMaxRows() { return this.maxRows; }
+  insertRowsAfter(after, n) { this.maxRows += n; }
   insertColumnsAfter(after, n) { this.maxCols += n; }
-  getRange(r, c, nr, nc) { if (r < 1 || c < 1 || c + (nc || 1) - 1 > this.maxCols) throw new Error('The coordinates of the range are outside the dimensions of the sheet.'); return new Range(this, r, c, nr || 1, nc || 1); }
+  getRange(r, c, nr, nc) { if (r < 1 || c < 1 || c + (nc || 1) - 1 > this.maxCols || r + (nr || 1) - 1 > this.maxRows) throw new Error('The coordinates of the range are outside the dimensions of the sheet.'); return new Range(this, r, c, nr || 1, nc || 1); }
   getDataRange() { return new Range(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); }
-  appendRow(a) { this.rows.length = this.getLastRow(); this.rows.push(a.slice()); this.maxCols = Math.max(this.maxCols, a.length); }
+  appendRow(a) { this.rows.length = this.getLastRow(); this.rows.push(a.slice()); this.maxCols = Math.max(this.maxCols, a.length); this.maxRows = Math.max(this.maxRows, this.rows.length); }
   deleteRow(i) { this.rows.splice(i - 1, 1); }
   setFrozenRows() {}
 }

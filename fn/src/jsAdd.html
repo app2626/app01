@@ -128,6 +128,9 @@ function loadAllDropdowns() {
     premiumOptions = data.premium; // Store globally for addPremium()
     document.querySelectorAll(".premium-select").forEach(select => fillSelect(select, data.premium));
     fillSelect(document.getElementById("guarantee"), data.guarantee);
+    fillSelect(document.getElementById("finance"), data.finance || []);
+    window.financeOptions = (data.finance || []).map(function (r) { return r[0]; });
+    if (window.globalData && typeof fillFinanceFilter === 'function') fillFinanceFilter(window.globalData);
   }).catch(function(err) { showError(err, 'โหลดตัวเลือกไม่สำเร็จ'); });
 }
 </script>
@@ -224,12 +227,18 @@ function loadSettingsData(sheetName) {
           <td><span class="text-muted">••••••</span> <button class="btn btn-sm btn-outline-secondary ms-2" onclick="resetUserPassword(${index})"><i class="fa-solid fa-key"></i> รีเซ็ต</button></td>
           <td>${escHtml(row[2])}</td>
           <td><span class="badge bg-primary">${escHtml(row[3])}</span></td>
-          <td class="text-center"><button class="btn btn-sm btn-danger" onclick="deleteSetting('${sheetName}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
+          <td class="text-center text-nowrap">
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editSetting('${sheetName}', ${index})" title="แก้ไข" aria-label="แก้ไข"><i class="fa-solid fa-pen"></i> แก้ไข</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteSetting('${sheetName}', ${index})" title="ลบ" aria-label="ลบ"><i class="fa-solid fa-trash"></i> ลบ</button>
+          </td>
         `;
       } else {
         tr.innerHTML = `
           <td>${escHtml(row[0])}</td>
-          <td class="text-center"><button class="btn btn-sm btn-danger" onclick="deleteSetting('${sheetName}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
+          <td class="text-center text-nowrap">
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="editSetting('${sheetName}', ${index})" title="แก้ไข" aria-label="แก้ไข"><i class="fa-solid fa-pen"></i> แก้ไข</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteSetting('${sheetName}', ${index})" title="ลบ" aria-label="ลบ"><i class="fa-solid fa-trash"></i> ลบ</button>
+          </td>
         `;
       }
       tbody.appendChild(tr);
@@ -259,7 +268,7 @@ function resetUserPassword(index) {
 
 function loadAllSettings() {
   loadGeneralConfig();
-  ['Admin', 'location', 'Product', 'Premium', 'guarantee'].forEach(sheet => loadSettingsData(sheet));
+  ['Admin', 'location', 'Product', 'Premium', 'guarantee', 'Finance'].forEach(sheet => loadSettingsData(sheet));
 }
 
 // ---- สร้าง Sheet ทั้งหมด ----
@@ -286,7 +295,8 @@ function initAllSheets() {
         'location':  '#fbbc04',
         'Product':   '#9334e6',
         'Premium':   '#ff6d00',
-        'guarantee': '#00897b'
+        'guarantee': '#00897b',
+        'Finance':   '#0f6b5c'
       };
 
       let rows = results.map(r => {
@@ -327,6 +337,135 @@ function initAllSheets() {
 }
 
 
+// ---------- Bulk upload (Excel / CSV, first column) ----------
+var SETTING_HEADERS = { location: 'ชื่อสาขา', Product: 'ชื่อสินค้ารุ่นต่างๆ', Premium: 'รายการของแถม' };
+var SHEETJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+var uploadTarget = '';
+var sheetJsPromise = null;
+
+function loadSheetJs() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!sheetJsPromise) {
+    sheetJsPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = SHEETJS_URL;
+      s.onload = function () { resolve(window.XLSX); };
+      s.onerror = function () { sheetJsPromise = null; reject(new Error('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่')); };
+      document.head.appendChild(s);
+    });
+  }
+  return sheetJsPromise;
+}
+
+function pickSettingFile(sheetName) {
+  uploadTarget = sheetName;
+  var input = document.getElementById('settingFileInput');
+  input.value = '';
+  input.click();
+}
+
+/** CSV: UTF-8 first, fall back to Windows-874 (Thai Excel "Save as CSV") when UTF-8 decoding fails. */
+function decodeCsv(buf) {
+  var text = new TextDecoder('utf-8').decode(buf);
+  if (text.indexOf('�') >= 0) {
+    try { text = new TextDecoder('windows-874').decode(buf); } catch (e) { }
+  }
+  return text.replace(/^﻿/, '');
+}
+
+function readSettingFile(input) {
+  var file = input.files && input.files[0];
+  var sheetName = uploadTarget;
+  if (!file || !sheetName) return;
+  if (file.size > 5 * 1024 * 1024) { Swal.fire('ไฟล์ใหญ่เกินไป', 'รองรับไฟล์ไม่เกิน 5 MB', 'error'); return; }
+  Swal.fire({ title: 'กำลังอ่านไฟล์...', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+  Promise.all([loadSheetJs(), file.arrayBuffer()]).then(function (res) {
+    var XLSX = res[0], buf = res[1];
+    var wb = /\.csv$/i.test(file.name) ? XLSX.read(decodeCsv(buf), { type: 'string' }) : XLSX.read(buf, { type: 'array' });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = ws ? XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }) : [];
+    var names = rows.map(function (r) { return String(r[0] == null ? '' : r[0]).trim(); });
+    if (names.length && names[0] === SETTING_HEADERS[sheetName]) names.shift();
+    previewSettingUpload(sheetName, file.name, names);
+  }).catch(function (err) { showError(err, 'อ่านไฟล์ไม่สำเร็จ'); });
+}
+
+function previewSettingUpload(sheetName, fileName, names) {
+  var existing = {};
+  (settingsCache[sheetName] || []).forEach(function (r) { existing[String(r[0]).trim()] = true; });
+  var fresh = [], dup = 0, blank = 0;
+  names.forEach(function (n) {
+    if (!n) { blank++; return; }
+    if (existing[n]) { dup++; return; }
+    existing[n] = true; fresh.push(n);
+  });
+  if (names.length > 2000) { Swal.fire('ไฟล์มีรายการมากเกินไป', 'อัปโหลดได้ครั้งละไม่เกิน 2,000 รายการ (ไฟล์นี้มี ' + names.length + ' แถว)', 'error'); return; }
+  if (!fresh.length) {
+    Swal.fire('ไม่มีรายการใหม่', 'ทุกรายการในไฟล์ "' + fileName + '" มีอยู่แล้วหรือเป็นแถวว่าง', 'info');
+    return;
+  }
+  var sample = fresh.slice(0, 10).map(function (n) { return '<li>' + escHtml(n) + '</li>'; }).join('');
+  Swal.fire({
+    title: 'นำเข้า ' + sheetName,
+    html: '<div class="text-start">' +
+      '<div class="mb-2 small text-muted">' + escHtml(fileName) + '</div>' +
+      '<div class="d-flex gap-2 flex-wrap mb-3">' +
+        '<span class="st st-done">เพิ่มใหม่ ' + fresh.length + ' รายการ</span>' +
+        (dup ? '<span class="st st-wait">ซ้ำ ข้าม ' + dup + '</span>' : '') +
+        (blank ? '<span class="fin">แถวว่าง ' + blank + '</span>' : '') +
+      '</div>' +
+      '<div class="small fw-semibold mb-1">ตัวอย่าง' + (fresh.length > 10 ? ' (10 รายการแรก)' : '') + '</div>' +
+      '<ol class="small mb-0 ps-3">' + sample + '</ol></div>',
+    showCancelButton: true,
+    confirmButtonText: 'นำเข้า ' + fresh.length + ' รายการ',
+    cancelButtonText: 'ยกเลิก'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+    callServer('addSettingDataBulk', sheetName, fresh).then(function (res) {
+      Swal.fire('นำเข้าสำเร็จ', 'เพิ่ม ' + res.added.length + ' รายการ' + (res.skipped ? ' (ข้ามซ้ำ ' + res.skipped + ')' : ''), 'success');
+      loadSettingsData(sheetName); loadAllDropdowns();
+    }).catch(function (err) { showError(err, 'นำเข้าไม่สำเร็จ'); loadSettingsData(sheetName); });
+  });
+}
+
+function editSetting(sheetName, rowIndex) {
+  let row = (settingsCache[sheetName] || [])[rowIndex];
+  if (!row) return;
+  let isAdmin = sheetName === 'Admin';
+  let html = isAdmin
+    ? `<div class="text-start small text-muted mb-1">Username: <b>${escHtml(row[0])}</b> (เปลี่ยนรหัสผ่านใช้ปุ่มรีเซ็ต)</div>
+       <input id="swal-edit-name" class="swal2-input" placeholder="ชื่อผู้ใช้งาน" value="${escHtml(row[2])}">
+       <select id="swal-edit-role" class="swal2-select w-75 mt-3">
+         ${['พนักงาน', 'บัญชี', 'แอดมิน'].map(r => `<option value="${r}"${r === row[3] ? ' selected' : ''}>${r}</option>`).join('')}
+       </select>`
+    : `<input id="swal-edit-name" class="swal2-input" value="${escHtml(row[0])}">
+       <div class="small text-muted mt-2">คำขอที่บันทึกไว้แล้วจะยังแสดงชื่อเดิม</div>`;
+
+  Swal.fire({
+    title: 'แก้ไขข้อมูล ' + sheetName,
+    html: html,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'บันทึก',
+    cancelButtonText: 'ยกเลิก',
+    preConfirm: () => {
+      let name = document.getElementById('swal-edit-name').value.trim();
+      if (isAdmin) return ['', '', name, document.getElementById('swal-edit-role').value];
+      if (!name) { Swal.showValidationMessage('กรุณากรอกข้อมูล'); return false; }
+      if (name === String(row[0]).trim()) { Swal.showValidationMessage('ยังไม่ได้เปลี่ยนแปลงข้อมูล'); return false; }
+      return [name];
+    }
+  }).then((result) => {
+    if (!result.isConfirmed) return;
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    callServer('updateSettingData', sheetName, rowIndex, row[0], result.value).then(() => {
+      Swal.fire('แก้ไขสำเร็จ', '', 'success');
+      loadSettingsData(sheetName); if (!isAdmin) loadAllDropdowns();
+    }).catch((err) => { showError(err, 'แก้ไขไม่สำเร็จ'); loadSettingsData(sheetName); });
+  });
+}
+
 function deleteSetting(sheetName, rowIndex) {
   Swal.fire({
     title: 'ยืนยันการลบ?',
@@ -342,7 +481,7 @@ function deleteSetting(sheetName, rowIndex) {
       let row = (settingsCache[sheetName] || [])[rowIndex] || [];
       callServer('deleteSettingData', sheetName, rowIndex, row[0]).then(() => {
         Swal.fire('ลบสำเร็จ!', '', 'success');
-        loadSettingsData(sheetName);
+        loadSettingsData(sheetName); if (sheetName !== 'Admin') loadAllDropdowns();
       }).catch((err) => { showError(err, 'ลบไม่สำเร็จ'); loadSettingsData(sheetName); });
     }
   });
@@ -391,7 +530,7 @@ function addSetting(sheetName) {
       Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
       callServer('addSettingData', sheetName, result.value).then(() => {
         Swal.fire('เพิ่มสำเร็จ!', '', 'success');
-        loadSettingsData(sheetName);
+        loadSettingsData(sheetName); if (sheetName !== 'Admin') loadAllDropdowns();
       }).catch((err) => showError(err, 'เพิ่มข้อมูลไม่สำเร็จ'));
     }
   });
@@ -415,6 +554,7 @@ function nextStep(current) {
   if (isValid) {
     stepDiv.style.display = 'none';
     document.getElementById('step' + (current + 1)).style.display = 'block';
+    setStepper(current + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
@@ -422,12 +562,23 @@ function nextStep(current) {
 function prevStep(current) {
   document.getElementById('step' + current).style.display = 'none';
   document.getElementById('step' + (current - 1)).style.display = 'block';
+  setStepper(current - 1);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function resetSteps() {
   document.querySelectorAll('.step-card').forEach(card => card.style.display = 'none');
   document.getElementById('step1').style.display = 'block';
+  setStepper(1);
+}
+
+function setStepper(active) {
+  document.querySelectorAll('#stepper li').forEach(function (li) {
+    var n = Number(li.getAttribute('data-step'));
+    li.classList.toggle('current', n === active);
+    li.classList.toggle('done', n < active);
+    if (n === active) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+  });
 }
 
 // ฟังก์ชั่นคำนวณราคาสุทธิ

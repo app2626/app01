@@ -16,7 +16,9 @@ var DATA_HEADERS = [
   "Invoice บัญชี :", "AR ใส่หมายเกตุถ้ามี :",
   // appended 2026-11 (barcodes used to be prefixed into the discount cells)
   "บาร์โค้ด AIS :", "บาร์โค้ด promotion :", "บาร์โค้ด Trade in :",
-  "บาร์โค้ด Trade up :", "บาร์โค้ด Big point :"
+  "บาร์โค้ด Trade up :", "บาร์โค้ด Big point :",
+  // appended 2026-11: finance company (blank on older rows = Ponmai)
+  "ไฟแนนซ์ :"
 ];
 
 var LOG_HEADERS = ["วันที่/เวลา", "ผู้ดำเนินการ", "สถานะการอนุมัติ", "ID รายการ", "รายละเอียด"];
@@ -30,7 +32,7 @@ var STATUS = {
   LEGACY_APPROVED: 'อนุมัติแล้ว'
 };
 
-var SETTINGS_SHEETS = ['Admin', 'location', 'Product', 'Premium', 'guarantee'];
+var SETTINGS_SHEETS = ['Admin', 'location', 'Product', 'Premium', 'guarantee', 'Finance'];
 
 // strict: column positions matter (rows are written by position), so the live header must match.
 var SHEET_DEFS = [
@@ -40,7 +42,9 @@ var SHEET_DEFS = [
   { name: 'location', headers: ['ชื่อสาขา'], color: '#fbbc04' },
   { name: 'Product', headers: ['ชื่อสินค้ารุ่นต่างๆ'], color: '#9334e6' },
   { name: 'Premium', headers: ['รายการของแถม'], color: '#ff6d00' },
-  { name: 'guarantee', headers: ['รายการรับประกันจอแตก'], color: '#00897b' }
+  { name: 'guarantee', headers: ['รายการรับประกันจอแตก'], color: '#00897b' },
+  // seed rows are written only when the sheet is first created
+  { name: 'Finance', headers: ['ชื่อไฟแนนซ์'], color: '#0f6b5c', seed: [['Ponmai'], ['Vyvr']] }
 ];
 
 /** 1-based column number of a Data header. */
@@ -76,36 +80,53 @@ function missingHeaderCount_(sheet, headers) {
 
 /** Creates missing sheets/headers; appends missing trailing headers. Throws on a mismatched strict header row. */
 function ensureSheets_() {
+  var results = SHEET_DEFS.map(ensureSheet_);
+  if (typeof ensureConfigSheet_ === 'function') results.push(ensureConfigSheet_());
+  return results;
+}
+
+/**
+ * Runtime helper: returns the named sheet, creating only that one if it is missing.
+ * Unlike ensureSheets_, it never validates other sheets, so header drift elsewhere
+ * (e.g. a legacy Log header) cannot break unrelated features.
+ */
+function ensureSheetByName_(name) {
   var ss = SpreadsheetApp.getActive();
-  var results = [];
-  SHEET_DEFS.forEach(function (def) {
-    var sheet = ss.getSheetByName(def.name);
-    var isNew = !sheet;
-    if (isNew) sheet = ss.insertSheet(def.name);
-    ensureWidth_(sheet, def.headers.length);
-    var status;
-    if (sheet.getLastRow() === 0) {
-      sheet.getRange(1, 1, 1, def.headers.length).setValues([def.headers]);
-      status = isNew ? 'สร้างใหม่ ✅' : 'เพิ่มหัวตาราง ✅';
-    } else if (def.strict) {
-      var missing = missingHeaderCount_(sheet, def.headers);
-      if (missing > 0) {
-        var from = def.headers.length - missing;
-        sheet.getRange(1, from + 1, 1, missing).setValues([def.headers.slice(from)]);
-        status = 'เพิ่มคอลัมน์ใหม่ ' + missing + ' คอลัมน์ ✅';
-      } else {
-        status = 'มีข้อมูลอยู่แล้ว ⏭️';
-      }
+  var sheet = ss.getSheetByName(name);
+  if (sheet) return sheet;
+  var def = SHEET_DEFS.filter(function (d) { return d.name === name; })[0];
+  if (!def) throw new Error('Unknown sheet: ' + name);
+  ensureSheet_(def);
+  return ss.getSheetByName(name);
+}
+
+function ensureSheet_(def) {
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss.getSheetByName(def.name);
+  var isNew = !sheet;
+  if (isNew) sheet = ss.insertSheet(def.name);
+  ensureWidth_(sheet, def.headers.length);
+  var status;
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, def.headers.length).setValues([def.headers]);
+    status = isNew ? 'สร้างใหม่ ✅' : 'เพิ่มหัวตาราง ✅';
+    if (isNew && def.seed) sheet.getRange(2, 1, def.seed.length, def.seed[0].length).setValues(def.seed);
+  } else if (def.strict) {
+    var missing = missingHeaderCount_(sheet, def.headers);
+    if (missing > 0) {
+      var from = def.headers.length - missing;
+      sheet.getRange(1, from + 1, 1, missing).setValues([def.headers.slice(from)]);
+      status = 'เพิ่มคอลัมน์ใหม่ ' + missing + ' คอลัมน์ ✅';
     } else {
       status = 'มีข้อมูลอยู่แล้ว ⏭️';
     }
-    sheet.getRange(1, 1, 1, def.headers.length).setFontWeight('bold').setBackground(def.color)
-      .setFontColor('#ffffff').setHorizontalAlignment('center');
-    sheet.setFrozenRows(1);
-    results.push({ name: def.name, status: status });
-  });
-  if (typeof ensureConfigSheet_ === 'function') results.push(ensureConfigSheet_());
-  return results;
+  } else {
+    status = 'มีข้อมูลอยู่แล้ว ⏭️';
+  }
+  sheet.getRange(1, 1, 1, def.headers.length).setFontWeight('bold').setBackground(def.color)
+    .setFontColor('#ffffff').setHorizontalAlignment('center');
+  sheet.setFrozenRows(1);
+  return { name: def.name, status: status };
 }
 
 /**
@@ -114,7 +135,7 @@ function ensureSheets_() {
  */
 function getDataSheet_() {
   var sheet = SpreadsheetApp.getActive().getSheetByName('Data');
-  if (!sheet) { ensureSheets_(); return SpreadsheetApp.getActive().getSheetByName('Data'); }
+  if (!sheet) return ensureSheetByName_('Data');
   ensureWidth_(sheet, DATA_HEADERS.length);
   try {
     var missing = missingHeaderCount_(sheet, DATA_HEADERS);

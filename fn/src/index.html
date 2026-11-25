@@ -11,6 +11,7 @@
 </script>
 
 <head>
+  <meta charset="utf-8">
   <base target="_top">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" />
   <link href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" rel="stylesheet" type="text/css">
@@ -44,90 +45,145 @@
 
 
 <body>
-  <div id="loading" class="d-flex justify-content-center  align-items-center invisible">
-    <div class="spinner-border" style="width: 3rem; height: 3rem;" role="status">
-    </div>
+  <div id="loading" class="d-flex justify-content-center align-items-center invisible" role="status" aria-live="polite">
+    <div class="loader-card"><span class="spinner-border" aria-hidden="true"></span> กำลังโหลดข้อมูล…</div>
   </div>
-  <div class="container-fluid">
-    <nav class="navbar navbar-expand-lg navbar-light bg-primary mb-3" id="mainNavbar" style="display: none;">
-      <div class="container-fluid d-flex flex-nowrap align-items-center">
-        <button class="btn btn-outline-light flex-shrink-0 me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarNav" aria-controls="sidebarNav">
-          <i class="fa-solid fa-bars"></i>
-        </button>
-        <h5 class="text-white mb-0 text-truncate">ระบบบันทึกข้อมูล FN+ Consignment</h5>
-        <span class="ms-auto"></span>
+
+  <header class="topbar" id="mainNavbar" style="display: none;">
+    <div class="topbar-inner">
+      <button class="icon-btn d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarNav" aria-controls="sidebarNav" aria-label="เปิดเมนู">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">FN+</div>
+        <div class="min-w-0">
+          <div class="brand-name">FN+ Consignment</div>
+          <div class="brand-sub">ระบบขออนุมัติขายผ่อนชำระ</div>
+        </div>
       </div>
+      <nav class="topnav" aria-label="เมนูหลัก">
+        <a href="#" data-view="table-view" class="table-only" style="display:none;" onclick="switchView('table-view'); return false;"><i class="fa-solid fa-list-check me-1"></i> รายการคำขอ</a>
+        <a href="#" data-view="form-view" onclick="switchView('form-view'); return false;"><i class="fa-solid fa-plus me-1"></i> สร้างคำขอ</a>
+        <a href="#" data-view="dashboard-view" class="dashboard-only" style="display:none;" onclick="switchView('dashboard-view'); return false;"><i class="fa-solid fa-chart-column me-1"></i> แดชบอร์ด</a>
+        <a href="#" data-view="admin-view" class="admin-only" style="display:none;" onclick="switchView('admin-view'); return false;"><i class="fa-solid fa-sliders me-1"></i> ตั้งค่าระบบ</a>
+      </nav>
+      <div class="user-chip logout" style="display:none;">
+        <div class="user-meta">
+          <div class="n" id="msg-user-name"></div>
+          <div class="r" id="msg-user-role"></div>
+        </div>
+        <div class="avatar" id="msg-avatar" aria-hidden="true"></div>
+        <button class="icon-btn d-none d-lg-grid" type="button" onclick="logout();" title="ออกจากระบบ" aria-label="ออกจากระบบ">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+<!-- Sidebar Offcanvas (mobile) -->
+<div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarNav" style="width: 280px;" aria-labelledby="sidebarTitle">
+  <div class="offcanvas-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">FN+</div>
+      <div class="brand-name" id="sidebarTitle">FN+ Consignment</div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="ปิดเมนู"></button>
+  </div>
+  <div class="offcanvas-body p-0 pt-2 d-flex flex-column">
+    <nav aria-label="เมนูหลัก">
+      <a href="#" data-view="table-view" class="side-link table-only" style="display:none;" onclick="switchView('table-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-list-check"></i> รายการคำขอ
+      </a>
+      <a href="#" data-view="form-view" class="side-link" onclick="switchView('form-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-plus"></i> สร้างคำขอ
+      </a>
+      <a href="#" data-view="dashboard-view" class="side-link dashboard-only" style="display:none;" onclick="switchView('dashboard-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-chart-column"></i> แดชบอร์ด
+      </a>
+      <a href="#" data-view="admin-view" class="side-link admin-only" style="display:none;" onclick="switchView('admin-view'); closeSidebar(); return false;">
+        <i class="fa-solid fa-sliders"></i> ตั้งค่าระบบ
+      </a>
     </nav>
 
-<!-- Sidebar Offcanvas -->
-<div class="offcanvas offcanvas-start bg-dark text-white" tabindex="-1" id="sidebarNav" style="width: 280px;">
-  <div class="offcanvas-header border-bottom border-secondary">
-    <h5 class="offcanvas-title"><i class="fa-solid fa-user-check"></i> เมนูหลัก</h5>
-    <button type="button" class="btn-close btn-close-white text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-  </div>
-  <div class="offcanvas-body p-0 mt-2 d-flex flex-column">
-    <div class="list-group list-group-flush mb-3">
-      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 text-white border-0" style="background-color: transparent;" onclick="switchView('form-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-plus me-2"></i> กรอกแบบฟอร์ม
-      </a>
-      
-      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 table-only text-white border-0" style="display:none; background-color: transparent;" onclick="switchView('table-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-table me-2"></i> ตารางข้อมูล
-      </a>
-      
-      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 dashboard-only text-white border-0" style="display:none; background-color: transparent;" onclick="switchView('dashboard-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-chart-line me-2"></i> แดชบอร์ด
-      </a>
-      
-      <a href="#" class="list-group-item list-group-item-action list-group-item-dark p-3 admin-only text-white border-0" style="display:none; background-color: transparent;" onclick="switchView('admin-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-gear me-2"></i> ตั้งค่าระบบ
-      </a>
-    </div>
-
-    <!-- ปุ่มออกจากระบบล่างสุด -->
-    <div class="mt-auto p-3 logout" style="display:none;">
-      <button class="btn btn-danger w-100 py-2" id="btnLogout" onclick="logout(); closeSidebar();">
-        <i class="fa-solid fa-right-from-bracket me-2"></i> ออกจากระบบ (<span id="msg-name"></span>)
+    <div class="mt-auto p-3 border-top logout" style="display:none;">
+      <div class="small text-muted mb-2">เข้าสู่ระบบในชื่อ <span class="fw-semibold text-dark" id="msg-name"></span></div>
+      <button class="btn btn-light w-100" id="btnLogout" onclick="logout(); closeSidebar();">
+        <i class="fa-solid fa-arrow-right-from-bracket me-2"></i> ออกจากระบบ
       </button>
     </div>
   </div>
 </div>
 <!-- End Sidebar -->
 
+  <main class="page" id="main-content">
+
 <!-- หน้า Login View -->
-<div class="container-fluid align-items-center justify-content-center" id="login-view" style="min-height: 80vh; display: none;">
-  <div class="card shadow-lg border-0" style="width: 100%; max-width: 400px; border-radius: 16px;">
-    <div class="card-header bg-primary text-white text-center py-4" style="border-radius: 16px 16px 0 0;">
-      <i class="fa-solid fa-circle-user fa-3x mb-2"></i>
-      <h4 class="mb-0 fw-bold">เข้าสู่ระบบ</h4>
-    </div>
-    <div class="card-body p-4">
+<div id="login-view" style="display: none;">
+  <div class="login-shell">
+    <aside class="login-aside">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">FN+</div>
+        <div class="brand-name text-white">FN+ Consignment</div>
+      </div>
+      <div>
+        <p class="login-headline">ขออนุมัติขายผ่อนชำระ ติดตามได้ทุกขั้นตอน</p>
+        <p>สาขาส่งคำขอ การเงินอนุมัติ บัญชีเปิด SO และ Invoice ทุกขั้นตอนบันทึกผู้ดำเนินการและเวลาไว้</p>
+      </div>
+      <ul class="login-flow">
+        <li><i class="fa-solid fa-paper-plane"></i> สาขาส่งคำขอพร้อมสลิปและสัญญา</li>
+        <li><i class="fa-solid fa-check"></i> การเงินตรวจยอดโอนและอนุมัติ</li>
+        <li><i class="fa-solid fa-file-invoice"></i> บัญชีเปิด Sales Order</li>
+        <li><i class="fa-solid fa-file-invoice-dollar"></i> ออก Invoice และปิดรายการ</li>
+      </ul>
+    </aside>
+    <div class="login-form">
+      <h1>เข้าสู่ระบบ</h1>
+      <div class="lead-sub">ใช้ชื่อผู้ใช้และรหัสผ่านที่ผู้ดูแลระบบออกให้</div>
       <form onsubmit="event.preventDefault(); login()">
-        <div class="input-group mb-3">
-          <span class="input-group-text bg-light text-primary border-end-0"><i class="fa-solid fa-user"></i></span>
-          <input type="text" class="form-control border-start-0" id="username" placeholder="ชื่อผู้ใช้งาน" required style="background-color: #f8f9fa;">
+        <div class="mb-3">
+          <label for="username">ชื่อผู้ใช้งาน</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="fa-solid fa-user"></i></span>
+            <input type="text" class="form-control" id="username" autocomplete="username" required>
+          </div>
         </div>
-        <div class="input-group mb-4">
-          <span class="input-group-text bg-light text-primary border-end-0"><i class="fa-solid fa-lock"></i></span>
-          <input type="password" class="form-control border-start-0" id="password" placeholder="รหัสผ่าน" required style="background-color: #f8f9fa;">
+        <div class="mb-3">
+          <label for="password">รหัสผ่าน</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="fa-solid fa-lock"></i></span>
+            <input type="password" class="form-control" id="password" autocomplete="current-password" required>
+          </div>
         </div>
-        <div id="login-error" class="text-danger text-center mb-3 fw-bold" style="display: none; font-size: 0.9em;">
-          <i class="fa-solid fa-triangle-exclamation"></i> ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง!
+        <div id="login-error" class="login-error mb-3" role="alert" style="display: none;">
+          <i class="fa-solid fa-circle-exclamation me-1"></i> ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง
         </div>
-        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" style="border-radius: 8px;">
-          <i class="fa-solid fa-right-to-bracket me-2"></i> ล็อกอินเข้าระบบ
+        <button type="submit" class="btn btn-primary w-100">
+          เข้าสู่ระบบ <i class="fa-solid fa-arrow-right ms-1"></i>
         </button>
       </form>
+      <div class="login-foot"><i class="fa-solid fa-shield-halved me-1"></i> เซสชันหมดอายุอัตโนมัติเมื่อไม่ได้ใช้งาน 6 ชั่วโมง</div>
     </div>
   </div>
 </div>
 
 <!--เริ่มฟอร์ม-->
-       <div class="container-fluid" id="form-view" style="display: none;">
-       <div class="col-md-8 mx-auto">
-      <form id="myForm" onsubmit="event.preventDefault(); addData(this)" style="text-align:left;font-size:.875rem">
-        <div class="card mb-3 step-card" id="step1">
-          <div class="card-header bg-primary text-white">1. ข้อมูลพนักงานและสาขา</div>
+    <section id="form-view" style="display: none;">
+      <div class="page-narrow">
+      <div class="page-head">
+        <div>
+          <h1>สร้างคำขออนุมัติ</h1>
+          <p>กรอกข้อมูลให้ครบ 4 ขั้นตอน ระบบจะแจ้งการเงินทันทีที่บันทึก</p>
+        </div>
+      </div>
+      <ol class="stepper" id="stepper" aria-label="ขั้นตอนการกรอก">
+        <li data-step="1" class="current"><span class="n">1</span><span>พนักงานและสาขา</span></li>
+        <li data-step="2"><span class="n">2</span><span>ข้อมูลลูกค้า</span></li>
+        <li data-step="3"><span class="n">3</span><span>สินค้าและการชำระ</span></li>
+        <li data-step="4"><span class="n">4</span><span>เอกสารแนบ</span></li>
+      </ol>
+      <form id="myForm" onsubmit="event.preventDefault(); addData(this)">
+        <div class="card mb-3 step-card tone-teal" id="step1">
+          <div class="card-header"><span class="section-title"><i class="fa-solid fa-id-badge"></i> ข้อมูลพนักงานและสาขา</span><span class="section-sub">ขั้นตอน 1/4</span></div>
           <div class="card-body">
             <div class="row">
               <div class="col-md-6 mb-2">
@@ -153,14 +209,14 @@
                 <input type="tel" class="form-control" id="emp_phone" name="emp_phone" required pattern="[0-9]{10}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);" title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก">
               </div>
             </div>
-            <div class="d-flex justify-content-end mt-4">
-              <button type="button" class="btn btn-primary px-4" onclick="nextStep(1)">ถัดไป <i class="fa-solid fa-arrow-right"></i></button>
+            <div class="step-actions end">
+              <button type="button" class="btn btn-primary px-4" onclick="nextStep(1)">ถัดไป <i class="fa-solid fa-arrow-right ms-1"></i></button>
             </div>
           </div>
         </div>
 
-        <div class="card mb-3 step-card" id="step2" style="display: none;">
-          <div class="card-header bg-success text-white">2. ข้อมูลลูกค้า</div>
+        <div class="card mb-3 step-card tone-blue" id="step2" style="display: none;">
+          <div class="card-header"><span class="section-title"><i class="fa-solid fa-user"></i> ข้อมูลลูกค้า</span><span class="section-sub">ขั้นตอน 2/4</span></div>
           <div class="card-body">
             <div class="row">
 
@@ -201,17 +257,23 @@
                 <input type="tel" class="form-control" id="customer_phone" name="customer_phone" required pattern="[0-9]{10}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);" title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก">
               </div>
             </div>
-            <div class="d-flex justify-content-between mt-4">
-              <button type="button" class="btn btn-secondary px-4" onclick="prevStep(2)"><i class="fa-solid fa-arrow-left"></i> ย้อนกลับ</button>
-              <button type="button" class="btn btn-success px-4" onclick="nextStep(2)">ถัดไป <i class="fa-solid fa-arrow-right"></i></button>
+            <div class="step-actions">
+              <button type="button" class="btn btn-light px-4" onclick="prevStep(2)"><i class="fa-solid fa-arrow-left me-1"></i> ย้อนกลับ</button>
+              <button type="button" class="btn btn-primary px-4" onclick="nextStep(2)">ถัดไป <i class="fa-solid fa-arrow-right ms-1"></i></button>
             </div>
           </div>
         </div>
 
-        <div class="card mb-3 step-card" id="step3" style="display: none;">
-          <div class="card-header bg-info text-dark">3. ข้อมูลสินค้าและการชำระเงิน</div>
+        <div class="card mb-3 step-card tone-amber" id="step3" style="display: none;">
+          <div class="card-header"><span class="section-title"><i class="fa-solid fa-mobile-screen"></i> ข้อมูลสินค้าและการชำระเงิน</span><span class="section-sub">ขั้นตอน 3/4</span></div>
           <div class="card-body">
             <div class="row">
+              <div class="col-12 mb-3">
+                <label for="finance">ไฟแนนซ์</label>
+                <select class="form-select" id="finance" name="finance" required>
+                  <option disabled selected value="">เลือกไฟแนนซ์</option>
+                </select>
+              </div>
               <div class="col-md-6 mb-2">
                 <label>ชื่อรุ่นสินค้า</label>
                 <select class="form-control select2" id="productname" name="productname" required>
@@ -223,8 +285,9 @@
                 <input type="text" class="form-control" id="imei" name="imei" required >
               </div>
               
-              <div class="col-md-12 mb-3 mt-3 border p-3 rounded bg-light">
-                <label class="fw-bold">PREMIUM (ของแถม)</label>
+              <div class="col-12 my-3">
+               <div class="subpanel">
+                <label>PREMIUM (ของแถม)</label>
                 <div id="premium-container">
                   <div class="input-group mb-2 premium-row">
                     <select class="form-control premium-select select2" name="premium_dynamic">
@@ -233,8 +296,9 @@
                     <button class="btn btn-outline-danger" type="button" onclick="removePremium(this)"><i class="fa-solid fa-trash"></i></button>
                   </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-primary mt-1" onclick="addPremium()"><i class="fa-solid fa-plus"></i> เพิ่มของแถม</button>
+                <button type="button" class="btn btn-sm btn-outline-primary mt-1" onclick="addPremium()"><i class="fa-solid fa-plus"></i> เพิ่มของแถม</button>
                 <input type="hidden" id="premium_combined" name="premium_combined" value="">
+               </div>
               </div>
               
               <div class="col-md-6 mb-2">
@@ -296,8 +360,8 @@
                 <input type="number" class="form-control" id="dues" name="dues" required >
               </div>
               <div class="col-md-6 mb-2">
-                <label class="fw-bold text-danger">ราคาสุทธิ</label>
-                <input type="number" class="form-control" id="netprice" name="netprice" required readonly>
+                <label>ราคาสุทธิ <span class="section-sub">(คำนวณอัตโนมัติ)</span></label>
+                <input type="number" class="form-control net-price" id="netprice" name="netprice" required readonly>
               </div>
               <div class="col-md-6 mb-2">
                 <label>จำนวนงวด</label>
@@ -308,174 +372,183 @@
                 <input type="number" class="form-control" id="installment_amount" name="installment_amount" required >
               </div>
             </div>
-            <div class="d-flex justify-content-between mt-4">
-              <button type="button" class="btn btn-secondary px-4" onclick="prevStep(3)"><i class="fa-solid fa-arrow-left"></i> ย้อนกลับ</button>
-              <button type="button" class="btn btn-info px-4" onclick="nextStep(3)">ถัดไป <i class="fa-solid fa-arrow-right"></i></button>
+            <div class="step-actions">
+              <button type="button" class="btn btn-light px-4" onclick="prevStep(3)"><i class="fa-solid fa-arrow-left me-1"></i> ย้อนกลับ</button>
+              <button type="button" class="btn btn-primary px-4" onclick="nextStep(3)">ถัดไป <i class="fa-solid fa-arrow-right ms-1"></i></button>
             </div>
           </div>
         </div>
 
-        <div class="card mb-3 step-card" id="step4" style="display: none;">
-          <div class="card-header bg-secondary text-white">4. เอกสารแนบ</div>
+        <div class="card mb-3 step-card tone-violet" id="step4" style="display: none;">
+          <div class="card-header"><span class="section-title"><i class="fa-solid fa-paperclip"></i> เอกสารแนบ</span><span class="section-sub">ขั้นตอน 4/4</span></div>
           <div class="card-body">
             <div class="row">
               <div class="col-md-12 mb-2">
-                <label>รูปสลิปการโอนเงิน</label>
+                <label for="myFile">รูปสลิปการโอนเงิน <span class="section-sub">ไฟล์รูปภาพ ไม่เกิน 10 MB</span></label>
                 <input type="file" class="form-control" id="myFile" name="myFile" accept="image/*" required >
               </div>
-              <div class="col-md-12 mb-2">
-                <label>แนบไฟล์ .PDF หนังสือสัญญา</label>
+              <div class="col-md-12 mb-2 mt-2">
+                <label for="myFile2">หนังสือสัญญา <span class="section-sub">ไฟล์ PDF ไม่เกิน 10 MB</span></label>
                 <input type="file" class="form-control" id="myFile2" name="myFile2" accept="application/pdf" required >
               </div>
-              <div class="col-md-12 mb-2 mt-4">
-                <div class="d-flex justify-content-between">
-                  <button type="button" class="btn btn-secondary px-4" onclick="prevStep(4)"><i class="fa-solid fa-arrow-left"></i> ย้อนกลับ</button>
-                  <button type="submit" id="btnsubmit" class="btn btn-primary px-4"><i class="fa-solid fa-paper-plane"></i> บันทึกข้อมูลขออนุมัติ</button>
-                </div>
-              </div>
+            </div>
+            <div class="step-actions">
+              <button type="button" class="btn btn-light px-4" onclick="prevStep(4)"><i class="fa-solid fa-arrow-left me-1"></i> ย้อนกลับ</button>
+              <button type="submit" id="btnsubmit" class="btn btn-primary px-4"><i class="fa-solid fa-paper-plane me-1"></i> ส่งคำขออนุมัติ</button>
             </div>
           </div>
         </div>
 
       </form>
-    </div>
-     </div>
+      </div>
+    </section>
 <!--ปิดฟอร์ม-->
 <!--เริ่มตาราง-->
-    <div class="container-fluid" id="table-view" style="display: block;">
-      
-      <!-- Summary Boxes -->
-      <div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-2 mb-3 text-center">
-        <div class="col">
-          <div class="card bg-warning text-dark shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('รออนุมัติ')">
-            <div class="card-body p-2 d-flex flex-column justify-content-center">
-              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-clock"></i> รออนุมัติ</span>
-              <h4 class="card-text fw-bold mb-0" id="countWait">0</h4>
-            </div>
-          </div>
+    <section id="table-view" style="display: block;">
+      <div class="page-head">
+        <div>
+          <h1>รายการคำขออนุมัติ</h1>
+          <p>คลิกที่การ์ดสถานะเพื่อกรองรายการ</p>
         </div>
-        <div class="col">
-          <div class="card bg-info text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('รอเปิด SO')">
-            <div class="card-body p-2 d-flex flex-column justify-content-center">
-              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-file-invoice"></i> รอเปิด SO</span>
-              <h4 class="card-text fw-bold mb-0" id="countWaitSO">0</h4>
-            </div>
-          </div>
-        </div>
-        <div class="col">
-          <div class="card bg-primary text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('รอเปิด Invoice')">
-            <div class="card-body p-2 d-flex flex-column justify-content-center">
-              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-file-invoice-dollar"></i> รอเปิด Invoice</span>
-              <h4 class="card-text fw-bold mb-0" id="countWaitInv">0</h4>
-            </div>
-          </div>
-        </div>
-        <div class="col">
-          <div class="card bg-success text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('เสร็จสมบูรณ์')">
-            <div class="card-body p-2 d-flex flex-column justify-content-center">
-              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-check-double"></i> เสร็จสมบูรณ์</span>
-              <h4 class="card-text fw-bold mb-0" id="countDone">0</h4>
-            </div>
-          </div>
-        </div>
-        <div class="col">
-          <div class="card bg-danger text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('ไม่อนุมัติ')">
-            <div class="card-body p-2 d-flex flex-column justify-content-center">
-              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-circle-xmark"></i> ไม่อนุมัติ</span>
-              <h4 class="card-text fw-bold mb-0" id="countReject">0</h4>
-            </div>
-          </div>
-        </div>
-        <div class="col">
-          <div class="card bg-secondary text-white shadow-sm border-0 h-100" style="cursor: pointer;" onclick="filterTableByStatus('ทั้งหมด')">
-            <div class="card-body p-2 d-flex flex-column justify-content-center">
-              <span class="card-title mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-list"></i> ทั้งหมด</span>
-              <h4 class="card-text fw-bold mb-0" id="countAll">0</h4>
-            </div>
-          </div>
+        <div class="d-flex gap-2 align-items-center">
+          <label for="financeFilter" class="visually-hidden">กรองตามไฟแนนซ์</label>
+          <select id="financeFilter" class="form-select form-select-sm finance-filter" onchange="filterByFinance()">
+            <option value="">ไฟแนนซ์ทั้งหมด</option>
+          </select>
+          <button type="button" class="btn btn-primary text-nowrap" onclick="switchView('form-view')"><i class="fa-solid fa-plus me-1"></i> สร้างคำขอ</button>
         </div>
       </div>
 
-      <!-- เอาปุ่มกรองออกตามที่ร้องขอ -->
-      <table id="datatable" class="display responsive nowrap" style="width:100%">
-        <thead class="bg-primary text-white"></thead>
-      </table>
-    </div>
+      <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-2 mb-3">
+        <div class="col">
+          <button type="button" class="kpi kpi-wait" data-status="รออนุมัติ" onclick="filterTableByStatus('รออนุมัติ')">
+            <span class="kpi-label"><span class="kpi-dot"><i class="fa-solid fa-clock"></i></span> รออนุมัติ</span>
+            <span class="kpi-value" id="countWait">0</span>
+          </button>
+        </div>
+        <div class="col">
+          <button type="button" class="kpi kpi-so" data-status="รอเปิด SO" onclick="filterTableByStatus('รอเปิด SO')">
+            <span class="kpi-label"><span class="kpi-dot"><i class="fa-solid fa-file-invoice"></i></span> รอเปิด SO</span>
+            <span class="kpi-value" id="countWaitSO">0</span>
+          </button>
+        </div>
+        <div class="col">
+          <button type="button" class="kpi kpi-inv" data-status="รอเปิด Invoice" onclick="filterTableByStatus('รอเปิด Invoice')">
+            <span class="kpi-label"><span class="kpi-dot"><i class="fa-solid fa-file-invoice-dollar"></i></span> รอเปิด Invoice</span>
+            <span class="kpi-value" id="countWaitInv">0</span>
+          </button>
+        </div>
+        <div class="col">
+          <button type="button" class="kpi kpi-done" data-status="เสร็จสมบูรณ์" onclick="filterTableByStatus('เสร็จสมบูรณ์')">
+            <span class="kpi-label"><span class="kpi-dot"><i class="fa-solid fa-check-double"></i></span> เสร็จสมบูรณ์</span>
+            <span class="kpi-value" id="countDone">0</span>
+          </button>
+        </div>
+        <div class="col">
+          <button type="button" class="kpi kpi-rej" data-status="ไม่อนุมัติ" onclick="filterTableByStatus('ไม่อนุมัติ')">
+            <span class="kpi-label"><span class="kpi-dot"><i class="fa-solid fa-xmark"></i></span> ไม่อนุมัติ</span>
+            <span class="kpi-value" id="countReject">0</span>
+          </button>
+        </div>
+        <div class="col">
+          <button type="button" class="kpi kpi-all" data-status="ทั้งหมด" onclick="filterTableByStatus('ทั้งหมด')">
+            <span class="kpi-label"><span class="kpi-dot"><i class="fa-solid fa-layer-group"></i></span> ทั้งหมด</span>
+            <span class="kpi-value" id="countAll">0</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table id="datatable" class="display responsive nowrap" style="width:100%">
+          <thead></thead>
+        </table>
+      </div>
+    </section>
 <!--ปิดตาราง-->
 
 <!--เริ่มแดชบอร์ด-->
-    <div class="container-fluid" id="dashboard-view" style="display: none;">
-      <div class="row">
-        <div class="col-md-6 mb-3">
-          <div class="card h-100 shadow-sm">
-            <div class="card-header bg-primary text-white">สรุปยอดรายเดือน (เฉพาะอนุมัติแล้ว)</div>
-            <div class="card-body" style="height: 300px;">
-              <canvas id="monthlyChart"></canvas>
-            </div>
+    <section id="dashboard-view" style="display: none;">
+      <div class="page-head">
+        <div>
+          <h1>แดชบอร์ด</h1>
+          <p>นับเฉพาะรายการที่อนุมัติแล้ว (รอเปิด SO, รอเปิด Invoice, เสร็จสมบูรณ์)</p>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-lg-7">
+          <div class="card h-100 tone-teal">
+            <div class="card-header"><span class="section-title"><i class="fa-solid fa-chart-column"></i> จำนวนรายการรายเดือน</span></div>
+            <div class="card-body"><div class="chart-box"><canvas id="monthlyChart"></canvas></div></div>
           </div>
         </div>
-        <div class="col-md-6 mb-3">
-          <div class="card h-100 shadow-sm">
-            <div class="card-header bg-success text-white">รุ่นสินค้าขายดี (เฉพาะอนุมัติแล้ว)</div>
-            <div class="card-body" style="height: 300px;">
-              <canvas id="modelChart"></canvas>
-            </div>
+        <div class="col-lg-5">
+          <div class="card h-100 tone-blue">
+            <div class="card-header"><span class="section-title"><i class="fa-solid fa-mobile-screen"></i> รุ่นสินค้าขายดี</span></div>
+            <div class="card-body"><div class="chart-box"><canvas id="modelChart"></canvas></div></div>
           </div>
         </div>
-        <div class="col-md-12 mb-3">
-          <div class="card h-100 shadow-sm">
-            <div class="card-header bg-info text-dark">10 สาขาขายดี (เฉพาะอนุมัติแล้ว)</div>
-            <div class="card-body" style="height: 300px;">
-              <canvas id="branchChart"></canvas>
-            </div>
+        <div class="col-lg-4">
+          <div class="card h-100 tone-violet">
+            <div class="card-header"><span class="section-title"><i class="fa-solid fa-building-columns"></i> สัดส่วนตามไฟแนนซ์</span></div>
+            <div class="card-body"><div class="chart-box"><canvas id="financeChart"></canvas></div></div>
+          </div>
+        </div>
+        <div class="col-lg-8">
+          <div class="card h-100 tone-amber">
+            <div class="card-header"><span class="section-title"><i class="fa-solid fa-store"></i> 10 สาขาที่มียอดสูงสุด</span></div>
+            <div class="card-body"><div class="chart-box"><canvas id="branchChart"></canvas></div></div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 <!--ปิดแดชบอร์ด-->
-  </div>
 
   <!-- เริ่มหน้าแอดมินตั้งค่า -->
-  <div class="container-fluid" id="admin-view" style="display: none;">
-    <div class="col-md-10 mx-auto">
-      <div class="card mb-3 shadow-sm border-0">
-        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-          <span><i class="fa-solid fa-gear"></i> ตั้งค่าระบบ (Admin Settings)</span>
-          <button class="btn btn-sm btn-danger" onclick="switchView('table-view')"><i class="fa-solid fa-xmark"></i> ปิด</button>
-        </div>
-        <div class="card-body bg-light">
+  <section id="admin-view" style="display: none;">
+    <div class="page-head">
+      <div>
+        <h1>ตั้งค่าระบบ</h1>
+        <p>การแจ้งเตือน ผู้ใช้งาน และรายการตัวเลือกในแบบฟอร์ม</p>
+      </div>
+      <button class="btn btn-light" onclick="switchView('table-view')"><i class="fa-solid fa-arrow-left me-1"></i> กลับไปหน้ารายการ</button>
+    </div>
+      <div class="card mb-3 tone-teal admin-card">
+        <div class="card-body">
           <ul class="nav nav-tabs" id="adminTabs" role="tablist">
             <li class="nav-item" role="presentation">
-              <button class="nav-link active fw-bold" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">ตั้งค่าแจ้งเตือน Telegram</button>
+              <button class="nav-link active" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">ตั้งค่าแจ้งเตือน Telegram</button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin-tab-pane" type="button" role="tab">Admin</button>
+              <button class="nav-link" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin-tab-pane" type="button" role="tab">Admin</button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold" id="location-tab" data-bs-toggle="tab" data-bs-target="#location-tab-pane" type="button" role="tab">Location</button>
+              <button class="nav-link" id="location-tab" data-bs-toggle="tab" data-bs-target="#location-tab-pane" type="button" role="tab">Location</button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold" id="product-tab" data-bs-toggle="tab" data-bs-target="#product-tab-pane" type="button" role="tab">Product</button>
+              <button class="nav-link" id="product-tab" data-bs-toggle="tab" data-bs-target="#product-tab-pane" type="button" role="tab">Product</button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold" id="premium-tab" data-bs-toggle="tab" data-bs-target="#premium-tab-pane" type="button" role="tab">PREMIUM</button>
+              <button class="nav-link" id="finance-tab" data-bs-toggle="tab" data-bs-target="#finance-tab-pane" type="button" role="tab">Finance</button>
             </li>
             <li class="nav-item" role="presentation">
-              <button class="nav-link fw-bold" id="guarantee-tab" data-bs-toggle="tab" data-bs-target="#guarantee-tab-pane" type="button" role="tab">Guarantee</button>
+              <button class="nav-link" id="premium-tab" data-bs-toggle="tab" data-bs-target="#premium-tab-pane" type="button" role="tab">PREMIUM</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="guarantee-tab" data-bs-toggle="tab" data-bs-target="#guarantee-tab-pane" type="button" role="tab">Guarantee</button>
             </li>
           </ul>
-          <div class="tab-content mt-3 bg-white p-3 border border-top-0 rounded-bottom" id="adminTabsContent">
+          <div class="tab-content pt-4" id="adminTabsContent">
             <!-- General Settings (Telegram & Email) -->
             <div class="tab-pane fade show active" id="general" role="tabpanel">
-              <h5 class="text-primary mb-3"><i class="fa-brands fa-telegram"></i> การตั้งค่าแจ้งเตือน Telegram</h5>
+              <h2 class="section-title mb-3"><i class="fa-brands fa-telegram"></i> การตั้งค่าแจ้งเตือน Telegram</h2>
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="fw-bold">1. แจ้งเตือนคำขอใหม่ (มีข้อมูลบันทึกลงระบบ)</label>
+                  <label>1. แจ้งเตือนคำขอใหม่ (มีข้อมูลบันทึกลงระบบ)</label>
                   <input type="text" class="form-control mb-2" id="notifyNewToken" placeholder="Bot Token">
                   <input type="text" class="form-control" id="notifyNewChatId" placeholder="Chat ID">
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="fw-bold">2. แจ้งเตือนสถานะ (อนุมัติแล้ว/ไม่อนุมัติ)</label>
+                  <label>2. แจ้งเตือนสถานะ (อนุมัติแล้ว/ไม่อนุมัติ)</label>
                   <input type="text" class="form-control mb-2" id="notifyApproveToken" placeholder="Bot Token">
                   <input type="text" class="form-control" id="notifyApproveChatId" placeholder="Chat ID">
                 </div>
@@ -483,21 +556,21 @@
               
               <hr class="my-4">
               
-              <h5 class="text-primary mb-3"><i class="fa-solid fa-envelope"></i> การตั้งค่าแจ้งเตือน Email</h5>
+              <h2 class="section-title mb-3"><i class="fa-solid fa-envelope"></i> การตั้งค่าแจ้งเตือน Email</h2>
               <div class="row mb-3">
                 <div class="col-md-6 mb-2">
-                  <label class="fw-bold d-flex justify-content-between align-items-center mb-2">
+                  <label class="d-flex justify-content-between align-items-center mb-2">
                     <span>ส่งถึง (To):</span>
-                    <button class="btn btn-sm btn-outline-success" onclick="addEmailInput('to')"><i class="fa-solid fa-plus"></i> เพิ่มเมล์</button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="addEmailInput('to')"><i class="fa-solid fa-plus"></i> เพิ่มเมล์</button>
                   </label>
                   <div id="emailToContainer">
                     <input type="email" class="form-control email-to-input mb-2" placeholder="example@gmail.com">
                   </div>
                 </div>
                 <div class="col-md-6 mb-2">
-                  <label class="fw-bold d-flex justify-content-between align-items-center mb-2">
+                  <label class="d-flex justify-content-between align-items-center mb-2">
                     <span>สำเนา (CC):</span>
-                    <button class="btn btn-sm btn-outline-success" onclick="addEmailInput('cc')"><i class="fa-solid fa-plus"></i> เพิ่มเมล์</button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="addEmailInput('cc')"><i class="fa-solid fa-plus"></i> เพิ่มเมล์</button>
                   </label>
                   <div id="emailCcContainer">
                     <input type="email" class="form-control email-cc-input mb-2" placeholder="example@gmail.com">
@@ -507,10 +580,10 @@
 
               <hr class="my-4">
               
-              <h5 class="text-primary mb-3"><i class="fa-brands fa-google-drive"></i> การตั้งค่า Google Drive สำหรับจัดเก็บไฟล์</h5>
+              <h2 class="section-title mb-3"><i class="fa-brands fa-google-drive"></i> การตั้งค่า Google Drive สำหรับจัดเก็บไฟล์</h2>
               <div class="row mb-3">
                 <div class="col-md-12 mb-2">
-                  <label class="fw-bold">Google Drive Folder ID (สำหรับเก็บรูปสลิปและ PDF)</label>
+                  <label>Google Drive Folder ID (สำหรับเก็บรูปสลิปและ PDF)</label>
                   <input type="text" class="form-control mt-2" id="driveFolderId" placeholder="ตัวอย่าง: 1_b5LnM6ZOV3vulT2i5Jk3QtKoAwEvRD5">
                 </div>
               </div>
@@ -520,7 +593,7 @@
               <hr class="my-4">
 
               <!-- ปุ่มสร้าง Sheet -->
-              <h5 class="text-danger mb-3"><i class="fa-solid fa-table-columns"></i> เครื่องมือระบบ</h5>
+              <h2 class="section-title mb-3"><i class="fa-solid fa-table-columns"></i> เครื่องมือระบบ</h2>
               <div class="alert alert-warning d-flex align-items-start gap-2 py-2">
                 <i class="fa-solid fa-triangle-exclamation mt-1"></i>
                 <div style="font-size:.85rem;">
@@ -528,7 +601,7 @@
                   หาก Sheet มีอยู่แล้วและมีข้อมูล จะ<strong>ไม่เขียนทับ</strong>ข้อมูลเดิม
                 </div>
               </div>
-              <button class="btn btn-danger" id="btnInitSheets" onclick="initAllSheets()">
+              <button class="btn btn-outline-danger" id="btnInitSheets" onclick="initAllSheets()">
                 <i class="fa-solid fa-database"></i> สร้าง Sheet ทั้งหมด &amp; ตั้งหัวตาราง
               </button>
               <!-- ผลลัพธ์ -->
@@ -538,8 +611,8 @@
             <!-- Admin -->
             <div class="tab-pane fade" id="admin-tab-pane" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="text-primary m-0"><i class="fa-solid fa-users-gear"></i> จัดการผู้ใช้งาน (Admin)</h5>
-                <button class="btn btn-sm btn-success" onclick="addSetting('Admin')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                <h2 class="section-title m-0"><i class="fa-solid fa-users-gear"></i> จัดการผู้ใช้งาน (Admin)</h2>
+                <button class="btn btn-sm btn-primary" onclick="addSetting('Admin')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
               </div>
               <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="table-Admin" style="width:100%">
@@ -551,8 +624,11 @@
             <!-- Location -->
             <div class="tab-pane fade" id="location-tab-pane" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="text-primary m-0"><i class="fa-solid fa-store"></i> จัดการสาขา (Location)</h5>
-                <button class="btn btn-sm btn-success" onclick="addSetting('location')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                <h2 class="section-title m-0"><i class="fa-solid fa-store"></i> จัดการสาขา (Location)</h2>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-primary" onclick="pickSettingFile('location')" title="นำเข้าจากไฟล์ Excel หรือ CSV (คอลัมน์แรก)"><i class="fa-solid fa-file-arrow-up"></i> อัปโหลดไฟล์</button>
+                  <button class="btn btn-sm btn-primary" onclick="addSetting('location')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="table-location" style="width:100%">
@@ -561,11 +637,28 @@
                 </table>
               </div>
             </div>
+            <!-- Finance -->
+            <div class="tab-pane fade" id="finance-tab-pane" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="section-title m-0"><i class="fa-solid fa-building-columns"></i> จัดการไฟแนนซ์ (Finance)</h2>
+                <button class="btn btn-sm btn-primary" onclick="addSetting('Finance')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+              </div>
+              <p class="section-sub mb-3">ลบชื่อออกจากรายการแล้ว คำขอเก่าที่ใช้ชื่อนั้นยังแสดงชื่อเดิม คำขอเก่าที่ไม่มีไฟแนนซ์นับเป็น Ponmai</p>
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="table-Finance" style="width:100%">
+                  <thead class="table-light"><tr><th>ชื่อไฟแนนซ์</th><th>จัดการ</th></tr></thead>
+                  <tbody><tr><td colspan="2" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
+                </table>
+              </div>
+            </div>
             <!-- Product -->
             <div class="tab-pane fade" id="product-tab-pane" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="text-primary m-0"><i class="fa-solid fa-mobile-screen"></i> จัดการสินค้ารุ่นต่างๆ (Product)</h5>
-                <button class="btn btn-sm btn-success" onclick="addSetting('Product')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                <h2 class="section-title m-0"><i class="fa-solid fa-mobile-screen"></i> จัดการสินค้ารุ่นต่างๆ (Product)</h2>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-primary" onclick="pickSettingFile('Product')" title="นำเข้าจากไฟล์ Excel หรือ CSV (คอลัมน์แรก)"><i class="fa-solid fa-file-arrow-up"></i> อัปโหลดไฟล์</button>
+                  <button class="btn btn-sm btn-primary" onclick="addSetting('Product')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="table-Product" style="width:100%">
@@ -577,8 +670,11 @@
             <!-- PREMIUM -->
             <div class="tab-pane fade" id="premium-tab-pane" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="text-primary m-0"><i class="fa-solid fa-gift"></i> จัดการของแถม (PREMIUM)</h5>
-                <button class="btn btn-sm btn-success" onclick="addSetting('Premium')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                <h2 class="section-title m-0"><i class="fa-solid fa-gift"></i> จัดการของแถม (PREMIUM)</h2>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-primary" onclick="pickSettingFile('Premium')" title="นำเข้าจากไฟล์ Excel หรือ CSV (คอลัมน์แรก)"><i class="fa-solid fa-file-arrow-up"></i> อัปโหลดไฟล์</button>
+                  <button class="btn btn-sm btn-primary" onclick="addSetting('Premium')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="table-Premium" style="width:100%">
@@ -590,8 +686,8 @@
             <!-- Guarantee -->
             <div class="tab-pane fade" id="guarantee-tab-pane" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="text-primary m-0"><i class="fa-solid fa-shield-halved"></i> จัดการประกันจอแตก (Guarantee)</h5>
-                <button class="btn btn-sm btn-success" onclick="addSetting('guarantee')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
+                <h2 class="section-title m-0"><i class="fa-solid fa-shield-halved"></i> จัดการประกันจอแตก (Guarantee)</h2>
+                <button class="btn btn-sm btn-primary" onclick="addSetting('guarantee')"><i class="fa-solid fa-plus"></i> เพิ่มข้อมูล</button>
               </div>
               <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="table-guarantee" style="width:100%">
@@ -603,9 +699,10 @@
           </div>
         </div>
       </div>
-    </div>
-  </div>
+  </section>
+  <input type="file" id="settingFileInput" accept=".xlsx,.xls,.csv" hidden onchange="readSettingFile(this)">
   <!-- ปิดหน้าแอดมินตั้งค่า -->
+  </main>
   
   <script>
     function switchView(viewId) {
@@ -620,10 +717,15 @@
         document.getElementById('mainNavbar').style.display = 'none';
         document.getElementById('login-view').style.display = 'flex'; // แสดงหน้าล็อกอินหากระบุ
       } else if (viewId) {
-        document.getElementById('mainNavbar').style.display = 'flex';
+        document.getElementById('mainNavbar').style.display = 'block';
         document.getElementById(viewId).style.display = 'block';
       }
-      
+      document.querySelectorAll('[data-view]').forEach(function (a) {
+        var on = a.getAttribute('data-view') === viewId;
+        a.classList.toggle('active', on);
+        if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      });
+
       if(viewId === 'admin-view') {
         loadAllSettings();
       } else if (viewId === 'form-view' && typeof resetSteps === 'function') {
@@ -643,8 +745,7 @@
   </script>
 
   <!--Footer -->
-  <footer class="container-fluid text-muted text-center mb-2">
-  </footer>
+  <footer class="app-foot logout" style="display:none;">FN+ Consignment · ระบบขออนุมัติขายผ่อนชำระ</footer>
   <!-- Auto Complete Thailand ที่อยู่ประเทศไทยอัตโนมัติ -->
 <script type="text/javascript">
   // ที่อยู่ลูกค้า: autocomplete ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์ (database pinned to the same commit as the plugin)

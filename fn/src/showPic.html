@@ -12,14 +12,14 @@
   function successPic(data){  
     loadingEnd();
     const statusMap = {
-      "รออนุมัติ":      "<span class='badge bg-warning text-dark sfont'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>",
-      "รอเปิด SO":      "<span class='badge bg-info text-white sfont'><i class='fa-solid fa-file-invoice'></i> รอเปิด SO</span>",
-      "รอเปิด Invoice": "<span class='badge bg-primary sfont'><i class='fa-solid fa-file-invoice-dollar'></i> รอเปิด Invoice</span>",
-      "เสร็จสมบูรณ์":   "<span class='badge bg-success sfont'><i class='fa-solid fa-check-double'></i> เสร็จสมบูรณ์</span>",
-      "ไม่อนุมัติ":     "<span class='badge bg-danger sfont'><i class='fa-solid fa-circle-xmark'></i> ไม่อนุมัติ</span>",
+      "รออนุมัติ":      "<span class='st st-wait'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>",
+      "รอเปิด SO":      "<span class='st st-so'><i class='fa-solid fa-file-invoice'></i> รอเปิด SO</span>",
+      "รอเปิด Invoice": "<span class='st st-inv'><i class='fa-solid fa-file-invoice-dollar'></i> รอเปิด Invoice</span>",
+      "เสร็จสมบูรณ์":   "<span class='st st-done'><i class='fa-solid fa-check-double'></i> เสร็จสมบูรณ์</span>",
+      "ไม่อนุมัติ":     "<span class='st st-rej'><i class='fa-solid fa-xmark'></i> ไม่อนุมัติ</span>",
     };
     // FIX: เก็บ status badge แยก ไม่ escape ส่วนนี้เพราะเป็น HTML ที่สร้างเอง
-    let statusBadge = statusMap[data[32]] || (data[32] ? escHtml(data[32]) : "<span class='badge bg-warning text-dark sfont'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>");
+    let statusBadge = statusMap[data[32]] || (data[32] ? escHtml(data[32]) : "<span class='st st-wait'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>");
     
     Swal.fire({
       position: 'top',
@@ -27,10 +27,13 @@
       // FIX: ใช้ escHtml() สำหรับข้อมูลทุกฟิลด์จาก Spreadsheet ป้องกัน XSS และ HTML แตก
       html: '<table class="table table-striped" style="text-align:left;font-size:.875rem">'+
             '<tr>'+
-            '<th colspan="2"class="bg-primary text-white text-center mb-2 p-2">ข้อมูลขออนุมัติ</th>'+
+            '<th colspan="2"class="text-center p-2" style="background:var(--accent-soft);color:var(--accent);">ข้อมูลขออนุมัติ</th>'+
             '</tr>'+
             '<tr>'+
             '<th>วันที่ขออนุมัติ</th>'+'<td>'+escHtml(data[1])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ไฟแนนซ์</th>'+'<td><span class="fin">'+escHtml(financeOf(data))+'</span></td>'+
             '</tr>'+
             '<tr>'+
              '<th>สาขา</th>'+'<td>'+escHtml(data[2])+'</td>'+

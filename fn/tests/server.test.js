@@ -14,11 +14,14 @@ const OLD_HEADERS_41 = ["ID :", "วันที่ขออนุมัติ",
 console.log('== SCHEMA');
 {
   const { ctx, sheets } = createGas();
-  t('DATA_HEADERS has 46 columns', () => eq(ctx.DATA_HEADERS.length, 46));
+  t('DATA_HEADERS has 47 columns', () => eq(ctx.DATA_HEADERS.length, 47));
+  t('finance is column 47', () => eq(ctx.col_('ไฟแนนซ์ :'), 47));
   t('DATA_HEADERS keeps the old 41 verbatim', () => eq(ctx.DATA_HEADERS.slice(0, 41), OLD_HEADERS_41));
   t('col_ status is 33', () => eq(ctx.col_('สถานะ :'), 33));
   t('col_ unknown throws', () => throws(() => ctx.col_('nope'), /Unknown column/));
-  t('ensureSheets_ creates all 8 sheets', () => { ctx.ensureSheets_(); ['Data', 'Log', 'Admin', 'Config', 'location', 'Product', 'Premium', 'guarantee'].forEach(n => ok(sheets[n], n)); });
+  t('ensureSheets_ creates all 9 sheets', () => { ctx.ensureSheets_(); ['Data', 'Log', 'Admin', 'Config', 'location', 'Product', 'Premium', 'guarantee', 'Finance'].forEach(n => ok(sheets[n], n)); });
+  t('ensureSheets_ seeds Finance with Ponmai, Vyvr', () => eq(sheets.Finance.rows, [['ชื่อไฟแนนซ์'], ['Ponmai'], ['Vyvr']]));
+  t('ensureSheets_ does not reseed existing Finance', () => { sheets.Finance.rows.splice(1); ctx.ensureSheets_(); eq(sheets.Finance.rows, [['ชื่อไฟแนนซ์']]); });
   t('Log header has record id', () => eq(sheets.Log.rows[0], ctx.LOG_HEADERS));
 }
 {
@@ -27,9 +30,15 @@ console.log('== SCHEMA');
     const d = ss.insertSheet('Data'); d.appendRow(OLD_HEADERS_41.slice()); const row = OLD_HEADERS_41.map((_, i) => 'v' + i); d.appendRow(row.slice());
     const lg = ss.insertSheet('Log'); lg.appendRow(['วันที่/เวลา', 'ผู้ดำเนินการ', 'สถานะการอนุมัติ']); lg.appendRow(['x', 'y', 'z']);
     ctx.ensureSheets_();
-    eq(sheets.Data.rows[0].length, 46); eq(sheets.Data.rows[0][45], 'บาร์โค้ด Big point :'); eq(sheets.Data.rows[1], row);
+    eq(sheets.Data.rows[0].length, 47); eq(sheets.Data.rows[0][45], 'บาร์โค้ด Big point :'); eq(sheets.Data.rows[0][46], 'ไฟแนนซ์ :'); eq(sheets.Data.rows[1], row);
     eq(sheets.Log.rows[0], ctx.LOG_HEADERS); eq(sheets.Log.rows[1], ['x', 'y', 'z']);
   });
+  t('dropdowns work when Finance is missing and Log header drifted', () => {
+    delete sheets.Finance; sheets.Log.rows[0][0] = 'Date';
+    try { eq(ctx.financeList_(), ['Ponmai', 'Vyvr']); eq(sheets.Log.rows[0][0], 'Date', 'Log header must not be touched'); }
+    finally { sheets.Log.rows[0][0] = ctx.LOG_HEADERS[0]; }
+  });
+  t('financeList_ creates Finance sheet when missing', () => { delete sheets.Finance; eq(ctx.financeList_(), ['Ponmai', 'Vyvr']); ok(sheets.Finance); });
   t('getDataSheet_ returns Data sheet', () => eq(ctx.getDataSheet_().getName(), 'Data'));
 }
 
@@ -83,7 +92,7 @@ console.log('== GUARDS / SETTINGS');
   const lastRow = n => sheets[n].rows[sheets[n].getLastRow() - 1];
   const adminOnly = {
     getConfigProperties: [], setConfigProperties: [{}], getSettingsData: ['location'], addSettingData: ['location', ['x']],
-    deleteSettingData: ['location', 0, 'x'], resetPassword: ['staff1', 'newpass1'], initializeAllSheets: [],
+    deleteSettingData: ['location', 0, 'x'], updateSettingData: ['location', 0, 'x', ['y']], addSettingDataBulk: ['location', ['a']], resetPassword: ['staff1', 'newpass1'], initializeAllSheets: [],
   };
   const anyRole = { getAllDropdownData: [] };
   Object.keys(Object.assign({}, adminOnly, anyRole)).forEach(fn => {
@@ -102,6 +111,30 @@ console.log('== GUARDS / SETTINGS');
   t('invalid sheet rejected', () => throws(() => ctx.getSettingsData(admin, 'Data'), /INVALID_SHEET/));
   t('invalid sheet rejected on add', () => throws(() => ctx.addSettingData(admin, 'Config', ['k', 'v']), /INVALID_SHEET/));
   t('delete with stale key rejected', () => throws(() => ctx.deleteSettingData(admin, 'location', 0, 'wrong'), /เปลี่ยนแปลง/));
+  t('bulk add appends new names, skips blanks and duplicates', () => {
+    const before = sheets.Product.rows.length;
+    sheets.Product.appendRow(['Galaxy S25']);
+    const r = ctx.addSettingDataBulk(admin, 'Product', [' Galaxy A56 ', '', 'Galaxy S25', 'Galaxy A56', 'iPhone 16', null]);
+    eq(r, { added: ['Galaxy A56', 'iPhone 16'], skipped: 4 });
+    eq(sheets.Product.rows.slice(before).map(x => x[0]), ['Galaxy S25', 'Galaxy A56', 'iPhone 16']);
+    sheets.Product.rows.splice(before);
+  });
+  t('bulk add only for location/Product/Premium', () => { throws(() => ctx.addSettingDataBulk(admin, 'Admin', ['x']), /INVALID_SHEET/); throws(() => ctx.addSettingDataBulk(admin, 'Finance', ['x']), /INVALID_SHEET/); });
+  t('bulk add over 2000 rejected', () => throws(() => ctx.addSettingDataBulk(admin, 'Premium', Array.from({ length: 2001 }, (_, i) => 'p' + i)), /2,000/));
+  t('bulk add grows the grid past its last row', () => { const sh = sheets.Premium; const n = sh.rows.length; sh.maxRows = sh.getLastRow(); eq(ctx.addSettingDataBulk(admin, 'Premium', ['g1', 'g2', 'g3']).added.length, 3); sh.rows.splice(n); });
+  t('bulk add with nothing new adds nothing', () => { const n = sheets.Premium.rows.length; eq(ctx.addSettingDataBulk(admin, 'Premium', ['', ' ']), { added: [], skipped: 2 }); eq(sheets.Premium.rows.length, n); });
+  t('update list item renames in place', () => { ctx.updateSettingData(admin, 'location', 0, 'สาขา A', [' สาขา A1 ']); eq(sheets.location.rows[1], ['สาขา A1']); sheets.location.rows[1] = ['สาขา A']; });
+  t('update with stale key rejected', () => throws(() => ctx.updateSettingData(admin, 'location', 0, 'wrong', ['z']), /เปลี่ยนแปลง/));
+  t('update to empty rejected', () => throws(() => ctx.updateSettingData(admin, 'location', 0, 'สาขา A', ['  ']), /กรุณากรอก/));
+  t('update to duplicate rejected', () => { sheets.location.appendRow(['สาขา B']); try { throws(() => ctx.updateSettingData(admin, 'location', 0, 'สาขา A', ['สาขา B']), /มีอยู่แล้ว/); } finally { sheets.location.rows.pop(); } });
+  t('update admin changes name and role, keeps username and hash', () => {
+    const before = sheets.Admin.rows[3].slice();
+    ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['ignored', '', 'พนักงานใหม่', 'บัญชี']);
+    eq(sheets.Admin.rows[3], [before[0], before[1], 'พนักงานใหม่', 'บัญชี']);
+    sheets.Admin.rows[3] = before;
+  });
+  t('update admin invalid role rejected', () => throws(() => ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['', '', 'x', 'root']), /สิทธิ์/));
+  t('cannot demote last admin', () => throws(() => ctx.updateSettingData(admin, 'Admin', 0, 'admin1', ['', '', 'แอดมินใหญ่', 'บัญชี']), /อย่างน้อย 1/));
   t('delete with matching key ok', () => { ctx.deleteSettingData(admin, 'location', 0, 'สาขา A'); eq(sheets.location.getLastRow(), 1); });
   t('cannot delete last admin', () => throws(() => ctx.deleteSettingData(admin, 'Admin', 0, 'admin1'), /อย่างน้อย 1/));
   t('added admin password is hashed', () => { ctx.addSettingData(admin, 'Admin', ['u9', 'secret9', 'n', 'พนักงาน']); ok(/^sha256\$/.test(lastRow('Admin')[1])); ok(ctx.login('u9', 'secret9')); });
@@ -126,7 +159,7 @@ console.log('== REQUESTS / WORKFLOW');
     id_card_number: '1103700012345', customer_name: 'ลูกค้า ทดสอบ', customer_phone: '0898765432', address: '1/2', road: '3',
     district: 'ตำบล', amphoe: 'อำเภอ', province: 'จังหวัด', zipcode: '10200', productname: 'Phone X', imei: '356789012345678',
     premium_combined: 'เคส', guarantee: '', price: '10000', down: '1000', discountais: '0', discountpromotion: '0',
-    discounttradein: '0', discounttradeup: '0', discountbigc: '0', dues: '0', installments: '10', installment_amount: '900',
+    discounttradein: '0', discounttradeup: '0', discountbigc: '0', dues: '0', installments: '10', installment_amount: '900', finance: 'Ponmai',
     file1Data: { base64: b64(10), mimeType: 'image/jpeg', name: 'slip.jpg' },
     file2Data: { base64: b64(10), mimeType: 'application/pdf', name: 'c.pdf' },
   }, o);
@@ -140,7 +173,7 @@ console.log('== REQUESTS / WORKFLOW');
     id = ctx.saveRequest(staff, form({ price: '10000', down: '1000', discountais: '500', dues: '200', netprice: '1' })).id;
     eq(Number(rowById(id)[C('ราคาสุทธิ :')]), 8700); eq(rowById(id)[C('สถานะ :')], 'รออนุมัติ');
   });
-  t('row is 46 wide with uploaded file links', () => { const r = rowById(id); eq(r.length, 46); ok(/^https:\/\/lh3\.googleusercontent\.com\/d\//.test(r[C('รูปสลิปเงินโอน :')])); ok(/^https:\/\/drive\.google\.com\/uc\?id=/.test(r[C('ใบเสร็จ :')])); eq(driveFiles.length, 2); });
+  t('row is 47 wide with uploaded file links', () => { const r = rowById(id); eq(r.length, 47); ok(/^https:\/\/lh3\.googleusercontent\.com\/d\//.test(r[C('รูปสลิปเงินโอน :')])); ok(/^https:\/\/drive\.google\.com\/uc\?id=/.test(r[C('ใบเสร็จ :')])); eq(driveFiles.length, 2); });
   t('barcode stored separately', () => { const i2 = ctx.saveRequest(staff, form({ barcode_ais: 'B1', discountais: '500' })).id; eq(rowById(i2)[C('ส่วนลด เปิดเบอร์ AIS :')], 500); eq(rowById(i2)[C('บาร์โค้ด AIS :')], 'B1'); });
   t('ids are unique on same millisecond', () => { const realNow = Date.now; Date.now = () => 1700000000000; try { const a = ctx.saveRequest(staff, form()).id, b = ctx.saveRequest(staff, form()).id; ok(a !== b, a + '==' + b); } finally { Date.now = realNow; } });
   t('invalid id card rejected', () => throws(() => ctx.saveRequest(staff, form({ id_card_number: '123' })), /เลขบัตรประชาชน/));
@@ -152,6 +185,12 @@ console.log('== REQUESTS / WORKFLOW');
   t('slip must be image', () => throws(() => ctx.saveRequest(staff, form({ file1Data: { mimeType: 'text/html', base64: 'AA==', name: 'x' } })), /รูป/));
   t('missing file rejected', () => throws(() => ctx.saveRequest(staff, form({ file2Data: null })), /PDF/));
   t('file over 10MB rejected', () => throws(() => ctx.saveRequest(staff, form({ file1Data: { mimeType: 'image/jpeg', base64: 'A'.repeat(14 * 1024 * 1024), name: 'x' } })), /10 MB/));
+  t('saveRequest stores finance trimmed', () => { const i = ctx.saveRequest(staff, form({ finance: ' Vyvr ' })).id; eq(rowById(i)[C('ไฟแนนซ์ :')], 'Vyvr'); });
+  t('unknown finance rejected', () => throws(() => ctx.saveRequest(staff, form({ finance: 'KTC' })), /ไฟแนนซ์/));
+  t('empty finance rejected', () => throws(() => ctx.saveRequest(staff, form({ finance: '' })), /ไฟแนนซ์/));
+  t('getAllDropdownData returns finance', () => eq(ctx.getAllDropdownData(staff).finance, [['Ponmai'], ['Vyvr']]));
+  t('new request message contains finance', () => { ctx.setConfigProperties(admin, { emailTo: 'a@b.c' }); ctx.saveRequest(staff, form({ finance: 'Vyvr' })); ok(/ไฟแนนซ์: Vyvr/.test(mail[mail.length - 1].htmlBody), 'no finance in mail'); });
+  t('empty Finance list rejects save', () => { const keep = sheets.Finance.rows.splice(1); try { throws(() => ctx.saveRequest(staff, form()), /ไฟแนนซ์/); } finally { sheets.Finance.rows.push(...keep); } });
   t('new request email sent', () => { ctx.setConfigProperties(admin, { emailTo: 'a@b.c' }); const n = mail.length; ctx.saveRequest(staff, form()); eq(mail.length, n + 1); });
 
   t('staff cannot updateStatus', () => throws(() => ctx.updateStatus(staff, { record: id, action: 'approve', financeAmount: '1' }), /FORBIDDEN/));
@@ -171,7 +210,7 @@ console.log('== REQUESTS / WORKFLOW');
   t('getData needs session', () => throws(() => ctx.getData(''), /AUTH_REQUIRED/));
   t('staff sees masked id card', () => { const rows = ctx.getData(staff); ok(rows.length > 0); rows.forEach(r => ok(/^X{9}\d{4}$/.test(r[6]), r[6])); });
   t('accounting sees full id card', () => eq(ctx.getData(acc)[0][6], '1103700012345'));
-  t('getData rows padded to 46', () => ctx.getData(acc).forEach(r => eq(r.length, 46)));
+  t('getData rows padded to 47', () => ctx.getData(acc).forEach(r => eq(r.length, 47)));
   t('findRecord masks for staff', () => ok(/^X{9}2345$/.test(ctx.findRecord(staff, id)[6])));
   t('findRecord unknown id', () => throws(() => ctx.findRecord(acc, 'zzz'), /ไม่พบ/));
   t('legacy functions removed', () => ['saveDataB64', 'statusRecordWithRemark'].forEach(f => eq(typeof ctx[f], 'undefined', f)));
@@ -187,8 +226,8 @@ console.log('== FINAL REVIEW FIXES');
   const lg = ss.insertSheet('Log'); lg.maxCols = 3; lg.appendRow(['วันที่/เวลา', 'ผู้ดำเนินการ', 'สถานะการอนุมัติ']);
   const ad = ss.insertSheet('Admin'); ad.appendRow(['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์']); ad.appendRow(['boss', 'bosspw', 'บอส', 'แอดมิน']);
   const tk = ctx.login('boss', 'bosspw').token;
-  t('C1 getData works on a 41-column live sheet', () => { const rows = ctx.getData(tk); eq(rows.length, 1); eq(rows[0].length, 46); });
-  t('C1 data columns grown to 46 with headers', () => { ok(sheets.Data.getMaxColumns() >= 46); eq(sheets.Data.rows[0].slice(41), ctx.DATA_HEADERS.slice(41)); });
+  t('C1 getData works on a 41-column live sheet', () => { const rows = ctx.getData(tk); eq(rows.length, 1); eq(rows[0].length, 47); eq(rows[0][46], ''); });
+  t('C1 data columns grown to 47 with headers', () => { ok(sheets.Data.getMaxColumns() >= 47); eq(sheets.Data.rows[0].slice(41), ctx.DATA_HEADERS.slice(41)); });
   // I1: legacy 'อนุมัติแล้ว' row whose SO is already filled must be finishable via updateAR.
   t('I1 updateAR from อนุมัติแล้ว with SO filled', () => eq(ctx.updateStatus(tk, { record: '111', action: 'updateAR', invoice: 'INV9' }).status, 'เสร็จสมบูรณ์'));
   t('C1 Log extended and written on narrow sheet', () => { const l = sheets.Log.rows[sheets.Log.getLastRow() - 1]; eq(l[3], '111'); });
@@ -212,7 +251,7 @@ console.log('== FINAL REVIEW FIXES');
   const realLock = ctx.LockService.getScriptLock;
   ctx.LockService.getScriptLock = () => { const l = realLock(); return { waitLock: x => { l.waitLock(x); lockState.held = true; }, releaseLock: () => { lockState.held = false; l.releaseLock(); } }; };
   const b64 = Buffer.alloc(8, 1).toString('base64');
-  ctx.saveRequest(staff, { date: '2026-11-25', location: 'A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012345', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
+  ctx.saveRequest(staff, { date: '2026-11-25', location: 'A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012345', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', finance: 'Ponmai', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
   t('I2 uploads happen outside the lock', () => eq(uploadsUnderLock, 0));
 }
 {

@@ -7,8 +7,36 @@ function getData(){
   }
 
   var table
+  // Rows saved before the finance column existed are Ponmai sales.
+  var DEFAULT_FINANCE = 'Ponmai';
+  function financeOf(r) { return String(r[46] || '').trim() || DEFAULT_FINANCE; }
+  function currentFinance() { var el = document.getElementById('financeFilter'); return el ? el.value : ''; }
+
   function showData(dataArray){
     window.globalData = dataArray;
+    fillFinanceFilter(dataArray);
+    updateCounts();
+    renderTable(dataArray);
+  }
+
+  /** Finance filter options = admin list + any name found on existing rows (deleted providers stay filterable). */
+  function fillFinanceFilter(dataArray) {
+    var sel = document.getElementById('financeFilter');
+    if (!sel) return;
+    var keep = sel.value;
+    var names = [];
+    (window.financeOptions || []).concat(dataArray.map(financeOf)).forEach(function (n) {
+      n = String(n || '').trim();
+      if (n && names.indexOf(n) < 0) names.push(n);
+    });
+    sel.innerHTML = '<option value="">ไฟแนนซ์ทั้งหมด</option>' +
+      names.map(function (n) { return '<option value="' + escHtml(n) + '">' + escHtml(n) + '</option>'; }).join('');
+    sel.value = names.indexOf(keep) >= 0 ? keep : '';
+  }
+
+  function updateCounts() {
+    var fin = currentFinance();
+    var dataArray = (window.globalData || []).filter(function (r) { return !fin || financeOf(r) === fin; });
     let allCount = dataArray.length;
     let waitCount = 0;
     let waitSOCount = 0;
@@ -38,9 +66,9 @@ function getData(){
     if(elWaitInv) elWaitInv.innerHTML = waitInvCount;
     if(elDone) elDone.innerHTML = doneCount;
     if(elRej) elRej.innerHTML = disappCount;
+  }
 
-
-
+  function renderTable(dataArray) {
     $(document).ready(function(){
       loadingEnd();
       table = $('#datatable').DataTable({
@@ -66,7 +94,7 @@ function getData(){
                 
                 (userRole !== "แอดมิน" && userRole !== "บัญชี")?{targets: [32],visible: false}:{targets: [32],visible: true}, 
 
-                (userRole !== "แอดมิน" && userRole !== "บัญชี")?{targets: [2,30,31,32,33,34,35,36,37,38,39,40],className: 'all'}:{targets: [2,30,31,32,33,34,35,36,37,38,39,40,41],className: 'all'}
+                (userRole !== "แอดมิน" && userRole !== "บัญชี")?{targets: [2,30,31,32,33,34,35,36,37,38,39,40,41],className: 'all'}:{targets: [2,30,31,32,33,34,35,36,37,38,39,40,41,42],className: 'all'}
                 ],
 
      columns: [
@@ -118,7 +146,7 @@ function getData(){
        },
        { title: "ปุ่มจัดการ", name: "manage", data: null,
          render: function(data, type, row) {
-           return "<button type='button' class='btn shadow-sm' style='background-color: #dc3545 !important; color: white !important; border: none;' onclick='statusData(this);'><i class='fa-solid fa-user-pen me-1'></i> จัดการ</button>";
+           return "<button type='button' class='btn btn-manage' onclick='statusData(this);'><i class='fa-solid fa-pen-to-square me-1'></i> จัดการ</button>";
          }
        },
        { title: "สถานะ", name: "status", data: 32,
@@ -126,15 +154,15 @@ function getData(){
           let st = typeof data === 'string' ? data.trim() : (data || '');
           if (type === 'display') {
             if(st ==="" || st ==="รออนุมัติ"){
-            return "<span class='text-warning sfont' style='text-shadow: 0.5px 0.5px 0px rgba(0,0,0,0.1);'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>"; 
+            return "<span class='st st-wait'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>"; 
             }else if(st ==="รอเปิด SO" || st ==="อนุมัติแล้ว"){
-            return "<span class='text-info sfont'><i class='fa-solid fa-file-invoice'></i> รอเปิด SO</span>";
+            return "<span class='st st-so'><i class='fa-solid fa-file-invoice'></i> รอเปิด SO</span>";
             }else if(st ==="รอเปิด Invoice"){
-            return "<span class='text-primary sfont'><i class='fa-solid fa-file-invoice-dollar'></i> รอเปิด Invoice</span>";
+            return "<span class='st st-inv'><i class='fa-solid fa-file-invoice-dollar'></i> รอเปิด Invoice</span>";
             }else if(st ==="เสร็จสมบูรณ์"){
-            return "<span class='text-success sfont'><i class='fa-solid fa-check-double'></i> เสร็จสมบูรณ์</span>";
+            return "<span class='st st-done'><i class='fa-solid fa-check-double'></i> เสร็จสมบูรณ์</span>";
             }else if(st ==="ไม่อนุมัติ"){
-            return "<span class='text-danger sfont'><i class='fa-solid fa-circle-xmark'></i> ไม่อนุมัติ</span>";
+            return "<span class='st st-rej'><i class='fa-solid fa-xmark'></i> ไม่อนุมัติ</span>";
             }
           } else if (type === 'filter' || type === 'sort') {
             // FIX: normalize "อนุมัติแล้ว" → "รอเปิด SO" เพื่อให้ filter ทำงานถูกต้อง
@@ -144,6 +172,12 @@ function getData(){
           }
           return data;
         }
+       },
+       { title: "ไฟแนนซ์", name: "finance", data: 46,
+         render: function (data, type, row) {
+           var f = financeOf(row);
+           return type === 'display' ? '<span class="fin">' + escHtml(f) + '</span>' : f;
+         }
        },
        { title: "Remark(การเงิน) :", data: 33 },
        { title: "ยอดเงินโอนที่ได้รับ(การเงิน) :", data: 34 },
@@ -174,14 +208,25 @@ function getData(){
               }
             },
          initComplete: function(settings){
-           // ไม่มีปุ่มกรองสถานะแล้ว จึงเว้นว่างไว้เผื่อใส่อย่างอื่นในอนาคต
+           // the table is rebuilt after every save/approval: keep the finance filter the user picked
+           if (currentFinance()) filterByFinance();
          }
       });    
   });
         //It will show only 4 pager buttons.
     $.fn.DataTable.ext.pager.numbers_length = 4;
 }
+function filterByFinance() {
+  updateCounts();
+  if (!table) return;
+  var f = currentFinance();
+  table.column('finance:name').search(f ? '^' + $.fn.dataTable.util.escapeRegex(f) + '$' : '', true, false).draw();
+}
+
 function filterTableByStatus(status) {
+  document.querySelectorAll('.kpi[data-status]').forEach(function (k) {
+    k.classList.toggle('active', status !== 'ทั้งหมด' && k.getAttribute('data-status') === status);
+  });
   if (!table) return;
   if (status === 'ทั้งหมด') {
     table.column('status:name').search('').draw();
