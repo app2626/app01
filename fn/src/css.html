@@ -316,6 +316,28 @@
   #admin-tab-pane     { --tone: #1d7fb8; --tone-bg: #dff0fa; }
   .admin-card .table-light th { background: var(--line-soft); color: var(--ink); }
 
+  /* ---------- Bottom tab bar (below lg, replaces the sidebar) ---------- */
+  .bottom-nav { display: none; }
+  @media (max-width: 991.98px) {
+    .bottom-nav {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-nav);
+      display: flex; justify-content: space-around; gap: 2px;
+      padding: 4px 6px calc(4px + env(safe-area-inset-bottom));
+      background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -2px 8px rgba(56, 65, 74, .08);
+    }
+    .bottom-nav a {
+      flex: 1 1 0; max-width: 96px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 4px; border-radius: var(--radius-sm); color: var(--muted); text-decoration: none;
+      font-size: .66rem; font-weight: 500; line-height: 1.15; text-align: center; transition: color .15s, background-color .15s;
+    }
+    .bottom-nav a i { font-size: 1.05rem; }
+    .bottom-nav a:hover { color: var(--accent); }
+    .bottom-nav a.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+    body.has-shell { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+    body.has-shell .app-foot { display: none !important; }
+    .topbar .brand-mark { width: 30px; height: 30px; font-size: .7rem; }
+  }
+
   /* ---------- Responsive ---------- */
   @media (max-width: 991.98px) {
     .app-sidebar { display: none; }

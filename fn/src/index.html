@@ -73,9 +73,7 @@
 
   <header class="topbar" id="mainNavbar" style="display: none;">
     <div class="topbar-inner">
-      <button class="icon-btn d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarNav" aria-controls="sidebarNav" aria-label="เปิดเมนู">
-        <i class="fa-solid fa-bars"></i>
-      </button>
+      <div class="brand-mark d-lg-none" aria-hidden="true">FN+</div>
       <button class="icon-btn d-none d-lg-grid" type="button" id="sidebarToggle" onclick="toggleSidebar()" aria-controls="appSidebar" aria-expanded="true" title="ซ่อน/แสดงเมนูซ้าย" aria-label="ซ่อน/แสดงเมนูซ้าย">
         <i class="fa-solid fa-bars"></i>
       </button>
@@ -92,6 +90,14 @@
       </div>
     </div>
   </header>
+
+<!-- Bottom tab bar (tablet / mobile) -->
+<nav class="bottom-nav" id="bottomNav" aria-label="เมนูหลัก" style="display:none;">
+  <a href="#" data-view="table-view" class="table-only" style="display:none;" onclick="switchView('table-view'); return false;"><i class="fa-solid fa-list-check"></i><span>รายการ</span></a>
+  <a href="#" data-view="form-view" onclick="switchView('form-view'); return false;"><i class="fa-solid fa-circle-plus"></i><span>สร้างคำขอ</span></a>
+  <a href="#" data-view="dashboard-view" class="dashboard-only" style="display:none;" onclick="switchView('dashboard-view'); return false;"><i class="fa-solid fa-chart-column"></i><span>แดชบอร์ด</span></a>
+  <a href="#" data-view="admin-view" class="admin-only" style="display:none;" onclick="switchView('admin-view'); return false;"><i class="fa-solid fa-sliders"></i><span>ตั้งค่า</span></a>
+</nav>
 
 <!-- Sidebar Offcanvas (mobile) -->
 <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarNav" style="width: 280px;" aria-labelledby="sidebarTitle">
@@ -730,6 +736,7 @@
       document.body.classList.toggle('has-shell', inApp);
       document.getElementById('appSidebar').classList.toggle('d-none', !inApp);
       document.getElementById('appSidebar').classList.toggle('d-lg-flex', inApp);
+      document.getElementById('bottomNav').style.display = inApp ? '' : 'none';
       var titles = { 'table-view': 'รายการคำขออนุมัติ', 'form-view': 'สร้างคำขออนุมัติ', 'dashboard-view': 'แดชบอร์ด', 'admin-view': 'ตั้งค่าระบบ' };
       document.getElementById('topbarTitle').textContent = titles[viewId] || 'FN+ Consignment';
       if(viewId === 'login-view' || viewId === '') {
