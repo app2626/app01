@@ -76,6 +76,9 @@
       <button class="icon-btn d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarNav" aria-controls="sidebarNav" aria-label="เปิดเมนู">
         <i class="fa-solid fa-bars"></i>
       </button>
+      <button class="icon-btn d-none d-lg-grid" type="button" id="sidebarToggle" onclick="toggleSidebar()" aria-controls="appSidebar" aria-expanded="true" title="ซ่อน/แสดงเมนูซ้าย" aria-label="ซ่อน/แสดงเมนูซ้าย">
+        <i class="fa-solid fa-bars"></i>
+      </button>
       <div class="page-title min-w-0" id="topbarTitle">FN+ Consignment</div>
       <div class="user-chip logout" style="display:none;">
         <div class="avatar" id="msg-avatar" aria-hidden="true"></div>
@@ -751,6 +754,24 @@
       }
     }
     
+    // desktop: collapse the left sidebar for a full-width page (remembered per browser)
+    function setSidebarCollapsed(collapsed) {
+      document.body.classList.toggle('sidebar-collapsed', collapsed);
+      var btn = document.getElementById('sidebarToggle');
+      if (btn) btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      try { localStorage.setItem('fnSidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+      // let DataTables / Chart.js re-measure the wider area
+      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 50);
+    }
+    function toggleSidebar() {
+      setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+    }
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem('fnSidebarCollapsed'); } catch (e) {}
+      if (saved === '1') document.body.classList.add('sidebar-collapsed');
+    })();
+
     function closeSidebar() {
       var sidebarEl = document.getElementById('sidebarNav');
       var offcanvas = bootstrap.Offcanvas.getInstance(sidebarEl);

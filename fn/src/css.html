@@ -114,6 +114,12 @@
   .topbar .page-title { color: #fff; font-weight: 600; font-size: .9rem; letter-spacing: .01em; }
   .topbar .page-title small { display: block; color: rgba(255, 255, 255, .55); font-weight: 400; font-size: .72rem; }
   body.has-shell { padding-top: var(--header-h); padding-left: var(--sidebar-w); }
+  body.has-shell, .topbar { transition: padding-left .2s ease, left .2s ease; }
+  @media (min-width: 992px) {
+    body.sidebar-collapsed .app-sidebar { display: none !important; }
+    body.sidebar-collapsed .topbar { left: 0; }
+    body.has-shell.sidebar-collapsed { padding-left: 0; }
+  }
 
   .brand { display: flex; align-items: center; gap: .6rem; min-width: 0; }
   .brand-mark {
