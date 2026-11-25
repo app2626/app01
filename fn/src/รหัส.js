@@ -4,72 +4,13 @@
 # ผู้พัฒนา: https://www.google.com/
 */
 
-function updateHeadersNow() {
-  let ss = SpreadsheetApp.getActive().getSheetByName('Data');
-  const headers = [
-      "ID :", "วันที่ขออนุมัติ", "สาขา :", "รหัสพนักงาน :", "ชื่อ-สกุล(พนง.) :", 
-      "เบอร์ติดต่อ(พนง.) :", "เลขบัตรประชาชน :", "ชื่อตัวและสกุล (ลูกค้า) :", 
-      "เบอร์ติดต่อลูกค้า :", "ที่อยู่ :", "หมู่ที่ :", "ตำบล/แขวง :", 
-      "อำเภอ/เขต :", "จังหวัด :", "รหัสไปรษณีย์ :", "ชื่อรุ่นสินค้า", 
-      "IMEI :", "PREMIUM :", "การรับประกันจอแตก :", "ราคาขายปลีกปกติ :", 
-      "เงินดาวน์ :", "ส่วนลด เปิดเบอร์ AIS :", "ส่วนลด promotion :", 
-      "ส่วนลด Trade in :", "ส่วนลด Trade up :", "ส่วนลด Big point :", 
-      "ค่าธรรมเนียม :", "ราคาสุทธิ :", "จำนวนงวด :", "งวดละ :", 
-      "รูปสลิปเงินโอน :", "ใบเสร็จ :", "สถานะ :", "Remark(การเงิน) :",
-      "ยอดเงินโอนที่ได้รับ(การเงิน) :", "Remark(การเงิน)ใส่หมายเหตุเพิ่มถ้ามี :",
-      "Remark(SO) :", "Sales Order created :", "Remark(SO)ใส่หมายเหตุเพิ่มถ้ามี :",
-      "Invoice บัญชี :", "AR ใส่หมายเกตุถ้ามี :"
-  ];
-  ss.getRange(1, 1, 1, headers.length).setValues([headers]);
-}
-
 function doGet() {
-  initializeSheets();
   return HtmlService.createTemplateFromFile('index').evaluate()
     .setTitle('FN+ Consignment')
     .setFaviconUrl('https://i.postimg.cc/5tcXkv1h/Demo-(5).png')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
 }
-
-function initializeSheets() {
-  let ss = SpreadsheetApp.getActive();
-  
-  // Data Sheet
-  let dataSheet = ss.getSheetByName('Data');
-  if (!dataSheet) {
-    dataSheet = ss.insertSheet('Data');
-  }
-  if (dataSheet.getLastRow() === 0) {
-    const headers = [
-      "ID :", "วันที่ขออนุมัติ", "สาขา :", "รหัสพนักงาน :", "ชื่อ-สกุล(พนง.) :", 
-      "เบอร์ติดต่อ(พนง.) :", "เลขบัตรประชาชน :", "ชื่อตัวและสกุล (ลูกค้า) :", 
-      "เบอร์ติดต่อลูกค้า :", "ที่อยู่ :", "หมู่ที่ :", "ตำบล/แขวง :", 
-      "อำเภอ/เขต :", "จังหวัด :", "รหัสไปรษณีย์ :", "ชื่อรุ่นสินค้า", 
-      "IMEI :", "PREMIUM :", "การรับประกันจอแตก :", "ราคาขายปลีกปกติ :", 
-      "เงินดาวน์ :", "ส่วนลด เปิดเบอร์ AIS :", "ส่วนลด promotion :", 
-      "ส่วนลด Trade in :", "ส่วนลด Trade up :", "ส่วนลด Big point :", 
-      "ค่าธรรมเนียม :", "ราคาสุทธิ :", "จำนวนงวด :", "งวดละ :", 
-      "รูปสลิปเงินโอน :", "ใบเสร็จ :", "สถานะ :", "Remark(การเงิน) :",
-      "ยอดเงินโอนที่ได้รับ(การเงิน) :", "Remark(การเงิน)ใส่หมายเหตุเพิ่มถ้ามี :",
-      "Remark(SO) :", "Sales Order created :", "Remark(SO)ใส่หมายเหตุเพิ่มถ้ามี :",
-      "Invoice บัญชี :", "AR ใส่หมายเกตุถ้ามี :"
-    ];
-    dataSheet.appendRow(headers);
-    dataSheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#f3f3f3");
-  }
-
-  // Log Sheet
-  let logSheet = ss.getSheetByName('Log');
-  if (!logSheet) {
-    logSheet = ss.insertSheet('Log');
-  }
-  if (logSheet.getLastRow() === 0) {
-    logSheet.appendRow(["วันที่/เวลา", "ผู้ดำเนินการ", "สถานะการอนุมัติ"]);
-    logSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#f3f3f3");
-  }
-}
-
 
 function authorizeEmail() {
   // ฟังก์ชั่นนี้มีไว้เพื่อให้ Google ตรวจสอบสิทธิ์ในการส่งอีเมล
@@ -82,7 +23,7 @@ function statusRecordWithRemark(obj) {
   lock.tryLock(10000);
   if (lock.hasLock()) {
     try {
-      let ss = getDataSheet();
+      let ss = getDataSheet_();
       var data = ss.getDataRange().getDisplayValues();
       var id = data.map(r => r[0]);
       var index = id.indexOf(obj.record);
@@ -155,13 +96,9 @@ function statusRecordWithRemark(obj) {
   }
 }
 
-function getDataSheet() {
-  return SpreadsheetApp.getActive().getSheetByName('Data');
-}
-
 /**DataTable */
 function getData(admin) {
-  let ss = getDataSheet();
+  let ss = getDataSheet_();
   var data = ss.getDataRange().getDisplayValues().slice(1);
   
   // 1. กรองแถวว่างออก (ป้องกันปัญหาดึงแถวว่างที่ไม่มีข้อมูลมาแสดง)
@@ -206,24 +143,13 @@ function checkLogin(username, pwd) {
 
 
 
-/**Approve */
-function setRemark(obj) {
-  // Logger.log(obj)
-  let ss = getDataSheet();
-  var data = ss.getDataRange().getDisplayValues()
-  var id = data.map(r => r[0])
-  var index = id.indexOf(obj.record)
-
-  ss.getRange(index + 1, 34).setValue(obj.Remark); // 34 is the new Remark column
-}
-
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 /**ค้นหาข้อมูล */
 function findRecord(record) {
-  let ss = getDataSheet();
+  let ss = getDataSheet_();
   var data = ss.getDataRange().getDisplayValues();
   var id = data.map(r => r[0]);
   var index = id.indexOf(record);
@@ -237,7 +163,7 @@ function saveDataB64(obj) {
   lock.tryLock(15000)
   if (lock.hasLock()) {
     try {
-      let ss = getDataSheet();
+      let ss = getDataSheet_();
       let config = getConfigProperties();
       let folderId = config.driveFolderId;
       let folder;
@@ -365,19 +291,7 @@ function saveDataB64(obj) {
 function getConfigProperties() {
   let ss = SpreadsheetApp.getActive();
   let sheet = ss.getSheetByName('Config');
-  
-  if (!sheet) {
-    sheet = ss.insertSheet('Config');
-    sheet.appendRow(['Key', 'Value']);
-    sheet.appendRow(['notifyNewToken', '']);
-    sheet.appendRow(['notifyNewChatId', '']);
-    sheet.appendRow(['notifyApproveToken', '']);
-    sheet.appendRow(['notifyApproveChatId', '']);
-    sheet.appendRow(['emailTo', '']);
-    sheet.appendRow(['emailCc', '']);
-    sheet.appendRow(['driveFolderId', '1aD2usGtfsge4iwX8A2Bo7MGPQUbGuQSo']);
-    sheet.getRange(1, 1, 1, 2).setFontWeight("bold").setBackground("#f3f3f3");
-  }
+  if (!sheet) { ensureConfigSheet_(); sheet = ss.getSheetByName('Config'); }
   
   let data = sheet.getDataRange().getDisplayValues();
   let config = {};
@@ -551,84 +465,16 @@ function addSettingData(sheetName, rowData) {
 }
 
 
-/**
- * สร้าง Sheet ทั้งหมดที่ระบบต้องการพร้อมหัวตาราง
- * ถ้า Sheet มีอยู่แล้วจะไม่เขียนทับข้อมูล — สร้างแค่หัวตารางถ้ายังว่างอยู่
- */
+/** Admin tool: create all sheets / headers (never overwrites data). */
 function initializeAllSheets() {
-  let ss = SpreadsheetApp.getActive();
-  let results = [];
-
-  // ---- Helper: สร้าง sheet + หัวตาราง ----
-  function ensureSheet(name, headers, headerColor) {
-    let sheet = ss.getSheetByName(name);
-    let isNew = false;
-    if (!sheet) {
-      sheet = ss.insertSheet(name);
-      isNew = true;
-    }
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(headers);
-      sheet.getRange(1, 1, 1, headers.length)
-        .setFontWeight('bold')
-        .setBackground(headerColor || '#f3f3f3')
-        .setFontColor(headerColor && headerColor !== '#f3f3f3' ? '#ffffff' : '#000000')
-        .setHorizontalAlignment('center');
-      sheet.setFrozenRows(1);
-      results.push({ name: name, status: isNew ? 'สร้างใหม่ ✅' : 'เพิ่มหัวตาราง ✅' });
-    } else {
-      results.push({ name: name, status: 'มีข้อมูลอยู่แล้ว ⏭️' });
-    }
-    return sheet;
-  }
-
-  // 1. Data — ตารางหลัก
-  ensureSheet('Data', [
-    "ID :", "วันที่ขออนุมัติ", "สาขา :", "รหัสพนักงาน :", "ชื่อ-สกุล(พนง.) :",
-    "เบอร์ติดต่อ(พนง.) :", "เลขบัตรประชาชน :", "ชื่อตัวและสกุล (ลูกค้า) :",
-    "เบอร์ติดต่อลูกค้า :", "ที่อยู่ :", "หมู่ที่ :", "ตำบล/แขวง :",
-    "อำเภอ/เขต :", "จังหวัด :", "รหัสไปรษณีย์ :", "ชื่อรุ่นสินค้า",
-    "IMEI :", "PREMIUM :", "การรับประกันจอแตก :", "ราคาขายปลีกปกติ :",
-    "เงินดาวน์ :", "ส่วนลด เปิดเบอร์ AIS :", "ส่วนลด promotion :",
-    "ส่วนลด Trade in :", "ส่วนลด Trade up :", "ส่วนลด Big point :",
-    "ค่าธรรมเนียม :", "ราคาสุทธิ :", "จำนวนงวด :", "งวดละ :",
-    "รูปสลิปเงินโอน :", "ใบเสร็จ :", "สถานะ :", "Remark(การเงิน) :",
-    "ยอดเงินโอนที่ได้รับ(การเงิน) :", "Remark(การเงิน)ใส่หมายเหตุเพิ่มถ้ามี :",
-    "Remark(SO) :", "Sales Order created :", "Remark(SO)ใส่หมายเหตุเพิ่มถ้ามี :",
-    "Invoice บัญชี :", "AR ใส่หมายเกตุถ้ามี :"
-  ], '#1a73e8');
-
-  // 2. Log — บันทึกการอนุมัติ
-  ensureSheet('Log', [
-    "วันที่/เวลา", "ผู้ดำเนินการ", "สถานะการอนุมัติ"
-  ], '#34a853');
-
-  // 3. Admin — ผู้ใช้งาน
-  ensureSheet('Admin', [
-    "Username", "Password", "ชื่อผู้ใช้งาน", "สิทธิ์"
-  ], '#ea4335');
-
-  // 4. Config — การตั้งค่า
-  let configSheet = ss.getSheetByName('Config');
-  if (!configSheet) {
-    getConfigProperties(); // ใช้ฟังก์ชันที่มีอยู่แล้วเพื่อสร้าง Config พร้อม default values
-    results.push({ name: 'Config', status: 'สร้างใหม่ ✅' });
-  } else {
-    results.push({ name: 'Config', status: 'มีข้อมูลอยู่แล้ว ⏭️' });
-  }
-
-  // 5. location — สาขา
-  ensureSheet('location', ["ชื่อสาขา"], '#fbbc04');
-
-  // 6. Product — สินค้า
-  ensureSheet('Product', ["ชื่อสินค้ารุ่นต่างๆ"], '#9334e6');
-
-  // 7. Premium — ของแถม
-  ensureSheet('Premium', ["รายการของแถม"], '#ff6d00');
-
-  // 8. guarantee — ประกัน
-  ensureSheet('guarantee', ["รายการรับประกันจอแตก"], '#00897b');
-
-  return results;
+  return ensureSheets_();
 }
 
+function ensureConfigSheet_() {
+  var ss = SpreadsheetApp.getActive();
+  if (ss.getSheetByName('Config')) return { name: 'Config', status: 'มีข้อมูลอยู่แล้ว ⏭️' };
+  var sheet = ss.insertSheet('Config');
+  sheet.getRange(1, 1, 8, 2).setValues([['Key', 'Value'], ['notifyNewToken', ''], ['notifyNewChatId', ''], ['notifyApproveToken', ''], ['notifyApproveChatId', ''], ['emailTo', ''], ['emailCc', ''], ['driveFolderId', '1aD2usGtfsge4iwX8A2Bo7MGPQUbGuQSo']]);
+  sheet.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#f3f3f3');
+  return { name: 'Config', status: 'สร้างใหม่ ✅' };
+}
