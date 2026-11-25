@@ -75,7 +75,47 @@ console.log('== AUTH');
   t('checkLogin removed', () => eq(typeof ctx.checkLogin, 'undefined'));
 }
 
-// @@TASK3@@
+// ===================== Task 3: guards, settings, config =====================
+console.log('== GUARDS / SETTINGS');
+{
+  const g = fixture(); const { ctx, sheets, mail, fetches, lockState } = g;
+  const admin = g.tok('admin1'), acc = g.tok('acc1'), staff = g.tok('staff1');
+  const lastRow = n => sheets[n].rows[sheets[n].getLastRow() - 1];
+  const adminOnly = {
+    getConfigProperties: [], setConfigProperties: [{}], getSettingsData: ['location'], addSettingData: ['location', ['x']],
+    deleteSettingData: ['location', 0, 'x'], resetPassword: ['staff1', 'newpass1'], initializeAllSheets: [],
+  };
+  const anyRole = { getAllDropdownData: [] };
+  Object.keys(Object.assign({}, adminOnly, anyRole)).forEach(fn => {
+    const args = adminOnly[fn] || anyRole[fn];
+    t(fn + ' without token -> AUTH_REQUIRED', () => throws(() => ctx[fn]('', ...args), /AUTH_REQUIRED/));
+  });
+  Object.keys(adminOnly).forEach(fn => {
+    t(fn + ' as staff -> FORBIDDEN', () => throws(() => ctx[fn](staff, ...adminOnly[fn]), /FORBIDDEN/));
+    t(fn + ' as บัญชี -> FORBIDDEN', () => throws(() => ctx[fn](acc, ...adminOnly[fn]), /FORBIDDEN/));
+  });
+  t('getAllDropdownData as staff ok', () => { sheets.location.appendRow(['สาขา A']); eq(ctx.getAllDropdownData(staff).location, [['สาขา A']]); });
+  t('Admin settings hide passwords', () => { const rows = ctx.getSettingsData(admin, 'Admin'); eq(rows.length, 3); rows.forEach(r => eq(r[1], '')); eq(rows[0][0], 'admin1'); });
+  t('config masks bot token', () => { ctx.setConfigProperties(admin, { notifyNewToken: '123456:ABCDEF' }); eq(ctx.getConfigProperties(admin).notifyNewToken, '••••CDEF'); });
+  t('masked value does not overwrite', () => { ctx.setConfigProperties(admin, { notifyNewToken: '••••CDEF' }); eq(ctx.getConfig_().notifyNewToken, '123456:ABCDEF'); });
+  t('unknown config key ignored', () => { ctx.setConfigProperties(admin, { evil: 'x' }); ok(!sheets.Config.rows.some(r => r[0] === 'evil')); });
+  t('invalid sheet rejected', () => throws(() => ctx.getSettingsData(admin, 'Data'), /INVALID_SHEET/));
+  t('invalid sheet rejected on add', () => throws(() => ctx.addSettingData(admin, 'Config', ['k', 'v']), /INVALID_SHEET/));
+  t('delete with stale key rejected', () => throws(() => ctx.deleteSettingData(admin, 'location', 0, 'wrong'), /เปลี่ยนแปลง/));
+  t('delete with matching key ok', () => { ctx.deleteSettingData(admin, 'location', 0, 'สาขา A'); eq(sheets.location.getLastRow(), 1); });
+  t('cannot delete last admin', () => throws(() => ctx.deleteSettingData(admin, 'Admin', 0, 'admin1'), /อย่างน้อย 1/));
+  t('added admin password is hashed', () => { ctx.addSettingData(admin, 'Admin', ['u9', 'secret9', 'n', 'พนักงาน']); ok(/^sha256\$/.test(lastRow('Admin')[1])); ok(ctx.login('u9', 'secret9')); });
+  t('duplicate username rejected', () => throws(() => ctx.addSettingData(admin, 'Admin', ['u9', 'x', 'n', 'พนักงาน']), /มีอยู่แล้ว/));
+  t('invalid role rejected', () => throws(() => ctx.addSettingData(admin, 'Admin', ['u10', 'secret10', 'n', 'root']), /สิทธิ์/));
+  t('resetPassword hashes and works', () => { ctx.resetPassword(admin, 'staff1', 'brandnew1'); ok(ctx.login('staff1', 'brandnew1')); ok(/^sha256\$/.test(sheets.Admin.rows[3][1])); });
+  t('resetPassword too short', () => throws(() => ctx.resetPassword(admin, 'staff1', '123'), /6/));
+  t('lock timeout surfaces error', () => { lockState.fail = true; try { throws(() => ctx.addSettingData(admin, 'location', ['y']), /กำลังประมวลผล/); } finally { lockState.fail = false; } });
+  t('email body escaped', () => { ctx.setConfigProperties(admin, { emailTo: 'a@b.c' }); ctx.sendNotify_('<b>x</b>\nline2', false, [], 's'); const m = mail[mail.length - 1]; ok(m.htmlBody.includes('&lt;b&gt;x&lt;/b&gt;<br>line2'), m.htmlBody); });
+  t('telegram skipped when chat id empty', () => { const n = fetches.length; ctx.sendNotify_('m', true, [], 's'); eq(fetches.length, n); });
+  t('old unguarded helpers removed', () => ['setRemark', 'updateHeadersNow', 'getDataSheet'].forEach(f => eq(typeof ctx[f], 'undefined', f)));
+}
+
+// @@TASK4@@
 
 process.on('exit', () => {
   console.log(`\n${pass} passed, ${fail} failed`);

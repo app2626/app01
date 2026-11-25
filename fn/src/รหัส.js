@@ -75,7 +75,7 @@ function statusRecordWithRemark(obj) {
         }
 
         try {
-          sendNotify(msg, true, [], subjectTitle);
+          sendNotify_(msg, true, [], subjectTitle);
         } catch (e) {
           console.error("Notify Error: " + e.message);
         }
@@ -146,7 +146,7 @@ function saveDataB64(obj) {
   if (lock.hasLock()) {
     try {
       let ss = getDataSheet_();
-      let config = getConfigProperties();
+      let config = getConfig_();
       let folderId = config.driveFolderId;
       let folder;
       
@@ -159,7 +159,6 @@ function saveDataB64(obj) {
       } catch (e) {
         try {
           folder = DriveApp.createFolder("FN+ Consignment_Uploads");
-          setConfigProperties({ driveFolderId: folder.getId() });
         } catch (e2) {
           throw new Error("ไม่สามารถเข้าถึงหรือสร้างโฟลเดอร์ใน Google Drive ได้ กรุณาตั้งค่า Folder ID ให้ถูกต้อง");
         }
@@ -256,7 +255,7 @@ function saveDataB64(obj) {
     var subjectTitle = "ขออนุมัติทำรายการ FN+ Consignment ชื่อ " + obj.customer_name + " สาขา " + obj.location;
 
     try {
-      sendNotify(msg, false, attachments, subjectTitle, imageForLine); // แจ้งคำขอใหม่ (isApprove = false)
+      sendNotify_(msg, false, attachments, subjectTitle, imageForLine); // แจ้งคำขอใหม่ (isApprove = false)
     } catch (e) {
       console.error("Notify Error: " + e.message);
     }
@@ -270,193 +269,3 @@ function saveDataB64(obj) {
   }
 }
 
-function getConfigProperties() {
-  let ss = SpreadsheetApp.getActive();
-  let sheet = ss.getSheetByName('Config');
-  if (!sheet) { ensureConfigSheet_(); sheet = ss.getSheetByName('Config'); }
-  
-  let data = sheet.getDataRange().getDisplayValues();
-  let config = {};
-  for (let i = 1; i < data.length; i++) {
-    config[data[i][0]] = data[i][1];
-  }
-  
-  return {
-    notifyNewToken: config['notifyNewToken'] || "",
-    notifyNewChatId: config['notifyNewChatId'] || "",
-    notifyApproveToken: config['notifyApproveToken'] || "",
-    notifyApproveChatId: config['notifyApproveChatId'] || "",
-    emailTo: config['emailTo'] || "",
-    emailCc: config['emailCc'] || "",
-    driveFolderId: config['driveFolderId'] || "1_b5LnM6ZOV3vulT2i5Jk3QtKoAwEvRD5"
-  };
-}
-
-function setConfigProperties(configObj) {
-  let lock = LockService.getScriptLock();
-  lock.tryLock(5000);
-  if (lock.hasLock()) {
-    try {
-      let ss = SpreadsheetApp.getActive();
-      let sheet = ss.getSheetByName('Config');
-      if (!sheet) {
-        getConfigProperties();
-        sheet = ss.getSheetByName('Config');
-      }
-
-      let data = sheet.getDataRange().getDisplayValues();
-      let keysFound = {};
-
-      for (let i = 1; i < data.length; i++) {
-        let key = data[i][0];
-        if (configObj[key] !== undefined) {
-          sheet.getRange(i + 1, 2).setValue(configObj[key]);
-          keysFound[key] = true;
-        }
-      }
-
-      for (let key in configObj) {
-        if (!keysFound[key]) {
-          sheet.appendRow([key, configObj[key]]);
-        }
-      }
-    } finally {
-      lock.releaseLock();
-    }
-  }
-  return true;
-}
-
-function sendNotify(msg, isApprove, attachments, subjectTitle, imageForLine) {
-  let config = getConfigProperties();
-  let botToken = isApprove ? config.notifyApproveToken : config.notifyNewToken;
-  let chatId = isApprove ? config.notifyApproveChatId : config.notifyNewChatId;
-  
-  // 1. Send Telegram Notification (only supports 1 photo easily without media group)
-  // We use imageForLine (the first image) for Telegram
-  if (imageForLine) {
-    var url = "https://api.telegram.org/bot" + botToken + "/sendPhoto";
-    var payload = {
-      "chat_id": chatId,
-      "photo": imageForLine,
-      "caption": msg
-    };
-    var options = {
-      "method": "post",
-      "payload": payload
-    };
-    UrlFetchApp.fetch(url, options);
-  } else {
-    var url = "https://api.telegram.org/bot" + botToken + "/sendMessage";
-    var payload = {
-      "chat_id": chatId,
-      "text": msg
-    };
-    var options = {
-      "method": "post",
-      "payload": payload
-    };
-    UrlFetchApp.fetch(url, options);
-  }
-  
-  // 2. Send Email Notification if emailTo is set
-  if (config.emailTo) {
-    try {
-      var body = msg.replace(/\n/g, "<br>");
-      var mailOptions = {
-        to: config.emailTo.replace(/\s+/g, ""),
-        subject: subjectTitle || (isApprove ? "แจ้งเตือนการเปลี่ยนสถานะ" : "แจ้งเตือนคำขอใหม่"),
-        htmlBody: body
-      };
-      if (config.emailCc) {
-        mailOptions.cc = config.emailCc.replace(/\s+/g, "");
-      }
-      if (attachments && attachments.length > 0) {
-        mailOptions.attachments = attachments;
-      }
-      MailApp.sendEmail(mailOptions);
-    } catch (emailErr) {
-      // FIX: ไม่ให้ email error ทำให้ทั้ง function ล้มเหลว ข้อมูลบันทึกลง Sheet แล้ว
-      console.error("Email Error: " + emailErr.message);
-    }
-  }
-}
-
-
-function getAllDropdownData() {
-  let ss = SpreadsheetApp.getActive();
-  
-  let getSheetData = function(sheetName) {
-    let sheet = ss.getSheetByName(sheetName);
-    if (!sheet) return [];
-    let lastRow = Math.max(2, sheet.getLastRow()); // Avoid errors if sheet is empty except header
-    if (lastRow < 2) return [];
-    let data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    // Return array of arrays to maintain compatibility with front-end logic (e.g. item[0])
-    return data.filter(r => r[0] !== "");
-  };
-
-  return {
-    location: getSheetData('location'),
-    product: getSheetData('Product'),
-    premium: getSheetData('Premium'),
-    guarantee: getSheetData('guarantee')
-  };
-}
-
- 
-
-// ---- Admin Settings CRUD ----
-function getSettingsData(sheetName) {
-  var sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
-  if (!sheet) return [];
-  var data = sheet.getDataRange().getDisplayValues();
-  return data.length > 1 ? data.slice(1) : [];
-}
-
-function deleteSettingData(sheetName, rowIndex) {
-  let lock = LockService.getScriptLock();
-  lock.tryLock(5000);
-  if (lock.hasLock()) {
-    try {
-      var sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
-      if (sheet) {
-        sheet.deleteRow(rowIndex + 2); // +2 because row 1 is header, index is 0-based
-      }
-    } finally {
-      lock.releaseLock();
-    }
-  }
-  return true;
-}
-
-function addSettingData(sheetName, rowData) {
-  let lock = LockService.getScriptLock();
-  lock.tryLock(5000);
-  if (lock.hasLock()) {
-    try {
-      var sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
-      if (sheet) {
-        sheet.appendRow(rowData);
-      }
-    } finally {
-      lock.releaseLock();
-    }
-  }
-  return true;
-}
-
-
-/** Admin tool: create all sheets / headers (never overwrites data). */
-function initializeAllSheets() {
-  return ensureSheets_();
-}
-
-function ensureConfigSheet_() {
-  var ss = SpreadsheetApp.getActive();
-  if (ss.getSheetByName('Config')) return { name: 'Config', status: 'มีข้อมูลอยู่แล้ว ⏭️' };
-  var sheet = ss.insertSheet('Config');
-  sheet.getRange(1, 1, 8, 2).setValues([['Key', 'Value'], ['notifyNewToken', ''], ['notifyNewChatId', ''], ['notifyApproveToken', ''], ['notifyApproveChatId', ''], ['emailTo', ''], ['emailCc', ''], ['driveFolderId', '1aD2usGtfsge4iwX8A2Bo7MGPQUbGuQSo']]);
-  sheet.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#f3f3f3');
-  return { name: 'Config', status: 'สร้างใหม่ ✅' };
-}
