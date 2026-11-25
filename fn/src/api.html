@@ -1,0 +1,108 @@
+<script>
+// ---- Session + server calls -------------------------------------------------
+// Every server call goes through callServer(): it adds the session token, and when the
+// session has expired it asks the user to log in again and retries the same call once,
+// without changing the current view (so a half-filled form is kept).
+var FN_KEYS = { token: 'fnToken', name: 'fnName', role: 'fnRole' };
+var userRole = '';
+var userDisplayName = '';
+
+function storageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function storageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+function storageRemove(k) { try { localStorage.removeItem(k); } catch (e) { } }
+
+function getToken() { return storageGet(FN_KEYS.token) || ''; }
+
+function saveSession(s) {
+  storageSet(FN_KEYS.token, s.token);
+  storageSet(FN_KEYS.name, s.name);
+  storageSet(FN_KEYS.role, s.role);
+  userRole = s.role;
+  userDisplayName = s.name;
+}
+
+function clearSession() {
+  storageRemove(FN_KEYS.token); storageRemove(FN_KEYS.name); storageRemove(FN_KEYS.role);
+  userRole = ''; userDisplayName = '';
+}
+
+function errorText(err) {
+  var m = (err && err.message) ? err.message : String(err || '');
+  return m.replace(/^(Exception|Error):\s*/, '');
+}
+
+function runServer(fnName, args) {
+  return new Promise(function (resolve, reject) {
+    var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    runner[fnName].apply(runner, args);
+  });
+}
+
+var reloginPromise = null;
+function promptRelogin() {
+  if (reloginPromise) return reloginPromise;
+  reloginPromise = Swal.fire({
+    title: 'เซสชันหมดอายุ',
+    text: 'กรุณาเข้าสู่ระบบอีกครั้ง ข้อมูลที่กรอกไว้จะไม่หาย',
+    html: '<input id="relogin-user" class="swal2-input" placeholder="ชื่อผู้ใช้งาน" autocomplete="username">' +
+          '<input id="relogin-pass" type="password" class="swal2-input" placeholder="รหัสผ่าน" autocomplete="current-password">',
+    showCancelButton: true,
+    confirmButtonText: 'เข้าสู่ระบบ',
+    cancelButtonText: 'ยกเลิก',
+    allowOutsideClick: false,
+    showLoaderOnConfirm: true,
+    preConfirm: function () {
+      var u = document.getElementById('relogin-user').value;
+      var p = document.getElementById('relogin-pass').value;
+      return runServer('login', [u, p]).then(function (s) {
+        if (!s) { Swal.showValidationMessage('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'); return false; }
+        return s;
+      }).catch(function (e) { Swal.showValidationMessage(errorText(e)); return false; });
+    }
+  }).then(function (r) {
+    reloginPromise = null;
+    if (!r.isConfirmed || !r.value) throw new Error('ยกเลิกการเข้าสู่ระบบ');
+    saveSession(r.value);
+    applyRoleUI(r.value.role, r.value.name);
+    return r.value;
+  }, function (e) { reloginPromise = null; throw e; });
+  return reloginPromise;
+}
+
+/** callServer('fn', a, b) -> Promise. Rejects with Error whose message is the server's text. */
+function callServer(fnName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return callServerWith({ relogin: true }, fnName, args);
+}
+
+function callServerWith(opts, fnName, args) {
+  return runServer(fnName, [getToken()].concat(args)).catch(function (err) {
+    var msg = errorText(err);
+    if (/AUTH_REQUIRED/.test(msg)) {
+      if (!opts.relogin) { clearSession(); throw new Error('AUTH_REQUIRED'); }
+      return promptRelogin().then(function () { return runServer(fnName, [getToken()].concat(args)); })
+        .catch(function (e2) { throw new Error(errorText(e2)); });
+    }
+    if (/FORBIDDEN/.test(msg)) throw new Error('คุณไม่มีสิทธิ์ดำเนินการนี้');
+    throw new Error(msg);
+  });
+}
+
+/** Shows the failure unless the user just cancelled the re-login dialog. */
+function showError(err, title) {
+  if (typeof loadingEnd === 'function') loadingEnd();
+  var msg = errorText(err);
+  if (msg === 'ยกเลิกการเข้าสู่ระบบ') return;
+  Swal.fire(title || 'เกิดข้อผิดพลาด', msg, 'error');
+}
+
+function applyRoleUI(role, name) {
+  userRole = role || '';
+  userDisplayName = name || '';
+  $('.logout').show();
+  $('.table-only').show();
+  $('.admin-only').toggle(role === 'แอดมิน');
+  $('.dashboard-only').toggle(role === 'แอดมิน' || role === 'บัญชี');
+  $('#msg-name').text(userDisplayName + ' (' + userRole + ')');
+}
+</script>

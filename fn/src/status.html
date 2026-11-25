@@ -17,8 +17,7 @@
      let invoice = rowData[39] || '';
      
      let obj = {}
-         obj.record = id
-         obj.name = admin;
+         obj.record = id;
 
      if (status.includes("รออนุมัติ") || status === "") {
         Swal.fire({
@@ -34,7 +33,6 @@
           allowOutsideClick: false,
         }).then(async (result) => {
           if (result.isConfirmed) {
-            obj.status = 'รอเปิด SO';
             obj.action = 'approve';
             const { value: formValues } = await Swal.fire({
               title: 'ข้อมูลการเงิน',
@@ -45,6 +43,7 @@
               focusConfirm: false,
               showCancelButton: true,
               preConfirm: () => {
+                if (!document.getElementById('swal-input2').value.trim()) { Swal.showValidationMessage('กรุณากรอกยอดเงินโอนที่ได้รับ'); return false; }
                 return [
                   document.getElementById('swal-input1').value,
                   document.getElementById('swal-input2').value,
@@ -59,8 +58,7 @@
               saveStatus(obj);
             }
           } else if (result.isDenied) {
-            obj.status = 'ไม่อนุมัติ';
-            obj.action = 'approve';
+            obj.action = 'reject';
             const { value: Remark } = await Swal.fire({
               input: 'textarea',
               inputLabel: 'หมายเหตุ (Remark)',
@@ -88,6 +86,7 @@
           focusConfirm: false,
           showCancelButton: true,
           preConfirm: () => {
+            if (!document.getElementById('swal-so2').value.trim()) { Swal.showValidationMessage('กรุณากรอกเลข Sales Order'); return false; }
             return [
               document.getElementById('swal-so1').value,
               document.getElementById('swal-so2').value,
@@ -96,7 +95,6 @@
           }
         }).then((result) => {
           if (result.isConfirmed && result.value) {
-            obj.status = 'รอเปิด Invoice';
             obj.soRemark = result.value[0];
             obj.soCreated = result.value[1];
             obj.soRemarkExtra = result.value[2];
@@ -113,6 +111,7 @@
           focusConfirm: false,
           showCancelButton: true,
           preConfirm: () => {
+            if (!document.getElementById('swal-ar1').value.trim()) { Swal.showValidationMessage('กรุณากรอกเลข Invoice'); return false; }
             return [
               document.getElementById('swal-ar1').value,
               document.getElementById('swal-ar2').value
@@ -120,7 +119,6 @@
           }
         }).then((result) => {
           if (result.isConfirmed && result.value) {
-            obj.status = 'เสร็จสมบูรณ์';
             obj.invoice = result.value[0];
             obj.arRemark = result.value[1];
             saveStatus(obj);
@@ -133,22 +131,12 @@
 
   function saveStatus(obj) {
      loadingStart();
-     google.script.run.withSuccessHandler(()=>{
-       Swal.fire({
-          position:'top',
-          title:'บันทึกข้อมูลเรียบร้อย!',
-          icon:'success',
-          showConfirmButton: false,
-          timer: 1500
-       });
+     callServer('updateStatus', obj).then(function () {
+       Swal.fire({ position: 'top', title: 'บันทึกข้อมูลเรียบร้อย!', icon: 'success', showConfirmButton: false, timer: 1500 });
        getData();
-     }).withFailureHandler((error) => {
-       loadingEnd();
-       Swal.fire({
-          title:'เกิดข้อผิดพลาด!',
-          text: error.message,
-          icon:'error'
-       });
-     }).statusRecordWithRemark(obj);
+     }).catch(function (error) {
+       showError(error);
+       getData();
+     });
   }
 </script>

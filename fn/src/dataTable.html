@@ -1,12 +1,9 @@
 <script>
-  let admin = "";
-
 function getData(){
-    google.script.run.withSuccessHandler(showData).withFailureHandler(function(error) {
-        console.error("getData error:", error);
-        loadingEnd();
-        Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้ กรุณารีเฟรชหน้าจออีกครั้ง', 'error');
-    }).getData(admin);
+    loadingStart();
+    return callServer('getData').then(showData).catch(function(error) {
+        showError(error, 'ไม่สามารถโหลดข้อมูลได้');
+    });
   }
 
   var table
@@ -150,7 +147,12 @@ function getData(){
        { title: "Sales Order created :", data: 37 },
        { title: "Remark(SO)ใส่หมายเหตุเพิ่มถ้ามี :", data: 38 },
        { title: "Invoice บัญชี :", data: 39 },
-       { title: "AR ใส่หมายเกตุถ้ามี :", data: 40 }
+       { title: "AR ใส่หมายเกตุถ้ามี :", data: 40 },
+       { title: "บาร์โค้ด AIS :", data: 41 },
+       { title: "บาร์โค้ด promotion :", data: 42 },
+       { title: "บาร์โค้ด Trade in :", data: 43 },
+       { title: "บาร์โค้ด Trade up :", data: 44 },
+       { title: "บาร์โค้ด Big point :", data: 45 }
       ],
     lengthMenu: [[20, 30, 50, 100, -1], [20, 30, 50, 100, "all"]],
     order: false,

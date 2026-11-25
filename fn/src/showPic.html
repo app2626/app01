@@ -13,15 +13,13 @@
       loadingStart();
       let tr = $(el).closest('tr');
       if (tr.hasClass('child')) { tr = tr.prev('.parent'); }
-      let record = tr[0].cells[0].innerHTML;
-    google.script.run.withSuccessHandler(successPic).withFailureHandler(function(err){
-      loadingEnd();
-      Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้: ' + err.message, 'error');
-    }).findRecord(record);
+      let record = table.row(tr).data()[0];
+    callServer('findRecord', record).then(successPic).catch(function(err){
+      showError(err, 'ไม่สามารถโหลดข้อมูลได้');
+    });
 }
 
   function successPic(data){  
-    console.log(data) 
     loadingEnd();
     const statusMap = {
       "รออนุมัติ":      "<span class='badge bg-warning text-dark sfont'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>",

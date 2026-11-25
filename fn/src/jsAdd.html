@@ -30,13 +30,6 @@ async function addData(form) {
   });
   formObj.premium_combined = premiumValues.join(", ");
 
-  // Combine barcodes with discount amounts
-  if (formObj.barcode_ais && formObj.barcode_ais.trim() !== '') formObj.discountais = `[${formObj.barcode_ais}] ` + formObj.discountais;
-  if (formObj.barcode_promotion && formObj.barcode_promotion.trim() !== '') formObj.discountpromotion = `[${formObj.barcode_promotion}] ` + formObj.discountpromotion;
-  if (formObj.barcode_tradein && formObj.barcode_tradein.trim() !== '') formObj.discounttradein = `[${formObj.barcode_tradein}] ` + formObj.discounttradein;
-  if (formObj.barcode_tradeup && formObj.barcode_tradeup.trim() !== '') formObj.discounttradeup = `[${formObj.barcode_tradeup}] ` + formObj.discounttradeup;
-  if (formObj.barcode_bigc && formObj.barcode_bigc.trim() !== '') formObj.discountbigc = `[${formObj.barcode_bigc}] ` + formObj.discountbigc;
-
   Swal.fire({
     position: 'top',
     icon: 'info',
@@ -53,11 +46,11 @@ async function addData(form) {
     formObj.file1Data = await getFileBase64(file1);
     formObj.file2Data = await getFileBase64(file2);
 
-    google.script.run.withSuccessHandler((data) => {
+    callServer('saveRequest', formObj).then(() => {
       getData();
       $('#myForm')[0].reset();
       $('.select2').val('').trigger('change');
-      
+
       const container = document.getElementById('premium-container');
       container.innerHTML = '';
       addPremium();
@@ -74,10 +67,10 @@ async function addData(form) {
           toast.addEventListener('mouseleave', Swal.resumeTimer)
         }
       });
-      Toast.fire({ icon: 'success', title: 'Save successfully' });
-    }).withFailureHandler((error) => {
-      Swal.fire('ข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้: ' + (error.message || error), 'error');
-    }).saveDataB64(formObj);
+      Toast.fire({ icon: 'success', title: 'บันทึกข้อมูลเรียบร้อย' });
+    }).catch((error) => {
+      showError(error, 'ไม่สามารถบันทึกข้อมูลได้');
+    });
   } catch (err) {
     Swal.fire('ข้อผิดพลาด', 'อ่านไฟล์ล้มเหลว: ' + err, 'error');
   }
@@ -115,47 +108,27 @@ function removePremium(btn) {
 
 // ---- Dropdown Loaders ----
 $(document).ready(function() {
-  loadAllDropdowns();
   $('.select2').select2({ theme: 'bootstrap-5' });
 });
 
+function fillSelect(select, items) {
+  // keep the disabled placeholder, drop previously loaded options (re-login reloads them)
+  Array.from(select.querySelectorAll('option:not([disabled])')).forEach(o => o.remove());
+  items.forEach(item => {
+    let opt = document.createElement("option");
+    opt.value = item[0]; opt.text = item[0];
+    select.appendChild(opt);
+  });
+}
+
 function loadAllDropdowns() {
-  google.script.run.withSuccessHandler(function(data) {
-    // Location
-    let locSelect = document.getElementById("location");
-    data.location.forEach(item => {
-      let opt = document.createElement("option");
-      opt.value = item[0]; opt.text = item[0];
-      locSelect.appendChild(opt);
-    });
-
-    // Product
-    let prodSelect = document.getElementById("productname");
-    data.product.forEach(item => {
-      let opt = document.createElement("option");
-      opt.value = item[0]; opt.text = item[0];
-      prodSelect.appendChild(opt);
-    });
-
-    // Premium
+  return callServer('getAllDropdownData').then(function(data) {
+    fillSelect(document.getElementById("location"), data.location);
+    fillSelect(document.getElementById("productname"), data.product);
     premiumOptions = data.premium; // Store globally for addPremium()
-    const premSelects = document.querySelectorAll(".premium-select");
-    premSelects.forEach(select => {
-      data.premium.forEach(item => {
-        let opt = document.createElement("option");
-        opt.value = item[0]; opt.text = item[0];
-        select.appendChild(opt);
-      });
-    });
-
-    // Guarantee
-    let guarSelect = document.getElementById("guarantee");
-    data.guarantee.forEach(item => {
-      let opt = document.createElement("option");
-      opt.value = item[0]; opt.text = item[0];
-      guarSelect.appendChild(opt);
-    });
-  }).getAllDropdownData();
+    document.querySelectorAll(".premium-select").forEach(select => fillSelect(select, data.premium));
+    fillSelect(document.getElementById("guarantee"), data.guarantee);
+  }).catch(function(err) { showError(err, 'โหลดตัวเลือกไม่สำเร็จ'); });
 }
 </script>
 
@@ -174,7 +147,7 @@ function addEmailInput(type, value = '') {
 }
 
 function loadGeneralConfig() {
-  google.script.run.withSuccessHandler(function(config) {
+  callServer('getConfigProperties').then(function(config) {
     document.getElementById('notifyNewToken').value = config.notifyNewToken || '';
     document.getElementById('notifyNewChatId').value = config.notifyNewChatId || '';
     document.getElementById('notifyApproveToken').value = config.notifyApproveToken || '';
@@ -202,7 +175,7 @@ function loadGeneralConfig() {
          addEmailInput('cc', email);
        }
     });
-  }).getConfigProperties();
+  }).catch(function(err) { showError(err, 'โหลดการตั้งค่าไม่สำเร็จ'); });
 }
 
 function saveGeneralConfig() {
@@ -220,19 +193,23 @@ function saveGeneralConfig() {
   };
   
   Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-  google.script.run.withSuccessHandler(function() {
+  callServer('setConfigProperties', config).then(function() {
     Swal.fire('บันทึกสำเร็จ!', 'อัปเดตการตั้งค่าแล้ว', 'success');
-  }).setConfigProperties(config);
+    loadGeneralConfig();
+  }).catch(function(err) { showError(err, 'บันทึกการตั้งค่าไม่สำเร็จ'); });
 }
 
 // ---- Admin Settings Scripts ----
 
+var settingsCache = {};
+
 function loadSettingsData(sheetName) {
-  google.script.run.withSuccessHandler(function(data) {
+  return callServer('getSettingsData', sheetName).then(function(data) {
+    settingsCache[sheetName] = data;
     let tbody = document.querySelector('#table-' + sheetName + ' tbody');
     if(!tbody) return;
     tbody.innerHTML = '';
-    
+
     if (data.length === 0) {
       let colCount = sheetName === 'Admin' ? 5 : 2;
       tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted">ไม่มีข้อมูล</td></tr>`;
@@ -243,21 +220,41 @@ function loadSettingsData(sheetName) {
       let tr = document.createElement('tr');
       if (sheetName === 'Admin') {
         tr.innerHTML = `
-          <td>${row[0] || ''}</td>
-          <td>${row[1] || ''}</td>
-          <td>${row[2] || ''}</td>
-          <td><span class="badge bg-primary">${row[3] || 'แอดมิน'}</span></td>
+          <td>${escHtml(row[0])}</td>
+          <td><span class="text-muted">••••••</span> <button class="btn btn-sm btn-outline-secondary ms-2" onclick="resetUserPassword(${index})"><i class="fa-solid fa-key"></i> รีเซ็ต</button></td>
+          <td>${escHtml(row[2])}</td>
+          <td><span class="badge bg-primary">${escHtml(row[3])}</span></td>
           <td class="text-center"><button class="btn btn-sm btn-danger" onclick="deleteSetting('${sheetName}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
         `;
       } else {
         tr.innerHTML = `
-          <td>${row[0] || ''}</td>
+          <td>${escHtml(row[0])}</td>
           <td class="text-center"><button class="btn btn-sm btn-danger" onclick="deleteSetting('${sheetName}', ${index})"><i class="fa-solid fa-trash"></i></button></td>
         `;
       }
       tbody.appendChild(tr);
     });
-  }).getSettingsData(sheetName);
+  }).catch(function(err) { showError(err, 'โหลดข้อมูลไม่สำเร็จ'); });
+}
+
+function resetUserPassword(index) {
+  let row = (settingsCache['Admin'] || [])[index];
+  if (!row) return;
+  Swal.fire({
+    title: 'รีเซ็ตรหัสผ่าน: ' + row[0],
+    input: 'password',
+    inputPlaceholder: 'รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)',
+    showCancelButton: true,
+    confirmButtonText: 'บันทึก',
+    cancelButtonText: 'ยกเลิก',
+    inputValidator: (v) => { if (!v || v.length < 6) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; }
+  }).then((r) => {
+    if (!r.isConfirmed) return;
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    callServer('resetPassword', row[0], r.value).then(() => {
+      Swal.fire('รีเซ็ตรหัสผ่านแล้ว', '', 'success');
+    }).catch((err) => showError(err));
+  });
 }
 
 function loadAllSettings() {
@@ -275,8 +272,8 @@ function initAllSheets() {
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังสร้าง...';
   resultBox.style.display = 'none';
 
-  google.script.run
-    .withSuccessHandler(function(results) {
+  callServer('initializeAllSheets')
+    .then(function(results) {
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-database"></i> สร้าง Sheet ทั้งหมด &amp; ตั้งหัวตาราง';
 
@@ -321,13 +318,12 @@ function initAllSheets() {
       // Reload settings tables
       loadAllSettings();
     })
-    .withFailureHandler(function(error) {
+    .catch(function(error) {
       btn.disabled = false;
       btn.innerHTML = '<i class="fa-solid fa-database"></i> สร้าง Sheet ทั้งหมด &amp; ตั้งหัวตาราง';
-      resultBox.innerHTML = `<div class="alert alert-danger"><i class="fa-solid fa-circle-xmark"></i> เกิดข้อผิดพลาด: ${error.message}</div>`;
+      resultBox.innerHTML = `<div class="alert alert-danger"><i class="fa-solid fa-circle-xmark"></i> เกิดข้อผิดพลาด: ${escHtml(errorText(error))}</div>`;
       resultBox.style.display = 'block';
-    })
-    .initializeAllSheets();
+    });
 }
 
 
@@ -343,10 +339,11 @@ function deleteSetting(sheetName, rowIndex) {
   }).then((result) => {
     if (result.isConfirmed) {
       Swal.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      google.script.run.withSuccessHandler(() => {
+      let row = (settingsCache[sheetName] || [])[rowIndex] || [];
+      callServer('deleteSettingData', sheetName, rowIndex, row[0]).then(() => {
         Swal.fire('ลบสำเร็จ!', '', 'success');
         loadSettingsData(sheetName);
-      }).deleteSettingData(sheetName, rowIndex);
+      }).catch((err) => { showError(err, 'ลบไม่สำเร็จ'); loadSettingsData(sheetName); });
     }
   });
 }
@@ -356,7 +353,7 @@ function addSetting(sheetName) {
   if (sheetName === 'Admin') {
     htmlContent = `
       <input id="swal-input1" class="swal2-input" placeholder="Username">
-      <input id="swal-input2" class="swal2-input" placeholder="Password">
+      <input id="swal-input2" type="password" class="swal2-input" placeholder="Password (อย่างน้อย 6 ตัวอักษร)">
       <input id="swal-input3" class="swal2-input" placeholder="ชื่อผู้ใช้งาน">
       <select id="swal-input4" class="swal2-select w-75 mt-3">
         <option value="พนักงาน">พนักงาน</option>
@@ -381,6 +378,7 @@ function addSetting(sheetName) {
         let v3 = document.getElementById('swal-input3').value;
         let v4 = document.getElementById('swal-input4').value;
         if (!v1 || !v2 || !v3) { Swal.showValidationMessage('กรุณากรอกข้อมูลให้ครบถ้วน'); return false; }
+        if (v2.length < 6) { Swal.showValidationMessage('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'); return false; }
         return [v1, v2, v3, v4];
       } else {
         let v1 = document.getElementById('swal-input1').value;
@@ -391,10 +389,10 @@ function addSetting(sheetName) {
   }).then((result) => {
     if (result.isConfirmed) {
       Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-      google.script.run.withSuccessHandler(() => {
+      callServer('addSettingData', sheetName, result.value).then(() => {
         Swal.fire('เพิ่มสำเร็จ!', '', 'success');
         loadSettingsData(sheetName);
-      }).addSettingData(sheetName, result.value);
+      }).catch((err) => showError(err, 'เพิ่มข้อมูลไม่สำเร็จ'));
     }
   });
 }
