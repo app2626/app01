@@ -1,0 +1,94 @@
+<script>
+function renderDashboard() {
+  if (!window.globalData) return;
+  
+  const approvedData = window.globalData.filter(r => ['อนุมัติแล้ว', 'รอเปิด SO', 'รอเปิด Invoice', 'เสร็จสมบูรณ์'].includes(r[32]));
+  
+  // --- 1. Monthly Data ---
+  const monthCounts = {};
+  const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  // FIX: เก็บ timestamp ด้วยเพื่อ sort ลำดับเวลาได้ถูกต้อง
+  const monthTimestamps = {};
+  approvedData.forEach(r => {
+    let dateStr = r[1];
+    if (dateStr) {
+      let d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        let m = d.getMonth();
+        let y = d.getFullYear() + 543; // Thai year
+        let key = monthNames[m] + ' ' + y.toString().substring(2);
+        monthCounts[key] = (monthCounts[key] || 0) + 1;
+        // เก็บ timestamp สำหรับ sort (ใช้วันที่ 1 ของเดือนนั้น)
+        if (!monthTimestamps[key]) {
+          monthTimestamps[key] = new Date(d.getFullYear(), m, 1).getTime();
+        }
+      }
+    }
+  });
+
+  // FIX: sort เดือนตามลำดับเวลาจริง ไม่ใช้ Object.keys() ที่ไม่รับประกัน order
+  const sortedMonthEntries = Object.entries(monthCounts).sort((a, b) => monthTimestamps[a[0]] - monthTimestamps[b[0]]);
+  const sortedMonthLabels = sortedMonthEntries.map(e => e[0]);
+  const sortedMonthValues = sortedMonthEntries.map(e => e[1]);
+
+  
+  // --- 2. Top Models ---
+  const modelCounts = {};
+  approvedData.forEach(r => {
+    let model = r[15];
+    if (model) {
+      modelCounts[model] = (modelCounts[model] || 0) + 1;
+    }
+  });
+  let sortedModels = Object.entries(modelCounts).sort((a, b) => b[1] - a[1]);
+  
+  // --- 3. Top 10 Branches ---
+  const branchCounts = {};
+  approvedData.forEach(r => {
+    let branch = r[2];
+    if (branch) {
+      branchCounts[branch] = (branchCounts[branch] || 0) + 1;
+    }
+  });
+  let sortedBranches = Object.entries(branchCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  
+  // Render Charts
+  // FIX: ใช้ sortedMonthLabels/Values ที่เรียงตามลำดับเวลาแล้ว
+  renderChart('monthlyChart', 'bar', sortedMonthLabels, sortedMonthValues, 'ยอดขาย (รายการ)');
+
+  renderChart('modelChart', 'doughnut', sortedModels.map(x => x[0]), sortedModels.map(x => x[1]), 'ยอดขาย (เครื่อง)');
+  renderChart('branchChart', 'bar', sortedBranches.map(x => x[0]), sortedBranches.map(x => x[1]), 'ยอดขาย (รายการ)');
+}
+
+let chartInstances = {};
+function renderChart(canvasId, type, labels, data, label) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  
+  if (chartInstances[canvasId]) {
+    chartInstances[canvasId].destroy();
+  }
+  
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: type,
+    data: {
+      labels: labels,
+      datasets: [{
+        label: label,
+        data: data,
+        backgroundColor: [
+          'rgba(54, 162, 235, 0.6)', 'rgba(255, 99, 132, 0.6)', 'rgba(255, 206, 86, 0.6)',
+          'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)',
+          'rgba(199, 199, 199, 0.6)', 'rgba(83, 102, 255, 0.6)', 'rgba(40, 159, 64, 0.6)',
+          'rgba(210, 199, 199, 0.6)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+    }
+  });
+}
+</script>

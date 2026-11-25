@@ -1,0 +1,170 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
+  /* Global Settings */
+  body {
+    font-family: 'Noto Sans Thai', sans-serif;
+    font-size: .875rem;
+    color: #1f2937; /* Tailwind gray-800 */
+    background-color: #f3f4f6;
+  }
+
+  /* To make the content readable over the background, add a semi-transparent overlay to main containers if needed, but since we use cards, they already have white backgrounds. */
+  .container-fluid {
+    position: relative;
+    z-index: 1;
+  }
+
+  .swal2-container {
+    z-index: 10000;
+  }
+
+  /* ปรับแต่งขนาด Popup Card (Modal) ของ DataTables ให้สูงและสวยขึ้น */
+  div.dtr-modal-display {
+    height: 85vh !important; /* เพิ่มความสูงของ Card */
+    width: 80vw !important; 
+    max-width: 700px;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+    border: none !important;
+    padding: 1.5rem !important;
+  }
+  
+  @media (max-width: 768px) {
+    div.dtr-modal-display {
+      width: 95vw !important;
+      height: 90vh !important;
+      padding: 1rem !important;
+    }
+  }
+
+  /* ปรับแต่งปุ่มปิด Modal (X) ให้เด่นขึ้น */
+  div.dtr-modal-close {
+    border-radius: 50% !important;
+    background-color: #ef4444 !important;
+    color: white !important;
+    border: none !important;
+    width: 30px !important;
+    height: 30px !important;
+    line-height: 30px !important;
+    top: 5px !important;
+    right: 5px !important;
+    font-size: 20px !important;
+  }
+  div.dtr-modal-close:hover {
+    background-color: #dc2626 !important;
+  }
+
+  /* DataTables Modernization & Sticky Header */
+  table.dataTable {
+    border-collapse: separate !important;
+    border-spacing: 0;
+    width: 100% !important;
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+  
+  table.dataTable tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+  }
+  
+  table.dataTable tbody tr:hover {
+    background-color: #f8fafc !important;
+  }
+  
+  /* Status Badges in Table */
+  .badge, .btn-sm.position-relative {
+    font-weight: 500;
+    padding: 0.4em 0.8em;
+    border-radius: 9999px !important;
+  }
+
+  /* Step Indicator Cards */
+  .step-card .card-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    color: #334155 !important;
+    border-left: 4px solid #3b82f6;
+    border-radius: 1rem 1rem 0 0 !important;
+  }
+  
+  #step1 .card-header { border-left-color: #3b82f6; }
+  #step2 .card-header { border-left-color: #10b981; }
+  #step3 .card-header { border-left-color: #0ea5e9; }
+  #step4 .card-header { border-left-color: #8b5cf6; }
+
+  /* Utilities */
+  .sfont {
+    font-size: .875rem;
+    font-weight: 500;
+  }
+
+  /* Form Labels */
+  label {
+    font-size: 16px;
+    font-weight: bold;
+  }
+
+  /* Loading Screen Overlay */
+  #loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(8px);
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* FAB Settings (If used) */
+  .fab-container { position: fixed; bottom: 20px; right: 20px; z-index: 999; cursor: pointer; }
+  .fab-icon-holder {
+    width: 56px; height: 56px; border-radius: 100%; background: #3b82f6;
+    box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4); transition: transform 0.2s ease;
+  }
+  .fab-icon-holder:hover { transform: scale(1.1) rotate(10deg); }
+  .fab-icon-holder i { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 24px; color: #fff; }
+  
+  /* Sidebar Offcanvas Customization */
+  .offcanvas {
+    background-color: #1e293b !important;
+    border-right: none;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+  }
+  .offcanvas-header {
+    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+  }
+  .list-group-item-dark {
+    background-color: transparent !important;
+    color: #cbd5e1 !important;
+    transition: all 0.2s ease;
+    border-radius: 0.5rem;
+    margin: 0.25rem 0.5rem;
+  }
+  .list-group-item-dark:hover {
+    background-color: rgba(255,255,255,0.1) !important;
+    color: #ffffff !important;
+    transform: translateX(5px);
+  }
+  
+  /* Summary Status Cards Overrides */
+  .bg-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; }
+  .bg-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; color: white !important;}
+  .bg-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; }
+  .bg-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important; }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .container-fluid { padding-left: 10px; padding-right: 10px; }
+    .card { border-radius: 0.75rem !important; }
+    .card-body { padding: 1rem !important; }
+    .navbar { padding: 0.5rem; }
+    .btn { width: 100%; margin-bottom: 0.5rem; }
+    .btn-group { display: flex; flex-direction: column; width: 100%; }
+    .btn-group .btn { border-radius: 0.5rem !important; margin-bottom: 0.25rem; }
+  }
+</style>

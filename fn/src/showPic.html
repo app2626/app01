@@ -1,0 +1,144 @@
+<script>    
+  // FIX: Helper function ป้องกัน XSS — escape HTML special characters จากข้อมูล Spreadsheet
+  function escHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function showPic(el){
+      loadingStart();
+      let tr = $(el).closest('tr');
+      if (tr.hasClass('child')) { tr = tr.prev('.parent'); }
+      let record = tr[0].cells[0].innerHTML;
+    google.script.run.withSuccessHandler(successPic).withFailureHandler(function(err){
+      loadingEnd();
+      Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลได้: ' + err.message, 'error');
+    }).findRecord(record);
+}
+
+  function successPic(data){  
+    console.log(data) 
+    loadingEnd();
+    const statusMap = {
+      "รออนุมัติ":      "<span class='badge bg-warning text-dark sfont'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>",
+      "รอเปิด SO":      "<span class='badge bg-info text-white sfont'><i class='fa-solid fa-file-invoice'></i> รอเปิด SO</span>",
+      "รอเปิด Invoice": "<span class='badge bg-primary sfont'><i class='fa-solid fa-file-invoice-dollar'></i> รอเปิด Invoice</span>",
+      "เสร็จสมบูรณ์":   "<span class='badge bg-success sfont'><i class='fa-solid fa-check-double'></i> เสร็จสมบูรณ์</span>",
+      "ไม่อนุมัติ":     "<span class='badge bg-danger sfont'><i class='fa-solid fa-circle-xmark'></i> ไม่อนุมัติ</span>",
+    };
+    // FIX: เก็บ status badge แยก ไม่ escape ส่วนนี้เพราะเป็น HTML ที่สร้างเอง
+    let statusBadge = statusMap[data[32]] || (data[32] ? escHtml(data[32]) : "<span class='badge bg-warning text-dark sfont'><i class='fa-solid fa-clock'></i> รออนุมัติ</span>");
+    
+    Swal.fire({
+      position: 'top',
+      showCloseButton: true,
+      // FIX: ใช้ escHtml() สำหรับข้อมูลทุกฟิลด์จาก Spreadsheet ป้องกัน XSS และ HTML แตก
+      html: '<table class="table table-striped" style="text-align:left;font-size:.875rem">'+
+            '<tr>'+
+            '<th colspan="2"class="bg-primary text-white text-center mb-2 p-2">ข้อมูลขออนุมัติ</th>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>วันที่ขออนุมัติ</th>'+'<td>'+escHtml(data[1])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+             '<th>สาขา</th>'+'<td>'+escHtml(data[2])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+             '<th>รหัสพนักงาน</th>'+'<td>'+escHtml(data[3])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ชื่อ-สกุล(พนง.)</th>'+'<td>'+escHtml(data[4])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+             '<th>เบอร์ติดต่อ(พนง.)</th>'+'<td>'+escHtml(data[5])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>เลขบัตรประชาชน</th>'+'<td>'+escHtml(data[6])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ชื่อ-สกุล ลูกค้า</th>'+'<td>'+escHtml(data[7])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>เบอร์ติดต่อลูกค้า</th>'+'<td>'+escHtml(data[8])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>บ้านเลขที่</th>'+'<td>'+escHtml(data[9])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>หมู่ที่</th>'+'<td>'+escHtml(data[10])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ตำบล/แขวง</th>'+'<td>'+escHtml(data[11])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>อำเภอ/เขต</th>'+'<td>'+escHtml(data[12])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>จังหวัด</th>'+'<td>'+escHtml(data[13])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>รหัสไปรษณีย์</th>'+'<td>'+escHtml(data[14])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+             '<th>ชื่อรุ่นสินค้า</th>'+'<td>'+escHtml(data[15])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>IMEI</th>'+'<td>'+escHtml(data[16])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>PREMIUM</th>'+'<td>'+escHtml(data[17])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>การรับประกันจอแตก</th>'+'<td>'+escHtml(data[18])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ราคาขายปลีกปกติ</th>'+'<td>'+escHtml(data[19])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>เงินดาวน์</th>'+'<td>'+escHtml(data[20])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ส่วนลด เปิดเบอร์ AIS</th>'+'<td>'+escHtml(data[21])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ส่วนลด promotion</th>'+'<td>'+escHtml(data[22])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ส่วนลด Trade in</th>'+'<td>'+escHtml(data[23])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ส่วนลด Trade up</th>'+'<td>'+escHtml(data[24])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ส่วนลด Big point</th>'+'<td>'+escHtml(data[25])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>ค่าธรรมเนียม</th>'+'<td>'+escHtml(data[26])+'</td>'+
+            '</tr>'+                    
+            '<tr>'+
+            '<th>ราคาสุทธิ</th>'+'<td>'+escHtml(data[27])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>จำนวนงวด</th>'+'<td>'+escHtml(data[28])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>งวดละ</th>'+'<td>'+escHtml(data[29])+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<th>สถานะ</th>'+'<td>'+statusBadge+'</td>'+
+            '</tr>'+
+            '<tr>'+
+            '<td colspan="2" style="text-align:center">'+'<img src="'+escHtml(data[30])+'" style="max-width:100%; height:auto;"><br>'+
+            (data[31] ? '<a href="'+escHtml(data[31])+'" target="_blank" class="btn btn-danger btn-sm mt-3"><i class="fa-solid fa-file-pdf"></i> ดูหนังสือสัญญา</a>' : '') +
+            '</td>'+
+            '</tr>'+
+            '</table>',
+     showConfirmButton: false,
+       })
+      
+  }
+</script>

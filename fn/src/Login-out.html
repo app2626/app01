@@ -1,0 +1,140 @@
+<script>
+//localStorage
+let userName, userRole;
+$(document).ready(function() {
+  loadingStart();
+  userName = localStorage.getItem('userName');
+  userRole = localStorage.getItem('userRole');
+  console.log('userName: ',userName)
+  
+  if(userName === null || userName ===""){
+      userName =""
+      userRole =""
+      switchView('login-view'); // แสดงหน้า Login View แทน popup
+      loadingEnd();
+  }else{
+      admin = userName;
+      $("#btnlogin").hide();
+      $(".logout").show();
+      
+      if(userRole === 'แอดมิน'){
+          $(".admin-only").show();
+          $(".table-only").show();
+          $(".dashboard-only").show();
+          switchView('table-view');
+      } else if(userRole === 'บัญชี'){
+          $(".admin-only").hide();
+          $(".table-only").show();
+          $(".dashboard-only").show();
+          switchView('table-view');
+      } else {
+          // พนักงาน
+          $(".admin-only").hide();
+          $(".table-only").show();
+          $(".dashboard-only").hide();
+          switchView('table-view');
+      }
+      
+      $("#msg-name").html(admin + " (" + userRole + ")");
+      $(".fablogin").hide();
+      $(".fablogout").show();
+      getData();
+  }
+});
+
+
+/**  LOGIN FUNCTIONS */
+  function login(){
+      $("#login-error").hide();
+      loadingStart();
+    const username = $("#username").val();
+    const pwd = $("#password").val();
+    
+          google.script.run.withSuccessHandler(function(output){
+            if(output !== 'null'){          
+                let userObj = JSON.parse(output);
+                localStorage.setItem('userName', userObj.name); 
+                localStorage.setItem('userRole', userObj.role);
+                admin = userObj.name;
+                userRole = userObj.role; // FIX: Update global variable!
+                let role = userRole;
+                
+                $("#btnlogin").hide();
+                $(".logout").show();
+                
+                if(role === 'แอดมิน'){
+                   $(".admin-only").show();
+                   $(".table-only").show();
+                   $(".dashboard-only").show();
+                   switchView('table-view');
+                } else if(role === 'บัญชี'){
+                   $(".admin-only").hide();
+                   $(".table-only").show();
+                   $(".dashboard-only").show();
+                   switchView('table-view');
+                } else {
+                   // พนักงาน
+                   $(".admin-only").hide();
+                   $(".table-only").show();
+                   $(".dashboard-only").hide();
+                   switchView('table-view');
+                }
+                
+                $("#msg-name").html(admin + " (" + role + ")");
+                $(".fablogin").hide();
+                $(".fablogout").show();
+                getData()
+              }else{
+                loadingEnd();
+                // แสดงข้อความผิดพลาดในฟอร์ม แทนการใช้ Toast เพื่อไม่ให้ popup หาย
+                $("#login-error").show();
+                // รีเซ็ตรหัสผ่าน
+                $("#password").val('');
+              }
+            }).withFailureHandler(function(error) {
+              loadingEnd();
+              Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเข้าสู่ระบบได้: ' + error.message, 'error');
+            }).checkLogin(username,pwd);        
+      }
+
+  //Loading screen
+  function loadingStart(){
+    $('#loading').removeClass('invisible');
+  }
+
+  function loadingEnd(){
+    $('#loading').addClass('invisible');   
+  }
+
+ 
+   // Logout
+     function logout(){
+      Swal.fire({
+      position: 'top',
+      title: 'คุณต้องการออกจากระบบ?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#198754',
+      cancelButtonColor: '#d33',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonText: 'ตกลง'
+    }).then((result) => {
+  if (result.isConfirmed) {
+      $(".logout").hide();
+      $(".admin-only").hide();
+      $(".table-only").hide();
+      $(".dashboard-only").hide();
+      $("#btnlogin").show();
+      $(".fablogin").show();
+      $(".fablogout").hide();
+      admin = "";
+      userRole = ""; // FIX: Clear global variable on logout
+      localStorage.removeItem('userName');
+      localStorage.removeItem('userRole');
+      switchView('login-view'); // ซ่อนหน้าอื่นๆ และแสดงหน้าล็อกอิน
+      loadingEnd();
+      }
+      })   
+    }
+  
+</script>
