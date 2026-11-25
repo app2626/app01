@@ -125,24 +125,6 @@ function getData(admin) {
   }) || [];
 }
 
-/*  GET USERNAME & PASSWORD  */
-function checkLogin(username, pwd) {
-  const ws = SpreadsheetApp.getActive().getSheetByName('Admin');
-  const data = ws.getDataRange().getDisplayValues().slice(1).filter(r => r[0] !== "");
-  let result = 'null';
-  for (let r of data) {
-    if (r[0] == username && r[1] == pwd) {
-      let role = String(r[3] || 'แอดมิน').trim(); // FIX: ป้องกัน trailing space จาก Sheet
-      let name = String(r[2] || '').trim();
-      result = JSON.stringify({ name: name, role: role });
-      break;
-    }
-  }
-  return result;
-}
-
-
-
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
