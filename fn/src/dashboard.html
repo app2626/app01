@@ -74,8 +74,8 @@ function renderChart(canvasId, type, labels, data, label) {
   }
   
   // one hue family for bars; a muted categorical set only where categories must be told apart (doughnut)
-  const ACCENT = '#0f6b5c';
-  const CATEGORICAL = ['#0f6b5c', '#3a8fb7', '#d39b2a', '#7a6bb8', '#c2564d', '#5b9a5f', '#8a96a3', '#2f5d8a', '#b07a4f', '#4fa3a0'];
+  const ACCENT = '#4b38b3';
+  const CATEGORICAL = ['#4b38b3', '#45cb85', '#299cdb', '#ffbe0b', '#f06548', '#3577f1', '#878a99', '#7f6fd1', '#0ab39c', '#f7b84b'];
   const isDoughnut = type === 'doughnut';
   const font = { family: "'IBM Plex Sans Thai', system-ui, sans-serif", size: 12 };
   Chart.defaults.font = font;
@@ -89,7 +89,7 @@ function renderChart(canvasId, type, labels, data, label) {
         label: label,
         data: data,
         backgroundColor: isDoughnut ? CATEGORICAL : ACCENT,
-        hoverBackgroundColor: isDoughnut ? CATEGORICAL : '#0b5a4d',
+        hoverBackgroundColor: isDoughnut ? CATEGORICAL : '#402fa0',
         borderColor: isDoughnut ? '#ffffff' : ACCENT,
         borderWidth: isDoughnut ? 2 : 0,
         borderRadius: isDoughnut ? 0 : 4,

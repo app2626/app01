@@ -49,31 +49,41 @@
     <div class="loader-card"><span class="spinner-border" aria-hidden="true"></span> กำลังโหลดข้อมูล…</div>
   </div>
 
+  <!-- Desktop sidebar -->
+  <aside class="app-sidebar d-none" id="appSidebar" aria-label="เมนูหลัก">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">FN+</div>
+      <div class="min-w-0">
+        <div class="brand-name">FN+ Consignment</div>
+        <div class="brand-sub">ระบบขออนุมัติขายผ่อนชำระ</div>
+      </div>
+    </div>
+    <nav>
+      <div class="menu-title">เมนู</div>
+      <a href="#" data-view="table-view" class="side-link table-only" style="display:none;" onclick="switchView('table-view'); return false;"><i class="fa-solid fa-list-check"></i> รายการคำขอ</a>
+      <a href="#" data-view="form-view" class="side-link" onclick="switchView('form-view'); return false;"><i class="fa-solid fa-circle-plus"></i> สร้างคำขอ</a>
+      <a href="#" data-view="dashboard-view" class="side-link dashboard-only" style="display:none;" onclick="switchView('dashboard-view'); return false;"><i class="fa-solid fa-chart-column"></i> แดชบอร์ด</a>
+      <div class="menu-title admin-only" style="display:none;">ผู้ดูแลระบบ</div>
+      <a href="#" data-view="admin-view" class="side-link admin-only" style="display:none;" onclick="switchView('admin-view'); return false;"><i class="fa-solid fa-sliders"></i> ตั้งค่าระบบ</a>
+    </nav>
+    <div class="side-foot logout" style="display:none;">
+      <button class="btn btn-light w-100" type="button" onclick="logout();"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i> ออกจากระบบ</button>
+    </div>
+  </aside>
+
   <header class="topbar" id="mainNavbar" style="display: none;">
     <div class="topbar-inner">
       <button class="icon-btn d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarNav" aria-controls="sidebarNav" aria-label="เปิดเมนู">
         <i class="fa-solid fa-bars"></i>
       </button>
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">FN+</div>
-        <div class="min-w-0">
-          <div class="brand-name">FN+ Consignment</div>
-          <div class="brand-sub">ระบบขออนุมัติขายผ่อนชำระ</div>
-        </div>
-      </div>
-      <nav class="topnav" aria-label="เมนูหลัก">
-        <a href="#" data-view="table-view" class="table-only" style="display:none;" onclick="switchView('table-view'); return false;"><i class="fa-solid fa-list-check me-1"></i> รายการคำขอ</a>
-        <a href="#" data-view="form-view" onclick="switchView('form-view'); return false;"><i class="fa-solid fa-plus me-1"></i> สร้างคำขอ</a>
-        <a href="#" data-view="dashboard-view" class="dashboard-only" style="display:none;" onclick="switchView('dashboard-view'); return false;"><i class="fa-solid fa-chart-column me-1"></i> แดชบอร์ด</a>
-        <a href="#" data-view="admin-view" class="admin-only" style="display:none;" onclick="switchView('admin-view'); return false;"><i class="fa-solid fa-sliders me-1"></i> ตั้งค่าระบบ</a>
-      </nav>
+      <div class="page-title min-w-0" id="topbarTitle">FN+ Consignment</div>
       <div class="user-chip logout" style="display:none;">
+        <div class="avatar" id="msg-avatar" aria-hidden="true"></div>
         <div class="user-meta">
           <div class="n" id="msg-user-name"></div>
           <div class="r" id="msg-user-role"></div>
         </div>
-        <div class="avatar" id="msg-avatar" aria-hidden="true"></div>
-        <button class="icon-btn d-none d-lg-grid" type="button" onclick="logout();" title="ออกจากระบบ" aria-label="ออกจากระบบ">
+        <button class="icon-btn d-lg-none" type="button" onclick="logout();" title="ออกจากระบบ" aria-label="ออกจากระบบ">
           <i class="fa-solid fa-arrow-right-from-bracket"></i>
         </button>
       </div>
@@ -713,6 +723,12 @@
       document.getElementById('dashboard-view').style.display = 'none';
       
       // จัดการ Navbar
+      var inApp = !!viewId && viewId !== 'login-view';
+      document.body.classList.toggle('has-shell', inApp);
+      document.getElementById('appSidebar').classList.toggle('d-none', !inApp);
+      document.getElementById('appSidebar').classList.toggle('d-lg-flex', inApp);
+      var titles = { 'table-view': 'รายการคำขออนุมัติ', 'form-view': 'สร้างคำขออนุมัติ', 'dashboard-view': 'แดชบอร์ด', 'admin-view': 'ตั้งค่าระบบ' };
+      document.getElementById('topbarTitle').textContent = titles[viewId] || 'FN+ Consignment';
       if(viewId === 'login-view' || viewId === '') {
         document.getElementById('mainNavbar').style.display = 'none';
         document.getElementById('login-view').style.display = 'flex'; // แสดงหน้าล็อกอินหากระบุ
