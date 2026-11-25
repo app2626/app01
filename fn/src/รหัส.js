@@ -1,8 +1,4 @@
-/*
-# ระบบ Login
-# Credit: https://www.google.com/
-# ผู้พัฒนา: https://www.google.com/
-*/
+// FN+ Consignment — web app entry point. Server logic lives in Schema/Auth/Settings/Requests/Notify.js.
 
 function doGet() {
   return HtmlService.createTemplateFromFile('index').evaluate()
