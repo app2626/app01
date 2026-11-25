@@ -123,34 +123,42 @@ function saveRequest(token, f) {
   var blob1 = toBlob_(f.file1Data), blob2 = toBlob_(f.file2Data);
 
   // Uploads happen outside the lock: they can take seconds and would block every other save/approval.
-  var file1Id = folder.createFile(blob1).getId();
-  var file2Id = folder.createFile(blob2).getId();
+  var file1 = folder.createFile(blob1);
+  var file2 = folder.createFile(blob2);
+  var file1Id = file1.getId(), file2Id = file2.getId();
 
-  var id = withLock_(function () {
-    var sheet = getDataSheet_();
-    var newIdValue = newId_(sheet);
+  var id;
+  try {
+    id = withLock_(function () {
+      var sheet = getDataSheet_();
+      var newIdValue = newId_(sheet);
 
-    var row = DATA_HEADERS.map(function () { return ''; });
-    var set = function (h, v) { row[col_(h) - 1] = v; };
-    set('ID :', "'" + newIdValue);
-    TEXT_FIELDS_.forEach(function (x) { set(x[1], str_(f[x[0]])); });
-    set('เบอร์ติดต่อ(พนง.) :', "'" + str_(f.emp_phone));
-    set('เลขบัตรประชาชน :', "'" + str_(f.id_card_number));
-    set('เบอร์ติดต่อลูกค้า :', "'" + str_(f.customer_phone));
-    set('รหัสไปรษณีย์ :', "'" + str_(f.zipcode));
-    set('PREMIUM :', str_(f.premium_combined));
-    set('การรับประกันจอแตก :', str_(f.guarantee));
-    AMOUNT_FIELDS_.forEach(function (x) { set(x[1], amount_(f[x[0]], x[2])); });
-    DISCOUNTS_.forEach(function (d) { set(d.barcodeCol, str_(f[d.barcode])); });
-    set('ราคาสุทธิ :', net);
-    set('จำนวนงวด :', Number(str_(f.installments)));
-    set('รูปสลิปเงินโอน :', 'https://lh3.googleusercontent.com/d/' + file1Id);
-    set('ใบเสร็จ :', 'https://drive.google.com/uc?id=' + file2Id);
-    set('สถานะ :', STATUS.WAIT);
-    set('ไฟแนนซ์ :', finance);
-    sheet.appendRow(row);
-    return newIdValue;
-  });
+      var row = DATA_HEADERS.map(function () { return ''; });
+      var set = function (h, v) { row[col_(h) - 1] = v; };
+      set('ID :', "'" + newIdValue);
+      TEXT_FIELDS_.forEach(function (x) { set(x[1], cellText_(f[x[0]])); });
+      set('เบอร์ติดต่อ(พนง.) :', "'" + str_(f.emp_phone));
+      set('เลขบัตรประชาชน :', "'" + str_(f.id_card_number));
+      set('เบอร์ติดต่อลูกค้า :', "'" + str_(f.customer_phone));
+      set('รหัสไปรษณีย์ :', "'" + str_(f.zipcode));
+      set('PREMIUM :', cellText_(f.premium_combined));
+      set('การรับประกันจอแตก :', cellText_(f.guarantee));
+      AMOUNT_FIELDS_.forEach(function (x) { set(x[1], amount_(f[x[0]], x[2])); });
+      DISCOUNTS_.forEach(function (d) { set(d.barcodeCol, cellText_(f[d.barcode])); });
+      set('ราคาสุทธิ :', net);
+      set('จำนวนงวด :', Number(str_(f.installments)));
+      set('รูปสลิปเงินโอน :', 'https://lh3.googleusercontent.com/d/' + file1Id);
+      set('ใบเสร็จ :', 'https://drive.google.com/uc?id=' + file2Id);
+      set('สถานะ :', STATUS.WAIT);
+      set('ไฟแนนซ์ :', cellText_(finance));
+      sheet.appendRow(row);
+      return newIdValue;
+    });
+  } catch (e) {
+    // the row was not written: do not leave orphan uploads in Drive
+    [file1, file2].forEach(function (file) { try { file.setTrashed(true); } catch (ignore) {} });
+    throw e;
+  }
 
   var discountLines = DISCOUNTS_.map(function (d) {
     var bc = str_(f[d.barcode]);
@@ -251,7 +259,7 @@ function updateStatus(token, obj) {
     if (!allowed) {
       throw new Error('รายการนี้ถูกดำเนินการไปแล้ว (สถานะปัจจุบัน: ' + (current || STATUS.WAIT) + ')');
     }
-    var put = function (h, v) { sheet.getRange(rowNum, col_(h)).setValue(v); };
+    var put = function (h, v) { sheet.getRange(rowNum, col_(h)).setValue(cellText_(v)); };
     put('สถานะ :', step.to);
     if (obj.action === 'approve' || obj.action === 'reject') {
       put('Remark(การเงิน) :', orDash_(obj.Remark));

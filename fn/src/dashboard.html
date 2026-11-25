@@ -1,4 +1,20 @@
 <script>
+/**
+ * Sheet display dates: ISO "2026-11-25" (as typed by the form) or Thai-locale day-first
+ * "25/11/2026", "25/11/2569", "25-11-2026 10:00". Never month-first. Buddhist years (> 2400) -> AD.
+ */
+function parseSheetDate(v) {
+  let s = String(v == null ? '' : v).trim(), y, m, d;
+  let iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let dmy = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);
+  if (iso) { y = +iso[1]; m = +iso[2]; d = +iso[3]; }
+  else if (dmy) { d = +dmy[1]; m = +dmy[2]; y = +dmy[3]; }
+  else return null;
+  if (y > 2400) y -= 543;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return new Date(y, m - 1, d);
+}
+
 function renderDashboard() {
   if (!window.globalData) return;
   
@@ -12,8 +28,8 @@ function renderDashboard() {
   approvedData.forEach(r => {
     let dateStr = r[1];
     if (dateStr) {
-      let d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
+      let d = parseSheetDate(dateStr);
+      if (d) {
         let m = d.getMonth();
         let y = d.getFullYear() + 543; // Thai year
         let key = monthNames[m] + ' ' + y.toString().substring(2);

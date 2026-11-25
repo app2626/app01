@@ -47,6 +47,15 @@ var SHEET_DEFS = [
   { name: 'Finance', headers: ['ชื่อไฟแนนซ์'], color: '#0f6b5c', seed: [['Ponmai'], ['Vyvr']] }
 ];
 
+/**
+ * User text for a sheet cell. Text starting with = + @ (or - followed by more) would be run by
+ * Sheets as a formula (data corruption / IMPORTXML exfiltration), so it is stored as literal text.
+ */
+function cellText_(v) {
+  var s = String(v == null ? '' : v).trim();
+  return /^[=+@]|^-./.test(s) ? "'" + s : s;
+}
+
 /** 1-based column number of a Data header. */
 function col_(header) {
   var i = DATA_HEADERS.indexOf(header);

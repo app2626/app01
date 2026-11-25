@@ -164,6 +164,7 @@ function getData(){
             }else if(st ==="ไม่อนุมัติ"){
             return "<span class='st st-rej'><i class='fa-solid fa-xmark'></i> ไม่อนุมัติ</span>";
             }
+            return escHtml(st); // any other value typed into the sheet is plain text
           } else if (type === 'filter' || type === 'sort') {
             // FIX: normalize "อนุมัติแล้ว" → "รอเปิด SO" เพื่อให้ filter ทำงานถูกต้อง
             if(st ==="" || st ==="รออนุมัติ") return "รออนุมัติ";

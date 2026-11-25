@@ -67,6 +67,16 @@ t('callServer maps FORBIDDEN to Thai', async () => {
   try { await ctx.callServer('getConfigProperties'); throw new Error('no throw'); } catch (e) { eq(e.message, 'คุณไม่มีสิทธิ์ดำเนินการนี้'); }
 });
 
+// dashboard.html: parseSheetDate (Thai sheet dates are day-first, may use Buddhist years)
+const dash = fs.readFileSync(path.join(__dirname, '..', 'src', 'dashboard.html'), 'utf8');
+const dctx = { String, Date }; vm.createContext(dctx);
+vm.runInContext(dash.match(/function parseSheetDate[\s\S]*?\n}\n/)[0], dctx);
+const ymd = v => { const d = dctx.parseSheetDate(v); return d ? [d.getFullYear(), d.getMonth() + 1, d.getDate()] : null; };
+t('parseSheetDate ISO', () => eq(ymd('2026-11-25'), [2026, 11, 25]));
+t('parseSheetDate day-first, not month-first', () => eq(ymd('05/11/2026'), [2026, 11, 5]));
+t('parseSheetDate Buddhist year with time', () => eq(ymd('5/1/2569 10:30:00'), [2026, 1, 5]));
+t('parseSheetDate rejects junk and impossible month', () => { eq(ymd('abc'), null); eq(ymd('11/25/2026'), null); });
+
 Promise.all(pending).then(() => {
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail) process.exitCode = 1;

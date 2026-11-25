@@ -41,7 +41,7 @@ function createGas() {
   const mail = [], fetches = [], driveFiles = [];
   const lockState = { fail: false };
   const toSigned = buf => Array.from(buf).map(b => (b > 127 ? b - 256 : b));
-  const folder = { getId: () => 'folder1', createFile: blob => { const id = 'f' + (driveFiles.length + 1); driveFiles.push({ id, blob }); return { getId: () => id }; } };
+  const folder = { getId: () => 'folder1', createFile: blob => { const id = 'f' + (driveFiles.length + 1); const f = { id, blob, trashed: false }; driveFiles.push(f); return { getId: () => id, setTrashed: v => { f.trashed = !!v; } }; } };
   const ctx = {
     console, Date, Math, JSON, parseInt, parseFloat, isNaN, isFinite, Number, String, Array, Object, RegExp, Error, Set, Map, Boolean,
     SpreadsheetApp: { getActive: () => ss, getActiveSpreadsheet: () => ss, flush() {} },

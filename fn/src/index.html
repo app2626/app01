@@ -99,40 +99,7 @@
   <a href="#" data-view="admin-view" class="admin-only" style="display:none;" onclick="switchView('admin-view'); return false;"><i class="fa-solid fa-sliders"></i><span>ตั้งค่า</span></a>
 </nav>
 
-<!-- Sidebar Offcanvas (mobile) -->
-<div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarNav" style="width: 280px;" aria-labelledby="sidebarTitle">
-  <div class="offcanvas-header">
-    <div class="brand">
-      <div class="brand-mark" aria-hidden="true">FN+</div>
-      <div class="brand-name" id="sidebarTitle">FN+ Consignment</div>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="ปิดเมนู"></button>
-  </div>
-  <div class="offcanvas-body p-0 pt-2 d-flex flex-column">
-    <nav aria-label="เมนูหลัก">
-      <a href="#" data-view="table-view" class="side-link table-only" style="display:none;" onclick="switchView('table-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-list-check"></i> รายการคำขอ
-      </a>
-      <a href="#" data-view="form-view" class="side-link" onclick="switchView('form-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-plus"></i> สร้างคำขอ
-      </a>
-      <a href="#" data-view="dashboard-view" class="side-link dashboard-only" style="display:none;" onclick="switchView('dashboard-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-chart-column"></i> แดชบอร์ด
-      </a>
-      <a href="#" data-view="admin-view" class="side-link admin-only" style="display:none;" onclick="switchView('admin-view'); closeSidebar(); return false;">
-        <i class="fa-solid fa-sliders"></i> ตั้งค่าระบบ
-      </a>
-    </nav>
 
-    <div class="mt-auto p-3 border-top logout" style="display:none;">
-      <div class="small text-muted mb-2">เข้าสู่ระบบในชื่อ <span class="fw-semibold text-dark" id="msg-name"></span></div>
-      <button class="btn btn-light w-100" id="btnLogout" onclick="logout(); closeSidebar();">
-        <i class="fa-solid fa-arrow-right-from-bracket me-2"></i> ออกจากระบบ
-      </button>
-    </div>
-  </div>
-</div>
-<!-- End Sidebar -->
 
   <main class="page" id="main-content">
 
@@ -779,13 +746,6 @@
       if (saved === '1') document.body.classList.add('sidebar-collapsed');
     })();
 
-    function closeSidebar() {
-      var sidebarEl = document.getElementById('sidebarNav');
-      var offcanvas = bootstrap.Offcanvas.getInstance(sidebarEl);
-      if (offcanvas) {
-        offcanvas.hide();
-      }
-    }
   </script>
 
   <!--Footer -->

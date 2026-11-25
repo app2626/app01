@@ -133,9 +133,13 @@ function addSettingData(token, sheetName, rowData) {
       if (!rowData[1] || rowData[1].length < 6) throw new Error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
       var roles = [ROLES.ADMIN, ROLES.ACC, ROLES.STAFF];
       if (roles.indexOf(rowData[3]) < 0) throw new Error('สิทธิ์ไม่ถูกต้อง');
-      sheet.appendRow([rowData[0], hashPassword_(rowData[1]), rowData[2] || rowData[0], rowData[3]]);
+      sheet.appendRow([cellText_(rowData[0]), hashPassword_(rowData[1]), cellText_(rowData[2] || rowData[0]), rowData[3]]);
     } else {
-      sheet.appendRow([rowData[0]]);
+      var last = sheet.getLastRow();
+      var exists = last >= 2 && sheet.getRange(2, 1, last - 1, 1).getDisplayValues()
+        .some(function (r) { return String(r[0]).trim() === rowData[0]; });
+      if (exists) throw new Error('"' + rowData[0] + '" มีอยู่แล้วในรายการ');
+      sheet.appendRow([cellText_(rowData[0])]);
     }
     return true;
   });
@@ -169,7 +173,7 @@ function addSettingDataBulk(token, sheetName, names) {
       var start = Math.max(last, 1) + 1;
       var need = start + added.length - 1 - sheet.getMaxRows();
       if (need > 0) sheet.insertRowsAfter(sheet.getMaxRows(), need);
-      sheet.getRange(start, 1, added.length, 1).setValues(added.map(function (n) { return [n]; }));
+      sheet.getRange(start, 1, added.length, 1).setValues(added.map(function (n) { return [cellText_(n)]; }));
     }
     return { added: added, skipped: names.length - added.length };
   });
@@ -220,14 +224,14 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
       if (target && target.role === ROLES.ADMIN && rowData[3] !== ROLES.ADMIN && admins.length <= 1) {
         throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
       }
-      sheet.getRange(rowNum, 3, 1, 2).setValues([[rowData[2] || key, rowData[3]]]);
+      sheet.getRange(rowNum, 3, 1, 2).setValues([[cellText_(rowData[2] || key), rowData[3]]]);
       return true;
     }
     if (!rowData[0]) throw new Error('กรุณากรอกข้อมูล');
     var names = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues();
     var dup = names.some(function (r, i) { return i + 2 !== rowNum && String(r[0]).trim() === rowData[0]; });
     if (dup) throw new Error('"' + rowData[0] + '" มีอยู่แล้วในรายการ');
-    sheet.getRange(rowNum, 1).setValue(rowData[0]);
+    sheet.getRange(rowNum, 1).setValue(cellText_(rowData[0]));
     return true;
   });
 }

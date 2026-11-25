@@ -140,6 +140,8 @@ console.log('== GUARDS / SETTINGS');
   t('added admin password is hashed', () => { ctx.addSettingData(admin, 'Admin', ['u9', 'secret9', 'n', 'พนักงาน']); ok(/^sha256\$/.test(lastRow('Admin')[1])); ok(ctx.login('u9', 'secret9')); });
   t('duplicate username rejected', () => throws(() => ctx.addSettingData(admin, 'Admin', ['u9', 'x', 'n', 'พนักงาน']), /มีอยู่แล้ว/));
   t('invalid role rejected', () => throws(() => ctx.addSettingData(admin, 'Admin', ['u10', 'secret10', 'n', 'root']), /สิทธิ์/));
+  t('duplicate list item rejected on add', () => { ctx.addSettingData(admin, 'location', ['สาขาซ้ำ']); throws(() => ctx.addSettingData(admin, 'location', [' สาขาซ้ำ ']), /มีอยู่แล้ว/); });
+  t('formula-like setting name stored as text', () => { ctx.addSettingData(admin, 'Product', ['=1+1']); eq(lastRow('Product')[0], "'=1+1"); });
   t('resetPassword hashes and works', () => { ctx.resetPassword(admin, 'staff1', 'brandnew1'); ok(ctx.login('staff1', 'brandnew1')); ok(/^sha256\$/.test(sheets.Admin.rows[3][1])); });
   t('resetPassword too short', () => throws(() => ctx.resetPassword(admin, 'staff1', '123'), /6/));
   t('lock timeout surfaces error', () => { lockState.fail = true; try { throws(() => ctx.addSettingData(admin, 'location', ['y']), /กำลังประมวลผล/); } finally { lockState.fail = false; } });
@@ -151,7 +153,7 @@ console.log('== GUARDS / SETTINGS');
 // ===================== Task 4: requests & workflow =====================
 console.log('== REQUESTS / WORKFLOW');
 {
-  const g = fixture(); const { ctx, sheets, driveFiles, mail } = g;
+  const g = fixture(); const { ctx, sheets, driveFiles, mail, lockState } = g;
   const admin = g.tok('admin1'), acc = g.tok('acc1'), staff = g.tok('staff1');
   const b64 = n => Buffer.alloc(n, 1).toString('base64');
   const form = (o = {}) => Object.assign({
@@ -191,12 +193,16 @@ console.log('== REQUESTS / WORKFLOW');
   t('getAllDropdownData returns finance', () => eq(ctx.getAllDropdownData(staff).finance, [['Ponmai'], ['Vyvr']]));
   t('new request message contains finance', () => { ctx.setConfigProperties(admin, { emailTo: 'a@b.c' }); ctx.saveRequest(staff, form({ finance: 'Vyvr' })); ok(/ไฟแนนซ์: Vyvr/.test(mail[mail.length - 1].htmlBody), 'no finance in mail'); });
   t('empty Finance list rejects save', () => { const keep = sheets.Finance.rows.splice(1); try { throws(() => ctx.saveRequest(staff, form()), /ไฟแนนซ์/); } finally { sheets.Finance.rows.push(...keep); } });
+  t('formula-like text stored as plain text', () => { const i = ctx.saveRequest(staff, form({ customer_name: '=IMPORTXML("x")', imei: '+123', premium_combined: '@a', barcode_ais: '-1+1' })).id; const r = rowById(i); eq(r[C('ชื่อตัวและสกุล (ลูกค้า) :')], "'=IMPORTXML(\"x\")"); eq(r[C('IMEI :')], "'+123"); eq(r[C('PREMIUM :')], "'@a"); eq(r[C('บาร์โค้ด AIS :')], "'-1+1"); });
+  t('plain text and lone dash untouched', () => { const i = ctx.saveRequest(staff, form({ customer_name: 'สมชาย', barcode_ais: '-' })).id; eq(rowById(i)[C('ชื่อตัวและสกุล (ลูกค้า) :')], 'สมชาย'); eq(rowById(i)[C('บาร์โค้ด AIS :')], '-'); });
+  t('uploaded files trashed when the save fails', () => { const n = driveFiles.length; lockState.fail = true; try { throws(() => ctx.saveRequest(staff, form()), /กำลังประมวลผล/); } finally { lockState.fail = false; } eq(driveFiles.length, n + 2); ok(driveFiles.slice(n).every(f => f.trashed), 'orphan files not trashed'); });
   t('new request email sent', () => { ctx.setConfigProperties(admin, { emailTo: 'a@b.c' }); const n = mail.length; ctx.saveRequest(staff, form()); eq(mail.length, n + 1); });
 
   t('staff cannot updateStatus', () => throws(() => ctx.updateStatus(staff, { record: id, action: 'approve', financeAmount: '1' }), /FORBIDDEN/));
   t('unknown action rejected', () => throws(() => ctx.updateStatus(acc, { record: id, action: 'hack' }), /INVALID_ACTION/));
   t('unknown record rejected', () => throws(() => ctx.updateStatus(acc, { record: 'nope', action: 'approve', financeAmount: '1' }), /ไม่พบ/));
   t('approve requires amount', () => throws(() => ctx.updateStatus(acc, { record: id, action: 'approve', financeAmount: '' }), /ยอดเงินโอน/));
+  t('workflow remarks stored as plain text', () => { const i = ctx.saveRequest(staff, form()).id; ctx.updateStatus(acc, { record: i, action: 'reject', Remark: '=HYPERLINK("x")' }); eq(rowById(i)[C('Remark(การเงิน) :')], "'=HYPERLINK(\"x\")"); });
   t('approve from empty status', () => { setStatus(id, ''); eq(ctx.updateStatus(acc, { record: id, action: 'approve', financeAmount: '8,700', Remark: 'ok' }).status, 'รอเปิด SO'); eq(rowById(id)[C('ยอดเงินโอนที่ได้รับ(การเงิน) :')], '8,700'); });
   t('double approve rejected', () => throws(() => ctx.updateStatus(acc, { record: id, action: 'approve', financeAmount: '1' }), /ดำเนินการไปแล้ว/));
   t('log has record id and session actor', () => { const l = sheets.Log.rows[sheets.Log.getLastRow() - 1]; eq(l[1], 'ฝ่ายบัญชี'); eq(l[2], 'รอเปิด SO'); eq(l[3], id); eq(l[4], 'approve'); });
