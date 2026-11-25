@@ -119,11 +119,13 @@ function saveRequest(token, f) {
   var folder = uploadFolder_();
   var blob1 = toBlob_(f.file1Data), blob2 = toBlob_(f.file2Data);
 
+  // Uploads happen outside the lock: they can take seconds and would block every other save/approval.
+  var file1Id = folder.createFile(blob1).getId();
+  var file2Id = folder.createFile(blob2).getId();
+
   var id = withLock_(function () {
     var sheet = getDataSheet_();
     var newIdValue = newId_(sheet);
-    var file1Id = folder.createFile(blob1).getId();
-    var file2Id = folder.createFile(blob2).getId();
 
     var row = DATA_HEADERS.map(function () { return ''; });
     var set = function (h, v) { row[col_(h) - 1] = v; };
@@ -209,8 +211,9 @@ function workflow_() {
   return {
   approve: { from: ['', STATUS.WAIT], to: STATUS.SO },
   reject: { from: ['', STATUS.WAIT], to: STATUS.REJECT },
-  updateSO: { from: [STATUS.SO, STATUS.LEGACY_APPROVED], to: STATUS.INV },
-  updateAR: { from: [STATUS.INV], to: STATUS.DONE }
+  // legacy 'อนุมัติแล้ว' rows: without an SO number they need updateSO, with one they need updateAR
+  updateSO: { from: [STATUS.SO, STATUS.LEGACY_APPROVED], to: STATUS.INV, legacySO: false },
+  updateAR: { from: [STATUS.INV, STATUS.LEGACY_APPROVED], to: STATUS.DONE, legacySO: true }
   };
 }
 
@@ -235,7 +238,12 @@ function updateStatus(token, obj) {
     if (idx < 1) throw new Error('ไม่พบข้อมูล ID: ' + obj.record);
     var rowNum = idx + 1;
     var current = str_(sheet.getRange(rowNum, col_('สถานะ :')).getDisplayValue());
-    if (step.from.indexOf(current) < 0) {
+    var allowed = step.from.indexOf(current) >= 0;
+    if (allowed && current === STATUS.LEGACY_APPROVED) {
+      var hasSO = str_(sheet.getRange(rowNum, col_('Sales Order created :')).getDisplayValue()) !== '';
+      allowed = hasSO === step.legacySO;
+    }
+    if (!allowed) {
       throw new Error('รายการนี้ถูกดำเนินการไปแล้ว (สถานะปัจจุบัน: ' + (current || STATUS.WAIT) + ')');
     }
     var put = function (h, v) { sheet.getRange(rowNum, col_(h)).setValue(v); };

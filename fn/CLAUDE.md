@@ -42,8 +42,8 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 |---|---|---|
 | `approve` (needs ยอดเงินโอน) | `''`, `รออนุมัติ` | `รอเปิด SO` |
 | `reject` (needs remark) | `''`, `รออนุมัติ` | `ไม่อนุมัติ` |
-| `updateSO` (needs SO no.) | `รอเปิด SO`, legacy `อนุมัติแล้ว` | `รอเปิด Invoice` |
-| `updateAR` (needs invoice) | `รอเปิด Invoice` | `เสร็จสมบูรณ์` |
+| `updateSO` (needs SO no.) | `รอเปิด SO`, legacy `อนุมัติแล้ว` with SO empty | `รอเปิด Invoice` |
+| `updateAR` (needs invoice) | `รอเปิด Invoice`, legacy `อนุมัติแล้ว` with SO filled | `เสร็จสมบูรณ์` |
 
 The server decides the new status and the actor (from the session); each step appends a Log row
 `[time, actor, status, record id, action]`. Net price is recomputed server-side:
@@ -52,6 +52,10 @@ The server decides the new status and the actor (from the session); each step ap
 Sessions: ScriptCache `sess_<token>`, 6 h sliding TTL; role re-read from the Admin sheet on every call.
 Passwords: `sha256$<salt>$<hex>` (1000 rounds); legacy plaintext cells are upgraded on first login.
 Login locks for 15 min after 5 failures per username.
+Blank role cell = แอดมิน only while no row says แอดมิน explicitly (legacy behaviour), otherwise พนักงาน.
+
+Sheet grid: sheets created by `appendRow` are only as wide as their first row, and `getRange` past
+`getMaxColumns()` throws in real GAS. `getDataSheet_()` widens the grid; the mock enforces the limit (26 default).
 
 ## Commands
 

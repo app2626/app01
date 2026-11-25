@@ -28,9 +28,18 @@ function verifyPassword_(plain, stored) {
   return hashPassword_(plain, salt) === stored;
 }
 
-function normalizeRole_(role) {
+/**
+ * The original app treated a blank role cell as แอดมิน. Keep that only while no row names แอดมิน
+ * explicitly, so an existing owner is not locked out; once a real แอดมิน exists, blank means พนักงาน.
+ */
+function normalizeRole_(role, hasExplicitAdmin) {
   role = String(role || '').trim();
-  return (role === ROLES.ADMIN || role === ROLES.ACC || role === ROLES.STAFF) ? role : ROLES.STAFF;
+  if (role === ROLES.ADMIN || role === ROLES.ACC || role === ROLES.STAFF) return role;
+  return (role === '' && !hasExplicitAdmin) ? ROLES.ADMIN : ROLES.STAFF;
+}
+
+function hasExplicitAdmin_(rows) {
+  return rows.some(function (r) { return String(r[3] || '').trim() === ROLES.ADMIN; });
 }
 
 /** Admin sheet rows as objects; rowNum is the 1-based sheet row. */
@@ -39,9 +48,10 @@ function readUsers_() {
   if (!sheet || sheet.getLastRow() < 2) return [];
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getDisplayValues();
   var users = [];
+  var explicitAdmin = hasExplicitAdmin_(data);
   data.forEach(function (r, i) {
     var username = String(r[0]).trim();
-    if (username) users.push({ rowNum: i + 2, username: username, password: r[1], name: String(r[2]).trim(), role: normalizeRole_(r[3]) });
+    if (username) users.push({ rowNum: i + 2, username: username, password: r[1], name: String(r[2]).trim(), role: normalizeRole_(r[3], explicitAdmin) });
   });
   return users;
 }

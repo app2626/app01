@@ -32,14 +32,15 @@ var STATUS = {
 
 var SETTINGS_SHEETS = ['Admin', 'location', 'Product', 'Premium', 'guarantee'];
 
+// strict: column positions matter (rows are written by position), so the live header must match.
 var SHEET_DEFS = [
-  { name: 'Data', headers: DATA_HEADERS, color: '#1a73e8' },
-  { name: 'Log', headers: LOG_HEADERS, color: '#34a853' },
-  { name: 'Admin', headers: ["Username", "Password", "ชื่อผู้ใช้งาน", "สิทธิ์"], color: '#ea4335' },
-  { name: 'location', headers: ["ชื่อสาขา"], color: '#fbbc04' },
-  { name: 'Product', headers: ["ชื่อสินค้ารุ่นต่างๆ"], color: '#9334e6' },
-  { name: 'Premium', headers: ["รายการของแถม"], color: '#ff6d00' },
-  { name: 'guarantee', headers: ["รายการรับประกันจอแตก"], color: '#00897b' }
+  { name: 'Data', headers: DATA_HEADERS, color: '#1a73e8', strict: true },
+  { name: 'Log', headers: LOG_HEADERS, color: '#34a853', strict: true },
+  { name: 'Admin', headers: ['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์'], color: '#ea4335' },
+  { name: 'location', headers: ['ชื่อสาขา'], color: '#fbbc04' },
+  { name: 'Product', headers: ['ชื่อสินค้ารุ่นต่างๆ'], color: '#9334e6' },
+  { name: 'Premium', headers: ['รายการของแถม'], color: '#ff6d00' },
+  { name: 'guarantee', headers: ['รายการรับประกันจอแตก'], color: '#00897b' }
 ];
 
 /** 1-based column number of a Data header. */
@@ -49,7 +50,31 @@ function col_(header) {
   return i + 1;
 }
 
-/** Creates missing sheets/headers; extends a shorter header row with the missing trailing headers. */
+/** Sheets created by appendRow are only as wide as their first row; getRange past the grid throws. */
+function ensureWidth_(sheet, width) {
+  var max = sheet.getMaxColumns();
+  if (max < width) sheet.insertColumnsAfter(max, width - max);
+}
+
+/**
+ * Compares the live header row with the expected one. Returns the number of trailing headers to
+ * append, or throws when an existing header differs (appending would put data in the wrong column).
+ */
+function missingHeaderCount_(sheet, headers) {
+  var current = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0].map(function (h) { return String(h).trim(); });
+  var firstEmpty = current.indexOf('');
+  if (firstEmpty < 0) firstEmpty = headers.length;
+  for (var i = 0; i < headers.length; i++) {
+    var ok = i < firstEmpty ? current[i] === headers[i] : current[i] === '';
+    if (!ok) {
+      throw new Error('หัวตารางของชีต ' + sheet.getName() + ' คอลัมน์ ' + (i + 1) + ' เป็น "' + current[i] +
+        '" แต่ระบบต้องการ "' + headers[i] + '" กรุณาแก้ไขหัวตารางในชีตก่อน');
+    }
+  }
+  return headers.length - firstEmpty;
+}
+
+/** Creates missing sheets/headers; appends missing trailing headers. Throws on a mismatched strict header row. */
 function ensureSheets_() {
   var ss = SpreadsheetApp.getActive();
   var results = [];
@@ -57,21 +82,22 @@ function ensureSheets_() {
     var sheet = ss.getSheetByName(def.name);
     var isNew = !sheet;
     if (isNew) sheet = ss.insertSheet(def.name);
+    ensureWidth_(sheet, def.headers.length);
     var status;
     if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, def.headers.length).setValues([def.headers]);
       status = isNew ? 'สร้างใหม่ ✅' : 'เพิ่มหัวตาราง ✅';
-    } else {
-      var width = Math.max(sheet.getLastColumn(), 1);
-      var current = sheet.getRange(1, 1, 1, width).getDisplayValues()[0];
-      var filled = current.filter(function (h) { return String(h).trim() !== ''; }).length;
-      if (filled < def.headers.length) {
-        var missing = def.headers.slice(filled);
-        sheet.getRange(1, filled + 1, 1, missing.length).setValues([missing]);
-        status = 'เพิ่มคอลัมน์ใหม่ ' + missing.length + ' คอลัมน์ ✅';
+    } else if (def.strict) {
+      var missing = missingHeaderCount_(sheet, def.headers);
+      if (missing > 0) {
+        var from = def.headers.length - missing;
+        sheet.getRange(1, from + 1, 1, missing).setValues([def.headers.slice(from)]);
+        status = 'เพิ่มคอลัมน์ใหม่ ' + missing + ' คอลัมน์ ✅';
       } else {
         status = 'มีข้อมูลอยู่แล้ว ⏭️';
       }
+    } else {
+      status = 'มีข้อมูลอยู่แล้ว ⏭️';
     }
     sheet.getRange(1, 1, 1, def.headers.length).setFontWeight('bold').setBackground(def.color)
       .setFontColor('#ffffff').setHorizontalAlignment('center');
@@ -82,8 +108,22 @@ function ensureSheets_() {
   return results;
 }
 
+/**
+ * Runtime accessor. Never throws on schema drift (the app must keep working): it widens the grid and
+ * appends missing headers only when the existing header row matches; initializeAllSheets reports drift.
+ */
 function getDataSheet_() {
   var sheet = SpreadsheetApp.getActive().getSheetByName('Data');
-  if (!sheet) { ensureSheets_(); sheet = SpreadsheetApp.getActive().getSheetByName('Data'); }
+  if (!sheet) { ensureSheets_(); return SpreadsheetApp.getActive().getSheetByName('Data'); }
+  ensureWidth_(sheet, DATA_HEADERS.length);
+  try {
+    var missing = missingHeaderCount_(sheet, DATA_HEADERS);
+    if (missing > 0) {
+      var from = DATA_HEADERS.length - missing;
+      sheet.getRange(1, from + 1, 1, missing).setValues([DATA_HEADERS.slice(from)]);
+    }
+  } catch (e) {
+    console.warn('Data header drift: ' + e.message);
+  }
   return sheet;
 }

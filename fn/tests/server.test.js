@@ -177,6 +177,60 @@ console.log('== REQUESTS / WORKFLOW');
   t('legacy functions removed', () => ['saveDataB64', 'statusRecordWithRemark'].forEach(f => eq(typeof ctx[f], 'undefined', f)));
 }
 
+// ===================== Final review fixes =====================
+console.log('== FINAL REVIEW FIXES');
+{
+  // C1: live Data sheet created by the original code is exactly 41 columns wide.
+  const g = createGas(); const { ctx, ss, sheets } = g;
+  const d = ss.insertSheet('Data'); d.maxCols = 41; d.appendRow(OLD_HEADERS_41.slice());
+  const legacy = OLD_HEADERS_41.map(() => ''); legacy[0] = '111'; legacy[6] = '1103700012345'; legacy[32] = 'อนุมัติแล้ว'; legacy[37] = 'SO9'; d.appendRow(legacy);
+  const lg = ss.insertSheet('Log'); lg.maxCols = 3; lg.appendRow(['วันที่/เวลา', 'ผู้ดำเนินการ', 'สถานะการอนุมัติ']);
+  const ad = ss.insertSheet('Admin'); ad.appendRow(['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์']); ad.appendRow(['boss', 'bosspw', 'บอส', 'แอดมิน']);
+  const tk = ctx.login('boss', 'bosspw').token;
+  t('C1 getData works on a 41-column live sheet', () => { const rows = ctx.getData(tk); eq(rows.length, 1); eq(rows[0].length, 46); });
+  t('C1 data columns grown to 46 with headers', () => { ok(sheets.Data.getMaxColumns() >= 46); eq(sheets.Data.rows[0].slice(41), ctx.DATA_HEADERS.slice(41)); });
+  // I1: legacy 'อนุมัติแล้ว' row whose SO is already filled must be finishable via updateAR.
+  t('I1 updateAR from อนุมัติแล้ว with SO filled', () => eq(ctx.updateStatus(tk, { record: '111', action: 'updateAR', invoice: 'INV9' }).status, 'เสร็จสมบูรณ์'));
+  t('C1 Log extended and written on narrow sheet', () => { const l = sheets.Log.rows[sheets.Log.getLastRow() - 1]; eq(l[3], '111'); });
+  t('C1 initializeAllSheets on narrow sheets', () => ok(ctx.initializeAllSheets(tk).length >= 8));
+}
+{
+  const g = fixture(); const { ctx, sheets } = g;
+  const acc = g.tok('acc1');
+  const row = OLD_HEADERS_41.map(() => ''); row[0] = '222'; row[32] = 'อนุมัติแล้ว'; sheets.Data.appendRow(row.concat(['', '', '', '', '']));
+  t('I1 updateAR from อนุมัติแล้ว without SO rejected', () => throws(() => ctx.updateStatus(acc, { record: '222', action: 'updateAR', invoice: 'X' }), /ดำเนินการไปแล้ว/));
+  const row2 = row.slice(); row2[0] = '333'; row2[37] = 'SO1'; sheets.Data.appendRow(row2.concat(['', '', '', '', '']));
+  t('I1 updateSO from อนุมัติแล้ว with SO already filled rejected', () => throws(() => ctx.updateStatus(acc, { record: '333', action: 'updateSO', soCreated: 'SO2' }), /ดำเนินการไปแล้ว/));
+}
+{
+  // I2: Drive uploads must happen outside the script lock.
+  const g = fixture(); const { ctx, lockState } = g;
+  const staff = g.tok('staff1');
+  let uploadsUnderLock = 0;
+  const realGet = ctx.DriveApp.getFolderById;
+  ctx.DriveApp.getFolderById = id => { const f = realGet(id); return { getId: f.getId, createFile: b => { if (lockState.held) uploadsUnderLock++; return f.createFile(b); } }; };
+  const realLock = ctx.LockService.getScriptLock;
+  ctx.LockService.getScriptLock = () => { const l = realLock(); return { waitLock: x => { l.waitLock(x); lockState.held = true; }, releaseLock: () => { lockState.held = false; l.releaseLock(); } }; };
+  const b64 = Buffer.alloc(8, 1).toString('base64');
+  ctx.saveRequest(staff, { date: '2026-11-25', location: 'A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012345', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
+  t('I2 uploads happen outside the lock', () => eq(uploadsUnderLock, 0));
+}
+{
+  // I3: header back-fill must not misplace columns when the live header row differs.
+  const g = createGas(); const { ctx, ss, sheets } = g;
+  const h = OLD_HEADERS_41.slice(); h[10] = ''; const d = ss.insertSheet('Data'); d.appendRow(h);
+  t('I3 mismatched header row refused', () => throws(() => ctx.ensureSheets_(), /หัวตาราง/));
+  t('I3 nothing written on mismatch', () => eq(sheets.Data.rows[0].length, 41));
+}
+{
+  // I4: legacy blank role meant admin; keep that when the sheet has no explicit แอดมิน.
+  const g = createGas(); const { ctx, ss } = g; ctx.ensureSheets_();
+  const ad = ss.getSheetByName('Admin'); ad.appendRow(['old', 'oldpw', 'เจ้าของ', '']); ad.appendRow(['s', 'spw', 'พนง', 'พนักงาน']);
+  t('I4 blank role is admin when no explicit admin exists', () => eq(ctx.login('old', 'oldpw').role, 'แอดมิน'));
+  ad.appendRow(['real', 'realpw', 'แอดมินจริง', 'แอดมิน']);
+  t('I4 blank role is staff once an explicit admin exists', () => eq(ctx.login('old', 'oldpw').role, 'พนักงาน'));
+}
+
 // @@TASK6@@
 
 process.on('exit', () => {

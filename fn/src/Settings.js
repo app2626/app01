@@ -102,7 +102,10 @@ function getSettingsData(token, sheetName) {
   requireSession_(token, [ROLES.ADMIN]);
   var sheet = settingsSheet_(sheetName);
   var data = sheet.getDataRange().getDisplayValues().slice(1);
-  if (sheetName === 'Admin') return data.map(function (r) { return [r[0], '', r[2], normalizeRole_(r[3])]; });
+  if (sheetName === 'Admin') {
+    var explicitAdmin = hasExplicitAdmin_(data);
+    return data.map(function (r) { return [r[0], '', r[2], normalizeRole_(r[3], explicitAdmin)]; });
+  }
   return data;
 }
 
