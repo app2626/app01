@@ -8,10 +8,39 @@ function getFileBase64(file) {
     reader.onload = () => resolve({
       base64: reader.result.split(',')[1],
       mimeType: file.type,
-      name: file.name
+      name: file.name || 'upload'
     });
     reader.onerror = error => reject(error);
     reader.readAsDataURL(file);
+  });
+}
+
+// Phone photos are often 3-10 MB; a slip stays readable at 2000 px. Returns a smaller JPEG Blob
+// (with .name) or the original file when the browser cannot decode it (HEIC) or it would not shrink.
+const IMG_MAX_EDGE = 2000, IMG_QUALITY = 0.85, IMG_MIN_BYTES = 400 * 1024;
+function compressImage(file) {
+  return new Promise((resolve) => {
+    if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < IMG_MIN_BYTES || !window.URL || !URL.createObjectURL) return resolve(file);
+    let url = URL.createObjectURL(file);
+    let img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let scale = Math.min(1, IMG_MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+      let canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      let g = canvas.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, canvas.width, canvas.height); // PNG transparency -> white
+      g.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (!canvas.toBlob) return resolve(file);
+      canvas.toBlob((blob) => {
+        if (!blob || blob.size >= file.size) return resolve(file);
+        blob.name = String(file.name || 'slip').replace(/\.[^.]+$/, '') + '.jpg';
+        resolve(blob);
+      }, 'image/jpeg', IMG_QUALITY);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
   });
 }
 
@@ -43,12 +72,13 @@ async function addData(form) {
     let file1 = document.getElementById('myFile').files[0];
     let file2 = document.getElementById('myFile2').files[0];
     
-    formObj.file1Data = await getFileBase64(file1);
+    formObj.file1Data = await getFileBase64(await compressImage(file1));
     formObj.file2Data = await getFileBase64(file2);
 
     callServer('saveRequest', formObj).then(() => {
       getData();
       $('#myForm')[0].reset();
+      clearDraft();
       $('.select2').val('').trigger('change');
       profileApplied = {};
       applyMyProfile(); // next request starts with today + my details again
@@ -176,6 +206,120 @@ function applyMyProfile() {
   if (warn) warn.style.display = (me.scoped && !(me.branches || []).length) ? 'block' : 'none';
 }
 
+// ---- Draft autosave (localStorage, this browser only) ----
+// Files are not kept (too large). Cleared on submit and logout; expires after 24 h; tied to the
+// account that wrote it, so a shared branch device never shows one user's customer to another.
+const DRAFT_KEY = 'fnDraft', DRAFT_TTL = 24 * 3600 * 1000;
+const DRAFT_SKIP = { myFile: 1, myFile2: 1, premium_combined: 1, netprice: 1, premium_dynamic: 1 };
+// fields the profile prefill fills by itself: a draft with only these is not worth keeping
+const DRAFT_PREFILL = { date: 1, location: 1, emp_id: 1, emp_name: 1, emp_phone: 1, id_type: 1, finance: 1 };
+let draftTimer = null, draftPending = false, draftOffered = false;
+
+function draftOwner() { return (myProfile && myProfile.empId) || storageGet(FN_KEYS.name) || ''; }
+
+function readDraft() {
+  try {
+    let d = JSON.parse(storageGet(DRAFT_KEY) || 'null');
+    if (!d || !d.values || Date.now() - d.savedAt > DRAFT_TTL || d.owner !== draftOwner()) return null;
+    return d;
+  } catch (e) { return null; }
+}
+
+function clearDraft(signedOut) {
+  clearTimeout(draftTimer);
+  if (signedOut) draftOffered = false;
+  storageRemove(DRAFT_KEY);
+  draftPending = false;
+  let b = document.getElementById('draft-banner');
+  if (b) b.style.setProperty('display', 'none', 'important');
+}
+
+function saveDraftNow() {
+  if (draftPending || !getToken()) return;
+  let form = document.getElementById('myForm');
+  if (!form) return;
+  let values = {}, worth = false;
+  Array.from(form.elements).forEach((el) => {
+    if (!el.name || DRAFT_SKIP[el.name] || el.type === 'file') return;
+    values[el.name] = el.value;
+    if (el.value && !DRAFT_PREFILL[el.name]) worth = true;
+  });
+  let premiums = Array.from(document.querySelectorAll('.premium-select')).map(s => s.value).filter(Boolean);
+  if (premiums.length) worth = true;
+  if (!worth) return; // an empty or prefill-only form never overwrites a real draft
+  storageSet(DRAFT_KEY, JSON.stringify({ owner: draftOwner(), savedAt: Date.now(), values: values, premiums: premiums }));
+}
+
+function scheduleDraftSave() { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraftNow, 800); }
+
+/** Shows the banner when this user has a draft. Called once the dropdowns are loaded. */
+function offerDraft() {
+  if (draftOffered) return; // once per login: later dropdown reloads must not re-offer the form in progress
+  draftOffered = true;
+  let d = readDraft();
+  let b = document.getElementById('draft-banner');
+  if (!d || !b) return;
+  draftPending = true; // do not overwrite it until the user decides
+  let t = new Date(d.savedAt);
+  let who = d.values.customer_name ? ' ลูกค้า ' + d.values.customer_name : '';
+  document.getElementById('draft-text').textContent = 'มีแบบร่างที่ยังไม่ได้ส่ง' + who + ' (บันทึกไว้ ' +
+    t.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) + ') ไฟล์แนบต้องเลือกใหม่';
+  b.style.setProperty('display', 'flex', 'important');
+}
+
+function restoreDraft() {
+  let d = readDraft();
+  if (!d) return clearDraft();
+  let form = document.getElementById('myForm');
+  Object.keys(d.values).forEach((name) => {
+    let el = form.elements[name];
+    if (!el || el.length > 1 && !el.tagName) return; // radio groups / duplicates: none in this form
+    if (el.tagName === 'SELECT') {
+      if (Array.from(el.options).some(o => o.value === d.values[name])) $(el).val(d.values[name]).trigger('change');
+    } else {
+      el.value = d.values[name];
+    }
+  });
+  if (d.premiums && d.premiums.length) {
+    document.getElementById('premium-container').innerHTML = '';
+    d.premiums.forEach((v) => {
+      addPremium();
+      let sels = document.querySelectorAll('.premium-select');
+      $(sels[sels.length - 1]).val(v).trigger('change');
+    });
+  }
+  profileApplied = {}; // restored values are the user's own: the profile prefill must not replace them
+  if (typeof calculateNetPrice === 'function') calculateNetPrice();
+  if (typeof checkIdentityFields === 'function') checkIdentityFields();
+  draftPending = false;
+  let b = document.getElementById('draft-banner');
+  if (b) b.style.setProperty('display', 'none', 'important');
+  Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'กรอกต่อจากแบบร่างแล้ว กรุณาแนบไฟล์ใหม่', showConfirmButton: false, timer: 3000 });
+}
+
+function discardDraft() { clearDraft(); }
+
+$(function () {
+  let form = document.getElementById('myForm');
+  if (!form) return;
+  form.addEventListener('input', scheduleDraftSave);
+  form.addEventListener('change', scheduleDraftSave);
+  $(form).on('select2:select select2:clear', scheduleDraftSave);
+  // closing / reloading the tab: save what is there right now
+  window.addEventListener('pagehide', saveDraftNow);
+});
+
+// ---- Add to home screen (GAS cannot serve a web manifest, so show the browser's own steps) ----
+function showInstallHelp() {
+  let ua = navigator.userAgent || '';
+  let ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let steps = ios
+    ? '<ol class="text-start small mb-0"><li>เปิดลิงก์ระบบนี้ใน <b>Safari</b></li><li>แตะปุ่ม <b>แชร์</b> <i class="fa-solid fa-arrow-up-from-bracket"></i> ด้านล่าง</li><li>เลือก <b>เพิ่มไปยังหน้าจอโฮม</b> แล้วแตะ <b>เพิ่ม</b></li></ol>'
+    : '<ol class="text-start small mb-0"><li>เปิดลิงก์ระบบนี้ใน <b>Chrome</b></li><li>แตะเมนู <b>⋮</b> มุมขวาบน</li><li>เลือก <b>เพิ่มลงในหน้าจอหลัก</b> (หรือ <b>ติดตั้งแอป</b>) แล้วแตะ <b>เพิ่ม</b></li></ol>';
+  Swal.fire({ title: 'ติดตั้งบนมือถือ', icon: 'info', confirmButtonText: 'เข้าใจแล้ว',
+    html: steps + '<div class="small text-muted mt-3 text-start">ระบบจะเปิดจากไอคอนบนหน้าจอได้เหมือนแอป และยังเข้าสู่ระบบค้างไว้ตามปกติ</div>' });
+}
+
 function loadAllDropdowns() {
   return callServer('getAllDropdownData').then(function(data) {
     myProfile = data.me || null;
@@ -187,6 +331,7 @@ function loadAllDropdowns() {
     fillSelect(document.getElementById("finance"), data.finance || []);
     window.financeOptions = (data.finance || []).map(function (r) { return r[0]; });
     applyMyProfile();
+    offerDraft();
     if (window.globalData && typeof fillFinanceFilter === 'function') fillFinanceFilter(window.globalData);
   }).catch(function(err) { showError(err, 'โหลดตัวเลือกไม่สำเร็จ'); });
 }

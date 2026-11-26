@@ -233,6 +233,34 @@ console.log('== FORGOT PASSWORD');
 }
 
 // ===================== Trust: mail quota, audit trail, staff notifications =====================
+console.log('== DATE RANGE');
+{
+  const g = fixture(); const { ctx, sheets } = g;
+  const acc = g.tok('acc1'), staff = g.tok('staff1');
+  const now = new Date(2026, 10, 26).getTime();
+  t('requestDate_ parses ISO, d/m/yyyy, Buddhist years; junk is null', () => {
+    eq(ctx.requestDate_('2026-11-25'), new Date(2026, 10, 25).getTime());
+    eq(ctx.requestDate_('25/11/2026'), new Date(2026, 10, 25).getTime());
+    eq(ctx.requestDate_('25/11/2569'), new Date(2026, 10, 25).getTime());
+    eq(ctx.requestDate_('2026-11-25 10:30:00'), new Date(2026, 10, 25).getTime());
+    eq(ctx.requestDate_(''), null); eq(ctx.requestDate_('เมื่อวาน'), null); eq(ctx.requestDate_('2026-13-40'), null);
+  });
+  const b64 = n => Buffer.alloc(n, 1).toString('base64');
+  const req = (date, imei) => ({ date, location: 'สาขา A', emp_id: 'staff1', emp_name: 'x', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'c', customer_phone: '0898765432', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei, price: '1000', installments: '1', finance: 'Ponmai', file1Data: { base64: b64(4), mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64(4), mimeType: 'application/pdf', name: 'b' } });
+  const oldDone = ctx.saveRequest(staff, req('2025-01-10', 'OLD-DONE')).id;
+  ctx.updateStatus(acc, { record: oldDone, action: 'reject', Remark: 'x' });
+  ctx.saveRequest(staff, req('2025-01-11', 'OLD-OPEN'));
+  ctx.saveRequest(staff, req('2026-11-20', 'NEW'));
+  ctx.saveRequest(staff, req('??', 'NODATE'));
+  ctx.nowMs_ = () => now; // fixed clock for the cutoff
+  const imeis = rows => rows.map(r => r[ctx.col_('IMEI :') - 1]).sort();
+  t('getData without options returns everything (old callers)', () => eq(imeis(ctx.getData(acc)), ['NEW', 'NODATE', 'OLD-DONE', 'OLD-OPEN']));
+  t('days=90 keeps recent, unfinished and undated rows, drops old finished ones', () => eq(imeis(ctx.getData(acc, { days: 90 })), ['NEW', 'NODATE', 'OLD-OPEN']));
+  t('days=0 means all', () => eq(ctx.getData(acc, { days: 0 }).length, 4));
+  t('bad days value is rejected', () => throws(() => ctx.getData(acc, { days: -5 }), /ช่วงวันที่/));
+  t('range filter still applies branch scope', () => { g.seedAdmin(['staff9', 'staffpw', 'อื่น', 'พนักงาน', '', '', 'สาขา B', '']); eq(ctx.getData(ctx.login('staff9', 'staffpw').token, { days: 90 }).length, 0); });
+}
+
 console.log('== TRUST');
 {
   const g = fixture(); const { ctx, sheets, mail, fetches, mailState, cache } = g;

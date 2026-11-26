@@ -216,17 +216,50 @@ function padRow_(r) {
   return r;
 }
 
-/** Public (any role). Staff get only their registered branches, with the national ID masked. */
-function getData(token) {
+function nowMs_() { return Date.now(); }
+
+/**
+ * "วันที่ขออนุมัติ" as local-midnight ms, or null. Accepts yyyy-mm-dd (the form's date input) and
+ * d/m/yyyy (a cell the sheet turned into a date), with Buddhist years (> 2400) converted.
+ */
+function requestDate_(s) {
+  s = str_(s);
+  var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/), y, mo, d;
+  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+  else return null;
+  if (y > 2400) y -= 543;
+  var t = new Date(y, mo - 1, d);
+  if (t.getFullYear() !== y || t.getMonth() !== mo - 1 || t.getDate() !== d) return null;
+  return t.getTime();
+}
+
+var FINAL_STATUSES_ = ['เสร็จสมบูรณ์', 'ไม่อนุมัติ'];
+
+/**
+ * Public (any role). Staff get only their registered branches, with the national ID masked.
+ * opts.days (optional, 1-3650; 0 or missing = everything): rows dated within the last N days, plus
+ * every request still in progress and every row without a readable date, so nothing actionable
+ * ever drops off the screen. This keeps the payload small once the sheet grows to thousands of rows.
+ */
+function getData(token, opts) {
   var user = requireSession_(token);
+  var days = opts && opts.days != null ? Number(opts.days) : 0;
+  if (!(days >= 0 && days <= 3650 && Math.floor(days) === days)) throw new Error('ช่วงวันที่ไม่ถูกต้อง');
   var scope = branchScope_(user);
   if (scope && !scope.length) return [];
   var sheet = getDataSheet_();
   if (sheet.getLastRow() < 2) return [];
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, DATA_HEADERS.length).getDisplayValues();
-  var b = col_('สาขา :') - 1;
+  var b = col_('สาขา :') - 1, st = col_('สถานะ :') - 1, dt = col_('วันที่ขออนุมัติ') - 1;
+  var cutoff = days ? nowMs_() - days * 86400000 : null;
   return data
-    .filter(function (r) { return r.join('').trim() !== '' && inScope_(scope, r[b]); })
+    .filter(function (r) {
+      if (r.join('').trim() === '' || !inScope_(scope, r[b])) return false;
+      if (cutoff === null || FINAL_STATUSES_.indexOf(str_(r[st])) < 0) return true;
+      var t = requestDate_(r[dt]);
+      return t === null || t >= cutoff;
+    })
     .map(function (r) { return maskRowFor_(padRow_(r), user.role); });
 }
 

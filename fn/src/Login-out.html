@@ -13,7 +13,7 @@ $(document).ready(function () {
   applyRoleUI(storageGet(FN_KEYS.role), storageGet(FN_KEYS.name));
   switchView('table-view');
   // Startup: an expired session goes straight to the login page instead of a dialog.
-  callServerWith({ relogin: false }, 'getData', []).then(function (rows) {
+  callServerWith({ relogin: false }, 'getData', [rangeOpts()]).then(function (rows) {
     showData(rows);
     loadAllDropdowns();
   }).catch(function (err) {
@@ -180,6 +180,7 @@ function logout() {
     var f = document.getElementById('myForm');
     if (f) { f.reset(); $('#myForm .select2').val('').trigger('change'); }
     if (typeof profileApplied !== 'undefined') { profileApplied = {}; myProfile = null; }
+    if (typeof clearDraft === 'function') clearDraft(true); // the draft may hold customer data: never leave it on a shared device
     resetRoleUI();
     switchView('login-view');
     loadingEnd();

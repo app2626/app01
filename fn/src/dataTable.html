@@ -1,7 +1,17 @@
 <script>
+// Range of finished requests to load (in-progress ones always load). Remembered per browser.
+var RANGE_KEY = 'fnRange';
+function currentRangeDays() {
+  var v = storageGet(RANGE_KEY);
+  return v === null || !/^(0|90|365)$/.test(v) ? 90 : Number(v);
+}
+function rangeOpts() { return { days: currentRangeDays() }; }
+function changeRange(sel) { storageSet(RANGE_KEY, sel.value); getData(); }
+$(function () { var el = document.getElementById('rangeFilter'); if (el) el.value = String(currentRangeDays()); });
+
 function getData(){
     loadingStart();
-    return callServer('getData').then(showData).catch(function(error) {
+    return callServer('getData', rangeOpts()).then(showData).catch(function(error) {
         showError(error, 'ไม่สามารถโหลดข้อมูลได้');
     });
   }
