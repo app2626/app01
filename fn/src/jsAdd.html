@@ -212,9 +212,12 @@ function loadSettingsData(sheetName) {
     let tbody = document.querySelector('#table-' + sheetName + ' tbody');
     if(!tbody) return;
     tbody.innerHTML = '';
+    let checkAll = document.getElementById('checkAll-' + sheetName);
+    if (checkAll) { checkAll.checked = false; checkAll.indeterminate = false; checkAll.disabled = data.length === 0; }
+    updateBulkDelete(sheetName);
 
     if (data.length === 0) {
-      let colCount = sheetName === 'Admin' ? 5 : 2;
+      let colCount = sheetName === 'Admin' ? 5 : 3;
       tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted">ไม่มีข้อมูล</td></tr>`;
       return;
     }
@@ -234,6 +237,7 @@ function loadSettingsData(sheetName) {
         `;
       } else {
         tr.innerHTML = `
+          <td class="text-center"><input type="checkbox" class="form-check-input setting-check" value="${index}" onchange="updateBulkDelete('${sheetName}')" aria-label="เลือก ${escHtml(row[0])}"></td>
           <td>${escHtml(row[0])}</td>
           <td class="text-center text-nowrap">
             <button class="btn btn-sm btn-outline-primary me-1" onclick="editSetting('${sheetName}', ${index})" title="แก้ไข" aria-label="แก้ไข"><i class="fa-solid fa-pen"></i> แก้ไข</button>
@@ -485,6 +489,83 @@ function deleteSetting(sheetName, rowIndex) {
       }).catch((err) => { showError(err, 'ลบไม่สำเร็จ'); loadSettingsData(sheetName); });
     }
   });
+}
+
+// ---------- Multi-row delete (list sheets, not Admin) ----------
+function settingChecks(sheetName) {
+  return Array.from(document.querySelectorAll('#table-' + sheetName + ' tbody .setting-check'));
+}
+
+function toggleAllSettings(sheetName, checked) {
+  settingChecks(sheetName).forEach(function (c) { c.checked = checked; });
+  updateBulkDelete(sheetName);
+}
+
+function updateBulkDelete(sheetName) {
+  var btn = document.getElementById('bulkDel-' + sheetName);
+  if (!btn) return;
+  var checks = settingChecks(sheetName);
+  var n = checks.filter(function (c) { return c.checked; }).length;
+  btn.classList.toggle('d-none', n === 0);
+  btn.querySelector('.bulk-count').textContent = n;
+  var all = document.getElementById('checkAll-' + sheetName);
+  if (all) { all.checked = n > 0 && n === checks.length; all.indeterminate = n > 0 && n < checks.length; }
+}
+
+function deleteSelectedSettings(sheetName) {
+  var rows = settingsCache[sheetName] || [];
+  var names = settingChecks(sheetName).filter(function (c) { return c.checked; })
+    .map(function (c) { var r = rows[Number(c.value)]; return r ? String(r[0]) : ''; })
+    .filter(function (n) { return n.trim() !== ''; });
+  if (!names.length) return;
+  var sample = names.slice(0, 10).map(function (n) { return '<li>' + escHtml(n) + '</li>'; }).join('');
+  Swal.fire({
+    title: 'ลบ ' + names.length + ' รายการ?',
+    html: '<div class="text-start"><ol class="small mb-1 ps-3">' + sample + '</ol>' +
+      (names.length > 10 ? '<div class="small text-muted">และอีก ' + (names.length - 10) + ' รายการ</div>' : '') +
+      '<div class="small text-muted mt-2">คำขอที่บันทึกไว้แล้วจะยังแสดงชื่อเดิม</div></div>',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'ลบ ' + names.length + ' รายการ',
+    cancelButtonText: 'ยกเลิก'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    Swal.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+    callServer('deleteSettingDataBulk', sheetName, names).then(function (res) {
+      Swal.fire('ลบสำเร็จ', 'ลบ ' + res.deleted + ' รายการ' + (res.missing ? ' (ไม่พบ ' + res.missing + ' รายการ อาจถูกลบไปแล้ว)' : ''), 'success');
+      loadSettingsData(sheetName); loadAllDropdowns();
+    }).catch(function (err) { showError(err, 'ลบไม่สำเร็จ'); loadSettingsData(sheetName); });
+  });
+}
+
+// ---------- Upload template (.xlsx) ----------
+var SETTING_SAMPLES = {
+  location: ['สาขา เซ็นทรัลเวิลด์', 'สาขา บิ๊กซี ลาดพร้าว', 'สาขา โลตัส บางนา'],
+  Product: ['Galaxy S25 Ultra 256GB', 'Galaxy A56 5G 128GB', 'iPhone 16 128GB'],
+  Premium: ['เคสใส', 'ฟิล์มกระจก', 'หัวชาร์จ 25W']
+};
+
+function downloadSettingTemplate(sheetName) {
+  var header = SETTING_HEADERS[sheetName];
+  if (!header) return;
+  loadSheetJs().then(function (XLSX) {
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet([[header]].concat(SETTING_SAMPLES[sheetName].map(function (n) { return [n]; })));
+    ws['!cols'] = [{ wch: 36 }];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    var help = XLSX.utils.aoa_to_sheet([
+      ['วิธีใช้'],
+      ['1. กรอกรายการในคอลัมน์ A ของชีตแรก หนึ่งรายการต่อหนึ่งแถว (แถวแรก "' + header + '" เป็นหัวตาราง ระบบข้ามให้)'],
+      ['2. ลบตัวอย่างออกหรือแทนที่ด้วยข้อมูลจริงก่อนอัปโหลด'],
+      ['3. แถวว่างและชื่อที่มีอยู่แล้วจะถูกข้าม อัปโหลดได้ครั้งละไม่เกิน 2,000 รายการ'],
+      ['4. บันทึกเป็น .xlsx หรือ .csv แล้วกดปุ่ม "อัปโหลดไฟล์"']
+    ]);
+    help['!cols'] = [{ wch: 90 }];
+    XLSX.utils.book_append_sheet(wb, help, 'วิธีใช้');
+    XLSX.writeFile(wb, 'ตัวอย่าง-' + sheetName + '.xlsx');
+  }).catch(function (err) { showError(err, 'สร้างไฟล์ตัวอย่างไม่สำเร็จ'); });
 }
 
 function addSetting(sheetName) {

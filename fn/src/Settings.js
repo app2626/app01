@@ -200,6 +200,42 @@ function deleteSettingData(token, sheetName, rowIndex, expectedKey) {
 }
 
 /**
+ * Public (แอดมิน). Deletes every list row whose column A matches one of `names` (ticked rows).
+ * Matching by name, not row index, keeps it safe against stale screens. Not for Admin (users are
+ * deleted one at a time so the last-admin guard stays simple). Returns { deleted, missing }.
+ */
+function deleteSettingDataBulk(token, sheetName, names) {
+  requireSession_(token, [ROLES.ADMIN]);
+  if (sheetName === 'Admin' || SETTINGS_SHEETS.indexOf(sheetName) < 0) throw new Error('INVALID_SHEET');
+  names = Array.isArray(names) ? names : [];
+  if (names.length > BULK_MAX_) throw new Error('ลบได้ครั้งละไม่เกิน 2,000 รายการ');
+  var want = {};
+  names.forEach(function (v) { var n = String(v == null ? '' : v).trim(); if (n) want[n] = true; });
+  var wanted = Object.keys(want).length;
+  if (!wanted) throw new Error('กรุณาเลือกรายการที่ต้องการลบ');
+  var sheet = settingsSheet_(sheetName);
+  return withLock_(function () {
+    var last = sheet.getLastRow();
+    var rows = [], found = {};
+    if (last >= 2) {
+      sheet.getRange(2, 1, last - 1, 1).getDisplayValues().forEach(function (r, i) {
+        var n = String(r[0]).trim();
+        if (want[n]) { rows.push(i + 2); found[n] = true; }
+      });
+    }
+    if (!rows.length) throw new Error('ข้อมูลมีการเปลี่ยนแปลง กรุณารีเฟรช');
+    // bottom-up, one deleteRows call per contiguous block
+    for (var end = rows.length - 1; end >= 0;) {
+      var start = end;
+      while (start > 0 && rows[start - 1] === rows[start] - 1) start--;
+      sheet.deleteRows(rows[start], end - start + 1);
+      end = start - 1;
+    }
+    return { deleted: rows.length, missing: wanted - Object.keys(found).length };
+  });
+}
+
+/**
  * Public (แอดมิน). Edits one settings row if column A still holds expectedKey.
  * List sheets: rowData[0] is the new name. Admin: username and password are kept
  * (password has its own reset); rowData[2] = display name, rowData[3] = role.

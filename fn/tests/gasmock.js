@@ -30,6 +30,7 @@ class Sheet {
   getDataRange() { return new Range(this, 1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); }
   appendRow(a) { this.rows.length = this.getLastRow(); this.rows.push(a.slice()); this.maxCols = Math.max(this.maxCols, a.length); this.maxRows = Math.max(this.maxRows, this.rows.length); }
   deleteRow(i) { this.rows.splice(i - 1, 1); }
+  deleteRows(i, n) { this.rows.splice(i - 1, n); }
   setFrozenRows() {}
 }
 

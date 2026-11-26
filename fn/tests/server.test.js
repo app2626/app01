@@ -92,7 +92,7 @@ console.log('== GUARDS / SETTINGS');
   const lastRow = n => sheets[n].rows[sheets[n].getLastRow() - 1];
   const adminOnly = {
     getConfigProperties: [], setConfigProperties: [{}], getSettingsData: ['location'], addSettingData: ['location', ['x']],
-    deleteSettingData: ['location', 0, 'x'], updateSettingData: ['location', 0, 'x', ['y']], addSettingDataBulk: ['location', ['a']], resetPassword: ['staff1', 'newpass1'], initializeAllSheets: [],
+    deleteSettingData: ['location', 0, 'x'], updateSettingData: ['location', 0, 'x', ['y']], addSettingDataBulk: ['location', ['a']], deleteSettingDataBulk: ['location', ['a']], resetPassword: ['staff1', 'newpass1'], initializeAllSheets: [],
   };
   const anyRole = { getAllDropdownData: [] };
   Object.keys(Object.assign({}, adminOnly, anyRole)).forEach(fn => {
@@ -123,6 +123,17 @@ console.log('== GUARDS / SETTINGS');
   t('bulk add over 2000 rejected', () => throws(() => ctx.addSettingDataBulk(admin, 'Premium', Array.from({ length: 2001 }, (_, i) => 'p' + i)), /2,000/));
   t('bulk add grows the grid past its last row', () => { const sh = sheets.Premium; const n = sh.rows.length; sh.maxRows = sh.getLastRow(); eq(ctx.addSettingDataBulk(admin, 'Premium', ['g1', 'g2', 'g3']).added.length, 3); sh.rows.splice(n); });
   t('bulk add with nothing new adds nothing', () => { const n = sheets.Premium.rows.length; eq(ctx.addSettingDataBulk(admin, 'Premium', ['', ' ']), { added: [], skipped: 2 }); eq(sheets.Premium.rows.length, n); });
+  t('bulk delete removes selected names, keeps the rest in order', () => {
+    const sh = sheets.guarantee; const before = sh.rows.length;
+    ['g-a', 'g-b', 'g-c', 'g-d', 'g-e'].forEach(n => sh.appendRow([n]));
+    eq(ctx.deleteSettingDataBulk(admin, 'guarantee', [' g-b ', 'g-c', 'g-e', 'gone']), { deleted: 3, missing: 1 });
+    eq(sh.rows.slice(before).map(x => x[0]), ['g-a', 'g-d']);
+    sh.rows.splice(before);
+  });
+  t('bulk delete with nothing matching rejected', () => throws(() => ctx.deleteSettingDataBulk(admin, 'Finance', ['nope']), /เปลี่ยนแปลง/));
+  t('bulk delete empty list rejected', () => throws(() => ctx.deleteSettingDataBulk(admin, 'Finance', []), /เลือก/));
+  t('bulk delete not allowed on Admin/Data', () => { throws(() => ctx.deleteSettingDataBulk(admin, 'Admin', ['staff1']), /INVALID_SHEET/); throws(() => ctx.deleteSettingDataBulk(admin, 'Data', ['x']), /INVALID_SHEET/); });
+  t('bulk delete over 2000 rejected', () => throws(() => ctx.deleteSettingDataBulk(admin, 'Premium', Array.from({ length: 2001 }, (_, i) => 'p' + i)), /2,000/));
   t('update list item renames in place', () => { ctx.updateSettingData(admin, 'location', 0, 'สาขา A', [' สาขา A1 ']); eq(sheets.location.rows[1], ['สาขา A1']); sheets.location.rows[1] = ['สาขา A']; });
   t('update with stale key rejected', () => throws(() => ctx.updateSettingData(admin, 'location', 0, 'wrong', ['z']), /เปลี่ยนแปลง/));
   t('update to empty rejected', () => throws(() => ctx.updateSettingData(admin, 'location', 0, 'สาขา A', ['  ']), /กรุณากรอก/));
