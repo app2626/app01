@@ -171,6 +171,7 @@ function applyMyProfile() {
   set('emp_name', me.name);
   set('emp_phone', me.phone);
   set('location', one, true);
+  checkPhoneField(document.getElementById('emp_phone')); // set programmatically: no input event
   let warn = document.getElementById('no-branch-warning');
   if (warn) warn.style.display = (me.scoped && !(me.branches || []).length) ? 'block' : 'none';
 }
@@ -284,7 +285,15 @@ function loadSettingsData(sheetName) {
         let pending = row[7] === 'รออนุมัติ';
         let contact = [row[4] ? '<div><i class="fa-regular fa-envelope me-1 text-muted"></i>' + escHtml(row[4]) + '</div>' : '',
           row[5] ? '<div><i class="fa-solid fa-phone me-1 text-muted"></i>' + escHtml(row[5]) + '</div>' : ''].join('') || '<span class="text-muted">-</span>';
+        let blocked = row[7] === 'ระงับ';
         if (pending) tr.className = 'table-warning';
+        if (blocked) tr.className = 'table-secondary text-muted';
+        let statusBadge = pending ? '<span class="st st-wait">รออนุมัติ</span>'
+          : blocked ? '<span class="st st-rej"><i class="fa-solid fa-ban me-1"></i>ระงับ</span>'
+          : '<span class="st st-done">ใช้งาน</span>';
+        let toggleBtn = pending ? ''
+          : blocked ? `<button class="btn btn-sm btn-outline-success me-1" onclick="setUserStatusRow(${index}, 'ใช้งาน')" title="เปิดใช้งาน" aria-label="เปิดใช้งาน"><i class="fa-solid fa-unlock"></i> เปิด</button>`
+          : `<button class="btn btn-sm btn-outline-warning me-1" onclick="setUserStatusRow(${index}, 'ระงับ')" title="ระงับการเข้าใช้งาน" aria-label="ระงับการเข้าใช้งาน"><i class="fa-solid fa-ban"></i> บล็อค</button>`;
         tr.innerHTML = `
           <td class="text-center">${pending ? `<input type="checkbox" class="form-check-input setting-check" value="${index}" onchange="updateBulkDelete('Admin')" aria-label="เลือก ${escHtml(row[0])}">` : ''}</td>
           <td class="fw-semibold">${escHtml(row[0])}</td>
@@ -292,9 +301,10 @@ function loadSettingsData(sheetName) {
           <td class="small">${contact}</td>
           <td class="small">${splitBranches(row[6]).map(b => '<div>' + escHtml(b) + '</div>').join('') || '<span class="text-muted">-</span>'}</td>
           <td><span class="badge bg-primary">${escHtml(row[3])}</span></td>
-          <td>${pending ? '<span class="st st-wait">รออนุมัติ</span>' : '<span class="st st-done">ใช้งาน</span>'}</td>
+          <td>${statusBadge}</td>
           <td class="text-center text-nowrap">
             ${pending ? `<button class="btn btn-sm btn-success me-1" onclick="approveUserRow(${index})" title="อนุมัติ"><i class="fa-solid fa-user-check"></i> อนุมัติ</button>` : ''}
+            ${toggleBtn}
             <button class="btn btn-sm btn-outline-primary me-1" onclick="editSetting('${sheetName}', ${index})" title="แก้ไข" aria-label="แก้ไข"><i class="fa-solid fa-pen"></i></button>
             <button class="btn btn-sm btn-outline-secondary me-1" onclick="resetUserPassword(${index})" title="รีเซ็ตรหัสผ่าน" aria-label="รีเซ็ตรหัสผ่าน"><i class="fa-solid fa-key"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="deleteSetting('${sheetName}', ${index})" title="${pending ? 'ปฏิเสธ / ลบ' : 'ลบ'}" aria-label="ลบ"><i class="fa-solid fa-trash"></i></button>
@@ -333,6 +343,29 @@ function resetUserPassword(index) {
     callServer('resetPassword', row[0], r.value).then(() => {
       Swal.fire('รีเซ็ตรหัสผ่านแล้ว', '', 'success');
     }).catch((err) => showError(err));
+  });
+}
+
+function setUserStatusRow(index, status) {
+  let row = (settingsCache['Admin'] || [])[index];
+  if (!row) return;
+  let block = status === 'ระงับ';
+  Swal.fire({
+    title: (block ? 'ระงับการเข้าใช้งาน ' : 'เปิดใช้งาน ') + row[0] + '?',
+    html: '<div class="small">' + escHtml(row[2]) + (row[6] ? '<br>สาขา: ' + escHtml(row[6]) : '') + '</div>' +
+      '<div class="small text-muted mt-2">' + (block
+        ? 'ผู้ใช้จะหลุดจากระบบทันทีและเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง คำขอที่บันทึกไว้แล้วไม่ถูกลบ'
+        : 'ผู้ใช้จะเข้าสู่ระบบได้ตามปกติด้วยรหัสผ่านเดิม') + '</div>',
+    icon: block ? 'warning' : 'question', showCancelButton: true,
+    confirmButtonText: block ? 'บล็อค' : 'เปิดใช้งาน', cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: block ? '#d97706' : '#198754'
+  }).then((r) => {
+    if (!r.isConfirmed) return;
+    Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    callServer('setUserStatus', row[0], status).then(() => {
+      Swal.fire(block ? 'ระงับแล้ว' : 'เปิดใช้งานแล้ว', row[0] + (block ? ' เข้าใช้งานไม่ได้แล้ว' : ' เข้าใช้งานได้แล้ว'), 'success');
+      loadSettingsData('Admin');
+    }).catch((err) => { showError(err, 'เปลี่ยนสถานะไม่สำเร็จ'); loadSettingsData('Admin'); });
   });
 }
 
@@ -824,6 +857,44 @@ function calculateNetPrice() {
   let netprice = price - down - discountais - discountpromotion - discounttradein - discounttradeup - discountbigc + dues;
   document.getElementById('netprice').value = netprice;
 }
+
+// ---- Live checks for ID / passport and phone numbers (nextStep() uses checkValidity, so the
+// custom message blocks the step and shows on the field). The server re-validates on save.
+function markField(el, ok, msg) {
+  el.setCustomValidity(ok ? '' : msg);
+  el.classList.toggle('is-invalid', !ok);
+}
+
+function checkPhoneField(el) {
+  if (!el) return;
+  let v = el.value.trim();
+  markField(el, !v || !!normalizePhone(v), 'เบอร์ไม่ถูกต้อง: ' + PHONE_RULE_TEXT);
+}
+
+function checkIdField() {
+  let el = document.getElementById('id_card_number');
+  if (!el) return;
+  let passport = document.getElementById('id_type').value === 'พาสปอร์ต';
+  let v = el.value.trim();
+  let msg = passport ? 'เลขพาสปอร์ต: ตัวอักษรภาษาอังกฤษและตัวเลข 6-9 ตัว' : 'เลขบัตรประชาชน 13 หลักไม่ถูกต้อง (ตรวจเลขหลักสุดท้ายอีกครั้ง)';
+  el.placeholder = passport ? 'เช่น AA1234567' : 'เลข 13 หลัก';
+  el.maxLength = passport ? 12 : 17; // room for spaces / dashes
+  document.getElementById('id_card_feedback').textContent = msg;
+  markField(el, !v || !!(passport ? passportNo(v) : thaiIdNo(v)), msg);
+}
+
+function checkIdentityFields() {
+  checkIdField();
+  document.querySelectorAll('.phone-input').forEach(checkPhoneField);
+}
+
+$(document).ready(function() {
+  $('.phone-input').on('input blur', function () { checkPhoneField(this); });
+  $('#id_card_number').on('input blur', checkIdField);
+  // reset() keeps custom validity messages, so re-check once the fields are empty again
+  $('#myForm').on('reset', function () { setTimeout(checkIdentityFields, 0); });
+  checkIdentityFields();
+});
 
 $(document).ready(function() {
   $('#price, #down, #discountais, #discountpromotion, #discounttradein, #discounttradeup, #discountbigc, #dues').on('input', calculateNetPrice);

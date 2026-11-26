@@ -205,8 +205,8 @@ function deleteSettingData(token, sheetName, rowIndex, expectedKey) {
     }
     if (sheetName === 'Admin') {
       var target = findUser_(expectedKey);
-      var admins = readUsers_().filter(function (u) { return u.role === ROLES.ADMIN; });
-      if (target && target.role === ROLES.ADMIN && admins.length <= 1) throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
+      var admins = activeAdmins_();
+      if (target && target.role === ROLES.ADMIN && isActiveUser_(target) && admins.length <= 1) throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
     }
     sheet.deleteRow(rowNum);
     return true;
@@ -271,8 +271,8 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
       var roles = [ROLES.ADMIN, ROLES.ACC, ROLES.STAFF];
       if (roles.indexOf(rowData[3]) < 0) throw new Error('สิทธิ์ไม่ถูกต้อง');
       var target = findUser_(key);
-      var admins = readUsers_().filter(function (u) { return u.role === ROLES.ADMIN; });
-      if (target && target.role === ROLES.ADMIN && rowData[3] !== ROLES.ADMIN && admins.length <= 1) {
+      var admins = activeAdmins_();
+      if (target && target.role === ROLES.ADMIN && isActiveUser_(target) && rowData[3] !== ROLES.ADMIN && admins.length <= 1) {
         throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
       }
       sheet.getRange(rowNum, 3, 1, 2).setValues([[cellText_(rowData[2] || key), rowData[3]]]);
@@ -280,7 +280,7 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
         // contact fields (cols 5-7); blank is allowed for accounts created by an admin
         var email = rowData[4] || '', phone = rowData[5] ? normalizePhone_(rowData[5]) : '';
         if (email && !validEmail_(email)) throw new Error('รูปแบบอีเมลไม่ถูกต้อง');
-        if (rowData[5] && !phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง (ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0)');
+        if (rowData[5] && !phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง: ' + PHONE_RULE_TEXT_);
         fillBlankHeaders_(sheet, ADMIN_HEADERS);
         sheet.getRange(rowNum, 5, 1, 3).setValues([[cellText_(email), phone ? "'" + phone : '', cellText_(normalizeBranches_(rawBranches, false))]]);
       }

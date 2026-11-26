@@ -33,12 +33,6 @@ function normalizeBranches_(input, strict) {
   return list.filter(function (n) { return seen[n]; }).concat(unknown).join(BRANCH_SEP_);
 }
 
-/** Digits only; Thai mobile/landline: 0 + 8-9 digits. Returns '' when invalid. */
-function normalizePhone_(v) {
-  var d = String(v == null ? '' : v).replace(/[\s-]/g, '');
-  return /^0\d{8,9}$/.test(d) ? d : '';
-}
-
 function validEmail_(v) {
   return v.length <= 100 && EMAIL_RE_.test(v);
 }
@@ -63,7 +57,7 @@ function register(form) {
   if (!EMP_ID_RE_.test(empId)) throw new Error('รหัสพนักงานใช้ได้เฉพาะ A-Z, 0-9, . _ - ยาว 2-30 ตัว');
   if (!name || name.length > 100) throw new Error('กรุณากรอกชื่อ-สกุล');
   if (!validEmail_(email)) throw new Error('รูปแบบอีเมลไม่ถูกต้อง');
-  if (!phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง (ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0)');
+  if (!phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง: ' + PHONE_RULE_TEXT_);
   // form.branch: single-branch clients from before multi-branch support
   var branch = normalizeBranches_(form.branches !== undefined ? form.branches : form.branch, true);
   if (!branch) throw new Error('กรุณาเลือกสาขาอย่างน้อย 1 สาขา');
@@ -94,6 +88,34 @@ function register(form) {
     console.error('Register notify failed: ' + e.message);
   }
   return { status: ACCOUNT_STATUS.PENDING };
+}
+
+/** แอดมิน accounts that can actually log in (blocked / pending ones do not count). */
+function activeAdmins_() {
+  return readUsers_().filter(function (u) { return u.role === ROLES.ADMIN && isActiveUser_(u); });
+}
+
+/**
+ * Public (แอดมิน). Block (ระงับ) or re-open (ใช้งาน) an account. Blocking takes effect on the
+ * user's next server call, because requireSession_ re-reads the status every time.
+ * An admin cannot block themself, so at least one active admin always remains.
+ */
+function setUserStatus(token, username, status) {
+  var me = requireSession_(token, [ROLES.ADMIN]);
+  status = String(status == null ? '' : status).trim();
+  if (status !== ACCOUNT_STATUS.ACTIVE && status !== ACCOUNT_STATUS.BLOCKED) throw new Error('สถานะบัญชีไม่ถูกต้อง');
+  return withLock_(function () {
+    var u = findUser_(username);
+    if (!u) throw new Error('ไม่พบผู้ใช้งาน');
+    if (status === ACCOUNT_STATUS.BLOCKED && u.username === me.username) throw new Error('ไม่สามารถระงับบัญชีของตัวเองได้');
+    if (status === ACCOUNT_STATUS.BLOCKED && u.role === ROLES.ADMIN && isActiveUser_(u) && activeAdmins_().length <= 1) {
+      throw new Error('ต้องมีแอดมินที่ใช้งานได้อย่างน้อย 1 คน');
+    }
+    var sheet = SpreadsheetApp.getActive().getSheetByName('Admin');
+    fillBlankHeaders_(sheet, ADMIN_HEADERS);
+    sheet.getRange(u.rowNum, 8).setValue(status);
+    return { username: u.username, status: status };
+  });
 }
 
 /** Public (แอดมิน). Activates one account (also re-activates one that is not pending). */

@@ -67,9 +67,21 @@ function checkFile_(file, kind) {
 
 function validateForm_(f) {
   TEXT_FIELDS_.forEach(function (x) { if (!str_(f[x[0]])) throw new Error('กรุณากรอก ' + x[2]); });
-  if (!/^0\d{9}$/.test(str_(f.emp_phone))) throw new Error('เบอร์ติดต่อ(พนง.) ต้องเป็นตัวเลข 10 หลัก');
-  if (!/^0\d{9}$/.test(str_(f.customer_phone))) throw new Error('เบอร์ติดต่อลูกค้า ต้องเป็นตัวเลข 10 หลัก');
-  if (!/^\d{13}$/.test(str_(f.id_card_number))) throw new Error('เลขบัตรประชาชน ต้องเป็นตัวเลข 13 หลัก');
+  // normalised in place so saveRequest stores the clean values
+  f.emp_phone = normalizePhone_(f.emp_phone);
+  if (!f.emp_phone) throw new Error('เบอร์ติดต่อ(พนง.) ไม่ถูกต้อง: ' + PHONE_RULE_TEXT_);
+  f.customer_phone = normalizePhone_(f.customer_phone);
+  if (!f.customer_phone) throw new Error('เบอร์ติดต่อลูกค้า ไม่ถูกต้อง: ' + PHONE_RULE_TEXT_);
+  f.id_type = str_(f.id_type) || ID_TYPES_.THAI; // older clients send no type
+  if (f.id_type === ID_TYPES_.THAI) {
+    f.id_card_number = thaiIdNo_(f.id_card_number);
+    if (!f.id_card_number) throw new Error('เลขบัตรประชาชนไม่ถูกต้อง: ต้องเป็นตัวเลข 13 หลัก และเลขตรวจสอบหลักสุดท้ายต้องถูกต้อง');
+  } else if (f.id_type === ID_TYPES_.PASSPORT) {
+    f.id_card_number = passportNo_(f.id_card_number);
+    if (!f.id_card_number) throw new Error('เลขพาสปอร์ตไม่ถูกต้อง: ใช้ตัวอักษรภาษาอังกฤษและตัวเลข 6-9 ตัว');
+  } else {
+    throw new Error('ประเภทเอกสารไม่ถูกต้อง');
+  }
   if (!/^\d{5}$/.test(str_(f.zipcode))) throw new Error('รหัสไปรษณีย์ ต้องเป็นตัวเลข 5 หลัก');
   AMOUNT_FIELDS_.forEach(function (x) { amount_(f[x[0]], x[2]); });
   var inst = Number(str_(f.installments));
@@ -154,6 +166,7 @@ function saveRequest(token, f) {
       set('ใบเสร็จ :', 'https://drive.google.com/uc?id=' + file2Id);
       set('สถานะ :', STATUS.WAIT);
       set('ไฟแนนซ์ :', cellText_(finance));
+      set('ประเภทเอกสาร :', f.id_type);
       sheet.appendRow(row);
       return newIdValue;
     });

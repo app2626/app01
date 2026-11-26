@@ -18,7 +18,9 @@ var DATA_HEADERS = [
   "บาร์โค้ด AIS :", "บาร์โค้ด promotion :", "บาร์โค้ด Trade in :",
   "บาร์โค้ด Trade up :", "บาร์โค้ด Big point :",
   // appended 2026-11: finance company (blank on older rows = Ponmai)
-  "ไฟแนนซ์ :"
+  "ไฟแนนซ์ :",
+  // appended 2026-11: which document "เลขบัตรประชาชน :" holds (blank on older rows = บัตรประชาชน)
+  "ประเภทเอกสาร :"
 ];
 
 var LOG_HEADERS = ["วันที่/เวลา", "ผู้ดำเนินการ", "สถานะการอนุมัติ", "ID รายการ", "รายละเอียด"];
@@ -35,7 +37,7 @@ var STATUS = {
 var ADMIN_HEADERS = ['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์', 'อีเมล', 'เบอร์ติดต่อ', 'สาขา', 'สถานะบัญชี'];
 
 /** Admin col 8. Blank = active (accounts created before self-registration). */
-var ACCOUNT_STATUS = { ACTIVE: 'ใช้งาน', PENDING: 'รออนุมัติ' };
+var ACCOUNT_STATUS = { ACTIVE: 'ใช้งาน', PENDING: 'รออนุมัติ', BLOCKED: 'ระงับ' };
 
 var SETTINGS_SHEETS =['Admin', 'location', 'Product', 'Premium', 'guarantee', 'Finance'];
 

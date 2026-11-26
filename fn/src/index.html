@@ -140,6 +140,7 @@
             <span class="input-group-text"><i class="fa-solid fa-lock"></i></span>
             <input type="password" class="form-control" id="password" autocomplete="current-password" required>
           </div>
+          <div class="text-end mt-1"><a href="#" class="small forgot-link" onclick="showForgot(); return false;">ลืมรหัสผ่าน?</a></div>
         </div>
         <div id="login-error" class="login-error mb-3" role="alert" style="display: none;">
           <i class="fa-solid fa-circle-exclamation me-1"></i> ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง
@@ -149,6 +150,42 @@
         </button>
       </form>
       <div class="login-switch">ยังไม่มีบัญชี? <a href="#" onclick="showRegister(); return false;">ลงทะเบียนใช้งาน</a></div>
+      </div>
+
+      <div id="forgot-panel" style="display: none;">
+      <h1>ลืมรหัสผ่าน</h1>
+      <div class="lead-sub" id="forgot-sub">กรอกรหัสพนักงานและอีเมลที่ใช้ลงทะเบียน ระบบจะส่งรหัสยืนยัน 6 หลักไปที่อีเมลนั้น</div>
+      <form id="forgot-form-1" onsubmit="event.preventDefault(); sendResetCode()" novalidate>
+        <div class="mb-2">
+          <label for="fg-empId">รหัสพนักงาน</label>
+          <input type="text" class="form-control" id="fg-empId" autocomplete="username" maxlength="30" required>
+        </div>
+        <div class="mb-3">
+          <label for="fg-email">อีเมลที่ลงทะเบียน</label>
+          <input type="email" class="form-control" id="fg-email" autocomplete="email" maxlength="100" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100" id="fg-send">ส่งรหัสยืนยันทางอีเมล <i class="fa-solid fa-envelope ms-1"></i></button>
+      </form>
+      <form id="forgot-form-2" onsubmit="event.preventDefault(); submitNewPassword()" novalidate style="display: none;">
+        <div class="mb-2">
+          <label for="fg-code">รหัสยืนยัน 6 หลักจากอีเมล</label>
+          <input type="text" class="form-control text-center fs-5" id="fg-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+        </div>
+        <div class="row g-2">
+          <div class="col-sm-6 mb-2">
+            <label for="fg-pwd">รหัสผ่านใหม่</label>
+            <input type="password" class="form-control" id="fg-pwd" autocomplete="new-password" minlength="6" maxlength="100" required>
+          </div>
+          <div class="col-sm-6 mb-3">
+            <label for="fg-pwd2">ยืนยันรหัสผ่านใหม่</label>
+            <input type="password" class="form-control" id="fg-pwd2" autocomplete="new-password" minlength="6" maxlength="100" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100" id="fg-save">ตั้งรหัสผ่านใหม่ <i class="fa-solid fa-key ms-1"></i></button>
+        <div class="text-center mt-2"><a href="#" class="small" onclick="forgotStep(1); return false;">ไม่ได้รับรหัส? ขอรหัสใหม่</a></div>
+      </form>
+      <div id="forgot-error" class="login-error mt-3" role="alert" style="display: none;"></div>
+      <div class="login-switch"><a href="#" onclick="showLogin(); return false;">กลับไปเข้าสู่ระบบ</a></div>
       </div>
 
       <div id="register-panel" style="display: none;">
@@ -174,7 +211,7 @@
           </div>
           <div class="col-sm-6 mb-2">
             <label for="reg-phone">เบอร์ติดต่อ</label>
-            <input type="tel" class="form-control" id="reg-phone" autocomplete="tel" inputmode="numeric" maxlength="12" placeholder="08xxxxxxxx" required>
+            <input type="tel" class="form-control" id="reg-phone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="08xxxxxxxx หรือ +รหัสประเทศ" required>
           </div>
           <div class="col-sm-6 mb-2">
             <label for="reg-password">ตั้งรหัสผ่าน</label>
@@ -240,7 +277,8 @@
               </div>
               <div class="col-md-4 mb-2">
                 <label>เบอร์ติดต่อ(พนง.)</label>
-                <input type="tel" class="form-control" id="emp_phone" name="emp_phone" required pattern="[0-9]{10}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);" title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก">
+                <input type="tel" class="form-control phone-input" id="emp_phone" name="emp_phone" required maxlength="20" inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxx">
+                <div class="invalid-feedback">มือถือ 10 หลัก, เบอร์บ้าน 9 หลัก หรือ +รหัสประเทศ</div>
               </div>
             </div>
             <div class="step-actions end">
@@ -255,8 +293,15 @@
             <div class="row">
 
               <div class="col-md-6 mb-2">
-                <label>เลขบัตรประชาชน</label>
-                <input type="text" class="form-control" id="id_card_number" name="id_card_number" required >
+                <label for="id_card_number">เอกสารยืนยันตัวตน</label>
+                <div class="input-group has-validation">
+                  <select class="form-select flex-grow-0 w-auto" id="id_type" name="id_type" aria-label="ประเภทเอกสาร" onchange="checkIdField()">
+                    <option value="บัตรประชาชน" selected>บัตรประชาชน</option>
+                    <option value="พาสปอร์ต">พาสปอร์ต</option>
+                  </select>
+                  <input type="text" class="form-control" id="id_card_number" name="id_card_number" required maxlength="20" autocomplete="off" placeholder="เลข 13 หลัก">
+                  <div class="invalid-feedback" id="id_card_feedback">เลขบัตรประชาชน 13 หลักไม่ถูกต้อง</div>
+                </div>
               </div>
               <div class="col-md-6 mb-2">
                 <label>ชื่อตัวและสกุล (ลูกค้า)</label>
@@ -288,7 +333,8 @@
               </div>
               <div class="col-md-6 mb-2">
                 <label>เบอร์ติดต่อลูกค้า</label>
-                <input type="tel" class="form-control" id="customer_phone" name="customer_phone" required pattern="[0-9]{10}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);" title="กรุณากรอกเบอร์โทรศัพท์ 10 หลัก">
+                <input type="tel" class="form-control phone-input" id="customer_phone" name="customer_phone" required maxlength="20" inputmode="tel" placeholder="08xxxxxxxx หรือ +รหัสประเทศ">
+                <div class="invalid-feedback">มือถือ 10 หลัก, เบอร์บ้าน 9 หลัก หรือ +รหัสประเทศ (เช่น +44 20 7946 0958)</div>
               </div>
             </div>
             <div class="step-actions">

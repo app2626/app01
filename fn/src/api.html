@@ -26,6 +26,33 @@ function safeUrl(u) {
   return '';
 }
 
+// ---- Input rules (mirror of src/Validate.js; the server re-checks everything) ----
+var PHONE_RULE_TEXT = 'มือถือ 10 หลัก (06/08/09), เบอร์บ้าน 9 หลัก (02-07) หรือเบอร์ต่างประเทศขึ้นต้นด้วย +รหัสประเทศ';
+
+/** Normalised phone or '' (Thai mobile/landline, +66 → 0…, other countries +cc… up to 15 digits). */
+function normalizePhone(v) {
+  var s = String(v == null ? '' : v).replace(/[\s\-().]/g, '');
+  if (/^\+66\d{8,9}$/.test(s)) s = '0' + s.slice(3);
+  if (/^0[689]\d{8}$/.test(s) || /^0[2-7]\d{7}$/.test(s)) return s;
+  if (/^\+[1-9]\d{7,14}$/.test(s) && s.indexOf('+66') !== 0) return s;
+  return '';
+}
+
+/** 13-digit Thai national ID with a valid check digit, or ''. */
+function thaiIdNo(v) {
+  var s = String(v == null ? '' : v).replace(/[\s-]/g, '');
+  if (!/^\d{13}$/.test(s)) return '';
+  var sum = 0;
+  for (var i = 0; i < 12; i++) sum += Number(s.charAt(i)) * (13 - i);
+  return (11 - sum % 11) % 10 === Number(s.charAt(12)) ? s : '';
+}
+
+/** Passport number: A-Z and 0-9, 6-9 characters (upper-cased), or ''. */
+function passportNo(v) {
+  var s = String(v == null ? '' : v).replace(/[\s-]/g, '').toUpperCase();
+  return /^[A-Z0-9]{6,9}$/.test(s) ? s : '';
+}
+
 function storageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function storageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
 function storageRemove(k) { try { localStorage.removeItem(k); } catch (e) { } }

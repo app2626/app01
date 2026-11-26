@@ -20,6 +20,11 @@ function hashPassword_(plain, salt) {
   return 'sha256$' + salt + '$' + toHex_(digest);
 }
 
+/** Short fingerprint of the stored password cell; changes whenever the password changes. */
+function passwordVersion_(stored) {
+  return String(stored || '').slice(-12);
+}
+
 /** Stored values without the sha256$ prefix are legacy plaintext. */
 function verifyPassword_(plain, stored) {
   stored = String(stored || '');
@@ -97,14 +102,20 @@ function login(username, pwd) {
   }
   cache.remove(failKey);
   // checked only after the password matches, so a stranger cannot probe which IDs are pending
-  if (!isActiveUser_(user)) throw new Error('บัญชีของคุณรอแอดมินอนุมัติ กรุณาติดต่อผู้ดูแลระบบ');
+  if (!isActiveUser_(user)) {
+    throw new Error(user.status === ACCOUNT_STATUS.BLOCKED
+      ? 'บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อแอดมิน'
+      : 'บัญชีของคุณรอแอดมินอนุมัติ กรุณาติดต่อผู้ดูแลระบบ');
+  }
 
-  if (String(user.password).indexOf('sha256$') !== 0) {
-    SpreadsheetApp.getActive().getSheetByName('Admin').getRange(user.rowNum, 2).setValue(hashPassword_(pwd));
+  var stored = String(user.password);
+  if (stored.indexOf('sha256$') !== 0) {
+    stored = hashPassword_(pwd);
+    SpreadsheetApp.getActive().getSheetByName('Admin').getRange(user.rowNum, 2).setValue(stored);
   }
 
   var token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
-  cache.put('sess_' + token, JSON.stringify({ username: user.username }), SESSION_TTL_);
+  cache.put('sess_' + token, JSON.stringify({ username: user.username, pv: passwordVersion_(stored) }), SESSION_TTL_);
   return { token: token, name: user.name, role: user.role };
 }
 
@@ -123,8 +134,14 @@ function requireSession_(token, roles) {
   var cache = CacheService.getScriptCache();
   var raw = cache.get('sess_' + token);
   if (!raw) throw new Error('AUTH_REQUIRED');
-  var user = findUser_(JSON.parse(raw).username);
-  if (!user || !isActiveUser_(user)) { cache.remove('sess_' + token); throw new Error('AUTH_REQUIRED'); }
+  var sess = JSON.parse(raw);
+  var user = findUser_(sess.username);
+  // pv: a password change (reset by email or by an admin) ends every older session of that user.
+  // Sessions created before pv existed have none and stay valid until they expire.
+  if (!user || !isActiveUser_(user) || (sess.pv && sess.pv !== passwordVersion_(user.password))) {
+    cache.remove('sess_' + token);
+    throw new Error('AUTH_REQUIRED');
+  }
   cache.put('sess_' + token, raw, SESSION_TTL_);
   if (roles && roles.indexOf(user.role) < 0) throw new Error('FORBIDDEN');
   return { username: user.username, name: user.name, role: user.role, phone: user.phone, branch: user.branch };

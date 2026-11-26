@@ -14,7 +14,8 @@ const OLD_HEADERS_41 = ["ID :", "วันที่ขออนุมัติ",
 console.log('== SCHEMA');
 {
   const { ctx, sheets } = createGas();
-  t('DATA_HEADERS has 47 columns', () => eq(ctx.DATA_HEADERS.length, 47));
+  t('DATA_HEADERS has 48 columns', () => eq(ctx.DATA_HEADERS.length, 48));
+  t('document type is column 48', () => eq(ctx.col_('ประเภทเอกสาร :'), 48));
   t('finance is column 47', () => eq(ctx.col_('ไฟแนนซ์ :'), 47));
   t('DATA_HEADERS keeps the old 41 verbatim', () => eq(ctx.DATA_HEADERS.slice(0, 41), OLD_HEADERS_41));
   t('col_ status is 33', () => eq(ctx.col_('สถานะ :'), 33));
@@ -30,7 +31,7 @@ console.log('== SCHEMA');
     const d = ss.insertSheet('Data'); d.appendRow(OLD_HEADERS_41.slice()); const row = OLD_HEADERS_41.map((_, i) => 'v' + i); d.appendRow(row.slice());
     const lg = ss.insertSheet('Log'); lg.appendRow(['วันที่/เวลา', 'ผู้ดำเนินการ', 'สถานะการอนุมัติ']); lg.appendRow(['x', 'y', 'z']);
     ctx.ensureSheets_();
-    eq(sheets.Data.rows[0].length, 47); eq(sheets.Data.rows[0][45], 'บาร์โค้ด Big point :'); eq(sheets.Data.rows[0][46], 'ไฟแนนซ์ :'); eq(sheets.Data.rows[1], row);
+    eq(sheets.Data.rows[0].length, 48); eq(sheets.Data.rows[0][47], 'ประเภทเอกสาร :'); eq(sheets.Data.rows[0][45], 'บาร์โค้ด Big point :'); eq(sheets.Data.rows[0][46], 'ไฟแนนซ์ :'); eq(sheets.Data.rows[1], row);
     eq(sheets.Log.rows[0], ctx.LOG_HEADERS); eq(sheets.Log.rows[1], ['x', 'y', 'z']);
   });
   t('dropdowns work when Finance is missing and Log header drifted', () => {
@@ -115,6 +116,7 @@ console.log('== REGISTER');
   t('single branch string still accepted', () => { ctx.register(reg({ empId: 'R2', branches: undefined, branch: 'สาขา B' })); eq(row('R2')[6], 'สาขา B'); });
   t('bad email rejected', () => throws(() => ctx.register(reg({ empId: 'E3', email: 'nope' })), /อีเมล/));
   t('bad phone rejected', () => throws(() => ctx.register(reg({ empId: 'E4', phone: '12' })), /เบอร์/));
+  t('register accepts a foreign number', () => { ctx.register(reg({ empId: 'INT1', phone: '+44 20 7946 0958' })); ok(sheets.Admin.rows.some(r => r[5] === "'+442079460958")); });
   t('short password rejected', () => throws(() => ctx.register(reg({ empId: 'E5', password: '123' })), /6/));
   t('bad employee id rejected', () => throws(() => ctx.register(reg({ empId: 'a b<' })), /รหัสพนักงาน/));
   t('missing name rejected', () => throws(() => ctx.register(reg({ empId: 'E6', name: ' ' })), /ชื่อ/));
@@ -159,6 +161,74 @@ console.log('== REGISTER');
     eq(sheets.Admin.rows[0].slice(4), ['อีเมล', 'เบอร์ติดต่อ', 'สาขา', 'สถานะบัญชี']); eq(sheets.Admin.rows[1], ['u', 'p', 'n', 'แอดมิน']);
   });
   t('login works on a narrow Admin grid', () => { sheets.Admin.maxCols = 4; sheets.Admin.rows[0].length = 4; ok(ctx.login('u', 'p')); });
+}
+
+// ===================== Block / unblock accounts =====================
+console.log('== BLOCK USERS');
+{
+  const g = fixture(); const { ctx, sheets } = g;
+  const admin = g.tok('admin1');
+  const row = u => sheets.Admin.rows.find(r => String(r[0]).replace(/^'/, '') === u);
+  t('block needs admin', () => { throws(() => ctx.setUserStatus('', 'staff1', 'ระงับ'), /AUTH_REQUIRED/); throws(() => ctx.setUserStatus(g.tok('acc1'), 'staff1', 'ระงับ'), /FORBIDDEN/); });
+  t('blocking ends the session at once and stops login', () => {
+    const tk = g.tok('staff1');
+    eq(ctx.setUserStatus(admin, 'staff1', 'ระงับ'), { username: 'staff1', status: 'ระงับ' });
+    eq(row('staff1')[7], 'ระงับ');
+    throws(() => ctx.requireSession_(tk), /AUTH_REQUIRED/);
+    throws(() => ctx.login('staff1', 'staffpw'), /ถูกระงับ/);
+  });
+  t('blocked: wrong password still answers null (no status leak)', () => eq(ctx.login('staff1', 'nope'), null));
+  t('blocked account shows as ระงับ in the admin list', () => eq(ctx.getSettingsData(admin, 'Admin').find(r => r[0] === 'staff1')[7], 'ระงับ'));
+  t('unblock lets the user log in again', () => { ctx.setUserStatus(admin, 'staff1', 'ใช้งาน'); ok(ctx.login('staff1', 'staffpw')); });
+  t('cannot block yourself', () => throws(() => ctx.setUserStatus(admin, 'admin1', 'ระงับ'), /ตัวเอง/));
+  t('cannot block the last active admin', () => {
+    g.seedAdmin(['admin2', 'admin2pw', 'แอดมินสอง', 'แอดมิน']);
+    const a2 = ctx.login('admin2', 'admin2pw').token;
+    ctx.setUserStatus(a2, 'admin1', 'ระงับ');
+    throws(() => ctx.setUserStatus(ctx.login('admin2', 'admin2pw').token, 'admin2', 'ระงับ'), /ตัวเอง/);
+    ctx.setUserStatus(a2, 'admin1', 'ใช้งาน');
+  });
+  t('blocked admins do not count as the remaining admin', () => {
+    // admin1 + admin2 exist; admin2 blocked -> admin1 is the only active admin and cannot be demoted
+    ctx.setUserStatus(admin, 'admin2', 'ระงับ');
+    throws(() => ctx.updateSettingData(admin, 'Admin', 0, 'admin1', ['', '', 'x', 'บัญชี']), /อย่างน้อย 1/);
+  });
+  t('unknown status / user rejected', () => { throws(() => ctx.setUserStatus(admin, 'staff1', 'root'), /สถานะ/); throws(() => ctx.setUserStatus(admin, 'ghost', 'ระงับ'), /ไม่พบ/); });
+}
+
+// ===================== Forgot password (email code) =====================
+console.log('== FORGOT PASSWORD');
+{
+  const g = fixture(); const { ctx, sheets, mail, cache } = g;
+  g.seedAdmin(['F1', 'oldpass1', 'ลืมรหัส', 'พนักงาน', 'f1@x.co', "'0812345678", 'สาขา A', 'ใช้งาน']);
+  g.seedAdmin(['F2', 'oldpass2', 'ไม่มีเมล', 'พนักงาน', '', '', 'สาขา A', 'ใช้งาน']);
+  const GENERIC = /หากข้อมูลถูกต้อง/;
+  const lastCode = () => (mail[mail.length - 1].htmlBody.match(/\b(\d{6})\b/) || [])[1];
+  const clearThrottle = u => cache.remove('pwreq_' + u);
+  t('request with matching id + email sends a 6-digit code to that email', () => {
+    const n = mail.length; ok(GENERIC.test(ctx.requestPasswordReset('F1', ' F1@X.co ').message));
+    eq(mail.length, n + 1); eq(mail[n].to, 'f1@x.co'); ok(/^\d{6}$/.test(lastCode()));
+  });
+  t('wrong email: same generic answer, nothing sent', () => { clearThrottle('F1'); const n = mail.length; ok(GENERIC.test(ctx.requestPasswordReset('F1', 'evil@x.co').message)); eq(mail.length, n); });
+  t('unknown id: same generic answer, nothing sent', () => { const n = mail.length; ok(GENERIC.test(ctx.requestPasswordReset('ghost', 'a@b.co').message)); eq(mail.length, n); });
+  t('account without email: nothing sent', () => { const n = mail.length; ctx.requestPasswordReset('F2', ''); eq(mail.length, n); });
+  t('second request within a minute sends nothing', () => { clearThrottle('F1'); ctx.requestPasswordReset('F1', 'f1@x.co'); const n = mail.length; ctx.requestPasswordReset('F1', 'f1@x.co'); eq(mail.length, n); });
+  t('wrong code rejected, old password still works', () => { throws(() => ctx.resetPasswordWithCode('F1', '000000', 'newpass9'), /ไม่ถูกต้อง/); ok(ctx.login('F1', 'oldpass1')); });
+  t('right code sets new password, code is single-use', () => {
+    const code = lastCode(); const old = ctx.login('F1', 'oldpass1').token;
+    eq(ctx.resetPasswordWithCode('F1', code, 'newpass9'), true);
+    ok(ctx.login('F1', 'newpass9')); eq(ctx.login('F1', 'oldpass1'), null);
+    throws(() => ctx.requireSession_(old), /AUTH_REQUIRED/);
+    throws(() => ctx.resetPasswordWithCode('F1', code, 'again123'), /ไม่ถูกต้อง|หมดอายุ/);
+  });
+  t('code dies after 5 wrong tries', () => {
+    clearThrottle('F1'); ctx.requestPasswordReset('F1', 'f1@x.co'); const code = lastCode();
+    for (let i = 0; i < 5; i++) { try { ctx.resetPasswordWithCode('F1', '111111', 'zzzzzz1'); } catch (e) { /* counting tries */ } }
+    throws(() => ctx.resetPasswordWithCode('F1', code, 'zzzzzz1'), /หมดอายุ|ขอรหัสใหม่/);
+  });
+  t('new password must be 6+ chars', () => { clearThrottle('F1'); ctx.requestPasswordReset('F1', 'f1@x.co'); throws(() => ctx.resetPasswordWithCode('F1', lastCode(), '123'), /6/); });
+  t('sessions from before an admin reset also die', () => { const tk = ctx.login('F1', 'newpass9').token; ctx.resetPassword(g.tok('admin1'), 'F1', 'byadmin1'); throws(() => ctx.requireSession_(tk), /AUTH_REQUIRED/); });
+  t('old sessions without a fingerprint keep working', () => { const tk = 'legacytoken'; cache.put('sess_' + tk, JSON.stringify({ username: 'admin1' })); eq(ctx.requireSession_(tk).username, 'admin1'); });
 }
 
 // ===================== Task 3: guards, settings, config =====================
@@ -252,7 +322,7 @@ console.log('== REQUESTS / WORKFLOW');
   const b64 = n => Buffer.alloc(n, 1).toString('base64');
   const form = (o = {}) => Object.assign({
     date: '2026-11-25', location: 'สาขา A', emp_id: 'E01', emp_name: 'พนักงานหนึ่ง', emp_phone: '0812345678',
-    id_card_number: '1103700012345', customer_name: 'ลูกค้า ทดสอบ', customer_phone: '0898765432', address: '1/2', road: '3',
+    id_card_number: '1103700012346', customer_name: 'ลูกค้า ทดสอบ', customer_phone: '0898765432', address: '1/2', road: '3',
     district: 'ตำบล', amphoe: 'อำเภอ', province: 'จังหวัด', zipcode: '10200', productname: 'Phone X', imei: '356789012345678',
     premium_combined: 'เคส', guarantee: '', price: '10000', down: '1000', discountais: '0', discountpromotion: '0',
     discounttradein: '0', discounttradeup: '0', discountbigc: '0', dues: '0', installments: '10', installment_amount: '900', finance: 'Ponmai',
@@ -269,11 +339,22 @@ console.log('== REQUESTS / WORKFLOW');
     id = ctx.saveRequest(staff, form({ price: '10000', down: '1000', discountais: '500', dues: '200', netprice: '1' })).id;
     eq(Number(rowById(id)[C('ราคาสุทธิ :')]), 8700); eq(rowById(id)[C('สถานะ :')], 'รออนุมัติ');
   });
-  t('row is 47 wide with uploaded file links', () => { const r = rowById(id); eq(r.length, 47); ok(/^https:\/\/lh3\.googleusercontent\.com\/d\//.test(r[C('รูปสลิปเงินโอน :')])); ok(/^https:\/\/drive\.google\.com\/uc\?id=/.test(r[C('ใบเสร็จ :')])); eq(driveFiles.length, 2); });
+  t('row is 48 wide with uploaded file links', () => { const r = rowById(id); eq(r.length, 48); ok(/^https:\/\/lh3\.googleusercontent\.com\/d\//.test(r[C('รูปสลิปเงินโอน :')])); ok(/^https:\/\/drive\.google\.com\/uc\?id=/.test(r[C('ใบเสร็จ :')])); eq(driveFiles.length, 2); });
   t('barcode stored separately', () => { const i2 = ctx.saveRequest(staff, form({ barcode_ais: 'B1', discountais: '500' })).id; eq(rowById(i2)[C('ส่วนลด เปิดเบอร์ AIS :')], 500); eq(rowById(i2)[C('บาร์โค้ด AIS :')], 'B1'); });
   t('ids are unique on same millisecond', () => { const realNow = Date.now; Date.now = () => 1700000000000; try { const a = ctx.saveRequest(staff, form()).id, b = ctx.saveRequest(staff, form()).id; ok(a !== b, a + '==' + b); } finally { Date.now = realNow; } });
   t('invalid id card rejected', () => throws(() => ctx.saveRequest(staff, form({ id_card_number: '123' })), /เลขบัตรประชาชน/));
   t('invalid phone rejected', () => throws(() => ctx.saveRequest(staff, form({ customer_phone: '12345' })), /เบอร์ติดต่อลูกค้า/));
+  t('Thai ID with a wrong check digit rejected', () => throws(() => ctx.saveRequest(staff, form({ id_card_number: '1103700012345' })), /เลขตรวจสอบ/));
+  t('Thai ID typed with dashes is accepted and stored as 13 digits', () => { const i = ctx.saveRequest(staff, form({ id_card_number: '1-1037-00012-34-6' })).id; eq(rowById(i)[C('เลขบัตรประชาชน :')], "'1103700012346"); eq(rowById(i)[C('ประเภทเอกสาร :')], 'บัตรประชาชน'); });
+  t('passport stored upper-case with its type', () => { const i = ctx.saveRequest(staff, form({ id_type: 'พาสปอร์ต', id_card_number: ' aa 1234567 ' })).id; eq(rowById(i)[C('เลขบัตรประชาชน :')], "'AA1234567"); eq(rowById(i)[C('ประเภทเอกสาร :')], 'พาสปอร์ต'); });
+  t('passport too short / with symbols rejected', () => { throws(() => ctx.saveRequest(staff, form({ id_type: 'พาสปอร์ต', id_card_number: 'A12' })), /พาสปอร์ต/); throws(() => ctx.saveRequest(staff, form({ id_type: 'พาสปอร์ต', id_card_number: 'A1234#67' })), /พาสปอร์ต/); });
+  t('unknown document type rejected', () => throws(() => ctx.saveRequest(staff, form({ id_type: 'ใบขับขี่' })), /ประเภทเอกสาร/));
+  t('phones: Thai mobile, landline, +66 and foreign numbers', () => {
+    const ph = v => ctx.normalizePhone_(v);
+    eq([ph('081-234-5678'), ph('02 123 4567'), ph('+66 81 234 5678'), ph('+1 (415) 555-2671'), ph('+44 20 7946 0958')], ['0812345678', '021234567', '0812345678', '+14155552671', '+442079460958']);
+    eq([ph('0112345678'), ph('081234567'), ph('12345'), ph('+0123456789'), ph('+1234567890123456'), ph('08x2345678')], ['', '', '', '', '', '']);
+  });
+  t('customer phone stored normalised, foreign number kept with +', () => { const i = ctx.saveRequest(staff, form({ customer_phone: '+1 415 555 2671', emp_phone: '081-234-5678' })).id; eq(rowById(i)[C('เบอร์ติดต่อลูกค้า :')], "'+14155552671"); eq(rowById(i)[C('เบอร์ติดต่อ(พนง.) :')], "'0812345678"); });
   t('missing required field rejected', () => throws(() => ctx.saveRequest(staff, form({ customer_name: ' ' })), /ชื่อตัวและสกุล/));
   t('negative amount rejected', () => throws(() => ctx.saveRequest(staff, form({ down: '-5' })), /เงินดาวน์/));
   t('installments out of range rejected', () => throws(() => ctx.saveRequest(staff, form({ installments: '0' })), /จำนวนงวด/));
@@ -309,8 +390,8 @@ console.log('== REQUESTS / WORKFLOW');
 
   t('getData needs session', () => throws(() => ctx.getData(''), /AUTH_REQUIRED/));
   t('staff sees masked id card', () => { const rows = ctx.getData(staff); ok(rows.length > 0); rows.forEach(r => ok(/^X{9}\d{4}$/.test(r[6]), r[6])); });
-  t('accounting sees full id card', () => eq(ctx.getData(acc)[0][6], '1103700012345'));
-  t('getData rows padded to 47', () => ctx.getData(acc).forEach(r => eq(r.length, 47)));
+  t('accounting sees full id card', () => eq(ctx.getData(acc)[0][6], '1103700012346'));
+  t('getData rows padded to 48', () => ctx.getData(acc).forEach(r => eq(r.length, 48)));
   t('branch scope: staff sees only rows of registered branches', () => {
     const other = ctx.saveRequest(admin, form({ location: 'สาขา Z' })).id;
     ok(ctx.getData(staff).length > 0); ok(ctx.getData(staff).every(r => r[2] === 'สาขา A'), 'foreign row leaked');
@@ -336,7 +417,7 @@ console.log('== REQUESTS / WORKFLOW');
     eq(ctx.getAllDropdownData(acc).location.length, 3); eq(ctx.getAllDropdownData(acc).me.scoped, false);
     sheets.location.rows.splice(1);
   });
-  t('findRecord masks for staff', () => ok(/^X{9}2345$/.test(ctx.findRecord(staff, id)[6])));
+  t('findRecord masks for staff', () => ok(/^X{9}2346$/.test(ctx.findRecord(staff, id)[6])));
   t('findRecord unknown id', () => throws(() => ctx.findRecord(acc, 'zzz'), /ไม่พบ/));
   t('legacy functions removed', () => ['saveDataB64', 'statusRecordWithRemark'].forEach(f => eq(typeof ctx[f], 'undefined', f)));
 }
@@ -351,8 +432,8 @@ console.log('== FINAL REVIEW FIXES');
   const lg = ss.insertSheet('Log'); lg.maxCols = 3; lg.appendRow(['วันที่/เวลา', 'ผู้ดำเนินการ', 'สถานะการอนุมัติ']);
   const ad = ss.insertSheet('Admin'); ad.appendRow(['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์']); ad.appendRow(['boss', 'bosspw', 'บอส', 'แอดมิน']);
   const tk = ctx.login('boss', 'bosspw').token;
-  t('C1 getData works on a 41-column live sheet', () => { const rows = ctx.getData(tk); eq(rows.length, 1); eq(rows[0].length, 47); eq(rows[0][46], ''); });
-  t('C1 data columns grown to 47 with headers', () => { ok(sheets.Data.getMaxColumns() >= 47); eq(sheets.Data.rows[0].slice(41), ctx.DATA_HEADERS.slice(41)); });
+  t('C1 getData works on a 41-column live sheet', () => { const rows = ctx.getData(tk); eq(rows.length, 1); eq(rows[0].length, 48); eq(rows[0][46], ''); });
+  t('C1 data columns grown to 48 with headers', () => { ok(sheets.Data.getMaxColumns() >= 48); eq(sheets.Data.rows[0].slice(41), ctx.DATA_HEADERS.slice(41)); });
   // I1: legacy 'อนุมัติแล้ว' row whose SO is already filled must be finishable via updateAR.
   t('I1 updateAR from อนุมัติแล้ว with SO filled', () => eq(ctx.updateStatus(tk, { record: '111', action: 'updateAR', invoice: 'INV9' }).status, 'เสร็จสมบูรณ์'));
   t('C1 Log extended and written on narrow sheet', () => { const l = sheets.Log.rows[sheets.Log.getLastRow() - 1]; eq(l[3], '111'); });
@@ -376,7 +457,7 @@ console.log('== FINAL REVIEW FIXES');
   const realLock = ctx.LockService.getScriptLock;
   ctx.LockService.getScriptLock = () => { const l = realLock(); return { waitLock: x => { l.waitLock(x); lockState.held = true; }, releaseLock: () => { lockState.held = false; l.releaseLock(); } }; };
   const b64 = Buffer.alloc(8, 1).toString('base64');
-  ctx.saveRequest(staff, { date: '2026-11-25', location: 'สาขา A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012345', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', finance: 'Ponmai', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
+  ctx.saveRequest(staff, { date: '2026-11-25', location: 'สาขา A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', finance: 'Ponmai', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
   t('I2 uploads happen outside the lock', () => eq(uploadsUnderLock, 0));
 }
 {

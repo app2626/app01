@@ -46,6 +46,14 @@ t('safeUrl blocks lookalike host', () => eq(c.safeUrl('https://drive.google.com.
 t('safeUrl allows drive', () => eq(c.safeUrl('https://drive.google.com/uc?id=1'), 'https://drive.google.com/uc?id=1'));
 t('safeUrl allows lh3', () => eq(c.safeUrl('https://lh3.googleusercontent.com/d/abc'), 'https://lh3.googleusercontent.com/d/abc'));
 
+t('normalizePhone accepts Thai and international formats', () => eq(
+  [c.normalizePhone('081-234-5678'), c.normalizePhone('02 123 4567'), c.normalizePhone('+66 81 234 5678'), c.normalizePhone('+1 (415) 555-2671')],
+  ['0812345678', '021234567', '0812345678', '+14155552671']));
+t('normalizePhone rejects bad numbers', () => eq(
+  [c.normalizePhone('0112345678'), c.normalizePhone('12345'), c.normalizePhone('+1234567890123456'), c.normalizePhone('')], ['', '', '', '']));
+t('thaiIdNo checks the check digit', () => eq([c.thaiIdNo('1-1037-00012-34-6'), c.thaiIdNo('1103700012345'), c.thaiIdNo('123')], ['1103700012346', '', '']));
+t('passportNo upper-cases and checks length', () => eq([c.passportNo(' aa1234567 '), c.passportNo('A12'), c.passportNo('A1234#67')], ['AA1234567', '', '']));
+
 t('callServer sends token first', async () => {
   const ctx = makeCtx((fn, args) => args);
   ctx.localStorage.setItem('fnToken', 'T1');

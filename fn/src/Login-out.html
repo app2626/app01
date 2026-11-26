@@ -47,7 +47,7 @@ function login() {
 
 // ---------- Self-registration (no token yet, so runServer like login) ----------
 function showRegister() {
-  $('#login-panel').hide(); $('#register-panel').show(); $('#register-error').hide();
+  $('#login-panel, #forgot-panel').hide(); $('#register-panel').show(); $('#register-error').hide();
   var $sel = $('#reg-branch');
   if (!$sel.data('select2')) {
     $sel.select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'เลือกสาขา (พิมพ์เพื่อค้นหา)', closeOnSelect: false });
@@ -62,7 +62,62 @@ function showRegister() {
 }
 
 function showLogin() {
-  $('#register-panel').hide(); $('#login-panel').show();
+  $('#register-panel, #forgot-panel').hide(); $('#login-panel').show();
+}
+
+// ---------- Forgot password: emailed 6-digit code, then a new password (no token) ----------
+function showForgot() {
+  $('#login-panel, #register-panel').hide(); $('#forgot-panel').show();
+  if (!$('#fg-empId').val()) $('#fg-empId').val($('#username').val());
+  forgotStep(1);
+  document.getElementById('fg-empId').focus();
+}
+
+function forgotStep(n) {
+  $('#forgot-error').hide();
+  $('#forgot-form-1').toggle(n === 1);
+  $('#forgot-form-2').toggle(n === 2);
+  $('#forgot-sub').text(n === 1
+    ? 'กรอกรหัสพนักงานและอีเมลที่ใช้ลงทะเบียน ระบบจะส่งรหัสยืนยัน 6 หลักไปที่อีเมลนั้น'
+    : 'กรอกรหัสยืนยันจากอีเมล แล้วตั้งรหัสผ่านใหม่');
+}
+
+function forgotFail(msg, fieldId) {
+  $('#forgot-error').html('<i class="fa-solid fa-circle-exclamation me-1"></i> ' + escHtml(msg)).show();
+  if (fieldId) document.getElementById(fieldId).focus();
+}
+
+function sendResetCode() {
+  var empId = $('#fg-empId').val().trim(), email = $('#fg-email').val().trim();
+  $('#forgot-error').hide();
+  if (!empId) return forgotFail('กรุณากรอกรหัสพนักงาน', 'fg-empId');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return forgotFail('รูปแบบอีเมลไม่ถูกต้อง', 'fg-email');
+  var btn = document.getElementById('fg-send');
+  btn.disabled = true;
+  runServer('requestPasswordReset', [empId, email]).then(function (res) {
+    btn.disabled = false;
+    forgotStep(2);
+    $('#forgot-sub').text(res.message);
+    document.getElementById('fg-code').focus();
+  }).catch(function (err) { btn.disabled = false; forgotFail(errorText(err)); });
+}
+
+function submitNewPassword() {
+  var empId = $('#fg-empId').val().trim(), code = $('#fg-code').val().trim();
+  var pwd = $('#fg-pwd').val(), pwd2 = $('#fg-pwd2').val();
+  $('#forgot-error').hide();
+  if (!/^\d{6}$/.test(code)) return forgotFail('รหัสยืนยันเป็นตัวเลข 6 หลัก', 'fg-code');
+  if (pwd.length < 6) return forgotFail('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร', 'fg-pwd');
+  if (pwd !== pwd2) return forgotFail('ยืนยันรหัสผ่านไม่ตรงกัน', 'fg-pwd2');
+  var btn = document.getElementById('fg-save');
+  btn.disabled = true;
+  runServer('resetPasswordWithCode', [empId, code, pwd]).then(function () {
+    btn.disabled = false;
+    $('#forgot-form-1')[0].reset(); $('#forgot-form-2')[0].reset();
+    showLogin();
+    $('#username').val(empId); $('#password').val('').focus();
+    Swal.fire({ icon: 'success', title: 'ตั้งรหัสผ่านใหม่แล้ว', text: 'เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย' });
+  }).catch(function (err) { btn.disabled = false; forgotFail(errorText(err)); });
 }
 
 function registerFail(msg, fieldId) {
@@ -79,7 +134,7 @@ function submitRegister() {
   if (!form.name) return registerFail('กรุณากรอกชื่อ-สกุล', 'reg-name');
   if (!form.branches.length) { registerFail('กรุณาเลือกสาขาอย่างน้อย 1 สาขา'); $('#reg-branch').select2('open'); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return registerFail('รูปแบบอีเมลไม่ถูกต้อง', 'reg-email');
-  if (!/^0\d{8,9}$/.test(form.phone)) return registerFail('เบอร์ติดต่อต้องเป็นตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0', 'reg-phone');
+  if (!normalizePhone(form.phone)) return registerFail('เบอร์ติดต่อไม่ถูกต้อง: ' + PHONE_RULE_TEXT, 'reg-phone');
   if (form.password.length < 6) return registerFail('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'reg-password');
   if (form.password !== document.getElementById('reg-password2').value) return registerFail('ยืนยันรหัสผ่านไม่ตรงกัน', 'reg-password2');
 
