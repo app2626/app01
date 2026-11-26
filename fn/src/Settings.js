@@ -116,7 +116,10 @@ function getSettingsData(token, sheetName) {
   var data = sheet.getDataRange().getDisplayValues().slice(1);
   if (sheetName === 'Admin') {
     var explicitAdmin = hasExplicitAdmin_(data);
-    return data.map(function (r) { return [r[0], '', r[2], normalizeRole_(r[3], explicitAdmin)]; });
+    var s = function (v) { return String(v == null ? '' : v).trim(); };
+    return data.map(function (r) {
+      return [r[0], '', r[2], normalizeRole_(r[3], explicitAdmin), s(r[4]), s(r[5]), s(r[6]), s(r[7]) || ACCOUNT_STATUS.ACTIVE];
+    });
   }
   return data;
 }
@@ -261,6 +264,14 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
         throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
       }
       sheet.getRange(rowNum, 3, 1, 2).setValues([[cellText_(rowData[2] || key), rowData[3]]]);
+      if (rowData.length > 4) {
+        // contact fields (cols 5-7); blank is allowed for accounts created by an admin
+        var email = rowData[4] || '', phone = rowData[5] ? normalizePhone_(rowData[5]) : '';
+        if (email && !validEmail_(email)) throw new Error('รูปแบบอีเมลไม่ถูกต้อง');
+        if (rowData[5] && !phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง (ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0)');
+        fillBlankHeaders_(sheet, ADMIN_HEADERS);
+        sheet.getRange(rowNum, 5, 1, 3).setValues([[cellText_(email), phone ? "'" + phone : '', cellText_(rowData[6] || '')]]);
+      }
       return true;
     }
     if (!rowData[0]) throw new Error('กรุณากรอกข้อมูล');

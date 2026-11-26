@@ -84,6 +84,59 @@ console.log('== AUTH');
   t('checkLogin removed', () => eq(typeof ctx.checkLogin, 'undefined'));
 }
 
+// ===================== Self-registration =====================
+console.log('== REGISTER');
+{
+  const g = fixture(); const { ctx, sheets, mail } = g;
+  const admin = g.tok('admin1');
+  sheets.location.appendRow(['สาขา A']);
+  ctx.setConfigProperties(admin, { emailTo: 'boss@x.y' });
+  const reg = (o = {}) => Object.assign({ empId: 'E1001', name: 'สมหญิง ใจดี', email: 'som@x.co', phone: '081-234-5678', branch: 'สาขา A', password: 'secret12' }, o);
+  const row = u => sheets.Admin.rows.find(r => String(r[0]).replace(/^'/, '') === u);
+  t('Admin sheet has the new profile headers', () => eq(sheets.Admin.rows[0], ['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์', 'อีเมล', 'เบอร์ติดต่อ', 'สาขา', 'สถานะบัญชี']));
+  t('register options list branches', () => eq(ctx.getRegisterOptions().branches, ['สาขา A']));
+  t('register stores pending staff with hashed pw and text phone', () => {
+    const n = mail.length;
+    eq(ctx.register(reg()), { status: 'รออนุมัติ' });
+    const r = row('E1001');
+    eq([r[0], r[2], r[3], r[4], r[5], r[6], r[7]], ["'E1001", 'สมหญิง ใจดี', 'พนักงาน', 'som@x.co', "'0812345678", 'สาขา A', 'รออนุมัติ']);
+    ok(/^sha256\$/.test(r[1]));
+    eq(mail.length, n + 1, 'admin notified');
+  });
+  t('pending user cannot log in', () => throws(() => ctx.login('E1001', 'secret12'), /รอแอดมินอนุมัติ/));
+  t('pending user wrong pw still returns null (no status leak)', () => eq(ctx.login('E1001', 'nope'), null));
+  t('duplicate employee id rejected', () => throws(() => ctx.register(reg({ email: 'b@x.co' })), /มีอยู่แล้ว/));
+  t('unknown branch rejected', () => throws(() => ctx.register(reg({ empId: 'E2', branch: 'ไม่มี' })), /สาขา/));
+  t('bad email rejected', () => throws(() => ctx.register(reg({ empId: 'E3', email: 'nope' })), /อีเมล/));
+  t('bad phone rejected', () => throws(() => ctx.register(reg({ empId: 'E4', phone: '12' })), /เบอร์/));
+  t('short password rejected', () => throws(() => ctx.register(reg({ empId: 'E5', password: '123' })), /6/));
+  t('bad employee id rejected', () => throws(() => ctx.register(reg({ empId: 'a b<' })), /รหัสพนักงาน/));
+  t('missing name rejected', () => throws(() => ctx.register(reg({ empId: 'E6', name: ' ' })), /ชื่อ/));
+  t('approveUser needs admin', () => { throws(() => ctx.approveUser('', 'E1001'), /AUTH_REQUIRED/); throws(() => ctx.approveUser(g.tok('acc1'), 'E1001'), /FORBIDDEN/); });
+  t('approved user can log in as staff', () => { ctx.approveUser(admin, 'E1001'); eq(row('E1001')[7], 'ใช้งาน'); const s = ctx.login('E1001', 'secret12'); eq(s.role, 'พนักงาน'); eq(s.name, 'สมหญิง ใจดี'); });
+  t('session dies when set back to pending', () => { const tk = ctx.login('E1001', 'secret12').token; row('E1001')[7] = 'รออนุมัติ'; throws(() => ctx.requireSession_(tk), /AUTH_REQUIRED/); row('E1001')[7] = 'ใช้งาน'; });
+  t('legacy 4-column users still log in', () => ok(ctx.login('staff1', 'staffpw')));
+  t('settings list returns profile + status', () => { const r = ctx.getSettingsData(admin, 'Admin').find(x => x[0] === 'E1001'); eq(r, ['E1001', '', 'สมหญิง ใจดี', 'พนักงาน', 'som@x.co', '0812345678', 'สาขา A', 'ใช้งาน']); });
+  t('admin edit updates contact fields', () => {
+    const i = ctx.getSettingsData(admin, 'Admin').findIndex(x => x[0] === 'E1001');
+    ctx.updateSettingData(admin, 'Admin', i, 'E1001', ['', '', 'สมหญิง ใหม่', 'บัญชี', 'new@x.co', '0899999999', 'สาขา A']);
+    const r = row('E1001'); eq([r[2], r[3], r[4], r[5], r[6], r[7]], ['สมหญิง ใหม่', 'บัญชี', 'new@x.co', "'0899999999", 'สาขา A', 'ใช้งาน']);
+  });
+  t('registration throttled after burst', () => {
+    for (let i = 0; i < 35; i++) { try { ctx.register(reg({ empId: 'B' + i })); } catch (e) { /* throttle engages inside the loop */ } }
+    throws(() => ctx.register(reg({ empId: 'B99' })), /ลองใหม่/);
+  });
+}
+{
+  const { ctx, ss, sheets } = createGas();
+  t('ensureSheets_ fills new Admin headers on an old 4-column sheet without touching rows', () => {
+    const a = ss.insertSheet('Admin'); a.maxCols = 4; a.appendRow(['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์']); a.appendRow(['u', 'p', 'n', 'แอดมิน']);
+    ctx.ensureSheets_();
+    eq(sheets.Admin.rows[0].slice(4), ['อีเมล', 'เบอร์ติดต่อ', 'สาขา', 'สถานะบัญชี']); eq(sheets.Admin.rows[1], ['u', 'p', 'n', 'แอดมิน']);
+  });
+  t('login works on a narrow Admin grid', () => { sheets.Admin.maxCols = 4; sheets.Admin.rows[0].length = 4; ok(ctx.login('u', 'p')); });
+}
+
 // ===================== Task 3: guards, settings, config =====================
 console.log('== GUARDS / SETTINGS');
 {

@@ -45,6 +45,56 @@ function login() {
   });
 }
 
+// ---------- Self-registration (no token yet, so runServer like login) ----------
+function showRegister() {
+  $('#login-panel').hide(); $('#register-panel').show(); $('#register-error').hide();
+  var sel = document.getElementById('reg-branch');
+  runServer('getRegisterOptions', []).then(function (o) {
+    var keep = sel.value;
+    sel.innerHTML = '<option value="" disabled>เลือกสาขา</option>';
+    (o.branches || []).forEach(function (b) { var opt = document.createElement('option'); opt.value = b; opt.text = b; sel.appendChild(opt); });
+    sel.value = (o.branches || []).indexOf(keep) >= 0 ? keep : '';
+  }).catch(function (err) { showError(err, 'โหลดรายชื่อสาขาไม่สำเร็จ'); });
+  document.getElementById('reg-empId').focus();
+}
+
+function showLogin() {
+  $('#register-panel').hide(); $('#login-panel').show();
+}
+
+function registerFail(msg, fieldId) {
+  $('#register-error').html('<i class="fa-solid fa-circle-exclamation me-1"></i> ' + escHtml(msg)).show();
+  if (fieldId) document.getElementById(fieldId).focus();
+}
+
+function submitRegister() {
+  var v = function (id) { return document.getElementById(id).value.trim(); };
+  var form = { empId: v('reg-empId'), name: v('reg-name'), email: v('reg-email'), phone: v('reg-phone').replace(/[\s-]/g, ''),
+    branch: document.getElementById('reg-branch').value, password: document.getElementById('reg-password').value };
+  $('#register-error').hide();
+  if (!/^[A-Za-z0-9._-]{2,30}$/.test(form.empId)) return registerFail('รหัสพนักงานใช้ได้เฉพาะ A-Z, 0-9, . _ - ยาว 2-30 ตัว', 'reg-empId');
+  if (!form.branch) return registerFail('กรุณาเลือกสาขา', 'reg-branch');
+  if (!form.name) return registerFail('กรุณากรอกชื่อ-สกุล', 'reg-name');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return registerFail('รูปแบบอีเมลไม่ถูกต้อง', 'reg-email');
+  if (!/^0\d{8,9}$/.test(form.phone)) return registerFail('เบอร์ติดต่อต้องเป็นตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0', 'reg-phone');
+  if (form.password.length < 6) return registerFail('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'reg-password');
+  if (form.password !== document.getElementById('reg-password2').value) return registerFail('ยืนยันรหัสผ่านไม่ตรงกัน', 'reg-password2');
+
+  var btn = document.getElementById('register-submit');
+  btn.disabled = true;
+  runServer('register', [form]).then(function () {
+    btn.disabled = false;
+    document.getElementById('register-form').reset();
+    showLogin();
+    $('#username').val(form.empId);
+    Swal.fire({ icon: 'success', title: 'ส่งคำขอลงทะเบียนแล้ว',
+      html: 'รหัสพนักงาน <b>' + escHtml(form.empId) + '</b><br>กรุณารอแอดมินอนุมัติ แล้วเข้าสู่ระบบด้วยรหัสพนักงานและรหัสผ่านที่ตั้งไว้' });
+  }).catch(function (err) {
+    btn.disabled = false;
+    registerFail(errorText(err).replace(/^Error:\s*/, ''));
+  });
+}
+
 function loadingStart() { $('#loading').removeClass('invisible'); }
 function loadingEnd() { $('#loading').addClass('invisible'); }
 

@@ -123,11 +123,12 @@
       </ul>
     </aside>
     <div class="login-form">
+      <div id="login-panel">
       <h1>เข้าสู่ระบบ</h1>
-      <div class="lead-sub">ใช้ชื่อผู้ใช้และรหัสผ่านที่ผู้ดูแลระบบออกให้</div>
+      <div class="lead-sub">ใช้รหัสพนักงาน (หรือชื่อผู้ใช้) และรหัสผ่านของคุณ</div>
       <form onsubmit="event.preventDefault(); login()">
         <div class="mb-3">
-          <label for="username">ชื่อผู้ใช้งาน</label>
+          <label for="username">รหัสพนักงาน / ชื่อผู้ใช้งาน</label>
           <div class="input-group">
             <span class="input-group-text"><i class="fa-solid fa-user"></i></span>
             <input type="text" class="form-control" id="username" autocomplete="username" required>
@@ -147,6 +148,50 @@
           เข้าสู่ระบบ <i class="fa-solid fa-arrow-right ms-1"></i>
         </button>
       </form>
+      <div class="login-switch">ยังไม่มีบัญชี? <a href="#" onclick="showRegister(); return false;">ลงทะเบียนใช้งาน</a></div>
+      </div>
+
+      <div id="register-panel" style="display: none;">
+      <h1>ลงทะเบียนใช้งาน</h1>
+      <div class="lead-sub">กรอกข้อมูลให้ครบ แอดมินจะอนุมัติบัญชีก่อนเข้าใช้งานได้</div>
+      <form id="register-form" onsubmit="event.preventDefault(); submitRegister()" novalidate>
+        <div class="row g-2">
+          <div class="col-sm-6 mb-2">
+            <label for="reg-empId">รหัสพนักงาน</label>
+            <input type="text" class="form-control" id="reg-empId" autocomplete="username" maxlength="30" pattern="[A-Za-z0-9._-]{2,30}" required>
+          </div>
+          <div class="col-sm-6 mb-2">
+            <label for="reg-branch">สาขาที่ลงทะเบียน</label>
+            <select class="form-select" id="reg-branch" required><option value="" selected disabled>กำลังโหลด...</option></select>
+          </div>
+          <div class="col-12 mb-2">
+            <label for="reg-name">ชื่อ-สกุล</label>
+            <input type="text" class="form-control" id="reg-name" autocomplete="name" maxlength="100" required>
+          </div>
+          <div class="col-sm-6 mb-2">
+            <label for="reg-email">อีเมล</label>
+            <input type="email" class="form-control" id="reg-email" autocomplete="email" maxlength="100" required>
+          </div>
+          <div class="col-sm-6 mb-2">
+            <label for="reg-phone">เบอร์ติดต่อ</label>
+            <input type="tel" class="form-control" id="reg-phone" autocomplete="tel" inputmode="numeric" maxlength="12" placeholder="08xxxxxxxx" required>
+          </div>
+          <div class="col-sm-6 mb-2">
+            <label for="reg-password">ตั้งรหัสผ่าน</label>
+            <input type="password" class="form-control" id="reg-password" autocomplete="new-password" minlength="6" maxlength="100" required>
+          </div>
+          <div class="col-sm-6 mb-3">
+            <label for="reg-password2">ยืนยันรหัสผ่าน</label>
+            <input type="password" class="form-control" id="reg-password2" autocomplete="new-password" minlength="6" maxlength="100" required>
+          </div>
+        </div>
+        <div id="register-error" class="login-error mb-3" role="alert" style="display: none;"></div>
+        <button type="submit" class="btn btn-primary w-100" id="register-submit">
+          ส่งคำขอลงทะเบียน <i class="fa-solid fa-paper-plane ms-1"></i>
+        </button>
+      </form>
+      <div class="login-switch">มีบัญชีแล้ว? <a href="#" onclick="showLogin(); return false;">กลับไปเข้าสู่ระบบ</a></div>
+      </div>
       <div class="login-foot"><i class="fa-solid fa-shield-halved me-1"></i> เซสชันหมดอายุอัตโนมัติเมื่อไม่ได้ใช้งาน 6 ชั่วโมง</div>
     </div>
   </div>
@@ -602,8 +647,8 @@
               </div>
               <div class="table-responsive">
                 <table class="table table-bordered table-hover" id="table-Admin" style="width:100%">
-                  <thead class="table-light"><tr><th>Username</th><th>Password</th><th>ชื่อผู้ใช้งาน</th><th>สิทธิ์</th><th>จัดการ</th></tr></thead>
-                  <tbody><tr><td colspan="5" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
+                  <thead class="table-light"><tr><th>รหัสพนักงาน / Username</th><th>ชื่อ-สกุล</th><th>ติดต่อ</th><th>สาขา</th><th>สิทธิ์</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+                  <tbody><tr><td colspan="7" class="text-center">กำลังโหลดข้อมูล...</td></tr></tbody>
                 </table>
               </div>
             </div>

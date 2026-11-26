@@ -11,6 +11,7 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 | `src/Schema.js` | `DATA_HEADERS`, `LOG_HEADERS`, `col_()`, `STATUS`, `SETTINGS_SHEETS`, `ensureSheets_()` |
 | `src/Auth.js` | password hashing, `login`/`logout`, `requireSession_` |
 | `src/Settings.js` | config (masked secrets), dropdown lists, settings CRUD, `withLock_` |
+| `src/Register.js` | self-registration (`register`, `getRegisterOptions`, no token) and `approveUser` |
 | `src/Requests.js` | `saveRequest`, `getData`, `findRecord`, `updateStatus` (workflow) |
 | `src/Notify.js` | Telegram + email (`sendNotify_`) |
 | `src/api.html` | client `callServer()`, `escHtml()`, `safeUrl()`, `applyRoleUI()` |
@@ -21,7 +22,7 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 - **Every public server function takes `token` first and calls `requireSession_(token, roles)`.**
   Helpers that must not be callable from the browser end in `_` (GAS hides them from `google.script.run`).
 - **Client calls go through `callServer('fn', ...args)` only** — never `google.script.run` directly
-  (except `login`/`logout` in `api.html`/`Login-out.html`, which have no token yet).
+  (except `login`/`logout`/`register`/`getRegisterOptions` in `api.html`/`Login-out.html`, which have no token yet).
 - **No top-level code that reads another file's globals** (GAS file load order is not guaranteed) —
   wrap it in a function, e.g. `workflow_()`.
 - **Data columns are append-only.** Address columns by header via `col_('สถานะ :')`, never by number.
@@ -52,6 +53,9 @@ The server decides the new status and the actor (from the session); each step ap
 Sessions: ScriptCache `sess_<token>`, 6 h sliding TTL; role re-read from the Admin sheet on every call.
 Passwords: `sha256$<salt>$<hex>` (1000 rounds); legacy plaintext cells are upgraded on first login.
 Login locks for 15 min after 5 failures per username.
+Admin sheet columns: `ADMIN_HEADERS` (Username, Password, name, role, email, phone, branch, status).
+Self-registered accounts are `พนักงาน` with status `รออนุมัติ` and cannot log in until an แอดมิน approves;
+blank status (older rows) = active. Registration is throttled to 30 sign-ups / 10 min app-wide.
 Blank role cell = แอดมิน only while no row says แอดมิน explicitly (legacy behaviour), otherwise พนักงาน.
 
 Sheet grid: sheets created by `appendRow` are only as wide as their first row, and `getRange` past

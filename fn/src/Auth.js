@@ -46,14 +46,22 @@ function hasExplicitAdmin_(rows) {
 function readUsers_() {
   var sheet = SpreadsheetApp.getActive().getSheetByName('Admin');
   if (!sheet || sheet.getLastRow() < 2) return [];
-  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getDisplayValues();
+  // old Admin sheets can be only 4 columns wide; getRange past the grid throws in real GAS
+  var width = Math.min(ADMIN_HEADERS.length, sheet.getMaxColumns());
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getDisplayValues();
   var users = [];
   var explicitAdmin = hasExplicitAdmin_(data);
   data.forEach(function (r, i) {
     var username = String(r[0]).trim();
-    if (username) users.push({ rowNum: i + 2, username: username, password: r[1], name: String(r[2]).trim(), role: normalizeRole_(r[3], explicitAdmin) });
+    if (username) users.push({ rowNum: i + 2, username: username, password: r[1], name: String(r[2]).trim(), role: normalizeRole_(r[3], explicitAdmin),
+      email: String(r[4] || '').trim(), phone: String(r[5] || '').trim(), branch: String(r[6] || '').trim(), status: String(r[7] || '').trim() });
   });
   return users;
+}
+
+/** Only a blank (legacy) or ใช้งาน status may log in. */
+function isActiveUser_(user) {
+  return user.status === '' || user.status === ACCOUNT_STATUS.ACTIVE;
 }
 
 function findUser_(username) {
@@ -75,6 +83,8 @@ function login(username, pwd) {
     return null;
   }
   cache.remove(failKey);
+  // checked only after the password matches, so a stranger cannot probe which IDs are pending
+  if (!isActiveUser_(user)) throw new Error('บัญชีของคุณรอแอดมินอนุมัติ กรุณาติดต่อผู้ดูแลระบบ');
 
   if (String(user.password).indexOf('sha256$') !== 0) {
     SpreadsheetApp.getActive().getSheetByName('Admin').getRange(user.rowNum, 2).setValue(hashPassword_(pwd));
@@ -101,7 +111,7 @@ function requireSession_(token, roles) {
   var raw = cache.get('sess_' + token);
   if (!raw) throw new Error('AUTH_REQUIRED');
   var user = findUser_(JSON.parse(raw).username);
-  if (!user) { cache.remove('sess_' + token); throw new Error('AUTH_REQUIRED'); }
+  if (!user || !isActiveUser_(user)) { cache.remove('sess_' + token); throw new Error('AUTH_REQUIRED'); }
   cache.put('sess_' + token, raw, SESSION_TTL_);
   if (roles && roles.indexOf(user.role) < 0) throw new Error('FORBIDDEN');
   return { username: user.username, name: user.name, role: user.role };

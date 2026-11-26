@@ -32,13 +32,19 @@ var STATUS = {
   LEGACY_APPROVED: 'อนุมัติแล้ว'
 };
 
-var SETTINGS_SHEETS = ['Admin', 'location', 'Product', 'Premium', 'guarantee', 'Finance'];
+var ADMIN_HEADERS = ['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์', 'อีเมล', 'เบอร์ติดต่อ', 'สาขา', 'สถานะบัญชี'];
+
+/** Admin col 8. Blank = active (accounts created before self-registration). */
+var ACCOUNT_STATUS = { ACTIVE: 'ใช้งาน', PENDING: 'รออนุมัติ' };
+
+var SETTINGS_SHEETS =['Admin', 'location', 'Product', 'Premium', 'guarantee', 'Finance'];
 
 // strict: column positions matter (rows are written by position), so the live header must match.
 var SHEET_DEFS = [
   { name: 'Data', headers: DATA_HEADERS, color: '#1a73e8', strict: true },
   { name: 'Log', headers: LOG_HEADERS, color: '#34a853', strict: true },
-  { name: 'Admin', headers: ['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์'], color: '#ea4335' },
+  // columns 5-8 appended 2026-11 for self-registration (blank status on old rows = active)
+  { name: 'Admin', headers: ADMIN_HEADERS, color: '#ea4335' },
   { name: 'location', headers: ['ชื่อสาขา'], color: '#fbbc04' },
   { name: 'Product', headers: ['ชื่อสินค้ารุ่นต่างๆ'], color: '#9334e6' },
   { name: 'Premium', headers: ['รายการของแถม'], color: '#ff6d00' },
@@ -109,6 +115,17 @@ function ensureSheetByName_(name) {
   return ss.getSheetByName(name);
 }
 
+/** Non-strict sheets: writes an expected header only into an empty header cell. Returns how many. */
+function fillBlankHeaders_(sheet, headers) {
+  ensureWidth_(sheet, headers.length);
+  var current = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0];
+  var n = 0;
+  headers.forEach(function (h, i) {
+    if (String(current[i]).trim() === '') { sheet.getRange(1, i + 1).setValue(h); n++; }
+  });
+  return n;
+}
+
 function ensureSheet_(def) {
   var ss = SpreadsheetApp.getActive();
   var sheet = ss.getSheetByName(def.name);
@@ -130,7 +147,8 @@ function ensureSheet_(def) {
       status = 'มีข้อมูลอยู่แล้ว ⏭️';
     }
   } else {
-    status = 'มีข้อมูลอยู่แล้ว ⏭️';
+    var filled = fillBlankHeaders_(sheet, def.headers);
+    status = filled ? 'เพิ่มคอลัมน์ใหม่ ' + filled + ' คอลัมน์ ✅' : 'มีข้อมูลอยู่แล้ว ⏭️';
   }
   sheet.getRange(1, 1, 1, def.headers.length).setFontWeight('bold').setBackground(def.color)
     .setFontColor('#ffffff').setHorizontalAlignment('center');
