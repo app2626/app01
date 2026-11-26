@@ -114,5 +114,5 @@ function requireSession_(token, roles) {
   if (!user || !isActiveUser_(user)) { cache.remove('sess_' + token); throw new Error('AUTH_REQUIRED'); }
   cache.put('sess_' + token, raw, SESSION_TTL_);
   if (roles && roles.indexOf(user.role) < 0) throw new Error('FORBIDDEN');
-  return { username: user.username, name: user.name, role: user.role };
+  return { username: user.username, name: user.name, role: user.role, phone: user.phone, branch: user.branch };
 }

@@ -48,12 +48,15 @@ function login() {
 // ---------- Self-registration (no token yet, so runServer like login) ----------
 function showRegister() {
   $('#login-panel').hide(); $('#register-panel').show(); $('#register-error').hide();
-  var sel = document.getElementById('reg-branch');
+  var $sel = $('#reg-branch');
+  if (!$sel.data('select2')) {
+    $sel.select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'เลือกสาขา (พิมพ์เพื่อค้นหา)', closeOnSelect: false });
+  }
   runServer('getRegisterOptions', []).then(function (o) {
-    var keep = sel.value;
-    sel.innerHTML = '<option value="" disabled>เลือกสาขา</option>';
-    (o.branches || []).forEach(function (b) { var opt = document.createElement('option'); opt.value = b; opt.text = b; sel.appendChild(opt); });
-    sel.value = (o.branches || []).indexOf(keep) >= 0 ? keep : '';
+    var keep = $sel.val() || [];
+    $sel.empty();
+    (o.branches || []).forEach(function (b) { $sel.append(new Option(b, b, false, keep.indexOf(b) >= 0)); });
+    $sel.trigger('change');
   }).catch(function (err) { showError(err, 'โหลดรายชื่อสาขาไม่สำเร็จ'); });
   document.getElementById('reg-empId').focus();
 }
@@ -70,11 +73,11 @@ function registerFail(msg, fieldId) {
 function submitRegister() {
   var v = function (id) { return document.getElementById(id).value.trim(); };
   var form = { empId: v('reg-empId'), name: v('reg-name'), email: v('reg-email'), phone: v('reg-phone').replace(/[\s-]/g, ''),
-    branch: document.getElementById('reg-branch').value, password: document.getElementById('reg-password').value };
+    branches: $('#reg-branch').val() || [], password: document.getElementById('reg-password').value };
   $('#register-error').hide();
   if (!/^[A-Za-z0-9._-]{2,30}$/.test(form.empId)) return registerFail('รหัสพนักงานใช้ได้เฉพาะ A-Z, 0-9, . _ - ยาว 2-30 ตัว', 'reg-empId');
-  if (!form.branch) return registerFail('กรุณาเลือกสาขา', 'reg-branch');
   if (!form.name) return registerFail('กรุณากรอกชื่อ-สกุล', 'reg-name');
+  if (!form.branches.length) { registerFail('กรุณาเลือกสาขาอย่างน้อย 1 สาขา'); $('#reg-branch').select2('open'); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return registerFail('รูปแบบอีเมลไม่ถูกต้อง', 'reg-email');
   if (!/^0\d{8,9}$/.test(form.phone)) return registerFail('เบอร์ติดต่อต้องเป็นตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0', 'reg-phone');
   if (form.password.length < 6) return registerFail('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'reg-password');
@@ -85,6 +88,7 @@ function submitRegister() {
   runServer('register', [form]).then(function () {
     btn.disabled = false;
     document.getElementById('register-form').reset();
+    $('#reg-branch').val(null).trigger('change');
     showLogin();
     $('#username').val(form.empId);
     Swal.fire({ icon: 'success', title: 'ส่งคำขอลงทะเบียนแล้ว',
@@ -117,6 +121,10 @@ function logout() {
     var token = getToken();
     if (token) runServer('logout', [token]).catch(function () { });
     clearSession();
+    // the next user must not inherit this user's half-filled request or employee details
+    var f = document.getElementById('myForm');
+    if (f) { f.reset(); $('#myForm .select2').val('').trigger('change'); }
+    if (typeof profileApplied !== 'undefined') { profileApplied = {}; myProfile = null; }
     resetRoleUI();
     switchView('login-view');
     loadingEnd();

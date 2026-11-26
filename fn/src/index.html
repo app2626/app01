@@ -156,17 +156,17 @@
       <div class="lead-sub">กรอกข้อมูลให้ครบ แอดมินจะอนุมัติบัญชีก่อนเข้าใช้งานได้</div>
       <form id="register-form" onsubmit="event.preventDefault(); submitRegister()" novalidate>
         <div class="row g-2">
-          <div class="col-sm-6 mb-2">
+          <div class="col-sm-5 mb-2">
             <label for="reg-empId">รหัสพนักงาน</label>
             <input type="text" class="form-control" id="reg-empId" autocomplete="username" maxlength="30" pattern="[A-Za-z0-9._-]{2,30}" required>
           </div>
-          <div class="col-sm-6 mb-2">
-            <label for="reg-branch">สาขาที่ลงทะเบียน</label>
-            <select class="form-select" id="reg-branch" required><option value="" selected disabled>กำลังโหลด...</option></select>
-          </div>
-          <div class="col-12 mb-2">
+          <div class="col-sm-7 mb-2">
             <label for="reg-name">ชื่อ-สกุล</label>
             <input type="text" class="form-control" id="reg-name" autocomplete="name" maxlength="100" required>
+          </div>
+          <div class="col-12 mb-2">
+            <label for="reg-branch">สาขาที่ลงทะเบียน <span class="text-muted fw-normal">(พนักงานหน่วยแทนเลือกได้หลายสาขา)</span></label>
+            <select class="form-select" id="reg-branch" multiple required></select>
           </div>
           <div class="col-sm-6 mb-2">
             <label for="reg-email">อีเมล</label>

@@ -14,6 +14,25 @@ function branchList_() {
     .filter(function (n) { return n !== ''; });
 }
 
+var BRANCH_SEP_ = ', ';
+var BRANCH_MAX_ = 30;
+
+/**
+ * Relief staff work at several branches. Accepts an array or a comma-separated string, trims and
+ * de-duplicates, and returns the names in location-sheet order joined by ", ". With strict, every
+ * name must be in the list (sign-up); otherwise unknown names (e.g. a branch since removed) are kept last.
+ */
+function normalizeBranches_(input, strict) {
+  var raw = Array.isArray(input) ? input : String(input == null ? '' : input).split(',');
+  var seen = {}, names = [];
+  raw.forEach(function (v) { var n = String(v == null ? '' : v).trim(); if (n && !seen[n]) { seen[n] = true; names.push(n); } });
+  if (names.length > BRANCH_MAX_) throw new Error('เลือกสาขาได้ไม่เกิน ' + BRANCH_MAX_ + ' สาขา');
+  var list = branchList_();
+  var unknown = names.filter(function (n) { return list.indexOf(n) < 0; });
+  if (strict && unknown.length) throw new Error('ไม่พบสาขา "' + unknown[0] + '" กรุณาเลือกสาขาจากรายการ');
+  return list.filter(function (n) { return seen[n]; }).concat(unknown).join(BRANCH_SEP_);
+}
+
 /** Digits only; Thai mobile/landline: 0 + 8-9 digits. Returns '' when invalid. */
 function normalizePhone_(v) {
   var d = String(v == null ? '' : v).replace(/[\s-]/g, '');
@@ -39,14 +58,15 @@ function register(form) {
   var name = String(form.name == null ? '' : form.name).trim();
   var email = String(form.email == null ? '' : form.email).trim();
   var phone = normalizePhone_(form.phone);
-  var branch = String(form.branch == null ? '' : form.branch).trim();
   var password = String(form.password == null ? '' : form.password);
 
   if (!EMP_ID_RE_.test(empId)) throw new Error('รหัสพนักงานใช้ได้เฉพาะ A-Z, 0-9, . _ - ยาว 2-30 ตัว');
   if (!name || name.length > 100) throw new Error('กรุณากรอกชื่อ-สกุล');
   if (!validEmail_(email)) throw new Error('รูปแบบอีเมลไม่ถูกต้อง');
   if (!phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง (ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0)');
-  if (branchList_().indexOf(branch) < 0) throw new Error('กรุณาเลือกสาขาจากรายการ');
+  // form.branch: single-branch clients from before multi-branch support
+  var branch = normalizeBranches_(form.branches !== undefined ? form.branches : form.branch, true);
+  if (!branch) throw new Error('กรุณาเลือกสาขาอย่างน้อย 1 สาขา');
   if (password.length < 6 || password.length > 100) throw new Error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
 
   var cache = CacheService.getScriptCache();

@@ -55,7 +55,7 @@ Passwords: `sha256$<salt>$<hex>` (1000 rounds); legacy plaintext cells are upgra
 Login locks for 15 min after 5 failures per username.
 Admin sheet columns: `ADMIN_HEADERS` (Username, Password, name, role, email, phone, branch, status).
 Self-registered accounts are `พนักงาน` with status `รออนุมัติ` and cannot log in until an แอดมิน approves;
-blank status (older rows) = active. Registration is throttled to 30 sign-ups / 10 min app-wide.
+blank status (older rows) = active. Branch cell may list several branches (relief staff), joined by ", " in location order. Registration is throttled to 30 sign-ups / 10 min app-wide.
 Blank role cell = แอดมิน only while no row says แอดมิน explicitly (legacy behaviour), otherwise พนักงาน.
 
 Sheet grid: sheets created by `appendRow` are only as wide as their first row, and `getRange` past

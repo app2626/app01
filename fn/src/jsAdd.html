@@ -50,6 +50,8 @@ async function addData(form) {
       getData();
       $('#myForm')[0].reset();
       $('.select2').val('').trigger('change');
+      profileApplied = {};
+      applyMyProfile(); // next request starts with today + my details again
 
       const container = document.getElementById('premium-container');
       container.innerHTML = '';
@@ -121,15 +123,66 @@ function fillSelect(select, items) {
   });
 }
 
+/** Location dropdown; a relief employee's own branches are grouped at the top. */
+function fillLocation(items, myBranches) {
+  let select = document.getElementById('location');
+  Array.from(select.querySelectorAll('option:not([disabled]), optgroup')).forEach(o => o.remove());
+  let all = items.map(r => String(r[0]));
+  let mine = (myBranches || []).filter(b => all.indexOf(b) >= 0);
+  let add = (parent, name) => { let o = document.createElement('option'); o.value = name; o.text = name; parent.appendChild(o); };
+  if (mine.length > 1) {
+    let gMine = document.createElement('optgroup'); gMine.label = 'สาขาที่ลงทะเบียนไว้';
+    let gAll = document.createElement('optgroup'); gAll.label = 'สาขาอื่น';
+    all.forEach(n => add(mine.indexOf(n) >= 0 ? gMine : gAll, n));
+    select.appendChild(gMine); if (gAll.children.length) select.appendChild(gAll);
+  } else {
+    all.forEach(n => add(select, n));
+  }
+}
+
+/** Today in the browser's local time (toISOString would give yesterday before 07:00 in Thailand). */
+function todayLocal() {
+  let d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+var myProfile = null;    // from getAllDropdownData().me
+var profileApplied = {}; // values we last filled in, so a different user's login replaces them
+
+/**
+ * Prefills date (today) and the employee section from the registration profile. A field is only
+ * written when it is empty or still holds what we filled before, so the user's own edits survive.
+ */
+function applyMyProfile() {
+  let me = myProfile || {};
+  let one = (me.branches || []).length === 1 ? me.branches[0] : '';
+  let set = (id, value, isSelect) => {
+    let el = document.getElementById(id);
+    if (!el) return;
+    let cur = el.value || '';
+    if (cur !== '' && cur !== (profileApplied[id] || '')) return;
+    if (isSelect && value && !Array.from(el.options).some(o => o.value === value)) value = '';
+    if (isSelect) $(el).val(value || '').trigger('change'); else el.value = value || '';
+    profileApplied[id] = value || '';
+  };
+  set('date', todayLocal());
+  set('emp_id', me.empId);
+  set('emp_name', me.name);
+  set('emp_phone', me.phone);
+  set('location', one, true);
+}
+
 function loadAllDropdowns() {
   return callServer('getAllDropdownData').then(function(data) {
-    fillSelect(document.getElementById("location"), data.location);
+    myProfile = data.me || null;
+    fillLocation(data.location, myProfile && myProfile.branches);
     fillSelect(document.getElementById("productname"), data.product);
     premiumOptions = data.premium; // Store globally for addPremium()
     document.querySelectorAll(".premium-select").forEach(select => fillSelect(select, data.premium));
     fillSelect(document.getElementById("guarantee"), data.guarantee);
     fillSelect(document.getElementById("finance"), data.finance || []);
     window.financeOptions = (data.finance || []).map(function (r) { return r[0]; });
+    applyMyProfile();
     if (window.globalData && typeof fillFinanceFilter === 'function') fillFinanceFilter(window.globalData);
   }).catch(function(err) { showError(err, 'โหลดตัวเลือกไม่สำเร็จ'); });
 }
@@ -233,7 +286,7 @@ function loadSettingsData(sheetName) {
           <td class="fw-semibold">${escHtml(row[0])}</td>
           <td>${escHtml(row[2])}</td>
           <td class="small">${contact}</td>
-          <td>${row[6] ? escHtml(row[6]) : '<span class="text-muted">-</span>'}</td>
+          <td class="small">${splitBranches(row[6]).map(b => '<div>' + escHtml(b) + '</div>').join('') || '<span class="text-muted">-</span>'}</td>
           <td><span class="badge bg-primary">${escHtml(row[3])}</span></td>
           <td>${pending ? '<span class="st st-wait">รออนุมัติ</span>' : '<span class="st st-done">ใช้งาน</span>'}</td>
           <td class="text-center text-nowrap">
@@ -461,9 +514,13 @@ function previewSettingUpload(sheetName, fileName, names) {
 }
 
 /** Branch names from the loaded location list, plus the user's current one if it was since removed. */
+function splitBranches(v) {
+  return String(v || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
 function branchNames(current) {
   let names = (settingsCache['location'] || []).map(r => String(r[0]).trim()).filter(Boolean);
-  if (current && names.indexOf(current) < 0) names.unshift(current);
+  splitBranches(current).forEach(b => { if (names.indexOf(b) < 0) names.unshift(b); });
   return names;
 }
 
@@ -476,10 +533,12 @@ function editSetting(sheetName, rowIndex) {
        <input id="swal-edit-name" class="swal2-input" placeholder="ชื่อผู้ใช้งาน" value="${escHtml(row[2])}">
        <input id="swal-edit-email" type="email" class="swal2-input" placeholder="อีเมล" value="${escHtml(row[4] || '')}">
        <input id="swal-edit-phone" type="tel" class="swal2-input" placeholder="เบอร์ติดต่อ" value="${escHtml(row[5] || '')}">
-       <select id="swal-edit-branch" class="swal2-select w-75 mt-3">
-         <option value="">- ไม่ระบุสาขา -</option>
-         ${branchNames(row[6]).map(b => `<option value="${escHtml(b)}"${b === row[6] ? ' selected' : ''}>${escHtml(b)}</option>`).join('')}
-       </select>
+       <div class="text-start w-75 mx-auto mt-3">
+         <label for="swal-edit-branch" class="small text-muted mb-1">สาขา (เลือกได้หลายสาขา)</label>
+         <select id="swal-edit-branch" multiple>
+           ${branchNames(row[6]).map(b => `<option value="${escHtml(b)}"${splitBranches(row[6]).indexOf(b) >= 0 ? ' selected' : ''}>${escHtml(b)}</option>`).join('')}
+         </select>
+       </div>
        <select id="swal-edit-role" class="swal2-select w-75 mt-3">
          ${['พนักงาน', 'บัญชี', 'แอดมิน'].map(r => `<option value="${r}"${r === row[3] ? ' selected' : ''}>${r}</option>`).join('')}
        </select>`
@@ -493,11 +552,14 @@ function editSetting(sheetName, rowIndex) {
     showCancelButton: true,
     confirmButtonText: 'บันทึก',
     cancelButtonText: 'ยกเลิก',
+    didOpen: () => {
+      if (isAdmin) $('#swal-edit-branch').select2({ theme: 'bootstrap-5', width: '100%', dropdownParent: $(Swal.getPopup()), placeholder: 'ไม่ระบุสาขา', closeOnSelect: false });
+    },
     preConfirm: () => {
       let name = document.getElementById('swal-edit-name').value.trim();
       if (isAdmin) return ['', '', name, document.getElementById('swal-edit-role').value,
         document.getElementById('swal-edit-email').value.trim(), document.getElementById('swal-edit-phone').value.trim(),
-        document.getElementById('swal-edit-branch').value];
+        $('#swal-edit-branch').val() || []];
       if (!name) { Swal.showValidationMessage('กรุณากรอกข้อมูล'); return false; }
       if (name === String(row[0]).trim()) { Swal.showValidationMessage('ยังไม่ได้เปลี่ยนแปลงข้อมูล'); return false; }
       return [name];

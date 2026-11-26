@@ -89,12 +89,12 @@ console.log('== REGISTER');
 {
   const g = fixture(); const { ctx, sheets, mail } = g;
   const admin = g.tok('admin1');
-  sheets.location.appendRow(['สาขา A']);
+  sheets.location.appendRow(['สาขา A']); sheets.location.appendRow(['สาขา B']);
   ctx.setConfigProperties(admin, { emailTo: 'boss@x.y' });
-  const reg = (o = {}) => Object.assign({ empId: 'E1001', name: 'สมหญิง ใจดี', email: 'som@x.co', phone: '081-234-5678', branch: 'สาขา A', password: 'secret12' }, o);
+  const reg = (o = {}) => Object.assign({ empId: 'E1001', name: 'สมหญิง ใจดี', email: 'som@x.co', phone: '081-234-5678', branches: ['สาขา A'], password: 'secret12' }, o);
   const row = u => sheets.Admin.rows.find(r => String(r[0]).replace(/^'/, '') === u);
   t('Admin sheet has the new profile headers', () => eq(sheets.Admin.rows[0], ['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์', 'อีเมล', 'เบอร์ติดต่อ', 'สาขา', 'สถานะบัญชี']));
-  t('register options list branches', () => eq(ctx.getRegisterOptions().branches, ['สาขา A']));
+  t('register options list branches', () => eq(ctx.getRegisterOptions().branches, ['สาขา A', 'สาขา B']));
   t('register stores pending staff with hashed pw and text phone', () => {
     const n = mail.length;
     eq(ctx.register(reg()), { status: 'รออนุมัติ' });
@@ -106,7 +106,13 @@ console.log('== REGISTER');
   t('pending user cannot log in', () => throws(() => ctx.login('E1001', 'secret12'), /รอแอดมินอนุมัติ/));
   t('pending user wrong pw still returns null (no status leak)', () => eq(ctx.login('E1001', 'nope'), null));
   t('duplicate employee id rejected', () => throws(() => ctx.register(reg({ email: 'b@x.co' })), /มีอยู่แล้ว/));
-  t('unknown branch rejected', () => throws(() => ctx.register(reg({ empId: 'E2', branch: 'ไม่มี' })), /สาขา/));
+  t('unknown branch rejected', () => throws(() => ctx.register(reg({ empId: 'E2', branches: ['สาขา A', 'ไม่มี'] })), /สาขา/));
+  t('no branch rejected', () => throws(() => ctx.register(reg({ empId: 'E2', branches: [] })), /สาขา/));
+  t('relief staff: several branches stored once each, in list order', () => {
+    ctx.register(reg({ empId: 'R1', branches: ['สาขา B', ' สาขา A ', 'สาขา B'] })); eq(row('R1')[6], 'สาขา A, สาขา B');
+    eq(ctx.getSettingsData(admin, 'Admin').find(x => x[0] === 'R1')[6], 'สาขา A, สาขา B');
+  });
+  t('single branch string still accepted', () => { ctx.register(reg({ empId: 'R2', branches: undefined, branch: 'สาขา B' })); eq(row('R2')[6], 'สาขา B'); });
   t('bad email rejected', () => throws(() => ctx.register(reg({ empId: 'E3', email: 'nope' })), /อีเมล/));
   t('bad phone rejected', () => throws(() => ctx.register(reg({ empId: 'E4', phone: '12' })), /เบอร์/));
   t('short password rejected', () => throws(() => ctx.register(reg({ empId: 'E5', password: '123' })), /6/));
@@ -115,12 +121,18 @@ console.log('== REGISTER');
   t('approveUser needs admin', () => { throws(() => ctx.approveUser('', 'E1001'), /AUTH_REQUIRED/); throws(() => ctx.approveUser(g.tok('acc1'), 'E1001'), /FORBIDDEN/); });
   t('approved user can log in as staff', () => { ctx.approveUser(admin, 'E1001'); eq(row('E1001')[7], 'ใช้งาน'); const s = ctx.login('E1001', 'secret12'); eq(s.role, 'พนักงาน'); eq(s.name, 'สมหญิง ใจดี'); });
   t('session dies when set back to pending', () => { const tk = ctx.login('E1001', 'secret12').token; row('E1001')[7] = 'รออนุมัติ'; throws(() => ctx.requireSession_(tk), /AUTH_REQUIRED/); row('E1001')[7] = 'ใช้งาน'; });
+  t('dropdown data carries my profile for the request form', () => {
+    ctx.register(reg({ empId: 'P1', name: 'ผู้ช่วย สาขา', phone: '0811112222', branches: ['สาขา B', 'สาขา A'] }));
+    ctx.approveUser(admin, 'P1');
+    eq(ctx.getAllDropdownData(ctx.login('P1', 'secret12').token).me, { empId: 'P1', name: 'ผู้ช่วย สาขา', phone: '0811112222', branches: ['สาขา A', 'สาขา B'] });
+  });
+  t('legacy user profile has blank contact and no branches', () => eq(ctx.getAllDropdownData(g.tok('staff1')).me, { empId: 'staff1', name: 'พนักงานหนึ่ง', phone: '', branches: [] }));
   t('legacy 4-column users still log in', () => ok(ctx.login('staff1', 'staffpw')));
   t('settings list returns profile + status', () => { const r = ctx.getSettingsData(admin, 'Admin').find(x => x[0] === 'E1001'); eq(r, ['E1001', '', 'สมหญิง ใจดี', 'พนักงาน', 'som@x.co', '0812345678', 'สาขา A', 'ใช้งาน']); });
   t('admin edit updates contact fields', () => {
     const i = ctx.getSettingsData(admin, 'Admin').findIndex(x => x[0] === 'E1001');
-    ctx.updateSettingData(admin, 'Admin', i, 'E1001', ['', '', 'สมหญิง ใหม่', 'บัญชี', 'new@x.co', '0899999999', 'สาขา A']);
-    const r = row('E1001'); eq([r[2], r[3], r[4], r[5], r[6], r[7]], ['สมหญิง ใหม่', 'บัญชี', 'new@x.co', "'0899999999", 'สาขา A', 'ใช้งาน']);
+    ctx.updateSettingData(admin, 'Admin', i, 'E1001', ['', '', 'สมหญิง ใหม่', 'บัญชี', 'new@x.co', '0899999999', ['สาขา B', 'สาขา A']]);
+    const r = row('E1001'); eq([r[2], r[3], r[4], r[5], r[6], r[7]], ['สมหญิง ใหม่', 'บัญชี', 'new@x.co', "'0899999999", 'สาขา A, สาขา B', 'ใช้งาน']);
   });
   t('registration throttled after burst', () => {
     for (let i = 0; i < 35; i++) { try { ctx.register(reg({ empId: 'B' + i })); } catch (e) { /* throttle engages inside the loop */ } }

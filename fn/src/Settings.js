@@ -80,7 +80,7 @@ function setConfigProperties(token, configObj) {
 
 /** Public (any role). */
 function getAllDropdownData(token) {
-  requireSession_(token);
+  var user = requireSession_(token);
   var ss = SpreadsheetApp.getActive();
   var list = function (name) {
     var sheet = ss.getSheetByName(name);
@@ -88,7 +88,10 @@ function getAllDropdownData(token) {
     return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().filter(function (r) { return r[0] !== ''; });
   };
   return { location: list('location'), product: list('Product'), premium: list('Premium'), guarantee: list('guarantee'),
-    finance: financeList_().map(function (n) { return [n]; }) };
+    finance: financeList_().map(function (n) { return [n]; }),
+    // prefills the employee section of the request form (fields stay editable)
+    me: { empId: user.username, name: user.name, phone: user.phone || '',
+      branches: String(user.branch || '').split(',').map(function (b) { return b.trim(); }).filter(function (b) { return b !== ''; }) } };
 }
 
 /** Finance company names (trimmed, non-empty). Creates and seeds the Finance sheet on first use. */
@@ -247,6 +250,7 @@ function deleteSettingDataBulk(token, sheetName, names) {
 function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
   requireSession_(token, [ROLES.ADMIN]);
   var sheet = settingsSheet_(sheetName);
+  var rawBranches = (rowData || [])[6]; // Admin: array of branch names (relief staff)
   rowData = (rowData || []).map(function (v) { return String(v == null ? '' : v).trim(); });
   return withLock_(function () {
     var rowNum = Number(rowIndex) + 2;
@@ -270,7 +274,7 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
         if (email && !validEmail_(email)) throw new Error('รูปแบบอีเมลไม่ถูกต้อง');
         if (rowData[5] && !phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง (ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0)');
         fillBlankHeaders_(sheet, ADMIN_HEADERS);
-        sheet.getRange(rowNum, 5, 1, 3).setValues([[cellText_(email), phone ? "'" + phone : '', cellText_(rowData[6] || '')]]);
+        sheet.getRange(rowNum, 5, 1, 3).setValues([[cellText_(email), phone ? "'" + phone : '', cellText_(normalizeBranches_(rawBranches, false))]]);
       }
       return true;
     }
