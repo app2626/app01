@@ -1,6 +1,7 @@
 // Notifications: Telegram + email. Failures are logged, never thrown (the record is already saved).
 
-var MAIL_LOW_ = 20;           // warn admins when this few emails are left today
+var MAIL_LOW_ = 40;           // warn admins when this few emails are left today
+var MAIL_RESERVE_ = 20;       // below this, only essential mail (password-reset codes) is sent
 var MAIL_ALERT_TTL_ = 21600;  // at most one quota warning per 6 h
 
 function escapeHtmlServer_(s) {
@@ -37,19 +38,23 @@ function mailQuotaAlert_(left) {
   if (cache.get('mailq_alert')) return;
   cache.put('mailq_alert', '1', MAIL_ALERT_TTL_);
   sendTelegram_('⚠️ FN+ Consignment: โควตาอีเมลวันนี้เหลือ ' + left + ' ฉบับ' +
-    (left <= 0 ? ' อีเมลแจ้งเตือน / ลืมรหัสผ่าน / อนุมัติบัญชี จะไม่ถูกส่งจนกว่าโควตาจะรีเซ็ต (ภายใน 24 ชม.)' : ''), false);
+    (left <= 0 ? ' อีเมลทุกประเภทรวมถึงรหัสลืมรหัสผ่าน จะไม่ถูกส่งจนกว่าโควตาจะรีเซ็ต (ภายใน 24 ชม.)'
+      : left <= MAIL_RESERVE_ ? ' อีเมลแจ้งเตือนหยุดส่งชั่วคราว เก็บโควตาที่เหลือไว้ให้รหัสลืมรหัสผ่าน (รีเซ็ตภายใน 24 ชม.)' : ''), false);
 }
 
 /**
  * Every email goes through here. Skips (returns false) instead of failing when today's quota is
- * used up, and warns admins on Telegram once when the quota is low or gone.
+ * used up, and warns admins on Telegram once when the quota is low or gone. The last
+ * MAIL_RESERVE_ emails of the day are kept for essential mail, so notifications can never use up
+ * the quota a locked-out user needs for a password-reset code.
  */
-function sendMail_(opts) {
+function sendMail_(opts, essential) {
   var recipients = String(opts.to || '').split(',').filter(String).length +
     (opts.cc ? String(opts.cc).split(',').filter(String).length : 0);
   if (!recipients) return false;
   var left = mailQuota_();
-  if (left !== null && left < recipients) {
+  var floor = essential ? 0 : MAIL_RESERVE_;
+  if (left !== null && left - recipients < floor) {
     console.error('Mail quota exhausted (' + left + ' left): skipped "' + opts.subject + '"');
     mailQuotaAlert_(left);
     return false;
@@ -79,8 +84,8 @@ function sendNotify_(msg, isApprove, attachments, subjectTitle, imageForTelegram
   }
 }
 
-/** Plain-text email to one user (escaped, newlines kept). */
-function mailUser_(to, subject, text) {
+/** Plain-text email to one user (escaped, newlines kept). essential: may use the reserve. */
+function mailUser_(to, subject, text, essential) {
   if (!to) return false;
-  return sendMail_({ to: to, subject: subject, htmlBody: escapeHtmlServer_(text).replace(/\n/g, '<br>') });
+  return sendMail_({ to: to, subject: subject, htmlBody: escapeHtmlServer_(text).replace(/\n/g, '<br>') }, !!essential);
 }

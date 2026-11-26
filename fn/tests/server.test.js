@@ -104,7 +104,7 @@ console.log('== REGISTER');
     const r = row('E1001');
     eq([r[0], r[2], r[3], r[4], r[5], r[6], r[7]], ["'E1001", 'สมหญิง ใจดี', 'พนักงาน', 'som@x.co', "'0812345678", 'สาขา A', 'รออนุมัติ']);
     ok(/^sha256\$/.test(r[1]));
-    eq(mail.length, n + 1, 'admin notified');
+    eq(mail.length, n, 'sign-ups must not spend the email quota (anyone can register)');
   });
   t('pending user cannot log in', () => throws(() => ctx.login('E1001', 'secret12'), /รอแอดมินอนุมัติ/));
   t('pending user wrong pw still returns null (no status leak)', () => eq(ctx.login('E1001', 'nope'), null));
@@ -262,6 +262,45 @@ console.log('== DATE RANGE');
   t('range filter still applies branch scope', () => { g.seedAdmin(['staff9', 'staffpw', 'อื่น', 'พนักงาน', '', '', 'สาขา B', '']); eq(ctx.getData(ctx.login('staff9', 'staffpw').token, { days: 90 }).length, 0); });
 }
 
+console.log('== BRANCH RENAME');
+{
+  const g = fixture(); const { ctx, sheets } = g;
+  const admin = g.tok('admin1'), acc = g.tok('acc1');
+  ['สาขา A', 'สาขา B', 'สาขา AB'].forEach(n => sheets.location.appendRow([n]));
+  g.seedAdmin(['relief', 'staffpw', 'หน่วยแทน', 'พนักงาน', '', '', 'สาขา A, สาขา B', '']);
+  g.seedAdmin(['other', 'staffpw', 'สาขาอื่น', 'พนักงาน', '', '', 'สาขา AB', '']);
+  const staff = g.tok('staff1');
+  const b64 = n => Buffer.alloc(n, 1).toString('base64');
+  const req = loc => ({ date: '2026-11-25', location: loc, emp_id: 'x', emp_name: 'x', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'c', customer_phone: '0898765432', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'RN-' + (++imeiSeq), price: '1000', installments: '1', finance: 'Ponmai', file1Data: { base64: b64(4), mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64(4), mimeType: 'application/pdf', name: 'b' } });
+  const idA = ctx.saveRequest(staff, req('สาขา A')).id;
+  ctx.saveRequest(acc, req('สาขา AB'));
+  const user = u => sheets.Admin.rows.find(r => r[0] === u);
+  const branchCol = ctx.col_('สาขา :') - 1;
+  let res;
+  t('renaming a branch returns how many accounts and requests followed', () => {
+    res = ctx.updateSettingData(admin, 'location', 0, 'สาขา A', ['สาขา เอ']);
+    eq(res, { accounts: 2, requests: 1 });
+  });
+  t('staff account follows the new name', () => eq(user('staff1')[6], 'สาขา เอ'));
+  t('relief staff keeps both branches, in location order', () => eq(user('relief')[6], 'สาขา เอ, สาขา B'));
+  t('a branch whose name only contains the old one is untouched', () => eq(user('other')[6], 'สาขา AB'));
+  t('requests of the branch follow the new name, others untouched', () => {
+    const names = sheets.Data.rows.slice(1).map(r => r[branchCol]).sort();
+    eq(names, ['สาขา AB', 'สาขา เอ']);
+  });
+  t('staff still see their earlier request after the rename', () => {
+    const rows = ctx.getData(g.tok('staff1'));
+    ok(rows.some(r => String(r[0]).replace(/^'/, '') === idA));
+  });
+  t('staff can submit for the renamed branch', () => ok(ctx.saveRequest(g.tok('staff1'), req('สาขา เอ')).id));
+  t('rename is in the audit trail with the counts', () => {
+    const r = sheets.Audit.rows.slice(1).find(x => x[2] === 'เปลี่ยนชื่อสาขา');
+    ok(r && /สาขา A → สาขา เอ/.test(r[4]) && /บัญชี 2/.test(r[4]) && /คำขอ 1/.test(r[4]), JSON.stringify(r));
+  });
+  t('renaming to an existing branch is still refused (no merge)', () => throws(() => ctx.updateSettingData(admin, 'location', 0, 'สาขา เอ', ['สาขา B']), /มีอยู่แล้ว/));
+  t('other list sheets keep returning true', () => { sheets.Product.appendRow(['P1']); eq(ctx.updateSettingData(admin, 'Product', 0, 'P1', ['P2']), true); });
+}
+
 console.log('== DUPLICATE IMEI');
 {
   const g = fixture(); const { ctx, sheets, fetches, driveFiles } = g;
@@ -313,12 +352,18 @@ console.log('== TRUST');
     ctx.sendNotify_('hello', false, [], 'subj'); ctx.sendNotify_('again', false, [], 'subj');
     eq(mail.length, n); eq(warned() - before, 1);
   });
-  t('low quota: email still sent, warning not repeated', () => {
-    cache.remove('mailq_alert'); mailState.quota = 5; const n = mail.length;
+  t('low quota: ordinary mail held back, warning not repeated', () => {
+    cache.remove('mailq_alert'); mailState.quota = 15; const n = mail.length;
     ctx.sendNotify_('x', false, [], 's'); ctx.sendNotify_('y', false, [], 's');
-    eq(mail.length, n + 2); eq(tg().filter(m => /โควตาอีเมล/.test(m)).length, 2);
+    eq(mail.length, n); eq(tg().filter(m => /โควตาอีเมล/.test(m)).length, 2);
+  });
+  t('low quota: essential mail (reset code) still goes out', () => {
+    mailState.quota = 15; const n = mail.length;
+    eq(ctx.mailUser_('u@x.y', 's', 't', true), true); eq(mail.length, n + 1);
+    eq(ctx.mailUser_('u@x.y', 's', 't'), false); eq(mail.length, n + 1);
     mailState.quota = 1500;
   });
+  t('above the reserve: ordinary mail is sent', () => { mailState.quota = 500; const n = mail.length; ctx.sendNotify_('z', false, [], 's'); eq(mail.length, n + 1); });
 
   sheets.location.appendRow(['สาขา A']);
   t('audit: self-registration', () => { ctx.register({ empId: 'S9', name: 'ส่งคำขอ', email: 's9@x.co', phone: '0812345678', branches: ['สาขา A'], password: 'secret12' }); eq(lastAudit().slice(1, 4), ['S9', 'ลงทะเบียน', 'S9']); });
@@ -360,6 +405,14 @@ console.log('== TRUST');
     const tk = ctx.login('S9', 'brandnew9').token; const id2 = ctx.saveRequest(tk, req()).id; const n = mail.length;
     ctx.updateStatus(acc, { record: id2, action: 'reject', Remark: 'สลิปไม่ชัด' });
     const m = mail.slice(n).find(x => x.to === 's9@x.co'); ok(m && /ไม่อนุมัติ/.test(m.subject) && /สลิปไม่ชัด/.test(m.htmlBody));
+  });
+  t('old row without submitter column: no personal mail even if รหัสพนักงาน matches an account', () => {
+    const id4 = ctx.saveRequest(g.tok('acc1'), Object.assign(req(), { emp_id: 'S9' })).id;
+    const row = sheets.Data.rows.find(r => String(r[0]).replace(/^'/, '') === id4);
+    row[ctx.col_('ผู้บันทึก (Username) :') - 1] = ''; // as written before the column existed
+    const n = mail.length;
+    ctx.updateStatus(acc, { record: id4, action: 'approve', financeAmount: '1' });
+    ok(!mail.slice(n).some(x => x.to === 's9@x.co'), 'mailed the account named in the typed employee id');
   });
   t('submitter without email: no personal mail, workflow still fine', () => {
     const id3 = ctx.saveRequest(g.tok('staff1'), Object.assign(req(), { emp_id: 'staff1' })); const n = mail.length;
@@ -427,6 +480,21 @@ console.log('== GUARDS / SETTINGS');
     ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['ignored', '', 'พนักงานใหม่', 'บัญชี']);
     eq(sheets.Admin.rows[3], [before[0], before[1], 'พนักงานใหม่', 'บัญชี', ...before.slice(4)]);
     sheets.Admin.rows[3] = before;
+  });
+  t('bad email on user edit changes nothing (no half save)', () => {
+    const before = sheets.Admin.rows[3].slice();
+    throws(() => ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['', '', 'ชื่อใหม่', 'แอดมิน', 'not-an-email', '', ['สาขา A']]), /อีเมล/);
+    eq(sheets.Admin.rows[3], before);
+  });
+  t('bad phone on user edit changes nothing', () => {
+    const before = sheets.Admin.rows[3].slice();
+    throws(() => ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['', '', 'ชื่อใหม่', 'แอดมิน', '', '12', ['สาขา A']]), /เบอร์/);
+    eq(sheets.Admin.rows[3], before);
+  });
+  t('staff cannot be saved without a branch', () => {
+    const before = sheets.Admin.rows[3].slice();
+    throws(() => ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['', '', 'x', 'พนักงาน', '', '', []]), /สาขา/);
+    eq(sheets.Admin.rows[3], before);
   });
   t('update admin invalid role rejected', () => throws(() => ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['', '', 'x', 'root']), /สิทธิ์/));
   t('cannot demote last admin', () => throws(() => ctx.updateSettingData(admin, 'Admin', 0, 'admin1', ['', '', 'แอดมินใหญ่', 'บัญชี']), /อย่างน้อย 1/));

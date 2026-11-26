@@ -378,9 +378,9 @@ function loadGeneralConfig() {
     let q = document.getElementById('mailQuotaInfo');
     if (q) {
       let left = config.mailQuotaRemaining;
-      q.className = 'small ' + (left == null ? 'text-muted' : left <= 20 ? 'text-danger fw-semibold' : 'text-muted');
+      q.className = 'small ' + (left == null ? 'text-muted' : left <= 40 ? 'text-danger fw-semibold' : 'text-muted');
       q.innerHTML = left == null ? '' : '<i class="fa-regular fa-envelope me-1"></i>โควตาอีเมลที่ส่งได้วันนี้เหลือ ' + escHtml(String(left)) + ' ฉบับ' +
-        (left <= 20 ? ' (ใกล้หมด อีเมลแจ้งเตือนและลืมรหัสผ่านอาจส่งไม่ได้)' : '');
+        (left <= 20 ? ' (หยุดส่งอีเมลแจ้งเตือนแล้ว เก็บไว้ให้รหัสลืมรหัสผ่าน)' : left <= 40 ? ' (ใกล้หมด เมื่อเหลือ 20 ฉบับจะหยุดส่งอีเมลแจ้งเตือน)' : '');
     }
     
     let toContainer = document.getElementById('emailToContainer');
@@ -750,7 +750,9 @@ function editSetting(sheetName, rowIndex) {
          ${['พนักงาน', 'บัญชี', 'แอดมิน'].map(r => `<option value="${r}"${r === row[3] ? ' selected' : ''}>${r}</option>`).join('')}
        </select>`
     : `<input id="swal-edit-name" class="swal2-input" value="${escHtml(row[0])}">
-       <div class="small text-muted mt-2">คำขอที่บันทึกไว้แล้วจะยังแสดงชื่อเดิม</div>`;
+       <div class="small text-muted mt-2">${sheetName === 'location'
+         ? 'บัญชีพนักงานของสาขานี้ และคำขอที่บันทึกไว้แล้ว จะเปลี่ยนเป็นชื่อใหม่ด้วย'
+         : 'คำขอที่บันทึกไว้แล้วจะยังแสดงชื่อเดิม'}</div>`;
 
   Swal.fire({
     title: 'แก้ไขข้อมูล ' + sheetName,
@@ -774,8 +776,10 @@ function editSetting(sheetName, rowIndex) {
   }).then((result) => {
     if (!result.isConfirmed) return;
     Swal.fire({ title: 'กำลังบันทึก...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    callServer('updateSettingData', sheetName, rowIndex, row[0], result.value).then(() => {
-      Swal.fire('แก้ไขสำเร็จ', '', 'success');
+    callServer('updateSettingData', sheetName, rowIndex, row[0], result.value).then((res) => {
+      Swal.fire('แก้ไขสำเร็จ', res && res.accounts !== undefined
+        ? 'อัปเดตบัญชีพนักงาน ' + res.accounts + ' บัญชี และคำขอ ' + res.requests + ' รายการให้ใช้ชื่อสาขาใหม่แล้ว' : '', 'success');
+      if (sheetName === 'location' && res && res.requests && typeof getData === 'function') getData();
       loadSettingsData(sheetName); if (!isAdmin) loadAllDropdowns();
     }).catch((err) => { showError(err, 'แก้ไขไม่สำเร็จ'); loadSettingsData(sheetName); });
   });

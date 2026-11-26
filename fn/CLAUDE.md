@@ -15,7 +15,7 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 | `src/Recovery.js` | forgot password: emailed 6-digit code (`requestPasswordReset`, `resetPasswordWithCode`, no token) |
 | `src/Validate.js` | Thai ID check digit, passport no., phone rules (`normalizePhone_`); mirrored in `api.html` |
 | `src/Requests.js` | `saveRequest`, `getData(token, {days})` (finished rows older than N days are left out; in-progress and undated rows always load), `findRecord`, `updateStatus` (workflow), `checkImei`; `saveRequest` refuses an IMEI already used by a non-rejected request (`DUP_IMEI`, any branch) unless `allow_dup_imei`, then flags it in the notification |
-| `src/Notify.js` | Telegram + email (`sendNotify_`); **every email goes through `sendMail_` / `mailUser_`** (checks the daily MailApp quota, Telegram warning when ≤ 20 left) |
+| `src/Notify.js` | Telegram + email (`sendNotify_`); **every email goes through `sendMail_` / `mailUser_`** (checks the daily MailApp quota, Telegram warning when ≤ 40 left; the last 20 are reserved for `essential` mail = password-reset codes). Self-registration notifies on Telegram only (public endpoint must not spend mail quota) |
 | `src/Audit.js` | `audit_(actor, action, target, detail)` → `Audit` sheet; never throws; config changes log key names only, never values |
 | `src/api.html` | client `callServer()`, `escHtml()`, `safeUrl()`, `applyRoleUI()` |
 | `src/jsAdd.html` | form: slip photos shrunk to ≤ 2000 px JPEG before upload (`compressImage`); draft autosave in localStorage `fnDraft` (per user, 24 h, cleared on submit/logout, no files) |
@@ -52,7 +52,7 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 
 The server decides the new status and the actor (from the session); each step appends a Log row
 `[time, actor, status, record id, action]`. Approve / reject also emails the submitter
-(`ผู้บันทึก (Username) :`, falling back to the account named in `รหัสพนักงาน :` for older rows).
+(`ผู้บันทึก (Username) :` only; older rows without it get no personal email, since `รหัสพนักงาน :` is user-typed).
 Account and settings changes (register, approve, block, password resets, settings CRUD, config) go to the `Audit` sheet. Net price is recomputed server-side:
 `price − down − all discounts + dues`.
 
@@ -63,7 +63,7 @@ change (email reset or admin reset) ends that user's older sessions.
 Admin sheet columns: `ADMIN_HEADERS` (Username, Password, name, role, email, phone, branch, status).
 Self-registered accounts are `พนักงาน` with status `รออนุมัติ` and cannot log in until an แอดมิน approves;
 Status `ระงับ` (blocked via `setUserStatus`) = cannot log in, session ends on the next call; an admin cannot block themself.
-blank status (older rows) = active. Branch cell may list several branches (relief staff), joined by ", " in location order. Registration is throttled to 30 sign-ups / 10 min app-wide.
+blank status (older rows) = active. Branch cell may list several branches (relief staff), joined by ", " in location order. Renaming a location (`updateSettingData` → `renameBranch_`) renames it in every account and in Data `สาขา :` (exact match), so scope keeps working. Registration is throttled to 30 sign-ups / 10 min app-wide.
 Blank role cell = แอดมิน only while no row says แอดมิน explicitly (legacy behaviour), otherwise พนักงาน.
 
 Sheet grid: sheets created by `appendRow` are only as wide as their first row, and `getRange` past

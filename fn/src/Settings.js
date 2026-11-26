@@ -276,7 +276,7 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
   var rawBranches = (rowData || [])[6]; // Admin: array of branch names (relief staff)
   rowData = (rowData || []).map(function (v) { return String(v == null ? '' : v).trim(); });
   var key = String(expectedKey).trim();
-  var before = null;
+  var before = null, renamed = null;
   withLock_(function () {
     var rowNum = Number(rowIndex) + 2;
     if (!(rowNum >= 2) || rowNum > sheet.getLastRow() ||
@@ -292,14 +292,22 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
       if (target && target.role === ROLES.ADMIN && isActiveUser_(target) && rowData[3] !== ROLES.ADMIN && admins.length <= 1) {
         throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
       }
-      sheet.getRange(rowNum, 3, 1, 2).setValues([[cellText_(rowData[2] || key), rowData[3]]]);
-      if (rowData.length > 4) {
+      // validate everything first: a rejected edit must leave the row exactly as it was
+      var withContact = rowData.length > 4; // older clients send only name + role
+      var email = '', phone = '', branches = target ? target.branch : '';
+      if (withContact) {
         // contact fields (cols 5-7); blank is allowed for accounts created by an admin
-        var email = rowData[4] || '', phone = rowData[5] ? normalizePhone_(rowData[5]) : '';
+        email = rowData[4] || '';
+        phone = rowData[5] ? normalizePhone_(rowData[5]) : '';
         if (email && !validEmail_(email)) throw new Error('รูปแบบอีเมลไม่ถูกต้อง');
         if (rowData[5] && !phone) throw new Error('เบอร์ติดต่อไม่ถูกต้อง: ' + PHONE_RULE_TEXT_);
+        branches = normalizeBranches_(rawBranches, false);
+      }
+      if (rowData[3] === ROLES.STAFF && !branches) throw new Error('พนักงานต้องมีสาขาอย่างน้อย 1 สาขา');
+      sheet.getRange(rowNum, 3, 1, 2).setValues([[cellText_(rowData[2] || key), rowData[3]]]);
+      if (withContact) {
         fillBlankHeaders_(sheet, ADMIN_HEADERS);
-        sheet.getRange(rowNum, 5, 1, 3).setValues([[cellText_(email), phone ? "'" + phone : '', cellText_(normalizeBranches_(rawBranches, false))]]);
+        sheet.getRange(rowNum, 5, 1, 3).setValues([[cellText_(email), phone ? "'" + phone : '', cellText_(branches)]]);
       }
       return;
     }
@@ -308,7 +316,14 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
     var dup = names.some(function (r, i) { return i + 2 !== rowNum && String(r[0]).trim() === rowData[0]; });
     if (dup) throw new Error('"' + rowData[0] + '" มีอยู่แล้วในรายการ');
     sheet.getRange(rowNum, 1).setValue(cellText_(rowData[0]));
+    // A branch rename must carry over: staff scope and the request list match branches by name.
+    if (sheetName === 'location' && key !== rowData[0]) renamed = renameBranch_(key, rowData[0]);
   });
+  if (renamed) {
+    audit_(me, 'เปลี่ยนชื่อสาขา', 'location', key + ' → ' + rowData[0] +
+      ' (บัญชี ' + renamed.accounts + ', คำขอ ' + renamed.requests + ')');
+    return renamed;
+  }
   if (sheetName === 'Admin') {
     var after = findUser_(key) || {};
     var diff = [];
@@ -320,6 +335,49 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
     audit_(me, 'แก้ไขข้อมูล', sheetName, key + ' → ' + rowData[0]);
   }
   return true;
+}
+
+/**
+ * Caller holds the lock and has already renamed the location row. Replaces the exact branch name
+ * (never a substring) in every account's branch list and in the "สาขา :" column of Data.
+ * Returns { accounts, requests } = how many cells changed.
+ */
+function renameBranch_(oldName, newName) {
+  var ss = SpreadsheetApp.getActive();
+  var accounts = 0, requests = 0;
+
+  var admin = ss.getSheetByName('Admin');
+  if (admin && admin.getLastRow() >= 2 && admin.getMaxColumns() >= 7) {
+    var cells = admin.getRange(2, 7, admin.getLastRow() - 1, 1).getDisplayValues();
+    cells.forEach(function (r, i) {
+      var parts = String(r[0]).split(',').map(function (b) { return b.trim(); });
+      if (parts.indexOf(oldName) < 0) return;
+      var next = parts.map(function (b) { return b === oldName ? newName : b; });
+      admin.getRange(i + 2, 7).setValue(cellText_(normalizeBranches_(next, false)));
+      accounts++;
+    });
+  }
+
+  var data = ss.getSheetByName('Data');
+  if (data && data.getLastRow() >= 2) {
+    var c = col_('สาขา :');
+    if (data.getMaxColumns() >= c) {
+      var range = data.getRange(2, c, data.getLastRow() - 1, 1);
+      var vals = range.getDisplayValues();
+      // write back in runs of consecutive changed rows: one call per run, not per cell
+      for (var i = 0; i < vals.length;) {
+        if (String(vals[i][0]).trim() !== oldName) { i++; continue; }
+        var j = i;
+        while (j < vals.length && String(vals[j][0]).trim() === oldName) j++;
+        var run = [];
+        for (var k = i; k < j; k++) run.push([cellText_(newName)]);
+        data.getRange(i + 2, c, j - i, 1).setValues(run);
+        requests += j - i;
+        i = j;
+      }
+    }
+  }
+  return { accounts: accounts, requests: requests };
 }
 
 /** Public (แอดมิน). */

@@ -80,10 +80,12 @@ function register(form) {
   });
   cache.put('reg_count', String(count + 1), REG_WINDOW_);
 
+  // Telegram only: anyone can call register without logging in, so an email per sign-up would let a
+  // stranger burn the daily mail quota that password resets and result emails depend on.
   try {
-    sendNotify_('🆕 มีผู้ลงทะเบียนใช้งานใหม่ รออนุมัติ\nรหัสพนักงาน: ' + empId + '\nชื่อ: ' + name +
+    sendTelegram_('🆕 มีผู้ลงทะเบียนใช้งานใหม่ รออนุมัติ\nรหัสพนักงาน: ' + empId + '\nชื่อ: ' + name +
       '\nสาขา: ' + branch + '\nอีเมล: ' + email + '\nเบอร์: ' + phone +
-      '\n\nอนุมัติได้ที่ ตั้งค่าระบบ > ผู้ใช้งาน', false, [], 'มีผู้ลงทะเบียนใช้งานใหม่ รออนุมัติ');
+      '\n\nอนุมัติได้ที่ ตั้งค่าระบบ > ผู้ใช้งาน', false);
   } catch (e) {
     console.error('Register notify failed: ' + e.message);
   }

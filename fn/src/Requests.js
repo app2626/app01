@@ -103,7 +103,6 @@ function toBlob_(file) {
   return Utilities.newBlob(Utilities.base64Decode(file.base64), file.mimeType, String(file.name || 'file').slice(0, 120));
 }
 
-/** 0-based index into the Data sheet values (row 0 = header), or -1. */
 /** IMEI as compared for duplicates: no spaces / dashes, upper case. */
 function normImei_(v) { return str_(v).replace(/[\s-]+/g, '').toUpperCase(); }
 
@@ -137,6 +136,7 @@ function dupImeiError_(matches) {
   }).join(', '));
 }
 
+/** 0-based index into the Data sheet values (row 0 = header), or -1. */
 function findRowIndex_(sheet, id) {
   id = str_(id);
   if (!id || sheet.getLastRow() < 2) return -1;
@@ -400,13 +400,15 @@ function updateStatus(token, obj) {
 }
 
 /**
- * Emails the result of approve / reject to the employee who submitted the request: the account in
- * "ผู้บันทึก (Username) :", or for older rows the account whose username equals "รหัสพนักงาน :".
+ * Emails the result of approve / reject to the account in "ผู้บันทึก (Username) :" (set by the
+ * server from the session). Older rows without it get no personal email: "รหัสพนักงาน :" is typed
+ * by the user, so trusting it could send customer details to whoever owns that ID.
  */
 function notifySubmitter_(row, obj, newStatus, actor) {
   try {
     var c = function (h) { return str_(row[col_(h) - 1]); };
-    var submitter = findUser_(c('ผู้บันทึก (Username) :')) || findUser_(c('รหัสพนักงาน :'));
+    var who = c('ผู้บันทึก (Username) :');
+    var submitter = who ? findUser_(who) : null;
     if (!submitter || !submitter.email || !validEmail_(submitter.email)) return;
     var approved = obj.action === 'approve';
     var text = 'เรียน ' + submitter.name
