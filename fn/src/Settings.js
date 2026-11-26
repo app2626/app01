@@ -25,7 +25,7 @@ function ensureConfigSheet_() {
   if (ss.getSheetByName('Config')) return { name: 'Config', status: 'มีข้อมูลอยู่แล้ว ⏭️' };
   var sheet = ss.insertSheet('Config');
   var rows = [['Key', 'Value']].concat(CONFIG_KEYS_.map(function (k) {
-    return [k, k === 'driveFolderId' ? '1aD2usGtfsge4iwX8A2Bo7MGPQUbGuQSo' : ''];
+    return [k, k === 'driveFolderId' ? DEFAULT_DRIVE_FOLDER_ : ''];
   }));
   sheet.getRange(1, 1, rows.length, 2).setValues(rows);
   sheet.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#f3f3f3');
@@ -58,10 +58,35 @@ function getConfigProperties(token) {
   return config;
 }
 
+/**
+ * Folder ID from what the admin typed: a bare ID or a pasted Drive link (.../folders/<id>?usp=...).
+ * Returns '' for blank, throws for anything that is not an ID.
+ */
+function driveFolderIdFrom_(v) {
+  v = String(v == null ? '' : v).trim();
+  if (!v) return '';
+  var m = v.match(/\/folders\/([A-Za-z0-9_-]+)/) || v.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  if (m) v = m[1];
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(v)) throw new Error('Folder ID ไม่ถูกต้อง: วาง ID หรือลิงก์ของโฟลเดอร์ Google Drive');
+  return v;
+}
+
 /** Public (แอดมิน). Masked values are ignored so the stored secret is kept. */
 function setConfigProperties(token, configObj) {
   var user = requireSession_(token, [ROLES.ADMIN]);
   configObj = configObj || {};
+  if (configObj.driveFolderId !== undefined && configObj.driveFolderId !== null) {
+    configObj.driveFolderId = driveFolderIdFrom_(configObj.driveFolderId);
+    // a new folder must be one the script can open, or every upload would fail after saving;
+    // an unchanged ID is not re-checked, so a Drive hiccup cannot block saving other settings
+    if (configObj.driveFolderId && configObj.driveFolderId !== getConfig_().driveFolderId) {
+      try {
+        DriveApp.getFolderById(configObj.driveFolderId).getId();
+      } catch (e) {
+        throw new Error('เปิดโฟลเดอร์ Drive นี้ไม่ได้: ตรวจว่า Folder ID ถูกต้อง และบัญชีที่ใช้ deploy ระบบมีสิทธิ์แก้ไขโฟลเดอร์นี้');
+      }
+    }
+  }
   var changed = withLock_(function () {
     ensureConfigSheet_();
     var sheet = SpreadsheetApp.getActive().getSheetByName('Config');

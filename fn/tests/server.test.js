@@ -336,6 +336,35 @@ console.log('== DUPLICATE IMEI');
   });
 }
 
+console.log('== DRIVE FOLDER');
+{
+  const g = fixture(); const { ctx, sheets } = g;
+  const admin = g.tok('admin1');
+  const cfg = () => ctx.getConfigProperties(admin).driveFolderId;
+  t('a new Config sheet uses the same default folder as the runtime fallback', () => {
+    const row = sheets.Config.rows.find(r => r[0] === 'driveFolderId'); eq(row[1], ctx.DEFAULT_DRIVE_FOLDER_);
+  });
+  t('folder id is saved as typed', () => { ctx.setConfigProperties(admin, { driveFolderId: ' 1AbCdEfGhIjKlMnOpQrSt ' }); eq(cfg(), '1AbCdEfGhIjKlMnOpQrSt'); });
+  t('a pasted Drive folder link is reduced to its id', () => {
+    ctx.setConfigProperties(admin, { driveFolderId: 'https://drive.google.com/drive/u/0/folders/1ZyXwVuTsRqPoNmLkJiHg?usp=sharing' });
+    eq(cfg(), '1ZyXwVuTsRqPoNmLkJiHg');
+  });
+  t('a folder the script cannot open is refused and the old id kept', () => {
+    const orig = ctx.DriveApp.getFolderById;
+    ctx.DriveApp.getFolderById = () => { throw new Error('No item with the given ID could be found'); };
+    try { throws(() => ctx.setConfigProperties(admin, { driveFolderId: '1NoSuchFolderXXXXXXXX' }), /โฟลเดอร์/); }
+    finally { ctx.DriveApp.getFolderById = orig; }
+    eq(cfg(), '1ZyXwVuTsRqPoNmLkJiHg');
+  });
+  t('garbage that is not an id is refused', () => throws(() => ctx.setConfigProperties(admin, { driveFolderId: 'ab cd' }), /Folder ID/));
+  t('unchanged id is not re-checked (Drive outage cannot block saving other settings)', () => {
+    const orig = ctx.DriveApp.getFolderById;
+    ctx.DriveApp.getFolderById = () => { throw new Error('down'); };
+    try { eq(ctx.setConfigProperties(admin, { driveFolderId: '1ZyXwVuTsRqPoNmLkJiHg', emailCc: 'c@x.y' }), true); }
+    finally { ctx.DriveApp.getFolderById = orig; }
+  });
+}
+
 console.log('== TRUST');
 {
   const g = fixture(); const { ctx, sheets, mail, fetches, mailState, cache } = g;
