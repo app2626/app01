@@ -213,6 +213,13 @@ function loadGeneralConfig() {
     document.getElementById('notifyApproveToken').value = config.notifyApproveToken || '';
     document.getElementById('notifyApproveChatId').value = config.notifyApproveChatId || '';
     document.getElementById('driveFolderId').value = config.driveFolderId || '';
+    let q = document.getElementById('mailQuotaInfo');
+    if (q) {
+      let left = config.mailQuotaRemaining;
+      q.className = 'small ' + (left == null ? 'text-muted' : left <= 20 ? 'text-danger fw-semibold' : 'text-muted');
+      q.innerHTML = left == null ? '' : '<i class="fa-regular fa-envelope me-1"></i>โควตาอีเมลที่ส่งได้วันนี้เหลือ ' + escHtml(String(left)) + ' ฉบับ' +
+        (left <= 20 ? ' (ใกล้หมด อีเมลแจ้งเตือนและลืมรหัสผ่านอาจส่งไม่ได้)' : '');
+    }
     
     let toContainer = document.getElementById('emailToContainer');
     toContainer.innerHTML = '';

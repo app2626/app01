@@ -41,6 +41,7 @@ function createGas() {
   const cache = { get: k => (k in cacheMap ? cacheMap[k] : null), put: (k, v) => { cacheMap[k] = String(v); }, remove: k => { delete cacheMap[k]; }, _map: cacheMap };
   const mail = [], fetches = [], driveFiles = [];
   const lockState = { fail: false };
+  const mailState = { quota: 1500 };
   const toSigned = buf => Array.from(buf).map(b => (b > 127 ? b - 256 : b));
   const folder = { getId: () => 'folder1', createFile: blob => { const id = 'f' + (driveFiles.length + 1); const f = { id, blob, trashed: false }; driveFiles.push(f); return { getId: () => id, setTrashed: v => { f.trashed = !!v; } }; } };
   const ctx = {
@@ -59,13 +60,13 @@ function createGas() {
     },
     HtmlService: { XFrameOptionsMode: { ALLOWALL: 1 }, createHtmlOutputFromFile: n => ({ getContent: () => fs.readFileSync(SRC + n + '.html', 'utf8') }), createTemplateFromFile: n => ({ evaluate: () => ({ setTitle() { return this; }, setFaviconUrl() { return this; }, addMetaTag() { return this; }, setXFrameOptionsMode() { return this; } }) }) },
     DriveApp: { getFolderById: () => folder, createFolder: () => folder },
-    MailApp: { sendEmail: o => mail.push(o) },
+    MailApp: { sendEmail: o => { mail.push(o); mailState.quota -= String(o.to || '').split(',').length + (o.cc ? String(o.cc).split(',').length : 0); }, getRemainingDailyQuota: () => mailState.quota },
     UrlFetchApp: { fetch: (url, opt) => { fetches.push({ url, opt }); return { getResponseCode: () => 200 }; } },
     Logger: { log() {} },
   };
   vm.createContext(ctx);
   for (const f of fs.readdirSync(SRC).filter(f => f.endsWith('.js')).sort()) vm.runInContext(fs.readFileSync(SRC + f, 'utf8'), ctx, { filename: f });
-  return { ctx, sheets, ss, cache, mail, fetches, driveFiles, lockState, Sheet };
+  return { ctx, sheets, ss, cache, mail, fetches, driveFiles, lockState, mailState, Sheet };
 }
 
 module.exports = { createGas, SRC };

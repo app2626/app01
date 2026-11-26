@@ -167,6 +167,7 @@ function saveRequest(token, f) {
       set('สถานะ :', STATUS.WAIT);
       set('ไฟแนนซ์ :', cellText_(finance));
       set('ประเภทเอกสาร :', f.id_type);
+      set('ผู้บันทึก (Username) :', cellText_(user.username));
       sheet.appendRow(row);
       return newIdValue;
     });
@@ -319,6 +320,35 @@ function updateStatus(token, obj) {
       + '\n👤 ผู้ดำเนินการ: ' + user.name;
     var subject = (obj.action === 'approve' ? 'อนุมัติ' : 'ไม่อนุมัติ') + 'ให้ทำรายการ FN+ Consignment ได้ สาขา ' + c('สาขา :');
     sendNotify_(msg, true, [], subject);
+    notifySubmitter_(r, obj, step.to, user);
   }
   return { status: step.to };
+}
+
+/**
+ * Emails the result of approve / reject to the employee who submitted the request: the account in
+ * "ผู้บันทึก (Username) :", or for older rows the account whose username equals "รหัสพนักงาน :".
+ */
+function notifySubmitter_(row, obj, newStatus, actor) {
+  try {
+    var c = function (h) { return str_(row[col_(h) - 1]); };
+    var submitter = findUser_(c('ผู้บันทึก (Username) :')) || findUser_(c('รหัสพนักงาน :'));
+    if (!submitter || !submitter.email || !validEmail_(submitter.email)) return;
+    var approved = obj.action === 'approve';
+    var text = 'เรียน ' + submitter.name
+      + '\n\nคำขอขายผ่อนชำระของคุณ' + (approved ? 'ได้รับการอนุมัติแล้ว' : 'ไม่ได้รับการอนุมัติ')
+      + '\n\nเลขที่คำขอ: ' + c('ID :')
+      + '\nสาขา: ' + c('สาขา :')
+      + '\nลูกค้า: ' + c('ชื่อตัวและสกุล (ลูกค้า) :')
+      + '\nสินค้า: ' + c('ชื่อรุ่นสินค้า') + ' (IMEI ' + c('IMEI :') + ')'
+      + '\nไฟแนนซ์: ' + (c('ไฟแนนซ์ :') || 'Ponmai')
+      + '\nสถานะ: ' + newStatus
+      + (approved ? '\nยอดเงินโอนที่ได้รับ: ' + str_(obj.financeAmount) : '')
+      + '\nหมายเหตุ: ' + orDash_(obj.Remark)
+      + '\nผู้ดำเนินการ: ' + actor.name
+      + (approved ? '' : '\n\nกรุณาตรวจสอบหมายเหตุ แล้วส่งคำขอใหม่หากต้องการ');
+    mailUser_(submitter.email, 'FN+ Consignment: คำขอ' + (approved ? 'ได้รับการอนุมัติ' : 'ไม่อนุมัติ') + ' - ' + c('ชื่อตัวและสกุล (ลูกค้า) :'), text);
+  } catch (e) {
+    console.error('Submitter notify failed: ' + e.message);
+  }
 }

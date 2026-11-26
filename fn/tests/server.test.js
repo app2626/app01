@@ -14,13 +14,14 @@ const OLD_HEADERS_41 = ["ID :", "วันที่ขออนุมัติ",
 console.log('== SCHEMA');
 {
   const { ctx, sheets } = createGas();
-  t('DATA_HEADERS has 48 columns', () => eq(ctx.DATA_HEADERS.length, 48));
+  t('DATA_HEADERS has 49 columns', () => eq(ctx.DATA_HEADERS.length, 49));
+  t('submitter is column 49', () => eq(ctx.col_('ผู้บันทึก (Username) :'), 49));
   t('document type is column 48', () => eq(ctx.col_('ประเภทเอกสาร :'), 48));
   t('finance is column 47', () => eq(ctx.col_('ไฟแนนซ์ :'), 47));
   t('DATA_HEADERS keeps the old 41 verbatim', () => eq(ctx.DATA_HEADERS.slice(0, 41), OLD_HEADERS_41));
   t('col_ status is 33', () => eq(ctx.col_('สถานะ :'), 33));
   t('col_ unknown throws', () => throws(() => ctx.col_('nope'), /Unknown column/));
-  t('ensureSheets_ creates all 9 sheets', () => { ctx.ensureSheets_(); ['Data', 'Log', 'Admin', 'Config', 'location', 'Product', 'Premium', 'guarantee', 'Finance'].forEach(n => ok(sheets[n], n)); });
+  t('ensureSheets_ creates all 10 sheets', () => { ctx.ensureSheets_(); ['Data', 'Log', 'Audit', 'Admin', 'Config', 'location', 'Product', 'Premium', 'guarantee', 'Finance'].forEach(n => ok(sheets[n], n)); });
   t('ensureSheets_ seeds Finance with Ponmai, Vyvr', () => eq(sheets.Finance.rows, [['ชื่อไฟแนนซ์'], ['Ponmai'], ['Vyvr']]));
   t('ensureSheets_ does not reseed existing Finance', () => { sheets.Finance.rows.splice(1); ctx.ensureSheets_(); eq(sheets.Finance.rows, [['ชื่อไฟแนนซ์']]); });
   t('Log header has record id', () => eq(sheets.Log.rows[0], ctx.LOG_HEADERS));
@@ -31,7 +32,7 @@ console.log('== SCHEMA');
     const d = ss.insertSheet('Data'); d.appendRow(OLD_HEADERS_41.slice()); const row = OLD_HEADERS_41.map((_, i) => 'v' + i); d.appendRow(row.slice());
     const lg = ss.insertSheet('Log'); lg.appendRow(['วันที่/เวลา', 'ผู้ดำเนินการ', 'สถานะการอนุมัติ']); lg.appendRow(['x', 'y', 'z']);
     ctx.ensureSheets_();
-    eq(sheets.Data.rows[0].length, 48); eq(sheets.Data.rows[0][47], 'ประเภทเอกสาร :'); eq(sheets.Data.rows[0][45], 'บาร์โค้ด Big point :'); eq(sheets.Data.rows[0][46], 'ไฟแนนซ์ :'); eq(sheets.Data.rows[1], row);
+    eq(sheets.Data.rows[0].length, 49); eq(sheets.Data.rows[0][47], 'ประเภทเอกสาร :'); eq(sheets.Data.rows[0][45], 'บาร์โค้ด Big point :'); eq(sheets.Data.rows[0][46], 'ไฟแนนซ์ :'); eq(sheets.Data.rows[1], row);
     eq(sheets.Log.rows[0], ctx.LOG_HEADERS); eq(sheets.Log.rows[1], ['x', 'y', 'z']);
   });
   t('dropdowns work when Finance is missing and Log header drifted', () => {
@@ -231,6 +232,78 @@ console.log('== FORGOT PASSWORD');
   t('old sessions without a fingerprint keep working', () => { const tk = 'legacytoken'; cache.put('sess_' + tk, JSON.stringify({ username: 'admin1' })); eq(ctx.requireSession_(tk).username, 'admin1'); });
 }
 
+// ===================== Trust: mail quota, audit trail, staff notifications =====================
+console.log('== TRUST');
+{
+  const g = fixture(); const { ctx, sheets, mail, fetches, mailState, cache } = g;
+  const admin = g.tok('admin1'), acc = g.tok('acc1');
+  ctx.setConfigProperties(admin, { emailTo: 'boss@x.y', notifyNewToken: '1:A', notifyNewChatId: '99' });
+  const audit = () => sheets.Audit.rows.slice(1);
+  const lastAudit = () => audit()[audit().length - 1];
+  const tg = () => fetches.filter(f => /sendMessage/.test(f.url)).map(f => f.opt.payload.text);
+
+  t('config shows the remaining mail quota', () => { mailState.quota = 1234; eq(ctx.getConfigProperties(admin).mailQuotaRemaining, 1234); });
+  t('no quota left: email skipped without error, Telegram warned once', () => {
+    mailState.quota = 0; const n = mail.length; const warned = () => tg().filter(m => /โควตาอีเมล/.test(m)).length;
+    const before = warned();
+    ctx.sendNotify_('hello', false, [], 'subj'); ctx.sendNotify_('again', false, [], 'subj');
+    eq(mail.length, n); eq(warned() - before, 1);
+  });
+  t('low quota: email still sent, warning not repeated', () => {
+    cache.remove('mailq_alert'); mailState.quota = 5; const n = mail.length;
+    ctx.sendNotify_('x', false, [], 's'); ctx.sendNotify_('y', false, [], 's');
+    eq(mail.length, n + 2); eq(tg().filter(m => /โควตาอีเมล/.test(m)).length, 2);
+    mailState.quota = 1500;
+  });
+
+  sheets.location.appendRow(['สาขา A']);
+  t('audit: self-registration', () => { ctx.register({ empId: 'S9', name: 'ส่งคำขอ', email: 's9@x.co', phone: '0812345678', branches: ['สาขา A'], password: 'secret12' }); eq(lastAudit().slice(1, 4), ['S9', 'ลงทะเบียน', 'S9']); });
+  t('audit: approve, block, unblock, reset password', () => {
+    ctx.approveUsers(admin, ['S9']); eq(lastAudit().slice(1, 4), ['แอดมินใหญ่ (admin1)', 'อนุมัติบัญชี', 'S9']);
+    ctx.setUserStatus(admin, 'S9', 'ระงับ'); eq(lastAudit()[2], 'ระงับบัญชี');
+    ctx.setUserStatus(admin, 'S9', 'ใช้งาน'); eq(lastAudit()[2], 'เปิดใช้งานบัญชี');
+    ctx.resetPassword(admin, 'S9', 'secret12'); eq(lastAudit().slice(2, 4), ['รีเซ็ตรหัสผ่าน', 'S9']);
+  });
+  t('audit: settings add / edit / delete / bulk', () => {
+    ctx.addSettingData(admin, 'Product', ['รุ่น X']); eq(lastAudit().slice(2, 5), ['เพิ่มข้อมูล', 'Product', 'รุ่น X']);
+    ctx.updateSettingData(admin, 'Product', 0, 'รุ่น X', ['รุ่น Y']); eq(lastAudit().slice(2, 5), ['แก้ไขข้อมูล', 'Product', 'รุ่น X → รุ่น Y']);
+    ctx.addSettingDataBulk(admin, 'Product', ['p1', 'p2']); eq(lastAudit().slice(2, 5), ['นำเข้าไฟล์', 'Product', '2 รายการ']);
+    ctx.deleteSettingDataBulk(admin, 'Product', ['p1', 'p2']); eq(lastAudit().slice(2, 5), ['ลบหลายรายการ', 'Product', 'p1, p2']);
+    ctx.deleteSettingData(admin, 'Product', 0, 'รุ่น Y'); eq(lastAudit().slice(2, 5), ['ลบข้อมูล', 'Product', 'รุ่น Y']);
+  });
+  t('audit: config change lists keys, never secret values', () => {
+    ctx.setConfigProperties(admin, { notifyApproveToken: '777:SECRET', emailCc: 'c@x.y' });
+    const r = lastAudit(); eq(r[2], 'แก้ไขการตั้งค่า'); ok(/notifyApproveToken/.test(r[4]) && /emailCc/.test(r[4])); ok(!/SECRET/.test(r.join(' ')), 'secret leaked');
+  });
+  t('audit: password reset by email code', () => {
+    ctx.requestPasswordReset('S9', 's9@x.co'); const code = mail[mail.length - 1].htmlBody.match(/\b(\d{6})\b/)[1];
+    ctx.resetPasswordWithCode('S9', code, 'brandnew9'); eq(lastAudit().slice(1, 4), ['S9', 'ตั้งรหัสผ่านใหม่ (อีเมล)', 'S9']);
+  });
+  t('audit sheet is not writable from settings screens', () => throws(() => ctx.getSettingsData(admin, 'Audit'), /INVALID_SHEET/));
+
+  const b64 = n => Buffer.alloc(n, 1).toString('base64');
+  const req = () => ({ date: '2026-11-25', location: 'สาขา A', emp_id: 'S9', emp_name: 'ส่งคำขอ', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'ลูกค้า ก', customer_phone: '0898765432', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'Phone Z', imei: 'I1', price: '1000', installments: '1', finance: 'Ponmai', file1Data: { base64: b64(4), mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64(4), mimeType: 'application/pdf', name: 'b' } });
+  let rid;
+  t('saveRequest records who submitted it', () => {
+    const tk = ctx.login('S9', 'brandnew9').token; rid = ctx.saveRequest(tk, req()).id;
+    const row = sheets.Data.rows.find(r => String(r[0]).replace(/^'/, '') === rid); eq(row[ctx.col_('ผู้บันทึก (Username) :') - 1], 'S9');
+  });
+  t('approve emails the submitter with the result', () => {
+    const n = mail.length; ctx.updateStatus(acc, { record: rid, action: 'approve', financeAmount: '900', Remark: 'ok' });
+    const m = mail.slice(n).find(x => x.to === 's9@x.co'); ok(m, 'submitter not emailed'); ok(/อนุมัติ/.test(m.subject) && /ลูกค้า ก/.test(m.htmlBody) && /รอเปิด SO/.test(m.htmlBody));
+  });
+  t('reject emails the submitter with the remark', () => {
+    const tk = ctx.login('S9', 'brandnew9').token; const id2 = ctx.saveRequest(tk, req()).id; const n = mail.length;
+    ctx.updateStatus(acc, { record: id2, action: 'reject', Remark: 'สลิปไม่ชัด' });
+    const m = mail.slice(n).find(x => x.to === 's9@x.co'); ok(m && /ไม่อนุมัติ/.test(m.subject) && /สลิปไม่ชัด/.test(m.htmlBody));
+  });
+  t('submitter without email: no personal mail, workflow still fine', () => {
+    const id3 = ctx.saveRequest(g.tok('staff1'), Object.assign(req(), { emp_id: 'staff1' })); const n = mail.length;
+    eq(ctx.updateStatus(acc, { record: id3.id, action: 'approve', financeAmount: '1' }).status, 'รอเปิด SO');
+    ok(!mail.slice(n).some(x => x.to === ''), 'mailed an empty address');
+  });
+}
+
 // ===================== Task 3: guards, settings, config =====================
 console.log('== GUARDS / SETTINGS');
 {
@@ -339,7 +412,7 @@ console.log('== REQUESTS / WORKFLOW');
     id = ctx.saveRequest(staff, form({ price: '10000', down: '1000', discountais: '500', dues: '200', netprice: '1' })).id;
     eq(Number(rowById(id)[C('ราคาสุทธิ :')]), 8700); eq(rowById(id)[C('สถานะ :')], 'รออนุมัติ');
   });
-  t('row is 48 wide with uploaded file links', () => { const r = rowById(id); eq(r.length, 48); ok(/^https:\/\/lh3\.googleusercontent\.com\/d\//.test(r[C('รูปสลิปเงินโอน :')])); ok(/^https:\/\/drive\.google\.com\/uc\?id=/.test(r[C('ใบเสร็จ :')])); eq(driveFiles.length, 2); });
+  t('row is 48 wide with uploaded file links', () => { const r = rowById(id); eq(r.length, 49); ok(/^https:\/\/lh3\.googleusercontent\.com\/d\//.test(r[C('รูปสลิปเงินโอน :')])); ok(/^https:\/\/drive\.google\.com\/uc\?id=/.test(r[C('ใบเสร็จ :')])); eq(driveFiles.length, 2); });
   t('barcode stored separately', () => { const i2 = ctx.saveRequest(staff, form({ barcode_ais: 'B1', discountais: '500' })).id; eq(rowById(i2)[C('ส่วนลด เปิดเบอร์ AIS :')], 500); eq(rowById(i2)[C('บาร์โค้ด AIS :')], 'B1'); });
   t('ids are unique on same millisecond', () => { const realNow = Date.now; Date.now = () => 1700000000000; try { const a = ctx.saveRequest(staff, form()).id, b = ctx.saveRequest(staff, form()).id; ok(a !== b, a + '==' + b); } finally { Date.now = realNow; } });
   t('invalid id card rejected', () => throws(() => ctx.saveRequest(staff, form({ id_card_number: '123' })), /เลขบัตรประชาชน/));
@@ -391,7 +464,7 @@ console.log('== REQUESTS / WORKFLOW');
   t('getData needs session', () => throws(() => ctx.getData(''), /AUTH_REQUIRED/));
   t('staff sees masked id card', () => { const rows = ctx.getData(staff); ok(rows.length > 0); rows.forEach(r => ok(/^X{9}\d{4}$/.test(r[6]), r[6])); });
   t('accounting sees full id card', () => eq(ctx.getData(acc)[0][6], '1103700012346'));
-  t('getData rows padded to 48', () => ctx.getData(acc).forEach(r => eq(r.length, 48)));
+  t('getData rows padded to 49', () => ctx.getData(acc).forEach(r => eq(r.length, 49)));
   t('branch scope: staff sees only rows of registered branches', () => {
     const other = ctx.saveRequest(admin, form({ location: 'สาขา Z' })).id;
     ok(ctx.getData(staff).length > 0); ok(ctx.getData(staff).every(r => r[2] === 'สาขา A'), 'foreign row leaked');
@@ -432,8 +505,8 @@ console.log('== FINAL REVIEW FIXES');
   const lg = ss.insertSheet('Log'); lg.maxCols = 3; lg.appendRow(['วันที่/เวลา', 'ผู้ดำเนินการ', 'สถานะการอนุมัติ']);
   const ad = ss.insertSheet('Admin'); ad.appendRow(['Username', 'Password', 'ชื่อผู้ใช้งาน', 'สิทธิ์']); ad.appendRow(['boss', 'bosspw', 'บอส', 'แอดมิน']);
   const tk = ctx.login('boss', 'bosspw').token;
-  t('C1 getData works on a 41-column live sheet', () => { const rows = ctx.getData(tk); eq(rows.length, 1); eq(rows[0].length, 48); eq(rows[0][46], ''); });
-  t('C1 data columns grown to 48 with headers', () => { ok(sheets.Data.getMaxColumns() >= 48); eq(sheets.Data.rows[0].slice(41), ctx.DATA_HEADERS.slice(41)); });
+  t('C1 getData works on a 41-column live sheet', () => { const rows = ctx.getData(tk); eq(rows.length, 1); eq(rows[0].length, 49); eq(rows[0][46], ''); });
+  t('C1 data columns grown to 48 with headers', () => { ok(sheets.Data.getMaxColumns() >= 49); eq(sheets.Data.rows[0].slice(41), ctx.DATA_HEADERS.slice(41)); });
   // I1: legacy 'อนุมัติแล้ว' row whose SO is already filled must be finishable via updateAR.
   t('I1 updateAR from อนุมัติแล้ว with SO filled', () => eq(ctx.updateStatus(tk, { record: '111', action: 'updateAR', invoice: 'INV9' }).status, 'เสร็จสมบูรณ์'));
   t('C1 Log extended and written on narrow sheet', () => { const l = sheets.Log.rows[sheets.Log.getLastRow() - 1]; eq(l[3], '111'); });

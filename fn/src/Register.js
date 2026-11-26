@@ -87,6 +87,7 @@ function register(form) {
   } catch (e) {
     console.error('Register notify failed: ' + e.message);
   }
+  audit_(empId, 'ลงทะเบียน', empId, branch);
   return { status: ACCOUNT_STATUS.PENDING };
 }
 
@@ -104,7 +105,7 @@ function setUserStatus(token, username, status) {
   var me = requireSession_(token, [ROLES.ADMIN]);
   status = String(status == null ? '' : status).trim();
   if (status !== ACCOUNT_STATUS.ACTIVE && status !== ACCOUNT_STATUS.BLOCKED) throw new Error('สถานะบัญชีไม่ถูกต้อง');
-  return withLock_(function () {
+  var res = withLock_(function () {
     var u = findUser_(username);
     if (!u) throw new Error('ไม่พบผู้ใช้งาน');
     if (status === ACCOUNT_STATUS.BLOCKED && u.username === me.username) throw new Error('ไม่สามารถระงับบัญชีของตัวเองได้');
@@ -116,13 +117,15 @@ function setUserStatus(token, username, status) {
     sheet.getRange(u.rowNum, 8).setValue(status);
     return { username: u.username, status: status };
   });
+  audit_(me, status === ACCOUNT_STATUS.BLOCKED ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี', res.username, '');
+  return res;
 }
 
 /** Public (แอดมิน). Activates one account (also re-activates one that is not pending). */
 function approveUser(token, username) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   if (!findUser_(username)) throw new Error('ไม่พบผู้ใช้งาน');
-  activateUsers_([username], false);
+  activateUsers_([username], false).forEach(function (u) { audit_(me, 'อนุมัติบัญชี', u, ''); });
   return true;
 }
 
@@ -131,7 +134,7 @@ function approveUser(token, username) {
  * already active are skipped. Returns { approved: string[], skipped: number }.
  */
 function approveUsers(token, usernames) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   usernames = Array.isArray(usernames) ? usernames : [];
   if (usernames.length > BULK_MAX_) throw new Error('อนุมัติได้ครั้งละไม่เกิน 2,000 รายการ');
   var want = {};
@@ -139,6 +142,7 @@ function approveUsers(token, usernames) {
   var names = Object.keys(want);
   if (!names.length) throw new Error('กรุณาเลือกบัญชีที่ต้องการอนุมัติ');
   var approved = activateUsers_(names, true);
+  approved.forEach(function (u) { audit_(me, 'อนุมัติบัญชี', u, ''); });
   return { approved: approved, skipped: names.length - approved.length };
 }
 
@@ -158,13 +162,8 @@ function activateUsers_(names, onlyPending) {
   });
   users.forEach(function (user) {
     if (!user.email || !validEmail_(user.email)) return;
-    try {
-      MailApp.sendEmail({ to: user.email, subject: 'FN+ Consignment: บัญชีของคุณได้รับการอนุมัติแล้ว',
-        htmlBody: escapeHtmlServer_('เรียน ' + user.name + '\n\nบัญชีผู้ใช้ ' + user.username +
-          ' ได้รับการอนุมัติแล้ว เข้าสู่ระบบได้ด้วยรหัสพนักงานและรหัสผ่านที่ตั้งไว้').replace(/\n/g, '<br>') });
-    } catch (e) {
-      console.error('Approve mail failed: ' + e.message);
-    }
+    mailUser_(user.email, 'FN+ Consignment: บัญชีของคุณได้รับการอนุมัติแล้ว', 'เรียน ' + user.name +
+      '\n\nบัญชีผู้ใช้ ' + user.username + ' ได้รับการอนุมัติแล้ว เข้าสู่ระบบได้ด้วยรหัสพนักงานและรหัสผ่านที่ตั้งไว้');
   });
   return users.map(function (u) { return u.username; });
 }

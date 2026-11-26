@@ -20,8 +20,13 @@ var DATA_HEADERS = [
   // appended 2026-11: finance company (blank on older rows = Ponmai)
   "ไฟแนนซ์ :",
   // appended 2026-11: which document "เลขบัตรประชาชน :" holds (blank on older rows = บัตรประชาชน)
-  "ประเภทเอกสาร :"
+  "ประเภทเอกสาร :",
+  // appended 2026-11: login of the account that submitted the request (for result emails)
+  "ผู้บันทึก (Username) :"
 ];
+
+// Who did what to accounts and settings (the request workflow keeps using Log).
+var AUDIT_HEADERS = ['วันที่/เวลา', 'ผู้ดำเนินการ', 'การกระทำ', 'เป้าหมาย', 'รายละเอียด'];
 
 var LOG_HEADERS = ["วันที่/เวลา", "ผู้ดำเนินการ", "สถานะการอนุมัติ", "ID รายการ", "รายละเอียด"];
 
@@ -45,6 +50,7 @@ var SETTINGS_SHEETS =['Admin', 'location', 'Product', 'Premium', 'guarantee', 'F
 var SHEET_DEFS = [
   { name: 'Data', headers: DATA_HEADERS, color: '#1a73e8', strict: true },
   { name: 'Log', headers: LOG_HEADERS, color: '#34a853', strict: true },
+  { name: 'Audit', headers: AUDIT_HEADERS, color: '#5f6368' },
   // columns 5-8 appended 2026-11 for self-registration (blank status on old rows = active)
   { name: 'Admin', headers: ADMIN_HEADERS, color: '#ea4335' },
   { name: 'location', headers: ['ชื่อสาขา'], color: '#fbbc04' },

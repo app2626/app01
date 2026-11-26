@@ -54,28 +54,33 @@ function getConfigProperties(token) {
   requireSession_(token, [ROLES.ADMIN]);
   var config = getConfig_();
   SECRET_KEYS_.forEach(function (k) { config[k] = maskSecret_(config[k]); });
+  config.mailQuotaRemaining = mailQuota_(); // read-only; not a CONFIG_KEYS_ entry, so never saved
   return config;
 }
 
 /** Public (แอดมิน). Masked values are ignored so the stored secret is kept. */
 function setConfigProperties(token, configObj) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var user = requireSession_(token, [ROLES.ADMIN]);
   configObj = configObj || {};
-  return withLock_(function () {
+  var changed = withLock_(function () {
     ensureConfigSheet_();
     var sheet = SpreadsheetApp.getActive().getSheetByName('Config');
     var data = sheet.getDataRange().getDisplayValues();
-    var rowOf = {};
-    for (var i = 1; i < data.length; i++) rowOf[data[i][0]] = i + 1;
+    var rowOf = {}, old = {}, keys = [];
+    for (var i = 1; i < data.length; i++) { rowOf[data[i][0]] = i + 1; old[data[i][0]] = data[i][1]; }
     CONFIG_KEYS_.forEach(function (key) {
       if (configObj[key] === undefined || configObj[key] === null) return;
       var value = String(configObj[key]).trim();
       if (value.indexOf(MASK_) === 0) return;
+      if (String(old[key] == null ? '' : old[key]) !== value) keys.push(key);
       if (rowOf[key]) sheet.getRange(rowOf[key], 2).setValue(value);
       else sheet.appendRow([key, value]);
     });
-    return true;
+    return keys;
   });
+  // key names only: values can be bot tokens
+  if (changed.length) audit_(user, 'แก้ไขการตั้งค่า', 'Config', changed.join(', '));
+  return true;
 }
 
 /** Public (any role). */
@@ -132,12 +137,13 @@ function getSettingsData(token, sheetName) {
 
 /** Public (แอดมิน). */
 function addSettingData(token, sheetName, rowData) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   var sheet = settingsSheet_(sheetName);
   var rawBranches = (rowData || [])[6]; // Admin: array of branch names
   rowData = (rowData || []).map(function (v) { return String(v == null ? '' : v).trim(); });
   if (!rowData[0]) throw new Error('กรุณากรอกข้อมูล');
-  return withLock_(function () {
+  var branchesAdded = '';
+  withLock_(function () {
     if (sheetName === 'Admin') {
       if (findUser_(rowData[0])) throw new Error('ชื่อผู้ใช้นี้มีอยู่แล้ว');
       if (!rowData[1] || rowData[1].length < 6) throw new Error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
@@ -148,6 +154,7 @@ function addSettingData(token, sheetName, rowData) {
       fillBlankHeaders_(sheet, ADMIN_HEADERS);
       sheet.appendRow([cellText_(rowData[0]), hashPassword_(rowData[1]), cellText_(rowData[2] || rowData[0]), rowData[3],
         '', '', cellText_(branches), ACCOUNT_STATUS.ACTIVE]);
+      branchesAdded = branches;
     } else {
       var last = sheet.getLastRow();
       var exists = last >= 2 && sheet.getRange(2, 1, last - 1, 1).getDisplayValues()
@@ -155,8 +162,10 @@ function addSettingData(token, sheetName, rowData) {
       if (exists) throw new Error('"' + rowData[0] + '" มีอยู่แล้วในรายการ');
       sheet.appendRow([cellText_(rowData[0])]);
     }
-    return true;
   });
+  if (sheetName === 'Admin') audit_(me, 'เพิ่มผู้ใช้', rowData[0], rowData[3] + (branchesAdded ? ' / ' + branchesAdded : ''));
+  else audit_(me, 'เพิ่มข้อมูล', sheetName, rowData[0]);
+  return true;
 }
 
 var BULK_SHEETS_ = ['location', 'Product', 'Premium'];
@@ -167,12 +176,12 @@ var BULK_MAX_ = 2000;
  * duplicates (within the file and against the sheet). Returns { added: string[], skipped: number }.
  */
 function addSettingDataBulk(token, sheetName, names) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   if (BULK_SHEETS_.indexOf(sheetName) < 0) throw new Error('INVALID_SHEET');
   names = Array.isArray(names) ? names : [];
   if (names.length > BULK_MAX_) throw new Error('อัปโหลดได้ครั้งละไม่เกิน 2,000 รายการ');
   var sheet = settingsSheet_(sheetName);
-  return withLock_(function () {
+  var res = withLock_(function () {
     var last = sheet.getLastRow();
     var seen = {};
     if (last >= 2) sheet.getRange(2, 1, last - 1, 1).getDisplayValues().forEach(function (r) { seen[String(r[0]).trim()] = true; });
@@ -191,13 +200,15 @@ function addSettingDataBulk(token, sheetName, names) {
     }
     return { added: added, skipped: names.length - added.length };
   });
+  if (res.added.length) audit_(me, 'นำเข้าไฟล์', sheetName, res.added.length + ' รายการ');
+  return res;
 }
 
 /** Public (แอดมิน). Deletes only if column A still holds expectedKey (protects against stale screens). */
 function deleteSettingData(token, sheetName, rowIndex, expectedKey) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   var sheet = settingsSheet_(sheetName);
-  return withLock_(function () {
+  withLock_(function () {
     var rowNum = Number(rowIndex) + 2;
     if (!(rowNum >= 2) || rowNum > sheet.getLastRow() ||
         String(sheet.getRange(rowNum, 1).getDisplayValue()).trim() !== String(expectedKey).trim()) {
@@ -209,8 +220,10 @@ function deleteSettingData(token, sheetName, rowIndex, expectedKey) {
       if (target && target.role === ROLES.ADMIN && isActiveUser_(target) && admins.length <= 1) throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
     }
     sheet.deleteRow(rowNum);
-    return true;
   });
+  if (sheetName === 'Admin') audit_(me, 'ลบผู้ใช้', String(expectedKey).trim(), '');
+  else audit_(me, 'ลบข้อมูล', sheetName, String(expectedKey).trim());
+  return true;
 }
 
 /**
@@ -219,7 +232,7 @@ function deleteSettingData(token, sheetName, rowIndex, expectedKey) {
  * deleted one at a time so the last-admin guard stays simple). Returns { deleted, missing }.
  */
 function deleteSettingDataBulk(token, sheetName, names) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   if (sheetName === 'Admin' || SETTINGS_SHEETS.indexOf(sheetName) < 0) throw new Error('INVALID_SHEET');
   names = Array.isArray(names) ? names : [];
   if (names.length > BULK_MAX_) throw new Error('ลบได้ครั้งละไม่เกิน 2,000 รายการ');
@@ -228,7 +241,7 @@ function deleteSettingDataBulk(token, sheetName, names) {
   var wanted = Object.keys(want).length;
   if (!wanted) throw new Error('กรุณาเลือกรายการที่ต้องการลบ');
   var sheet = settingsSheet_(sheetName);
-  return withLock_(function () {
+  var res = withLock_(function () {
     var last = sheet.getLastRow();
     var rows = [], found = {};
     if (last >= 2) {
@@ -245,8 +258,10 @@ function deleteSettingDataBulk(token, sheetName, names) {
       sheet.deleteRows(rows[start], end - start + 1);
       end = start - 1;
     }
-    return { deleted: rows.length, missing: wanted - Object.keys(found).length };
+    return { deleted: rows.length, missing: wanted - Object.keys(found).length, names: Object.keys(found) };
   });
+  audit_(me, 'ลบหลายรายการ', sheetName, res.names.join(', '));
+  return { deleted: res.deleted, missing: res.missing };
 }
 
 /**
@@ -256,13 +271,14 @@ function deleteSettingDataBulk(token, sheetName, names) {
  * Existing Data rows keep the name they were saved with.
  */
 function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   var sheet = settingsSheet_(sheetName);
   var rawBranches = (rowData || [])[6]; // Admin: array of branch names (relief staff)
   rowData = (rowData || []).map(function (v) { return String(v == null ? '' : v).trim(); });
-  return withLock_(function () {
+  var key = String(expectedKey).trim();
+  var before = null;
+  withLock_(function () {
     var rowNum = Number(rowIndex) + 2;
-    var key = String(expectedKey).trim();
     if (!(rowNum >= 2) || rowNum > sheet.getLastRow() ||
         String(sheet.getRange(rowNum, 1).getDisplayValue()).trim() !== key) {
       throw new Error('ข้อมูลมีการเปลี่ยนแปลง กรุณารีเฟรช');
@@ -271,6 +287,7 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
       var roles = [ROLES.ADMIN, ROLES.ACC, ROLES.STAFF];
       if (roles.indexOf(rowData[3]) < 0) throw new Error('สิทธิ์ไม่ถูกต้อง');
       var target = findUser_(key);
+      before = target;
       var admins = activeAdmins_();
       if (target && target.role === ROLES.ADMIN && isActiveUser_(target) && rowData[3] !== ROLES.ADMIN && admins.length <= 1) {
         throw new Error('ต้องมีแอดมินอย่างน้อย 1 คน');
@@ -284,32 +301,46 @@ function updateSettingData(token, sheetName, rowIndex, expectedKey, rowData) {
         fillBlankHeaders_(sheet, ADMIN_HEADERS);
         sheet.getRange(rowNum, 5, 1, 3).setValues([[cellText_(email), phone ? "'" + phone : '', cellText_(normalizeBranches_(rawBranches, false))]]);
       }
-      return true;
+      return;
     }
     if (!rowData[0]) throw new Error('กรุณากรอกข้อมูล');
     var names = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues();
     var dup = names.some(function (r, i) { return i + 2 !== rowNum && String(r[0]).trim() === rowData[0]; });
     if (dup) throw new Error('"' + rowData[0] + '" มีอยู่แล้วในรายการ');
     sheet.getRange(rowNum, 1).setValue(cellText_(rowData[0]));
-    return true;
   });
+  if (sheetName === 'Admin') {
+    var after = findUser_(key) || {};
+    var diff = [];
+    if (before && before.role !== after.role) diff.push('สิทธิ์ ' + before.role + ' → ' + after.role);
+    if (before && before.branch !== after.branch) diff.push('สาขา ' + (before.branch || '-') + ' → ' + (after.branch || '-'));
+    if (before && (before.name !== after.name || before.email !== after.email || before.phone !== after.phone)) diff.push('ข้อมูลติดต่อ/ชื่อ');
+    audit_(me, 'แก้ไขผู้ใช้', key, diff.join('; ') || 'ไม่มีการเปลี่ยนแปลง');
+  } else {
+    audit_(me, 'แก้ไขข้อมูล', sheetName, key + ' → ' + rowData[0]);
+  }
+  return true;
 }
 
 /** Public (แอดมิน). */
 function resetPassword(token, username, newPwd) {
-  requireSession_(token, [ROLES.ADMIN]);
+  var me = requireSession_(token, [ROLES.ADMIN]);
   newPwd = String(newPwd || '');
   if (newPwd.length < 6) throw new Error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
-  return withLock_(function () {
+  var target = withLock_(function () {
     var user = findUser_(username);
     if (!user) throw new Error('ไม่พบผู้ใช้งาน');
     SpreadsheetApp.getActive().getSheetByName('Admin').getRange(user.rowNum, 2).setValue(hashPassword_(newPwd));
-    return true;
+    return user.username;
   });
+  audit_(me, 'รีเซ็ตรหัสผ่าน', target, 'โดยแอดมิน');
+  return true;
 }
 
 /** Public (แอดมิน). Creates all sheets / headers; never overwrites data. */
 function initializeAllSheets(token) {
-  requireSession_(token, [ROLES.ADMIN]);
-  return withLock_(function () { return ensureSheets_(); });
+  var me = requireSession_(token, [ROLES.ADMIN]);
+  var res = withLock_(function () { return ensureSheets_(); });
+  audit_(me, 'สร้าง/ตรวจ Sheet', 'ทั้งหมด', '');
+  return res;
 }

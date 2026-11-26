@@ -31,14 +31,10 @@ function requestPasswordReset(empId, email) {
 
   var code = resetCode_();
   cache.put('pwreset_' + user.username, JSON.stringify({ h: hashPassword_(code), tries: 0 }), RESET_TTL_);
-  try {
-    MailApp.sendEmail({ to: user.email, subject: 'FN+ Consignment: รหัสยืนยันสำหรับตั้งรหัสผ่านใหม่',
-      htmlBody: escapeHtmlServer_('เรียน ' + user.name + '\n\nรหัสยืนยันสำหรับตั้งรหัสผ่านใหม่ของบัญชี ' + user.username +
-        ' คือ\n\n' + code + '\n\nรหัสนี้ใช้ได้ภายใน 15 นาที และใช้ได้ครั้งเดียว\n' +
-        'หากคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องทำอะไร รหัสผ่านเดิมยังใช้ได้ตามปกติ').replace(/\n/g, '<br>') });
-  } catch (e) {
-    console.error('Reset mail failed: ' + e.message);
-  }
+  mailUser_(user.email, 'FN+ Consignment: รหัสยืนยันสำหรับตั้งรหัสผ่านใหม่', 'เรียน ' + user.name +
+    '\n\nรหัสยืนยันสำหรับตั้งรหัสผ่านใหม่ของบัญชี ' + user.username + ' คือ\n\n' + code +
+    '\n\nรหัสนี้ใช้ได้ภายใน 15 นาที และใช้ได้ครั้งเดียว\n' +
+    'หากคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องทำอะไร รหัสผ่านเดิมยังใช้ได้ตามปกติ');
   return answer;
 }
 
@@ -69,5 +65,6 @@ function resetPasswordWithCode(empId, code, newPwd) {
   });
   cache.remove(key);
   cache.remove('fail_' + user.username); // a fresh password should not stay behind the login lockout
+  audit_(user.username, 'ตั้งรหัสผ่านใหม่ (อีเมล)', user.username, '');
   return true;
 }

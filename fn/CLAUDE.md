@@ -15,7 +15,8 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 | `src/Recovery.js` | forgot password: emailed 6-digit code (`requestPasswordReset`, `resetPasswordWithCode`, no token) |
 | `src/Validate.js` | Thai ID check digit, passport no., phone rules (`normalizePhone_`); mirrored in `api.html` |
 | `src/Requests.js` | `saveRequest`, `getData`, `findRecord`, `updateStatus` (workflow) |
-| `src/Notify.js` | Telegram + email (`sendNotify_`) |
+| `src/Notify.js` | Telegram + email (`sendNotify_`); **every email goes through `sendMail_` / `mailUser_`** (checks the daily MailApp quota, Telegram warning when ≤ 20 left) |
+| `src/Audit.js` | `audit_(actor, action, target, detail)` → `Audit` sheet; never throws; config changes log key names only, never values |
 | `src/api.html` | client `callServer()`, `escHtml()`, `safeUrl()`, `applyRoleUI()` |
 | other `src/*.html` | UI partials (Bootstrap 5, jQuery, DataTables, Select2, SweetAlert2, Chart.js) |
 
@@ -49,7 +50,9 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 | `updateAR` (needs invoice) | `รอเปิด Invoice`, legacy `อนุมัติแล้ว` with SO filled | `เสร็จสมบูรณ์` |
 
 The server decides the new status and the actor (from the session); each step appends a Log row
-`[time, actor, status, record id, action]`. Net price is recomputed server-side:
+`[time, actor, status, record id, action]`. Approve / reject also emails the submitter
+(`ผู้บันทึก (Username) :`, falling back to the account named in `รหัสพนักงาน :` for older rows).
+Account and settings changes (register, approve, block, password resets, settings CRUD, config) go to the `Audit` sheet. Net price is recomputed server-side:
 `price − down − all discounts + dues`.
 
 Sessions: ScriptCache `sess_<token>`, 6 h sliding TTL; role re-read from the Admin sheet on every call.
