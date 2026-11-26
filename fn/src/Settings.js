@@ -87,10 +87,13 @@ function getAllDropdownData(token) {
     if (!sheet || sheet.getLastRow() < 2) return [];
     return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().filter(function (r) { return r[0] !== ''; });
   };
-  return { location: list('location'), product: list('Product'), premium: list('Premium'), guarantee: list('guarantee'),
+  var scope = branchScope_(user);
+  var locations = list('location').filter(function (r) { return inScope_(scope, r[0]); });
+  return { location: locations, product: list('Product'), premium: list('Premium'), guarantee: list('guarantee'),
     finance: financeList_().map(function (n) { return [n]; }),
     // prefills the employee section of the request form (fields stay editable)
-    me: { empId: user.username, name: user.name, phone: user.phone || '',
+    // scoped: พนักงาน limited to `branches` (an empty list means the admin has not set a branch yet)
+    me: { empId: user.username, name: user.name, phone: user.phone || '', scoped: scope !== null,
       branches: String(user.branch || '').split(',').map(function (b) { return b.trim(); }).filter(function (b) { return b !== ''; }) } };
 }
 
@@ -131,6 +134,7 @@ function getSettingsData(token, sheetName) {
 function addSettingData(token, sheetName, rowData) {
   requireSession_(token, [ROLES.ADMIN]);
   var sheet = settingsSheet_(sheetName);
+  var rawBranches = (rowData || [])[6]; // Admin: array of branch names
   rowData = (rowData || []).map(function (v) { return String(v == null ? '' : v).trim(); });
   if (!rowData[0]) throw new Error('กรุณากรอกข้อมูล');
   return withLock_(function () {
@@ -139,7 +143,11 @@ function addSettingData(token, sheetName, rowData) {
       if (!rowData[1] || rowData[1].length < 6) throw new Error('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
       var roles = [ROLES.ADMIN, ROLES.ACC, ROLES.STAFF];
       if (roles.indexOf(rowData[3]) < 0) throw new Error('สิทธิ์ไม่ถูกต้อง');
-      sheet.appendRow([cellText_(rowData[0]), hashPassword_(rowData[1]), cellText_(rowData[2] || rowData[0]), rowData[3]]);
+      var branches = normalizeBranches_(rawBranches, true);
+      if (rowData[3] === ROLES.STAFF && !branches) throw new Error('พนักงานต้องมีสาขาอย่างน้อย 1 สาขา');
+      fillBlankHeaders_(sheet, ADMIN_HEADERS);
+      sheet.appendRow([cellText_(rowData[0]), hashPassword_(rowData[1]), cellText_(rowData[2] || rowData[0]), rowData[3],
+        '', '', cellText_(branches), ACCOUNT_STATUS.ACTIVE]);
     } else {
       var last = sheet.getLastRow();
       var exists = last >= 2 && sheet.getRange(2, 1, last - 1, 1).getDisplayValues()

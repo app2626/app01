@@ -130,7 +130,8 @@ function fillLocation(items, myBranches) {
   let all = items.map(r => String(r[0]));
   let mine = (myBranches || []).filter(b => all.indexOf(b) >= 0);
   let add = (parent, name) => { let o = document.createElement('option'); o.value = name; o.text = name; parent.appendChild(o); };
-  if (mine.length > 1) {
+  // a scoped พนักงาน already receives only their own branches from the server: no grouping needed
+  if (mine.length > 1 && !(myProfile && myProfile.scoped)) {
     let gMine = document.createElement('optgroup'); gMine.label = 'สาขาที่ลงทะเบียนไว้';
     let gAll = document.createElement('optgroup'); gAll.label = 'สาขาอื่น';
     all.forEach(n => add(mine.indexOf(n) >= 0 ? gMine : gAll, n));
@@ -170,6 +171,8 @@ function applyMyProfile() {
   set('emp_name', me.name);
   set('emp_phone', me.phone);
   set('location', one, true);
+  let warn = document.getElementById('no-branch-warning');
+  if (warn) warn.style.display = (me.scoped && !(me.branches || []).length) ? 'block' : 'none';
 }
 
 function loadAllDropdowns() {
@@ -270,7 +273,7 @@ function loadSettingsData(sheetName) {
     updateBulkDelete(sheetName);
 
     if (data.length === 0) {
-      let colCount = sheetName === 'Admin' ? 7 : 3;
+      let colCount = sheetName === 'Admin' ? 8 : 3;
       tbody.innerHTML = `<tr><td colspan="${colCount}" class="text-center text-muted">ไม่มีข้อมูล</td></tr>`;
       return;
     }
@@ -283,6 +286,7 @@ function loadSettingsData(sheetName) {
           row[5] ? '<div><i class="fa-solid fa-phone me-1 text-muted"></i>' + escHtml(row[5]) + '</div>' : ''].join('') || '<span class="text-muted">-</span>';
         if (pending) tr.className = 'table-warning';
         tr.innerHTML = `
+          <td class="text-center">${pending ? `<input type="checkbox" class="form-check-input setting-check" value="${index}" onchange="updateBulkDelete('Admin')" aria-label="เลือก ${escHtml(row[0])}">` : ''}</td>
           <td class="fw-semibold">${escHtml(row[0])}</td>
           <td>${escHtml(row[2])}</td>
           <td class="small">${contact}</td>
@@ -308,6 +312,7 @@ function loadSettingsData(sheetName) {
       }
       tbody.appendChild(tr);
     });
+    updateBulkDelete(sheetName); // now that the row checkboxes exist
   }).catch(function(err) { showError(err, 'โหลดข้อมูลไม่สำเร็จ'); });
 }
 
@@ -605,10 +610,13 @@ function toggleAllSettings(sheetName, checked) {
   updateBulkDelete(sheetName);
 }
 
+/** Shows the bulk button (ลบที่เลือก on lists, อนุมัติที่เลือก on Admin) with the ticked count. */
 function updateBulkDelete(sheetName) {
-  var btn = document.getElementById('bulkDel-' + sheetName);
+  var btn = document.getElementById('bulkDel-' + sheetName) || document.getElementById('bulkApprove-' + sheetName);
   if (!btn) return;
   var checks = settingChecks(sheetName);
+  var all0 = document.getElementById('checkAll-' + sheetName);
+  if (all0 && sheetName === 'Admin') all0.disabled = checks.length === 0; // only pending rows have a box
   var n = checks.filter(function (c) { return c.checked; }).length;
   btn.classList.toggle('d-none', n === 0);
   btn.querySelector('.bulk-count').textContent = n;
@@ -641,6 +649,31 @@ function deleteSelectedSettings(sheetName) {
       Swal.fire('ลบสำเร็จ', 'ลบ ' + res.deleted + ' รายการ' + (res.missing ? ' (ไม่พบ ' + res.missing + ' รายการ อาจถูกลบไปแล้ว)' : ''), 'success');
       loadSettingsData(sheetName); loadAllDropdowns();
     }).catch(function (err) { showError(err, 'ลบไม่สำเร็จ'); loadSettingsData(sheetName); });
+  });
+}
+
+function approveSelectedUsers() {
+  var rows = settingsCache['Admin'] || [];
+  var picked = settingChecks('Admin').filter(function (c) { return c.checked; })
+    .map(function (c) { return rows[Number(c.value)]; }).filter(Boolean);
+  if (!picked.length) return;
+  var list = picked.slice(0, 10).map(function (r) {
+    return '<li><b>' + escHtml(r[0]) + '</b> ' + escHtml(r[2]) + (r[6] ? ' <span class="text-muted">(' + escHtml(r[6]) + ')</span>' : '') + '</li>';
+  }).join('');
+  Swal.fire({
+    title: 'อนุมัติ ' + picked.length + ' บัญชี?',
+    html: '<div class="text-start"><ol class="small mb-1 ps-3">' + list + '</ol>' +
+      (picked.length > 10 ? '<div class="small text-muted">และอีก ' + (picked.length - 10) + ' บัญชี</div>' : '') +
+      '<div class="small text-muted mt-2">ทุกบัญชีได้สิทธิ์ตามที่แสดงในตาราง ระบบจะส่งอีเมลแจ้งผู้ใช้แต่ละคน</div></div>',
+    icon: 'question', showCancelButton: true, confirmButtonColor: '#198754',
+    confirmButtonText: 'อนุมัติ ' + picked.length + ' บัญชี', cancelButtonText: 'ยกเลิก'
+  }).then(function (r) {
+    if (!r.isConfirmed) return;
+    Swal.fire({ title: 'กำลังอนุมัติ...', allowOutsideClick: false, didOpen: function () { Swal.showLoading(); } });
+    callServer('approveUsers', picked.map(function (x) { return x[0]; })).then(function (res) {
+      Swal.fire('อนุมัติแล้ว', 'อนุมัติ ' + res.approved.length + ' บัญชี' + (res.skipped ? ' (ข้าม ' + res.skipped + ' บัญชีที่อนุมัติไปแล้วหรือถูกลบ)' : ''), 'success');
+      loadSettingsData('Admin');
+    }).catch(function (err) { showError(err, 'อนุมัติไม่สำเร็จ'); loadSettingsData('Admin'); });
   });
 }
 
@@ -684,6 +717,12 @@ function addSetting(sheetName) {
         <option value="บัญชี">บัญชี</option>
         <option value="แอดมิน">แอดมิน</option>
       </select>
+      <div class="text-start w-75 mx-auto mt-3">
+        <label for="swal-input-branch" class="small text-muted mb-1">สาขา (พนักงานเห็นเฉพาะข้อมูลสาขาที่เลือก)</label>
+        <select id="swal-input-branch" multiple>
+          ${branchNames('').map(b => `<option value="${escHtml(b)}">${escHtml(b)}</option>`).join('')}
+        </select>
+      </div>
     `;
   } else {
     htmlContent = `<input id="swal-input1" class="swal2-input" placeholder="กรอกข้อมูลใหม่">`;
@@ -695,15 +734,20 @@ function addSetting(sheetName) {
     focusConfirm: false,
     showCancelButton: true,
     confirmButtonText: 'บันทึก',
+    didOpen: () => {
+      if (sheetName === 'Admin') $('#swal-input-branch').select2({ theme: 'bootstrap-5', width: '100%', dropdownParent: $(Swal.getPopup()), placeholder: 'เลือกสาขา', closeOnSelect: false });
+    },
     preConfirm: () => {
       if (sheetName === 'Admin') {
         let v1 = document.getElementById('swal-input1').value;
         let v2 = document.getElementById('swal-input2').value;
         let v3 = document.getElementById('swal-input3').value;
         let v4 = document.getElementById('swal-input4').value;
+        let branches = $('#swal-input-branch').val() || [];
         if (!v1 || !v2 || !v3) { Swal.showValidationMessage('กรุณากรอกข้อมูลให้ครบถ้วน'); return false; }
         if (v2.length < 6) { Swal.showValidationMessage('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'); return false; }
-        return [v1, v2, v3, v4];
+        if (v4 === 'พนักงาน' && !branches.length) { Swal.showValidationMessage('พนักงานต้องมีสาขาอย่างน้อย 1 สาขา'); return false; }
+        return [v1, v2, v3, v4, '', '', branches];
       } else {
         let v1 = document.getElementById('swal-input1').value;
         if (!v1) { Swal.showValidationMessage('กรุณากรอกข้อมูล'); return false; }

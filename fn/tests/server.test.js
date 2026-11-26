@@ -49,7 +49,7 @@ function fixture() {
   g.seedAdmin = row => g.sheets.Admin.appendRow(row);
   g.seedAdmin(['admin1', 'adminpw', 'แอดมินใหญ่', 'แอดมิน']);
   g.seedAdmin(['acc1', 'accpw', 'ฝ่ายบัญชี', 'บัญชี']);
-  g.seedAdmin(['staff1', 'staffpw', 'พนักงานหนึ่ง', 'พนักงาน']);
+  g.seedAdmin(['staff1', 'staffpw', 'พนักงานหนึ่ง', 'พนักงาน', '', '', 'สาขา A', '']);
   g.tok = u => g.ctx.login(u, u.replace(/1$/, '') + 'pw').token;
   return g;
 }
@@ -124,9 +124,21 @@ console.log('== REGISTER');
   t('dropdown data carries my profile for the request form', () => {
     ctx.register(reg({ empId: 'P1', name: 'ผู้ช่วย สาขา', phone: '0811112222', branches: ['สาขา B', 'สาขา A'] }));
     ctx.approveUser(admin, 'P1');
-    eq(ctx.getAllDropdownData(ctx.login('P1', 'secret12').token).me, { empId: 'P1', name: 'ผู้ช่วย สาขา', phone: '0811112222', branches: ['สาขา A', 'สาขา B'] });
+    eq(ctx.getAllDropdownData(ctx.login('P1', 'secret12').token).me, { empId: 'P1', name: 'ผู้ช่วย สาขา', phone: '0811112222', scoped: true, branches: ['สาขา A', 'สาขา B'] });
   });
-  t('legacy user profile has blank contact and no branches', () => eq(ctx.getAllDropdownData(g.tok('staff1')).me, { empId: 'staff1', name: 'พนักงานหนึ่ง', phone: '', branches: [] }));
+  t('legacy user profile has blank contact and no branches', () => { g.seedAdmin(['old1', 'oldpw', 'เก่า', 'พนักงาน']); const me = ctx.getAllDropdownData(ctx.login('old1', 'oldpw').token).me; eq([me.phone, me.branches, me.scoped], ['', [], true]); });
+  t('approveUsers approves only pending accounts, emails each', () => {
+    ['M1', 'M2'].forEach(id => ctx.register(reg({ empId: id, email: id.toLowerCase() + '@x.co' })));
+    const n = mail.length;
+    eq(ctx.approveUsers(admin, ['M1', 'M2', 'E1001', 'ghost', 'M1']), { approved: ['M1', 'M2'], skipped: 2 });
+    eq([row('M1')[7], row('M2')[7]], ['ใช้งาน', 'ใช้งาน']);
+    eq(mail.slice(n).map(m => m.to), ['m1@x.co', 'm2@x.co']);
+    ok(ctx.login('M2', 'secret12'));
+  });
+  t('approveUsers needs admin and a list', () => {
+    throws(() => ctx.approveUsers(g.tok('acc1'), ['M1']), /FORBIDDEN/);
+    throws(() => ctx.approveUsers(admin, []), /เลือก/);
+  });
   t('legacy 4-column users still log in', () => ok(ctx.login('staff1', 'staffpw')));
   t('settings list returns profile + status', () => { const r = ctx.getSettingsData(admin, 'Admin').find(x => x[0] === 'E1001'); eq(r, ['E1001', '', 'สมหญิง ใจดี', 'พนักงาน', 'som@x.co', '0812345678', 'สาขา A', 'ใช้งาน']); });
   t('admin edit updates contact fields', () => {
@@ -206,14 +218,20 @@ console.log('== GUARDS / SETTINGS');
   t('update admin changes name and role, keeps username and hash', () => {
     const before = sheets.Admin.rows[3].slice();
     ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['ignored', '', 'พนักงานใหม่', 'บัญชี']);
-    eq(sheets.Admin.rows[3], [before[0], before[1], 'พนักงานใหม่', 'บัญชี']);
+    eq(sheets.Admin.rows[3], [before[0], before[1], 'พนักงานใหม่', 'บัญชี', ...before.slice(4)]);
     sheets.Admin.rows[3] = before;
   });
   t('update admin invalid role rejected', () => throws(() => ctx.updateSettingData(admin, 'Admin', 2, 'staff1', ['', '', 'x', 'root']), /สิทธิ์/));
   t('cannot demote last admin', () => throws(() => ctx.updateSettingData(admin, 'Admin', 0, 'admin1', ['', '', 'แอดมินใหญ่', 'บัญชี']), /อย่างน้อย 1/));
   t('delete with matching key ok', () => { ctx.deleteSettingData(admin, 'location', 0, 'สาขา A'); eq(sheets.location.getLastRow(), 1); });
   t('cannot delete last admin', () => throws(() => ctx.deleteSettingData(admin, 'Admin', 0, 'admin1'), /อย่างน้อย 1/));
-  t('added admin password is hashed', () => { ctx.addSettingData(admin, 'Admin', ['u9', 'secret9', 'n', 'พนักงาน']); ok(/^sha256\$/.test(lastRow('Admin')[1])); ok(ctx.login('u9', 'secret9')); });
+  t('admin-added staff needs a branch', () => throws(() => ctx.addSettingData(admin, 'Admin', ['u8', 'secret8', 'n', 'พนักงาน']), /สาขา/));
+  t('admin-added staff stores branches, active', () => {
+    sheets.location.appendRow(['สาขา X']);
+    ctx.addSettingData(admin, 'Admin', ['u7', 'secret7', 'n', 'พนักงาน', '', '', ['สาขา X']]);
+    eq(lastRow('Admin').slice(6), ['สาขา X', 'ใช้งาน']); eq(ctx.getAllDropdownData(ctx.login('u7', 'secret7').token).me.branches, ['สาขา X']);
+  });
+  t('added admin password is hashed', () => { ctx.addSettingData(admin, 'Admin', ['u9', 'secret9', 'n', 'บัญชี']); ok(/^sha256\$/.test(lastRow('Admin')[1])); ok(ctx.login('u9', 'secret9')); });
   t('duplicate username rejected', () => throws(() => ctx.addSettingData(admin, 'Admin', ['u9', 'x', 'n', 'พนักงาน']), /มีอยู่แล้ว/));
   t('invalid role rejected', () => throws(() => ctx.addSettingData(admin, 'Admin', ['u10', 'secret10', 'n', 'root']), /สิทธิ์/));
   t('duplicate list item rejected on add', () => { ctx.addSettingData(admin, 'location', ['สาขาซ้ำ']); throws(() => ctx.addSettingData(admin, 'location', [' สาขาซ้ำ ']), /มีอยู่แล้ว/); });
@@ -293,6 +311,31 @@ console.log('== REQUESTS / WORKFLOW');
   t('staff sees masked id card', () => { const rows = ctx.getData(staff); ok(rows.length > 0); rows.forEach(r => ok(/^X{9}\d{4}$/.test(r[6]), r[6])); });
   t('accounting sees full id card', () => eq(ctx.getData(acc)[0][6], '1103700012345'));
   t('getData rows padded to 47', () => ctx.getData(acc).forEach(r => eq(r.length, 47)));
+  t('branch scope: staff sees only rows of registered branches', () => {
+    const other = ctx.saveRequest(admin, form({ location: 'สาขา Z' })).id;
+    ok(ctx.getData(staff).length > 0); ok(ctx.getData(staff).every(r => r[2] === 'สาขา A'), 'foreign row leaked');
+    ok(ctx.getData(acc).some(r => r[0] === other), 'บัญชี must see all branches');
+    throws(() => ctx.findRecord(staff, other), /ไม่พบข้อมูล/);
+    eq(ctx.findRecord(acc, other)[2], 'สาขา Z');
+  });
+  t('branch scope: staff cannot submit for another branch', () => throws(() => ctx.saveRequest(staff, form({ location: 'สาขา Z' })), /ไม่ใช่สาขาที่ลงทะเบียน/));
+  t('branch scope: relief staff covers each registered branch', () => {
+    g.seedAdmin(['relief1', 'reliefpw', 'หน่วยแทน', 'พนักงาน', '', '', 'สาขา A, สาขา Z', '']);
+    const tk = ctx.login('relief1', 'reliefpw').token;
+    ctx.saveRequest(tk, form({ location: 'สาขา Z' }));
+    const seen = new Set(ctx.getData(tk).map(r => r[2])); eq([...seen].sort(), ['สาขา A', 'สาขา Z']);
+  });
+  t('branch scope: staff without a branch sees nothing and cannot submit', () => {
+    g.seedAdmin(['nob1', 'nobpw', 'ไม่มีสาขา', 'พนักงาน']);
+    const tk = ctx.login('nob1', 'nobpw').token;
+    eq(ctx.getData(tk), []); throws(() => ctx.saveRequest(tk, form()), /ยังไม่ได้กำหนดสาขา/);
+  });
+  t('branch scope: dropdown lists only my branches for staff, all for บัญชี', () => {
+    ['สาขา A', 'สาขา Z', 'สาขา Q'].forEach(n => sheets.location.appendRow([n]));
+    eq(ctx.getAllDropdownData(staff).location, [['สาขา A']]);
+    eq(ctx.getAllDropdownData(acc).location.length, 3); eq(ctx.getAllDropdownData(acc).me.scoped, false);
+    sheets.location.rows.splice(1);
+  });
   t('findRecord masks for staff', () => ok(/^X{9}2345$/.test(ctx.findRecord(staff, id)[6])));
   t('findRecord unknown id', () => throws(() => ctx.findRecord(acc, 'zzz'), /ไม่พบ/));
   t('legacy functions removed', () => ['saveDataB64', 'statusRecordWithRemark'].forEach(f => eq(typeof ctx[f], 'undefined', f)));
@@ -333,7 +376,7 @@ console.log('== FINAL REVIEW FIXES');
   const realLock = ctx.LockService.getScriptLock;
   ctx.LockService.getScriptLock = () => { const l = realLock(); return { waitLock: x => { l.waitLock(x); lockState.held = true; }, releaseLock: () => { lockState.held = false; l.releaseLock(); } }; };
   const b64 = Buffer.alloc(8, 1).toString('base64');
-  ctx.saveRequest(staff, { date: '2026-11-25', location: 'A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012345', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', finance: 'Ponmai', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
+  ctx.saveRequest(staff, { date: '2026-11-25', location: 'สาขา A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012345', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', finance: 'Ponmai', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
   t('I2 uploads happen outside the lock', () => eq(uploadsUnderLock, 0));
 }
 {

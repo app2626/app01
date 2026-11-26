@@ -59,6 +59,19 @@ function readUsers_() {
   return users;
 }
 
+/**
+ * Branch scope of a session user: null = every branch (แอดมิน, บัญชี); otherwise the พนักงาน's
+ * registered branches (possibly empty, which means no data and no submitting until an admin sets one).
+ */
+function branchScope_(user) {
+  if (user.role !== ROLES.STAFF) return null;
+  return String(user.branch || '').split(',').map(function (b) { return b.trim(); }).filter(function (b) { return b !== ''; });
+}
+
+function inScope_(scope, branch) {
+  return scope === null || scope.indexOf(String(branch == null ? '' : branch).trim()) >= 0;
+}
+
 /** Only a blank (legacy) or ใช้งาน status may log in. */
 function isActiveUser_(user) {
   return user.status === '' || user.status === ACCOUNT_STATUS.ACTIVE;

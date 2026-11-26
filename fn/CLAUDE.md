@@ -11,7 +11,7 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 | `src/Schema.js` | `DATA_HEADERS`, `LOG_HEADERS`, `col_()`, `STATUS`, `SETTINGS_SHEETS`, `ensureSheets_()` |
 | `src/Auth.js` | password hashing, `login`/`logout`, `requireSession_` |
 | `src/Settings.js` | config (masked secrets), dropdown lists, settings CRUD, `withLock_` |
-| `src/Register.js` | self-registration (`register`, `getRegisterOptions`, no token) and `approveUser` |
+| `src/Register.js` | self-registration (`register`, `getRegisterOptions`, no token), `approveUser` / `approveUsers` (bulk) |
 | `src/Requests.js` | `saveRequest`, `getData`, `findRecord`, `updateStatus` (workflow) |
 | `src/Notify.js` | Telegram + email (`sendNotify_`) |
 | `src/api.html` | client `callServer()`, `escHtml()`, `safeUrl()`, `applyRoleUI()` |
@@ -35,8 +35,8 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 
 | Role | Can |
 |---|---|
-| `พนักงาน` | submit requests, view table (national ID masked to last 4 digits) |
-| `บัญชี` | + every workflow step, dashboard |
+| `พนักงาน` | submit requests, view table (national ID masked to last 4 digits) — **only for their registered branches** (`branchScope_`: getData, findRecord, saveRequest, location dropdown); no branch = no data |
+| `บัญชี` | + every workflow step, dashboard, all branches |
 | `แอดมิน` | + settings, users, config, sheet setup |
 
 | action | allowed from | to |

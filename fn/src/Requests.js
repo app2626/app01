@@ -112,9 +112,12 @@ function newId_(sheet) {
 
 /** Public (any role). */
 function saveRequest(token, f) {
-  requireSession_(token);
+  var user = requireSession_(token);
   f = f || {};
   validateForm_(f);
+  var scope = branchScope_(user);
+  if (scope && !scope.length) throw new Error('บัญชีของคุณยังไม่ได้กำหนดสาขา กรุณาติดต่อแอดมิน');
+  if (!inScope_(scope, f.location)) throw new Error('สาขา "' + str_(f.location) + '" ไม่ใช่สาขาที่ลงทะเบียนไว้');
   var finance = str_(f.finance);
   if (!finance) throw new Error('กรุณาเลือก ไฟแนนซ์');
   if (financeList_().indexOf(finance) < 0) throw new Error('ไม่พบไฟแนนซ์ "' + finance + '" ในรายการ กรุณาเลือกใหม่ หรือให้แอดมินเพิ่มในหน้าตั้งค่า');
@@ -199,24 +202,28 @@ function padRow_(r) {
   return r;
 }
 
-/** Public (any role). Staff get the national ID masked. */
+/** Public (any role). Staff get only their registered branches, with the national ID masked. */
 function getData(token) {
   var user = requireSession_(token);
+  var scope = branchScope_(user);
+  if (scope && !scope.length) return [];
   var sheet = getDataSheet_();
   if (sheet.getLastRow() < 2) return [];
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, DATA_HEADERS.length).getDisplayValues();
+  var b = col_('สาขา :') - 1;
   return data
-    .filter(function (r) { return r.join('').trim() !== ''; })
+    .filter(function (r) { return r.join('').trim() !== '' && inScope_(scope, r[b]); })
     .map(function (r) { return maskRowFor_(padRow_(r), user.role); });
 }
 
-/** Public (any role). */
+/** Public (any role). A row outside the staff member's branches reads as not found. */
 function findRecord(token, record) {
   var user = requireSession_(token);
   var sheet = getDataSheet_();
   var idx = findRowIndex_(sheet, record);
-  if (idx < 1) throw new Error('ไม่พบข้อมูล ID: ' + record);
-  return maskRowFor_(padRow_(sheet.getRange(idx + 1, 1, 1, DATA_HEADERS.length).getDisplayValues()[0]), user.role);
+  var row = idx < 1 ? null : padRow_(sheet.getRange(idx + 1, 1, 1, DATA_HEADERS.length).getDisplayValues()[0]);
+  if (!row || !inScope_(branchScope_(user), row[col_('สาขา :') - 1])) throw new Error('ไม่พบข้อมูล ID: ' + record);
+  return maskRowFor_(row, user.role);
 }
 
 // A function, not a top-level var: it reads STATUS from Schema.js, and GAS file load order is not guaranteed.
