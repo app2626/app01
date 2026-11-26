@@ -75,7 +75,7 @@ async function addData(form) {
     formObj.file1Data = await getFileBase64(await compressImage(file1));
     formObj.file2Data = await getFileBase64(file2);
 
-    callServer('saveRequest', formObj).then(() => {
+    const send = (obj) => callServer('saveRequest', obj).then(() => {
       getData();
       $('#myForm')[0].reset();
       clearDraft();
@@ -100,9 +100,26 @@ async function addData(form) {
         }
       });
       Toast.fire({ icon: 'success', title: 'บันทึกข้อมูลเรียบร้อย' });
+      let w = document.getElementById('imei-dup-warning'); if (w) w.style.display = 'none';
     }).catch((error) => {
-      showError(error, 'ไม่สามารถบันทึกข้อมูลได้');
+      let msg = errorText(error);
+      if (!/^DUP_IMEI/.test(msg)) return showError(error, 'ไม่สามารถบันทึกข้อมูลได้');
+      // The IMEI is already on another request: the user may still send it, finance sees a warning.
+      Swal.fire({
+        icon: 'warning', title: 'IMEI นี้มีคำขออยู่แล้ว',
+        html: '<div class="small text-start">' + escHtml(msg.replace(/^DUP_IMEI:\s*IMEI นี้มีคำขออยู่แล้ว\s*/, '')) + '</div>' +
+          '<div class="small text-muted mt-2 text-start">ถ้าเป็นการส่งซ้ำโดยไม่ตั้งใจ ให้กลับไปตรวจสอบ IMEI ' +
+          'ถ้ายืนยันส่ง ฝ่ายบัญชีจะเห็นคำเตือนว่า IMEI ซ้ำ</div>',
+        showCancelButton: true, confirmButtonText: 'ยืนยันส่งคำขอ', cancelButtonText: 'กลับไปแก้ไข',
+        confirmButtonColor: '#d97706'
+      }).then((r) => {
+        if (!r.isConfirmed) return;
+        Swal.fire({ position: 'top', icon: 'info', title: 'กำลังบันทึกข้อมูล...', showConfirmButton: false, allowOutsideClick: false });
+        Swal.showLoading();
+        send(Object.assign({}, obj, { allow_dup_imei: true }));
+      });
     });
+    send(formObj);
   } catch (err) {
     Swal.fire('ข้อผิดพลาด', 'อ่านไฟล์ล้มเหลว: ' + err, 'error');
   }
@@ -1012,6 +1029,22 @@ function calculateNetPrice() {
 
 // ---- Live checks for ID / passport and phone numbers (nextStep() uses checkValidity, so the
 // custom message blocks the step and shows on the field). The server re-validates on save.
+// Live duplicate-IMEI hint (a warning, not a block: the save asks for confirmation).
+let imeiCheckSeq = 0;
+function checkImeiField() {
+  let el = document.getElementById('imei'), box = document.getElementById('imei-dup-warning');
+  if (!el || !box) return;
+  let v = el.value.trim(), seq = ++imeiCheckSeq;
+  box.style.display = 'none';
+  if (!v) return;
+  callServer('checkImei', v).then((matches) => {
+    if (seq !== imeiCheckSeq || !matches || !matches.length) return; // a newer value was typed meanwhile
+    box.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i>IMEI นี้มีคำขออยู่แล้ว: ' +
+      matches.map(m => escHtml(m.id) + ' (' + escHtml(m.branch) + ', ' + escHtml(m.status) + (m.date ? ', ' + escHtml(m.date) : '') + ')').join(', ');
+    box.style.display = 'block';
+  }).catch(() => { /* hint only: the server checks again on save */ });
+}
+
 function markField(el, ok, msg) {
   el.setCustomValidity(ok ? '' : msg);
   el.classList.toggle('is-invalid', !ok);

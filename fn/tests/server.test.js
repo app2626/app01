@@ -45,6 +45,7 @@ console.log('== SCHEMA');
 }
 
 // ===================== shared fixtures =====================
+let imeiSeq = 0; // every saved request gets its own IMEI (duplicates are refused)
 function fixture() {
   const g = createGas();
   g.ctx.ensureSheets_();
@@ -261,6 +262,41 @@ console.log('== DATE RANGE');
   t('range filter still applies branch scope', () => { g.seedAdmin(['staff9', 'staffpw', 'อื่น', 'พนักงาน', '', '', 'สาขา B', '']); eq(ctx.getData(ctx.login('staff9', 'staffpw').token, { days: 90 }).length, 0); });
 }
 
+console.log('== DUPLICATE IMEI');
+{
+  const g = fixture(); const { ctx, sheets, fetches, driveFiles } = g;
+  const acc = g.tok('acc1'), staff = g.tok('staff1');
+  g.seedAdmin(['staff9', 'staffpw', 'อื่น', 'พนักงาน', '', '', 'สาขา B', '']);
+  sheets.location.appendRow(['สาขา A']); sheets.location.appendRow(['สาขา B']);
+  const staffB = ctx.login('staff9', 'staffpw').token;
+  ctx.setConfigProperties(g.tok('admin1'), { notifyNewToken: '1:A', notifyNewChatId: '99' });
+  const b64 = n => Buffer.alloc(n, 1).toString('base64');
+  const req = (imei, loc) => ({ date: '2026-11-25', location: loc || 'สาขา A', emp_id: 'x', emp_name: 'x', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'ลูกค้าลับ', customer_phone: '0898765432', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei, price: '1000', installments: '1', finance: 'Ponmai', file1Data: { base64: b64(4), mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64(4), mimeType: 'application/pdf', name: 'b' } });
+  const first = ctx.saveRequest(staff, req('35-1234 5678 90123')).id;
+  t('normImei_ ignores spaces, dashes and case', () => eq(ctx.normImei_(' 35-1234 5678 90123 '), '351234567890123'));
+  t('checkImei finds the earlier request (any spacing)', () => { const m = ctx.checkImei(staff, '351234567890123'); eq(m.length, 1); eq(m[0].id, first); eq(m[0].status, 'รออนุมัติ'); });
+  t('checkImei across branches shows no customer data', () => { const m = ctx.checkImei(staffB, '351234567890123'); eq(m.length, 1); eq(m[0].branch, 'สาขา A'); ok(!JSON.stringify(m).includes('ลูกค้าลับ')); });
+  t('checkImei blank / unknown = no matches', () => { eq(ctx.checkImei(staff, '').length, 0); eq(ctx.checkImei(staff, '999').length, 0); });
+  t('checkImei needs a session', () => throws(() => ctx.checkImei('bad', '1'), /AUTH_REQUIRED/));
+  t('saving the same IMEI again is refused with DUP_IMEI, before any upload', () => {
+    const files = driveFiles.length;
+    throws(() => ctx.saveRequest(staffB, req('351234567890123', 'สาขา B')), /^DUP_IMEI/);
+    eq(driveFiles.length, files);
+  });
+  t('confirmed duplicate is saved and flagged to finance', () => {
+    const n = fetches.length;
+    const id = ctx.saveRequest(staffB, Object.assign(req('351234567890123', 'สาขา B'), { allow_dup_imei: true })).id; ok(id);
+    const msg = fetches.slice(n).map(f => f.opt.payload.caption || f.opt.payload.text || '').join(' ');
+    ok(/IMEI ซ้ำ/.test(msg) && msg.includes(first), 'warning missing: ' + msg);
+  });
+  t('a rejected request does not block the IMEI', () => {
+    const id = ctx.saveRequest(staff, req('IMEI-R1')).id;
+    ctx.updateStatus(acc, { record: id, action: 'reject', Remark: 'x' });
+    eq(ctx.checkImei(staff, 'imei r1').length, 0);
+    ok(ctx.saveRequest(staff, req('IMEI-R1')).id);
+  });
+}
+
 console.log('== TRUST');
 {
   const g = fixture(); const { ctx, sheets, mail, fetches, mailState, cache } = g;
@@ -310,7 +346,7 @@ console.log('== TRUST');
   t('audit sheet is not writable from settings screens', () => throws(() => ctx.getSettingsData(admin, 'Audit'), /INVALID_SHEET/));
 
   const b64 = n => Buffer.alloc(n, 1).toString('base64');
-  const req = () => ({ date: '2026-11-25', location: 'สาขา A', emp_id: 'S9', emp_name: 'ส่งคำขอ', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'ลูกค้า ก', customer_phone: '0898765432', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'Phone Z', imei: 'I1', price: '1000', installments: '1', finance: 'Ponmai', file1Data: { base64: b64(4), mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64(4), mimeType: 'application/pdf', name: 'b' } });
+  const req = () => ({ date: '2026-11-25', location: 'สาขา A', emp_id: 'S9', emp_name: 'ส่งคำขอ', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'ลูกค้า ก', customer_phone: '0898765432', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'Phone Z', imei: 'I1-' + (++imeiSeq), price: '1000', installments: '1', finance: 'Ponmai', file1Data: { base64: b64(4), mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64(4), mimeType: 'application/pdf', name: 'b' } });
   let rid;
   t('saveRequest records who submitted it', () => {
     const tk = ctx.login('S9', 'brandnew9').token; rid = ctx.saveRequest(tk, req()).id;
@@ -424,7 +460,7 @@ console.log('== REQUESTS / WORKFLOW');
   const form = (o = {}) => Object.assign({
     date: '2026-11-25', location: 'สาขา A', emp_id: 'E01', emp_name: 'พนักงานหนึ่ง', emp_phone: '0812345678',
     id_card_number: '1103700012346', customer_name: 'ลูกค้า ทดสอบ', customer_phone: '0898765432', address: '1/2', road: '3',
-    district: 'ตำบล', amphoe: 'อำเภอ', province: 'จังหวัด', zipcode: '10200', productname: 'Phone X', imei: '356789012345678',
+    district: 'ตำบล', amphoe: 'อำเภอ', province: 'จังหวัด', zipcode: '10200', productname: 'Phone X', imei: String(356789012345678 + (++imeiSeq)),
     premium_combined: 'เคส', guarantee: '', price: '10000', down: '1000', discountais: '0', discountpromotion: '0',
     discounttradein: '0', discounttradeup: '0', discountbigc: '0', dues: '0', installments: '10', installment_amount: '900', finance: 'Ponmai',
     file1Data: { base64: b64(10), mimeType: 'image/jpeg', name: 'slip.jpg' },
@@ -558,7 +594,7 @@ console.log('== FINAL REVIEW FIXES');
   const realLock = ctx.LockService.getScriptLock;
   ctx.LockService.getScriptLock = () => { const l = realLock(); return { waitLock: x => { l.waitLock(x); lockState.held = true; }, releaseLock: () => { lockState.held = false; l.releaseLock(); } }; };
   const b64 = Buffer.alloc(8, 1).toString('base64');
-  ctx.saveRequest(staff, { date: '2026-11-25', location: 'สาขา A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I', price: '1', installments: '1', finance: 'Ponmai', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
+  ctx.saveRequest(staff, { date: '2026-11-25', location: 'สาขา A', emp_id: 'E', emp_name: 'N', emp_phone: '0812345678', id_card_number: '1103700012346', customer_name: 'C', customer_phone: '0812345678', address: 'a', road: 'r', district: 'd', amphoe: 'a', province: 'p', zipcode: '10200', productname: 'P', imei: 'I-' + (++imeiSeq), price: '1', installments: '1', finance: 'Ponmai', file1Data: { base64: b64, mimeType: 'image/png', name: 'a' }, file2Data: { base64: b64, mimeType: 'application/pdf', name: 'b' } });
   t('I2 uploads happen outside the lock', () => eq(uploadsUnderLock, 0));
 }
 {

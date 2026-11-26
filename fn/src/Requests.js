@@ -104,6 +104,39 @@ function toBlob_(file) {
 }
 
 /** 0-based index into the Data sheet values (row 0 = header), or -1. */
+/** IMEI as compared for duplicates: no spaces / dashes, upper case. */
+function normImei_(v) { return str_(v).replace(/[\s-]+/g, '').toUpperCase(); }
+
+/**
+ * Requests that already use this IMEI, across ALL branches (a device sold twice is the point),
+ * except rejected ones, which may be resubmitted. Only id / date / branch / status are returned,
+ * never customer data, because staff can see matches outside their own branches.
+ */
+function imeiMatches_(imei) {
+  var key = normImei_(imei);
+  if (!key) return [];
+  var sheet = getDataSheet_();
+  if (sheet.getLastRow() < 2) return [];
+  var c = function (h) { return col_(h) - 1; };
+  var iImei = c('IMEI :'), iSt = c('สถานะ :'), iId = c('ID :'), iDate = c('วันที่ขออนุมัติ'), iBr = c('สาขา :');
+  var width = Math.max(iImei, iSt, iId, iDate, iBr) + 1;
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, width).getDisplayValues()
+    .filter(function (r) { return normImei_(r[iImei]) === key && str_(r[iSt]) !== 'ไม่อนุมัติ'; })
+    .map(function (r) { return { id: str_(r[iId]), date: str_(r[iDate]), branch: str_(r[iBr]), status: str_(r[iSt]) || 'รออนุมัติ' }; });
+}
+
+/** Public (any role). Live check while typing the IMEI; at most 5 matches. */
+function checkImei(token, imei) {
+  requireSession_(token);
+  return imeiMatches_(imei).slice(0, 5);
+}
+
+function dupImeiError_(matches) {
+  return new Error('DUP_IMEI: IMEI นี้มีคำขออยู่แล้ว ' + matches.slice(0, 5).map(function (m) {
+    return m.id + ' (' + m.branch + ', ' + m.status + ')';
+  }).join(', '));
+}
+
 function findRowIndex_(sheet, id) {
   id = str_(id);
   if (!id || sheet.getLastRow() < 2) return -1;
@@ -134,6 +167,11 @@ function saveRequest(token, f) {
   if (!finance) throw new Error('กรุณาเลือก ไฟแนนซ์');
   if (financeList_().indexOf(finance) < 0) throw new Error('ไม่พบไฟแนนซ์ "' + finance + '" ในรายการ กรุณาเลือกใหม่ หรือให้แอดมินเพิ่มในหน้าตั้งค่า');
   var net = calcNetPrice_(f);
+  // Duplicate IMEI: refused unless the user confirmed it (allow_dup_imei); checked before the
+  // uploads so a refusal costs nothing, and again inside the lock against a parallel save.
+  var allowDup = f.allow_dup_imei === true || f.allow_dup_imei === 'true';
+  var dups = imeiMatches_(f.imei);
+  if (dups.length && !allowDup) throw dupImeiError_(dups);
   var folder = uploadFolder_();
   var blob1 = toBlob_(f.file1Data), blob2 = toBlob_(f.file2Data);
 
@@ -146,6 +184,8 @@ function saveRequest(token, f) {
   try {
     id = withLock_(function () {
       var sheet = getDataSheet_();
+      dups = imeiMatches_(f.imei);
+      if (dups.length && !allowDup) throw dupImeiError_(dups);
       var newIdValue = newId_(sheet);
 
       var row = DATA_HEADERS.map(function () { return ''; });
@@ -196,7 +236,8 @@ function saveRequest(token, f) {
     + '\nราคาสุทธิ: ' + net
     + '\nจำนวนงวด: ' + str_(f.installments)
     + '\nงวดละ: ' + amount_(f.installment_amount, 'งวดละ')
-    + '\n📌สถานะ ' + STATUS.WAIT;
+    + '\n📌สถานะ ' + STATUS.WAIT
+    + (dups.length ? '\n⚠️ IMEI ซ้ำกับคำขอ: ' + dups.slice(0, 5).map(function (m) { return m.id + ' (' + m.branch + ', ' + m.status + ')'; }).join(', ') + ' (ผู้ส่งยืนยันแล้ว กรุณาตรวจสอบ)' : '');
   sendNotify_(msg, false, [blob1, blob2], 'ขออนุมัติทำรายการ FN+ Consignment ชื่อ ' + str_(f.customer_name) + ' สาขา ' + str_(f.location), blob1);
   return { id: id };
 }

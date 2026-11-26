@@ -372,7 +372,8 @@
               </div>
               <div class="col-md-6 mb-2">
                 <label>IMEI</label>
-                <input type="text" class="form-control" id="imei" name="imei" required >
+                <input type="text" class="form-control" id="imei" name="imei" required autocomplete="off" onchange="checkImeiField()" aria-describedby="imei-dup-warning">
+                <div id="imei-dup-warning" class="small text-warning-emphasis mt-1" role="status" aria-live="polite" style="display: none;"></div>
               </div>
               
               <div class="col-12 my-3">

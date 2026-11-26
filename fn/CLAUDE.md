@@ -14,7 +14,7 @@ requests; finance/accounting move them through a fixed workflow. Data lives in t
 | `src/Register.js` | self-registration (`register`, `getRegisterOptions`, no token), `approveUser` / `approveUsers` (bulk), `setUserStatus` (block / unblock) |
 | `src/Recovery.js` | forgot password: emailed 6-digit code (`requestPasswordReset`, `resetPasswordWithCode`, no token) |
 | `src/Validate.js` | Thai ID check digit, passport no., phone rules (`normalizePhone_`); mirrored in `api.html` |
-| `src/Requests.js` | `saveRequest`, `getData(token, {days})` (finished rows older than N days are left out; in-progress and undated rows always load), `findRecord`, `updateStatus` (workflow) |
+| `src/Requests.js` | `saveRequest`, `getData(token, {days})` (finished rows older than N days are left out; in-progress and undated rows always load), `findRecord`, `updateStatus` (workflow), `checkImei`; `saveRequest` refuses an IMEI already used by a non-rejected request (`DUP_IMEI`, any branch) unless `allow_dup_imei`, then flags it in the notification |
 | `src/Notify.js` | Telegram + email (`sendNotify_`); **every email goes through `sendMail_` / `mailUser_`** (checks the daily MailApp quota, Telegram warning when ≤ 20 left) |
 | `src/Audit.js` | `audit_(actor, action, target, detail)` → `Audit` sheet; never throws; config changes log key names only, never values |
 | `src/api.html` | client `callServer()`, `escHtml()`, `safeUrl()`, `applyRoleUI()` |
